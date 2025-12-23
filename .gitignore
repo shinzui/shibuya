@@ -1,0 +1,12 @@
+dist
+dist-*
+cabal-dev
+
+.direnv
+.envrc
+
+.pre-commit-config.yaml
+
+cabal.project.local
+
+.claude/
