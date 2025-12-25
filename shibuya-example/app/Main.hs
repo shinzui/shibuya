@@ -1,9 +1,10 @@
--- | Example demonstrating Shibuya with an infinite stream.
--- Creates a simple counter that generates messages indefinitely,
--- with a handler that prints each value to the terminal.
+-- | Example demonstrating Shibuya with multiple infinite streams.
+-- Shows how to merge multiple adapters so a single worker
+-- can process messages from different queues.
 module Main (main) where
 
 import Data.Function ((&))
+import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
@@ -18,20 +19,56 @@ import Shibuya.Runner (defaultRunnerConfig)
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
 
--- | Create an adapter that produces an infinite stream of counter messages.
--- Each message contains an incrementing integer.
-infiniteCounterAdapter :: (IOE :> es) => TrackingAck -> Adapter es Int
-infiniteCounterAdapter tracking =
+-- | Tagged message that identifies which queue it came from.
+data TaggedMessage = TaggedMessage
+  { source :: !Text,
+    value :: !Int
+  }
+  deriving stock (Show)
+
+-- | Merge multiple adapters into one.
+-- Messages from all adapters are interleaved in the output stream.
+mergeAdapters :: [Adapter es msg] -> Adapter es msg
+mergeAdapters adapters =
   Adapter
-    { adapterName = "example:infinite-counter",
-      source = Stream.unfold Unfold.fromList [0 ..] & Stream.mapM (mkIngested tracking),
-      shutdown = liftIO $ Text.putStrLn "Shutting down infinite counter adapter"
+    { adapterName = "merged:" <> Text.intercalate "+" (map (.adapterName) adapters),
+      source = Stream.concatMap (.source) (Stream.fromList adapters),
+      shutdown = mapM_ (.shutdown) adapters
     }
 
--- | Create an Ingested message from a counter value.
-mkIngested :: (IOE :> es) => TrackingAck -> Int -> Eff es (Ingested es Int)
-mkIngested tracking n = do
-  let msgId = MessageId $ "msg-" <> Text.pack (show n)
+-- | Create an adapter that produces an infinite stream of counter messages.
+-- Each message contains an incrementing integer starting from 0.
+counterAdapter :: (IOE :> es) => TrackingAck -> Adapter es TaggedMessage
+counterAdapter tracking =
+  Adapter
+    { adapterName = "counter",
+      source =
+        Stream.unfold Unfold.fromList [0 ..]
+          & Stream.mapM (mkIngested tracking "counter"),
+      shutdown = liftIO $ Text.putStrLn "Shutting down counter adapter"
+    }
+
+-- | Create an adapter that produces an infinite stream of "events".
+-- Generates negative numbers to distinguish from the counter.
+eventsAdapter :: (IOE :> es) => TrackingAck -> Adapter es TaggedMessage
+eventsAdapter tracking =
+  Adapter
+    { adapterName = "events",
+      source =
+        Stream.unfold Unfold.fromList [-1, -2 ..]
+          & Stream.mapM (mkIngested tracking "events"),
+      shutdown = liftIO $ Text.putStrLn "Shutting down events adapter"
+    }
+
+-- | Create an Ingested message from a value.
+mkIngested ::
+  (IOE :> es) =>
+  TrackingAck ->
+  Text ->
+  Int ->
+  Eff es (Ingested es TaggedMessage)
+mkIngested tracking sourceName n = do
+  let msgId = MessageId $ sourceName <> "-" <> Text.pack (show (abs n))
   pure
     Ingested
       { envelope =
@@ -40,28 +77,34 @@ mkIngested tracking n = do
               cursor = Nothing,
               partition = Nothing,
               enqueuedAt = Nothing,
-              payload = n
+              payload = TaggedMessage {source = sourceName, value = n}
             },
         ack = trackingAckHandle tracking msgId,
         lease = Nothing
       }
 
--- | Handler that prints each message to the terminal.
-printHandler :: (IOE :> es) => Handler es Int
+-- | Handler that prints each message with its source.
+printHandler :: (IOE :> es) => Handler es TaggedMessage
 printHandler ingested = do
-  liftIO $ Text.putStrLn $ "Processing message: " <> Text.pack (show ingested.envelope.payload)
+  let msg = ingested.envelope.payload
+  liftIO $
+    Text.putStrLn $
+      "[" <> msg.source <> "] Processing: " <> Text.pack (show msg.value)
   pure AckOk
 
 main :: IO ()
 main = runEff $ do
-  liftIO $ Text.putStrLn "Starting Shibuya example with infinite stream..."
+  liftIO $ Text.putStrLn "Starting Shibuya example with multiple queues..."
+  liftIO $ Text.putStrLn "Press Ctrl+C to stop.\n"
 
   -- Create tracking for ack decisions
   tracking <- newTrackingAck
 
-  -- Create the adapter and run the app
-  let adapter = infiniteCounterAdapter tracking
-      config = defaultRunnerConfig adapter printHandler
+  -- Create multiple adapters and merge them
+  let counter = counterAdapter tracking
+      events = eventsAdapter tracking
+      merged = mergeAdapters [counter, events]
+      config = defaultRunnerConfig merged printHandler
 
   result <- runApp config
 
