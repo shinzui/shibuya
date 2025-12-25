@@ -1,2 +1,6 @@
 packages:
   shibuya-core
+
+-- Use local NQE with Streamly support
+optional-packages:
+  /Users/shinzui/Keikaku/hub/haskell/nqe/nqe.cabal

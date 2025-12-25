@@ -11,28 +11,61 @@ common warnings
 library
   import: warnings
   exposed-modules:
+    -- Core Types (Phase 1)
+    -- Effectful Types (Phase 2)
+    -- Handler (Phase 3)
+    -- Policy (Phase 4)
+    -- Adapter (Phase 5)
+    -- Runner (Phase 6)
+    -- Stream Utilities (Phase 7)
+    -- App (Phase 9)
+    Shibuya.Adapter
+    Shibuya.Adapter.Mock
+    Shibuya.App
     Shibuya.Core
+    Shibuya.Core.Ack
+    Shibuya.Core.AckHandle
+    Shibuya.Core.Ingested
+    Shibuya.Core.Lease
+    Shibuya.Core.Types
+    Shibuya.Handler
+    Shibuya.Policy
+    Shibuya.Prelude
+    Shibuya.Runner
+    Shibuya.Runner.Ingester
+    Shibuya.Runner.Master
+    Shibuya.Runner.Metrics
+    Shibuya.Runner.Processor
+    Shibuya.Runner.Serial
+    Shibuya.Runner.Supervised
+    Shibuya.Stream
 
   default-extensions:
     DeriveAnyClass
     DerivingStrategies
+    DuplicateRecordFields
     LambdaCase
+    NoFieldSelectors
     OverloadedLabels
+    OverloadedRecordDot
     OverloadedStrings
     QuasiQuotes
 
   build-depends:
     base ^>=4.21.0.0,
     bytestring ^>=0.12.2.0,
+    containers,
     effectful ^>=2.6.1.0,
     effectful-core ^>=2.6.1.0,
     generic-lens ^>=2.3.0.0,
     lens ^>=5.3.5,
     nqe ^>=0.6,
+    stm,
     streamly ^>=0.11,
     streamly-core ^>=0.3,
     text ^>=2.1.3,
     time,
+    unliftio ^>=0.2,
     uuid,
     vector,
 
@@ -45,6 +78,32 @@ test-suite shibuya-core-test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  other-modules:
+    Shibuya.Core.AckSpec
+    Shibuya.Core.TypesSpec
+    Shibuya.PolicySpec
+    Shibuya.Runner.SupervisedSpec
+    Shibuya.RunnerSpec
+
   build-depends:
+    QuickCheck ^>=2.15,
     base ^>=4.21.0.0,
+    effectful,
+    hspec ^>=2.11,
+    nqe,
     shibuya-core,
+    streamly,
+    streamly-core,
+    text,
+    time,
