@@ -11,7 +11,7 @@ import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
-import Shibuya.App (ProcessorId (..), QueueProcessor (..), Strategy (..), runAppMulti, waitApp)
+import Shibuya.App (ProcessorId (..), QueueProcessor (..), Strategy (..), runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
@@ -97,7 +97,7 @@ main = runEff $ do
 
   -- Run all processors concurrently under supervision
   result <-
-    runAppMulti
+    runApp
       IgnoreAll -- Keep running even if a processor fails
       100 -- Inbox size
       [ (ProcessorId "orders", ordersProcessor),

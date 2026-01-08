@@ -1,8 +1,8 @@
-# Multi-Queue Processing: `runAppMulti` Design
+# Multi-Queue Processing Design
 
 ## Overview
 
-This document analyzes the design for `runAppMulti`, which enables a single Shibuya application to process messages from multiple independent queues concurrently.
+This document analyzes the design for `runApp`, which enables a single Shibuya application to process messages from multiple independent queues concurrently.
 
 ## Current State
 
@@ -41,7 +41,7 @@ The existing infrastructure already supports multi-queue processing internally:
 ### Option 1: List of RunnerConfigs (Homogeneous message type)
 
 ```haskell
-runAppMulti ::
+runApp ::
   (IOE :> es) =>
   Strategy ->
   [RunnerConfig es msg] ->
@@ -56,7 +56,7 @@ runAppMulti ::
 data SomeAdapter es where
   SomeAdapter :: Adapter es msg -> Handler es msg -> SomeAdapter es
 
-runAppMulti ::
+runApp ::
   (IOE :> es) =>
   Strategy ->
   [(ProcessorId, SomeAdapter es)] ->
@@ -101,7 +101,7 @@ data AppHandle = AppHandle
   }
 
 -- | Run multiple queue processors concurrently.
-runAppMulti ::
+runApp ::
   (IOE :> es) =>
   -- | Supervision strategy (OneForOne, AllForOne, etc.)
   Strategy ->
@@ -113,7 +113,7 @@ runAppMulti ::
 ## Implementation Sketch
 
 ```haskell
-runAppMulti strategy namedProcessors = do
+runApp strategy namedProcessors = do
   -- 1. Validate all processor configs
   for_ namedProcessors $ \(_, QueueProcessor{..}) ->
     validatePolicy ...
@@ -176,7 +176,7 @@ main = runEff $ do
         }
 
   -- Run all processors
-  result <- runAppMulti OneForOne
+  result <- runApp OneForOne
     [ ("orders", ordersProc)
     , ("events", eventsProc)
     ]
@@ -217,7 +217,7 @@ main = runEff $ do
 ## Migration Path
 
 1. Add `QueueProcessor` and `AppHandle` types
-2. Implement `runAppMulti` using existing `Master` + `runSupervised`
+2. Implement `runApp` using existing `Master` + `runSupervised`
 3. Add `AppHandle` introspection functions
 4. Update example to demonstrate multi-queue
-5. Consider deprecating single-adapter `runApp` in favor of `runAppMulti` with single-element list
+5. Consider deprecating single-adapter `runApp` in favor of `runApp` with single-element list
