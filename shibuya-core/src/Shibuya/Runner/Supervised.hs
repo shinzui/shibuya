@@ -32,7 +32,9 @@ import Control.Concurrent.STM
     writeTVar,
   )
 import Data.Text qualified as Text
-import Effectful (Eff, IOE, liftIO, (:>))
+import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
+import Effectful.Dispatch.Static (unsafeEff_)
+import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
@@ -52,7 +54,8 @@ import Shibuya.Runner.Metrics
   )
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (Async, catchAny, finally, withRunInIO)
+import UnliftIO (Async, catchAny, finally)
+import UnliftIO qualified as UIO
 
 -- | Handle for a supervised processor.
 -- Provides introspection into the running processor.
@@ -110,14 +113,16 @@ runSupervised master inboxSize procId adapter handler = do
   -- Register with Master
   registerProcessor master procId metricsVar
 
-  -- Add as supervised child
-  -- We need to convert our Eff action to IO for the supervisor
-  supervisedChild <- withRunInIO $ \runInIO -> do
-    addChild (master.state).supervisor $ do
-      -- This runs in IO under the supervisor
+  -- Add as supervised child using NQE's Supervisor
+  -- ConcUnlift Persistent allows the runInIO function to be used in the async child
+  supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
+    addChild master.state.supervisor $
       runInIO $
         processStream metricsVar doneVar adapter handler
           `finally` unregisterProcessor master procId
+
+  -- Link so exceptions propagate to the parent
+  unsafeEff_ $ UIO.link supervisedChild
 
   pure
     SupervisedProcessor
