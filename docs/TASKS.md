@@ -16,11 +16,15 @@ This document breaks down the Shibuya framework into atomic, testable tasks. Eac
 | Phase 8: Core Runner Logic | ✅ Complete | 3 tests |
 | Phase 8.5: Master & Supervision | ✅ Complete | 5 tests |
 | Phase 9: Application Entry Point | ✅ Complete | 3 tests |
+| Phase 9.5: Multi-Queue API | ✅ Complete | - |
 | Phase 10: Re-export Module | ✅ Complete | - |
 | Phase 11: Postgres Adapter | ⏳ Pending | - |
 | Phase 12: Kafka Adapter | ⏳ Pending | - |
 
 **Total: 42 tests passing**
+
+### Recent Updates
+- **Phase 9.5**: Added `QueueProcessor` existential type, `AppHandle` for introspection, and unified `runApp` for multi-queue processing with supervision.
 
 ## Phase 1: Core Types (No Dependencies) ✅
 
@@ -522,9 +526,9 @@ isDone :: SupervisedProcessor -> Eff es Bool
 
 ---
 
-## Phase 9: Application Entry Point
+## Phase 9: Application Entry Point ✅
 
-### Task 9.1: AppError Type
+### Task 9.1: AppError Type ✅
 **Module:** `Shibuya.App`
 **File:** `src/Shibuya/App.hs`
 
@@ -533,34 +537,65 @@ data AppError
   = PolicyValidationError !Text
   | AdapterError !Text
   | HandlerError !Text
+  | RuntimeError !Text
   deriving stock (Eq, Show)
 ```
 
-**Tests:**
-- All constructors distinguishable
-- Show instance works
-
-**Definition of Done:** `cabal test` passes
+**Status:** ✅ Completed
 
 ---
 
-### Task 9.2: runApp Entry Point
+### Task 9.2: QueueProcessor & AppHandle Types ✅
+**Module:** `Shibuya.App`
+**File:** `src/Shibuya/App.hs`
+
+```haskell
+-- | Existential wrapper for adapter + handler pair
+data QueueProcessor es where
+  QueueProcessor ::
+    { adapter :: Adapter es msg
+    , handler :: Handler es msg
+    } -> QueueProcessor es
+
+-- | Handle for running application
+data AppHandle es = AppHandle
+  { master :: !Master
+  , processors :: !(Map ProcessorId (SupervisedProcessor, QueueProcessor es))
+  }
+```
+
+**Status:** ✅ Completed
+
+---
+
+### Task 9.3: runApp Entry Point ✅
 **Module:** `Shibuya.App`
 **File:** `src/Shibuya/App.hs`
 
 ```haskell
 runApp
   :: (IOE :> es)
-  => RunnerConfig es msg
-  -> Eff es (Either AppError ())
+  => Strategy                          -- Supervision strategy
+  -> Int                               -- Inbox size
+  -> [(ProcessorId, QueueProcessor es)] -- Named processors
+  -> Eff es (Either AppError (AppHandle es))
 ```
 
-**Tests:**
-- Returns PolicyValidationError for invalid policy
-- Returns Right () on successful completion
-- Uses Serial runner when configured
+**Status:** ✅ Completed
 
-**Definition of Done:** `cabal test` passes with full integration test
+---
+
+### Task 9.4: AppHandle Operations ✅
+**Module:** `Shibuya.App`
+**File:** `src/Shibuya/App.hs`
+
+```haskell
+getAppMetrics :: (IOE :> es) => AppHandle es -> Eff es MetricsMap
+stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
+waitApp :: (IOE :> es) => AppHandle es -> Eff es ()
+```
+
+**Status:** ✅ Completed
 
 ---
 

@@ -1,13 +1,13 @@
 # Shibuya Usage Guide
 
-This guide shows how to use Shibuya to process messages from a queue.
+This guide shows how to use Shibuya to process messages from queues.
 
 ## Quick Start
 
 ```haskell
 module Main where
 
-import Shibuya.Core  -- Everything you need!
+import Shibuya.App
 import Shibuya.Adapter.Postgres (postgresAdapter)  -- hypothetical adapter
 import Effectful
 import Effectful.Concurrent (runConcurrent)
@@ -36,16 +36,21 @@ main :: IO ()
 main = runEff . runConcurrent $ do
   -- 1. Create your adapter
   pool <- createConnectionPool "postgresql://localhost/mydb"
-  let adapter = postgresAdapter pool "orders_queue"
 
-  -- 2. Configure the runner
-  let config = defaultRunnerConfig adapter handleOrder
+  -- 2. Define your processor (adapter + handler)
+  let ordersProcessor = QueueProcessor
+        { adapter = postgresAdapter pool "orders_queue"
+        , handler = handleOrder
+        }
 
-  -- 3. Run!
-  result <- runApp config
+  -- 3. Run with supervision!
+  result <- runApp IgnoreAll 100
+    [ (ProcessorId "orders", ordersProcessor)
+    ]
+
   case result of
     Left err -> liftIO $ print err
-    Right () -> pure ()
+    Right appHandle -> waitApp appHandle
 ```
 
 ## Writing Handlers
@@ -136,66 +141,46 @@ handleEvent ingested = do
           pure $ AckRetry (RetryDelay 60)
 ```
 
-## Configuring the Runner
+## Configuring runApp
 
 ### Basic Configuration
 
 ```haskell
-let config = defaultRunnerConfig adapter handler
--- Defaults: Unordered, Serial, inboxSize = 100
+-- runApp signature:
+runApp
+  :: Strategy                          -- Supervision strategy
+  -> Int                               -- Inbox size for backpressure
+  -> [(ProcessorId, QueueProcessor es)] -- Named processors
+  -> Eff es (Either AppError (AppHandle es))
 ```
 
-### Custom Configuration
+### Example: Single Processor
 
 ```haskell
-let config = RunnerConfig
-      { adapter     = myAdapter
-      , handler     = myHandler
-      , ordering    = Unordered       -- No ordering guarantees
-      , concurrency = Async 10        -- Process 10 messages concurrently
-      , inboxSize   = 500             -- Buffer up to 500 messages
-      }
+result <- runApp IgnoreAll 100
+  [ (ProcessorId "orders", ordersProcessor)
+  ]
 ```
 
-### Ordering Policies
+### Example: Multiple Processors
 
-| Policy | Use Case | Concurrency Allowed |
-|--------|----------|---------------------|
-| `StrictInOrder` | Event sourcing, must process in exact order | `Serial` only |
-| `PartitionedInOrder` | Kafka-style, order within partition | `Async` across partitions |
-| `Unordered` | Independent messages, max throughput | Any |
+```haskell
+result <- runApp IgnoreAll 500
+  [ (ProcessorId "orders", ordersProcessor)
+  , (ProcessorId "events", eventsProcessor)
+  , (ProcessorId "notifications", notificationsProcessor)
+  ]
+```
 
-### Concurrency Modes
+### Inbox Size
 
-| Mode | Behavior |
+The inbox size controls backpressure - how many messages are buffered between the adapter stream and the handler:
+
+| Size | Use Case |
 |------|----------|
-| `Serial` | One message at a time |
-| `Ahead n` | Prefetch n messages, process in order |
-| `Async n` | Process up to n messages concurrently |
-
-### Example: High-Throughput Worker
-
-```haskell
-let config = RunnerConfig
-      { adapter     = sqsAdapter
-      , handler     = handleNotification
-      , ordering    = Unordered
-      , concurrency = Async 50      -- 50 concurrent handlers
-      , inboxSize   = 1000          -- Large buffer for bursts
-      }
-```
-
-### Example: Ordered Event Processing
-
-```haskell
-let config = RunnerConfig
-      { adapter     = kafkaAdapter
-      , handler     = handleDomainEvent
-      , ordering    = StrictInOrder
-      , concurrency = Serial        -- Required for StrictInOrder
-      , inboxSize   = 100
-      }
-```
+| `100` | Default, good for most cases |
+| `500-1000` | High throughput, bursty traffic |
+| `50` | Memory-constrained environments |
 
 ## Using Lease Extension
 
@@ -223,40 +208,42 @@ handleLongRunning ingested = do
 
 ## Running Multiple Processors
 
-Use the Master for running multiple processors with supervision:
+Use `runApp` to run multiple processors concurrently with supervision:
 
 ```haskell
-import Shibuya.Core  -- Includes Master, runSupervised, Strategy, etc.
+import Shibuya.App
 
 main :: IO ()
 main = runEff . runConcurrent $ do
-  -- Start the master with a supervision strategy
-  master <- startMaster KillAll  -- Strategy is re-exported from Shibuya.Core
+  -- Define your processors
+  let ordersProcessor = QueueProcessor
+        { adapter = ordersAdapter
+        , handler = handleOrders
+        }
+      notificationsProcessor = QueueProcessor
+        { adapter = notificationsAdapter
+        , handler = handleNotifications
+        }
+      analyticsProcessor = QueueProcessor
+        { adapter = analyticsAdapter
+        , handler = handleAnalytics
+        }
 
-  -- Start multiple processors
-  proc1 <- runSupervised master 100
-             (ProcessorId "orders")
-             ordersAdapter
-             handleOrders
+  -- Run all processors under supervision
+  result <- runApp IgnoreAll 100
+    [ (ProcessorId "orders", ordersProcessor)
+    , (ProcessorId "notifications", notificationsProcessor)
+    , (ProcessorId "analytics", analyticsProcessor)
+    ]
 
-  proc2 <- runSupervised master 100
-             (ProcessorId "notifications")
-             notificationsAdapter
-             handleNotifications
-
-  proc3 <- runSupervised master 100
-             (ProcessorId "analytics")
-             analyticsAdapter
-             handleAnalytics
-
-  -- Monitor metrics
-  forever $ do
-    liftIO $ threadDelay 10_000_000  -- 10 seconds
-    metrics <- getAllMetrics master
-    liftIO $ printMetrics metrics
-
-  -- Cleanup
-  stopMaster master
+  case result of
+    Left err -> print err
+    Right appHandle -> do
+      -- Monitor metrics periodically
+      forever $ do
+        liftIO $ threadDelay 10_000_000  -- 10 seconds
+        metrics <- getAppMetrics appHandle
+        liftIO $ printMetrics metrics
 ```
 
 ## Monitoring & Metrics
@@ -264,12 +251,9 @@ main = runEff . runConcurrent $ do
 ### Getting Processor Metrics
 
 ```haskell
--- Get all processor metrics
-metrics <- getAllMetrics master
+-- Get all processor metrics from AppHandle
+metrics <- getAppMetrics appHandle
 -- metrics :: Map ProcessorId ProcessorMetrics
-
--- Get specific processor metrics
-maybeMetrics <- getProcessorMetrics master (ProcessorId "orders")
 ```
 
 ### ProcessorMetrics Structure
@@ -317,7 +301,7 @@ printMetrics metrics = do
 
 module Main where
 
-import Shibuya.Core
+import Shibuya.App
 import Shibuya.Adapter.Postgres (postgresAdapter)  -- hypothetical adapter
 import Effectful
 import Effectful.Concurrent
@@ -369,55 +353,44 @@ main :: IO ()
 main = runEff . runConcurrent $ do
   pool <- liftIO $ createConnectionPool "postgresql://localhost/orders"
 
-  let adapter = postgresAdapter pool "order_events"
-
-  let config = RunnerConfig
-        { adapter     = adapter
-        , handler     = handleOrder
-        , ordering    = PartitionedInOrder  -- Order by orderId
-        , concurrency = Async 5
-        , inboxSize   = 200
+  let ordersProcessor = QueueProcessor
+        { adapter = postgresAdapter pool "order_events"
+        , handler = handleOrder
         }
 
   liftIO $ putStrLn "Starting order processor..."
 
-  result <- runApp config
+  result <- runApp IgnoreAll 200
+    [ (ProcessorId "orders", ordersProcessor)
+    ]
 
   case result of
-    Left (PolicyValidationError err) ->
-      liftIO $ putStrLn $ "Config error: " <> unpack err
-    Left (AdapterError err) ->
-      liftIO $ putStrLn $ "Adapter error: " <> unpack err
-    Left (HandlerError err) ->
-      liftIO $ putStrLn $ "Handler error: " <> unpack err
-    Right () ->
+    Left err ->
+      liftIO $ putStrLn $ "Error: " <> show err
+    Right appHandle -> do
+      liftIO $ putStrLn "Processor running..."
+      waitApp appHandle
       liftIO $ putStrLn "Processor stopped gracefully"
 ```
 
 ## Supervision Strategies
 
-When using the Master, choose a strategy for child failures:
+Choose a supervision strategy when calling `runApp`:
 
 | Strategy | Behavior | Use Case |
 |----------|----------|----------|
 | `IgnoreAll` | Continue running, ignore failures | Independent processors |
 | `IgnoreGraceful` | Continue unless exception thrown | Graceful shutdown handling |
 | `KillAll` | Stop all processors on any failure | Coordinated shutdown |
-| `Notify inbox` | Send death notification to inbox | Custom failure handling |
+| `OneForOne` | Restart only the failed processor | Default for most apps |
 
 ```haskell
 -- Independent processors - failures don't affect each other
-master <- startMaster IgnoreAll
+result <- runApp IgnoreAll 100 processors
 
 -- All-or-nothing - if one fails, stop everything
-master <- startMaster KillAll
+result <- runApp KillAll 100 processors
 
--- Custom handling
-deathNotices <- newInbox
-master <- startMaster (Notify deathNotices)
-
--- Monitor deaths in separate thread
-async $ forever $ do
-  notice <- receive deathNotices
-  handleProcessorDeath notice
+-- Restart failed processors individually
+result <- runApp OneForOne 100 processors
 ```

@@ -371,35 +371,59 @@ Where Streamly wiring, supervision, ack lifecycle, and halt semantics are applie
 
 ```haskell
 module Shibuya.App
-  ( runApp
+  ( -- * Running Processors
+    runApp
+  , QueueProcessor(..)
+  , AppHandle(..)
+    -- * AppHandle Operations
+  , getAppMetrics
+  , stopApp
+  , waitApp
+    -- * Errors
   , AppError(..)
+    -- * Re-exports
+  , ProcessorId(..)
+  , ProcessorMetrics(..)
+  , Strategy(..)
   ) where
 
-import Shibuya.Runner (RunnerConfig)
-import Shibuya.Policy (validatePolicy)
-import Effectful (Eff, IOE)
+-- | A queue processor pairs an adapter with its handler.
+-- The message type is existentially hidden, allowing heterogeneous queues.
+data QueueProcessor es where
+  QueueProcessor ::
+    { adapter :: Adapter es msg
+    , handler :: Handler es msg
+    } -> QueueProcessor es
+
+-- | Handle for a running multi-queue application.
+data AppHandle es = AppHandle
+  { master :: !Master
+  , processors :: !(Map ProcessorId (SupervisedProcessor, QueueProcessor es))
+  }
 
 data AppError
   = PolicyValidationError !Text
   | AdapterError !Text
   | HandlerError !Text
+  | RuntimeError !Text
   deriving stock (Eq, Show)
 
--- | Run the message processing application
+-- | Run queue processors concurrently under NQE supervision.
 runApp
   :: (IOE :> es)
-  => RunnerConfig es msg
-  -> Eff es (Either AppError ())
-runApp config = do
-  case validatePolicy (ordering config) (concurrency config) of
-    Left err -> pure $ Left $ PolicyValidationError err
-    Right () -> do
-      -- Implementation:
-      -- 1. Create bounded inbox
-      -- 2. Start ingester (adapter.source -> inbox)
-      -- 3. Start processor (inbox -> handler -> ack)
-      -- 4. Supervise both
-      undefined
+  => Strategy                          -- ^ Supervision strategy
+  -> Int                               -- ^ Inbox size for backpressure
+  -> [(ProcessorId, QueueProcessor es)] -- ^ Named processors
+  -> Eff es (Either AppError (AppHandle es))
+
+-- | Get metrics for all processors.
+getAppMetrics :: (IOE :> es) => AppHandle es -> Eff es MetricsMap
+
+-- | Gracefully stop all processors.
+stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
+
+-- | Wait for all processors to complete.
+waitApp :: (IOE :> es) => AppHandle es -> Eff es ()
 ```
 
 ---

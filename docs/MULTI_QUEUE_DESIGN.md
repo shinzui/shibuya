@@ -1,12 +1,14 @@
 # Multi-Queue Processing Design
 
+> **Status: ✅ Implemented**
+>
+> This design has been implemented. See `Shibuya.App` for the API.
+
 ## Overview
 
-This document analyzes the design for `runApp`, which enables a single Shibuya application to process messages from multiple independent queues concurrently.
+This document describes the design for `runApp`, which enables a single Shibuya application to process messages from multiple independent queues concurrently.
 
-## Current State
-
-The existing infrastructure already supports multi-queue processing internally:
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -28,63 +30,13 @@ The existing infrastructure already supports multi-queue processing internally:
     └─────────────┘  └─────────────┘  └─────────────┘
 ```
 
-**Existing components:**
+**Components:**
 - `Master` - Coordinator process managing child processors
 - `Supervisor` (NQE) - Restarts failed children based on strategy
 - `runSupervised` - Spawns adapter+handler as supervised child
 - `ProcessorMetrics` - Per-processor stats (received, processed, failed)
 
-**Gap:** `runApp` only accepts a single `RunnerConfig` and uses `runSerial` directly.
-
-## Proposed API
-
-### Option 1: List of RunnerConfigs (Homogeneous message type)
-
-```haskell
-runApp ::
-  (IOE :> es) =>
-  Strategy ->
-  [RunnerConfig es msg] ->
-  Eff es (Either AppError AppHandle)
-```
-
-**Limitation:** All adapters must produce the same message type `msg`.
-
-### Option 2: Existential wrapper (Heterogeneous message types)
-
-```haskell
-data SomeAdapter es where
-  SomeAdapter :: Adapter es msg -> Handler es msg -> SomeAdapter es
-
-runApp ::
-  (IOE :> es) =>
-  Strategy ->
-  [(ProcessorId, SomeAdapter es)] ->
-  Eff es (Either AppError AppHandle)
-```
-
-**Benefit:** Each adapter can have its own message type.
-
-### Option 3: Builder pattern
-
-```haskell
-data AppBuilder es = AppBuilder
-  { processors :: [(ProcessorId, SomeAdapter es)]
-  , strategy :: Strategy
-  , ...
-  }
-
-buildApp :: AppBuilder es -> Eff es (Either AppError AppHandle)
-
--- Usage:
-app <- buildApp $
-  defaultAppBuilder
-    & addProcessor "orders" ordersAdapter ordersHandler
-    & addProcessor "events" eventsAdapter eventsHandler
-    & withStrategy OneForOne
-```
-
-## Recommended: Option 2 with Named Processors
+## Implemented API
 
 ```haskell
 -- | Wrapper for adapter + handler pair with hidden message type.
@@ -214,10 +166,12 @@ main = runEff $ do
    - For independent queues, parallel shutdown is fine
    - May need ordered shutdown for dependent processors (future)
 
-## Migration Path
+## Implementation Status
 
-1. Add `QueueProcessor` and `AppHandle` types
-2. Implement `runApp` using existing `Master` + `runSupervised`
-3. Add `AppHandle` introspection functions
-4. Update example to demonstrate multi-queue
-5. Consider deprecating single-adapter `runApp` in favor of `runApp` with single-element list
+All items completed:
+
+1. ✅ Added `QueueProcessor` and `AppHandle` types
+2. ✅ Implemented `runApp` using existing `Master` + `runSupervised`
+3. ✅ Added `AppHandle` introspection functions (`getAppMetrics`, `stopApp`, `waitApp`)
+4. ✅ Updated example to demonstrate multi-queue (`shibuya-example`)
+5. ✅ Unified API: single `runApp` handles both single and multi-queue cases

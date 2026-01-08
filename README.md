@@ -39,7 +39,7 @@ build-depends:
 
 module Main where
 
-import Shibuya.Core
+import Shibuya.App
 import Shibuya.Adapter.Postgres (postgresAdapter)  -- or your adapter of choice
 import Effectful
 import Effectful.Concurrent (runConcurrent)
@@ -65,13 +65,19 @@ handleOrder ingested = do
 main :: IO ()
 main = runEff . runConcurrent $ do
   pool <- createConnectionPool "postgresql://localhost/mydb"
-  let adapter = postgresAdapter pool "orders_queue"
 
-  let config = defaultRunnerConfig adapter handleOrder
+  let ordersProcessor = QueueProcessor
+        { adapter = postgresAdapter pool "orders_queue"
+        , handler = handleOrder
+        }
 
-  runApp config >>= \case
+  result <- runApp IgnoreAll 100
+    [ (ProcessorId "orders", ordersProcessor)
+    ]
+
+  case result of
     Left err -> liftIO $ print err
-    Right () -> pure ()
+    Right appHandle -> waitApp appHandle
 ```
 
 ## Ack Decisions
@@ -88,32 +94,49 @@ AckHalt (HaltFatal reason)         -- Stop processing entirely
 ## Configuration
 
 ```haskell
-let config = RunnerConfig
-      { adapter     = myAdapter
-      , handler     = myHandler
-      , ordering    = Unordered      -- or StrictInOrder, PartitionedInOrder
-      , concurrency = Async 10       -- or Serial, Ahead n
-      , inboxSize   = 500
-      }
+-- runApp takes:
+--   Strategy   - Supervision strategy (IgnoreAll, KillAll, etc.)
+--   Int        - Inbox size for backpressure
+--   [(ProcessorId, QueueProcessor es)] - Named processors
+
+result <- runApp
+  IgnoreAll   -- Keep running even if a processor fails
+  500         -- Inbox buffer size
+  [ (ProcessorId "orders", ordersProcessor)
+  , (ProcessorId "events", eventsProcessor)
+  ]
 ```
 
 ## Running Multiple Processors
 
-Use the Master for supervised multi-processor setups:
+Run multiple independent queues concurrently with `runApp`:
 
 ```haskell
 main = runEff . runConcurrent $ do
-  master <- startMaster KillAll
+  let ordersProcessor = QueueProcessor
+        { adapter = sqsAdapter "orders-queue"
+        , handler = handleOrders
+        }
+      eventsProcessor = QueueProcessor
+        { adapter = kafkaAdapter "events-topic"
+        , handler = handleEvents
+        }
 
-  proc1 <- runSupervised master 100 (ProcessorId "orders") ordersAdapter handleOrders
-  proc2 <- runSupervised master 100 (ProcessorId "emails") emailsAdapter handleEmails
+  result <- runApp IgnoreAll 100
+    [ (ProcessorId "orders", ordersProcessor)
+    , (ProcessorId "events", eventsProcessor)
+    ]
 
-  -- Monitor metrics
-  metrics <- getAllMetrics master
-  forM_ (Map.toList metrics) $ \(ProcessorId name, pm) ->
-    putStrLn $ name <> ": " <> show pm.stats.processed <> " processed"
+  case result of
+    Left err -> print err
+    Right appHandle -> do
+      -- Monitor metrics
+      metrics <- getAppMetrics appHandle
+      forM_ (Map.toList metrics) $ \(ProcessorId name, pm) ->
+        putStrLn $ name <> ": " <> show pm.stats.processed <> " processed"
 
-  stopMaster master
+      -- Wait for completion or use stopApp to shut down
+      waitApp appHandle
 ```
 
 ## Documentation
@@ -142,7 +165,7 @@ shibuya-core/
 │   │   ├── Supervised.hs    -- Supervised processor runner
 │   │   ├── Metrics.hs       -- ProcessorState, StreamStats
 │   │   └── Serial.hs        -- Sequential runner
-│   ├── App.hs               -- runApp entry point
+│   ├── App.hs               -- runApp, QueueProcessor, AppHandle
 │   └── Stream.hs            -- Stream utilities
 ```
 
