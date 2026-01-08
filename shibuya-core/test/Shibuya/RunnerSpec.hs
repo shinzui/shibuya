@@ -2,23 +2,22 @@
 
 module Shibuya.RunnerSpec (spec) where
 
+import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppError (..), runApp)
+import Shibuya.App (AppError (..), QueueProcessor (..), runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Runner (RunnerConfig (..), defaultRunnerConfig)
+import Shibuya.Runner.Metrics (ProcessorId (..))
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
-import Prelude hiding (Ordering)
 
 spec :: Spec
 spec = do
@@ -34,9 +33,21 @@ spec = do
         -- Create adapter and handler
         let adapter = testAdapter messages
             handler = testHandler processedRef
+            processor = QueueProcessor adapter handler
 
         -- Run the app
-        runApp $ defaultRunnerConfig adapter handler
+        res <-
+          runApp
+            IgnoreAll
+            100
+            [ (ProcessorId "test", processor)
+            ]
+
+        case res of
+          Left err -> pure $ Left err
+          Right appHandle -> do
+            waitApp appHandle
+            pure $ Right ()
 
       -- Verify result
       result `shouldBe` Right ()
@@ -52,13 +63,24 @@ spec = do
         -- Create adapter and handler
         let adapter = testAdapter messages
             handler = alwaysAckOk
+            processor = QueueProcessor adapter handler
 
         -- Run the app
-        res <- runApp $ defaultRunnerConfig adapter handler
+        res <-
+          runApp
+            IgnoreAll
+            100
+            [ (ProcessorId "test", processor)
+            ]
 
-        -- Get tracked decisions
-        decs <- liftIO $ readIORef tracking.trackedDecisions
-        pure (decs, res)
+        case res of
+          Left err -> do
+            decs <- liftIO $ readIORef tracking.trackedDecisions
+            pure (decs, Left err)
+          Right appHandle -> do
+            waitApp appHandle
+            decs <- liftIO $ readIORef tracking.trackedDecisions
+            pure (decs, Right ())
 
       -- Verify all messages were acked
       result `shouldBe` Right ()
@@ -66,21 +88,32 @@ spec = do
       -- All should be AckOk (decisions are in reverse order)
       all ((== AckOk) . snd) decisions `shouldBe` True
 
-    it "rejects invalid policy" $ do
+    it "returns AppHandle for multiple processors" $ do
       result <- runEff $ do
-        messages <- createTestMessages 1
-        let adapter = testAdapter messages
-            handler = alwaysAckOk
-            config =
-              (defaultRunnerConfig adapter handler)
-                { ordering = StrictInOrder,
-                  concurrency = Async 4 -- Invalid: StrictInOrder requires Serial
-                }
-        runApp config
+        messages1 <- createTestMessages 2
+        messages2 <- createTestMessages 2
 
-      case result of
-        Left (PolicyValidationError _) -> pure ()
-        other -> expectationFailure $ "Expected PolicyValidationError, got: " ++ show other
+        let adapter1 = testAdapter messages1
+            adapter2 = testAdapter messages2
+            handler = alwaysAckOk
+            proc1 = QueueProcessor adapter1 handler
+            proc2 = QueueProcessor adapter2 handler
+
+        res <-
+          runApp
+            IgnoreAll
+            100
+            [ (ProcessorId "proc1", proc1),
+              (ProcessorId "proc2", proc2)
+            ]
+
+        case res of
+          Left err -> pure $ Left err
+          Right appHandle -> do
+            waitApp appHandle
+            pure $ Right ()
+
+      result `shouldBe` Right ()
 
 -- Test helpers
 
