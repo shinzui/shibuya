@@ -2,11 +2,14 @@
 
 This document describes how messages flow through Shibuya from adapter to handler.
 
-## High-Level Flow
+## Single Queue Processor Flow
+
+The diagram below shows the internal flow for **one** queue processor.
+Each queue processor created via `runApp` gets its own instance of this pipeline.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                        runApp / runSupervised                    │
+│                 runSupervised (per queue processor)              │
 └──────────────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -44,6 +47,45 @@ This document describes how messages flow through Shibuya from adapter to handle
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+## Multi-Queue Architecture
+
+Each queue processor runs in its own independent pipeline:
+
+```
+runApp strategy inboxSize
+  [ (ProcessorId "orders", QueueProcessor ordersAdapter ordersHandler)
+  , (ProcessorId "events", QueueProcessor eventsAdapter eventsHandler)
+  ]
+
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                           Master                                │
+│         (shared Supervisor + MetricsMap)                        │
+└─────────────────────────────────────────────────────────────────┘
+          │                                    │
+          ▼                                    ▼
+┌──────────────────────────┐    ┌──────────────────────────┐
+│ runIngesterAndProcessor  │    │ runIngesterAndProcessor  │
+│      "orders"            │    │      "events"            │
+│                          │    │                          │
+│  ┌────────────────────┐  │    │  ┌────────────────────┐  │
+│  │  Bounded Inbox     │  │    │  │  Bounded Inbox     │  │
+│  │  (own inboxSize)   │  │    │  │  (own inboxSize)   │  │
+│  └────────────────────┘  │    └────────────────────────┘  │
+│  Ingester → Processor    │    │  Ingester → Processor    │
+│  ordersAdapter           │    │  eventsAdapter           │
+│  ordersHandler           │    │  eventsHandler           │
+└──────────────────────────┘    └──────────────────────────┘
+```
+
+Each queue processor is **completely independent**:
+- Own bounded inbox (backpressure is per-queue)
+- Own ingester thread
+- Own processor thread
+- Own metrics (registered with shared Master)
+- Supervised as separate children (failures don't affect other queues)
+
 ## Detailed Steps
 
 ### 1. Application Startup
@@ -53,9 +95,10 @@ runApp strategy inboxSize processors
 ```
 
 1. `startMaster strategy` - Creates NQE Supervisor and MetricsMap
-2. For each processor:
+2. For each `(procId, QueueProcessor adapter handler)`:
    - `runSupervised master inboxSize procId adapter handler`
-   - Registers metrics TVar with Master
+   - Creates its own bounded inbox
+   - Registers its metrics TVar with Master
    - Spawns as supervised child
 
 ### 2. Processor Startup
