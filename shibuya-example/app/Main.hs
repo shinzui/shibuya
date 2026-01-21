@@ -1,21 +1,34 @@
 -- | Example demonstrating Shibuya with multiple independent queues.
 -- Each queue runs as a separate supervised processor, showing how
 -- a single application can process messages from different sources concurrently.
+-- This example also shows how to retrieve and display metrics.
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
+import Control.Monad (replicateM_)
 import Data.Function ((&))
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
-import Shibuya.App (ProcessorId (..), QueueProcessor (..), Strategy (..), runApp, waitApp)
+import Shibuya.App
+  ( AppHandle,
+    ProcessorId (..),
+    ProcessorMetrics (..),
+    QueueProcessor (..),
+    Strategy (..),
+    getAppMetrics,
+    runApp,
+    stopApp,
+  )
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Runner.Metrics (ProcessorState (..), StreamStats (..))
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
 
@@ -73,11 +86,35 @@ printHandler name ingested = do
   liftIO $ threadDelay 1000 -- 1ms delay to simulate work
   pure AckOk
 
+-- | Print metrics for all processors.
+printMetrics :: (IOE :> es) => AppHandle es -> Eff es ()
+printMetrics appHandle = do
+  metrics <- getAppMetrics appHandle
+  liftIO $ do
+    Text.putStrLn "\n===== Processor Metrics ====="
+    _ <- Map.traverseWithKey printProcessorMetrics metrics
+    Text.putStrLn "============================\n"
+  where
+    printProcessorMetrics :: ProcessorId -> ProcessorMetrics -> IO ()
+    printProcessorMetrics (ProcessorId name) pm = do
+      Text.putStrLn $ "Processor: " <> name
+      Text.putStrLn $ "  State:     " <> formatState pm.state
+      Text.putStrLn $ "  Received:  " <> Text.pack (show pm.stats.received)
+      Text.putStrLn $ "  Processed: " <> Text.pack (show pm.stats.processed)
+      Text.putStrLn $ "  Dropped:   " <> Text.pack (show pm.stats.dropped)
+      Text.putStrLn $ "  Failed:    " <> Text.pack (show pm.stats.failed)
+
+    formatState :: ProcessorState -> Text
+    formatState Idle = "Idle"
+    formatState (Processing count _) = "Processing (" <> Text.pack (show count) <> " in flight)"
+    formatState (Failed err _) = "Failed: " <> err
+    formatState Stopped = "Stopped"
+
 main :: IO ()
 main = runEff $ do
   liftIO $ Text.putStrLn "Starting Shibuya example with multiple independent queues..."
   liftIO $ Text.putStrLn "Each queue runs as a separate supervised processor."
-  liftIO $ Text.putStrLn "Press Ctrl+C to stop.\n"
+  liftIO $ Text.putStrLn "Will show metrics every second for 5 iterations.\n"
 
   -- Create tracking for ack decisions (shared for simplicity)
   tracking <- newTrackingAck
@@ -107,8 +144,14 @@ main = runEff $ do
   case result of
     Left err -> liftIO $ Text.putStrLn $ "Error: " <> Text.pack (show err)
     Right appHandle -> do
-      liftIO $ Text.putStrLn "All processors started. Waiting..."
+      liftIO $ Text.putStrLn "All processors started."
 
-      -- For demo purposes, wait (will block forever with infinite streams)
-      -- In a real app, you might use stopApp after some condition
-      waitApp appHandle
+      -- Print metrics every second for 5 iterations
+      replicateM_ 5 $ do
+        liftIO $ threadDelay 1000000 -- 1 second
+        printMetrics appHandle
+
+      -- Gracefully stop all processors
+      liftIO $ Text.putStrLn "Stopping processors..."
+      stopApp appHandle
+      liftIO $ Text.putStrLn "Done!"

@@ -26,6 +26,7 @@ executable shibuya-example
 
   build-depends:
     base ^>=4.21.0.0,
+    containers,
     effectful ^>=2.6.1.0,
     shibuya-core,
     streamly-core ^>=0.3,
