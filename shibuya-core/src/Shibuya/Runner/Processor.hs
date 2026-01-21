@@ -3,11 +3,12 @@
 module Shibuya.Runner.Processor
   ( runProcessor,
     runProcessorN,
+    drainInbox,
   )
 where
 
-import Control.Concurrent.NQE.Process (Inbox, receive)
-import Control.Monad (forever)
+import Control.Concurrent.NQE.Process (Inbox, mailboxEmpty, receive)
+import Control.Monad (forever, unless)
 import Effectful (Eff, IOE, (:>))
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
@@ -63,3 +64,20 @@ processOne handler inbox = do
   case decision of
     AckHalt _ -> pure () -- For now, just continue. Runner should handle halt.
     _ -> pure ()
+
+-- | Drain all remaining messages from inbox until empty.
+-- Used after ingester completes to process buffered messages.
+drainInbox ::
+  (IOE :> es) =>
+  -- | Message handler
+  Handler es msg ->
+  -- | Source inbox
+  Inbox (Ingested es msg) ->
+  Eff es ()
+drainInbox handler inbox = go
+  where
+    go = do
+      empty <- mailboxEmpty inbox
+      unless empty $ do
+        processOne handler inbox
+        go
