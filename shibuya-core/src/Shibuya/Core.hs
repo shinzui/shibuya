@@ -2,6 +2,19 @@
 --
 -- This module re-exports all public types and functions from the Shibuya framework.
 -- Import this module for application development.
+--
+-- Example:
+--
+-- @
+-- import Shibuya.Core
+--
+-- main = runEff $ do
+--   let processor = QueueProcessor myAdapter myHandler
+--   result <- runApp IgnoreAll 100 [(ProcessorId "main", processor)]
+--   case result of
+--     Right handle -> waitApp handle
+--     Left err -> print err
+-- @
 module Shibuya.Core
   ( -- * Message Types
     MessageId (..),
@@ -37,6 +50,11 @@ module Shibuya.Core
     -- * App
     runApp,
     AppError (..),
+    QueueProcessor (..),
+    AppHandle (..),
+    waitApp,
+    stopApp,
+    getAppMetrics,
 
     -- * Master & Supervision
     Master (..),
@@ -68,7 +86,7 @@ where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), runApp)
+import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), getAppMetrics, runApp, stopApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))

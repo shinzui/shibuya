@@ -27,71 +27,26 @@ other-modules:
 
 ---
 
-## 2.2 Complete Core.hs Exports
+## 2.2 Complete Core.hs Exports ✅ COMPLETED
 
-### Problem
-`Shibuya.Core` exports `runApp` but not the types needed to use it effectively:
+**Status:** Implemented. Core.hs now exports all App types and operations.
+
+### Summary
+Users can now use a single import for the full public API:
 
 ```haskell
--- Current: Users must do
-import Shibuya.Core (runApp, ...)
-import Shibuya.App (QueueProcessor(..), AppHandle, waitApp, stopApp, getAppMetrics)
-
--- Expected: Single import should suffice
 import Shibuya.Core
 ```
 
-### Files to Modify
-- `src/Shibuya/Core.hs`
+### Exports Added
+- `QueueProcessor (..)`
+- `AppHandle (..)`
+- `waitApp`
+- `stopApp`
+- `getAppMetrics`
 
-### Implementation Plan
-
-#### Step 1: Add missing exports to Core.hs
-```haskell
-module Shibuya.Core
-  ( -- ... existing exports ...
-
-    -- * App Types (NEW)
-    QueueProcessor (..),
-    AppHandle (..),
-
-    -- * App Operations (NEW)
-    waitApp,
-    stopApp,
-    getAppMetrics,
-  )
-where
-
-import Shibuya.App
-  ( AppError (..),
-    QueueProcessor (..),  -- NEW
-    AppHandle (..),       -- NEW
-    runApp,
-    waitApp,              -- NEW
-    stopApp,              -- NEW
-    getAppMetrics,        -- NEW
-  )
-```
-
-#### Step 2: Add usage example in module haddock
-```haskell
--- | Shibuya Core - Public API
---
--- Import this module for application development:
---
--- @
--- import Shibuya.Core
---
--- main = runEff $ do
---   let processor = QueueProcessor myAdapter myHandler
---   result <- runApp IgnoreAll 100 [(ProcessorId \"main\", processor)]
---   case result of
---     Right handle -> waitApp handle
---     Left err -> print err
--- @
-```
-
-#### Step 3: Verify example compiles with single import
+### Documentation
+Added usage example to module haddock.
 
 ---
 
@@ -174,5 +129,5 @@ Add others if needed.
 | Item | Status | Complexity |
 |------|--------|------------|
 | 2.1 Hide Internals | ✅ Done | Low |
-| 2.2 Core.hs Exports | 🔲 Pending | Low |
+| 2.2 Core.hs Exports | ✅ Done | Low |
 | 2.3 Own Strategy | 🔲 Pending | Medium |
