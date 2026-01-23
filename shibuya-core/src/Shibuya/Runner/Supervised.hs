@@ -43,6 +43,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Prelude
+import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
 import Shibuya.Runner.Metrics
@@ -54,7 +55,7 @@ import Shibuya.Runner.Metrics
     incFailed,
     incProcessed,
   )
-import UnliftIO (Async, catchAny, finally)
+import UnliftIO (Async, catch, catchAny, finally, throwIO)
 import UnliftIO qualified as UIO
 
 -- | Handle for a supervised processor.
@@ -119,7 +120,11 @@ runSupervised master inboxSize procId adapter handler = do
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO $
-        runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler
+        -- Catch ProcessorHalt to prevent propagation via link
+        -- (Halt is intentional, not a failure - other processors should continue)
+        ( runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler
+            `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
+        )
           `finally` unregisterProcessor master procId
 
   -- Link so exceptions propagate to the parent
@@ -281,7 +286,9 @@ processMessageFromInbox metricsVar handler inbox = do
     Right AckOk -> updateSuccess metricsVar
     Right (AckRetry _) -> updateSuccess metricsVar
     Right (AckDeadLetter _) -> updateFailed metricsVar
-    Right (AckHalt reason) -> updateHalted metricsVar reason
+    Right (AckHalt reason) -> do
+      updateHalted metricsVar reason
+      throwIO $ ProcessorHalt reason -- Stops the processing loop
     Left errMsg -> do
       now' <- liftIO getCurrentTime
       liftIO $ atomically $ modifyTVar' metricsVar $ \m ->

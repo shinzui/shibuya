@@ -32,6 +32,7 @@ library
     Shibuya.Policy
     Shibuya.Prelude
     Shibuya.Runner
+    Shibuya.Runner.Halt
     Shibuya.Runner.Ingester
     Shibuya.Runner.Master
     Shibuya.Runner.Metrics
@@ -103,7 +104,9 @@ test-suite shibuya-core-test
     hspec ^>=2.11,
     nqe,
     shibuya-core,
+    stm,
     streamly,
     streamly-core,
     text,
     time,
+    unliftio,

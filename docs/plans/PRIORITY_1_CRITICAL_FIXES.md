@@ -4,154 +4,57 @@ These issues represent gaps between documented/expected behavior and actual impl
 
 ---
 
-## 1.1 Implement Backpressure
+## 1.1 Implement Backpressure ✅ COMPLETED
 
-### Problem
-The `inboxSize` parameter in `runApp` and `runSupervised` is documented for backpressure but has no effect. The `Ingester.hs` module exists with bounded inbox logic but is never used.
+**Status:** Implemented in commit `31427e2`
 
-**Current flow:**
-```
-Adapter.source → Stream.mapM processMessage → drain
-```
+### Summary
+Backpressure is now implemented via NQE's bounded inbox. The `inboxSize` parameter in `runSupervised` and `runWithMetrics` controls the inbox capacity.
 
-**Expected flow:**
+### Architecture
 ```
-Adapter.source → Ingester (bounded inbox) → Processor → Handler
+Adapter.source → Ingester (async) → Bounded Inbox → Processor → Handler
 ```
 
-### Files to Modify
-- `src/Shibuya/Runner/Supervised.hs` - Main changes
-- `src/Shibuya/Runner/Ingester.hs` - May need adjustments
-- `src/Shibuya/Runner/Processor.hs` - May need adjustments
+### Key Changes
+- `Supervised.hs`: Uses `newBoundedInbox inboxSize` to create bounded channel
+- `Ingester.hs`: Added `runIngesterWithMetrics` to track received count
+- `Processor.hs`: Added `drainInbox` for processing remaining messages after stream exhausts
 
-### Implementation Plan
-
-#### Step 1: Understand current Ingester/Processor design
-Read and verify the existing `Ingester.hs` and `Processor.hs` implementations work correctly in isolation.
-
-#### Step 2: Modify `runSupervised` to use bounded inbox
-```haskell
--- Current (Supervised.hs:118-122)
-supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-  addChild master.state.supervisor $
-    runInIO $
-      processStream metricsVar doneVar adapter handler
-        `finally` unregisterProcessor master procId
-
--- New approach:
--- 1. Create bounded inbox using NQE
--- 2. Spawn ingester thread (adapter.source → inbox)
--- 3. Spawn processor thread (inbox → handler)
--- 4. Link both threads for supervision
-```
-
-#### Step 3: Update `processStream` or replace it
-Either modify `processStream` to:
-- Accept an inbox and use `Processor.runProcessor`, OR
-- Split into two async operations (ingester + processor)
-
-#### Step 4: Handle metrics in the new flow
-Ensure `incReceived` is called by ingester, `incProcessed`/`incFailed` by processor.
-
-#### Step 5: Add backpressure tests
-- Test that fast producer blocks when inbox is full
-- Test that slow consumer doesn't cause memory growth
-- Test metrics are accurate under backpressure
-
-### Breaking Changes
-None expected - this implements documented behavior.
-
-### Test Plan
-1. Create adapter that produces messages faster than handler processes
-2. Verify inbox size limits buffered messages
-3. Verify `dropped` metric increments if using drop-on-full strategy (or blocking behavior)
+### Behavior
+- **Blocking backpressure**: When inbox is full, ingester blocks until space is available
+- **Graceful shutdown**: Processor drains remaining messages when stream completes
+- **Metrics tracking**: `received` incremented by ingester, `processed`/`failed` by processor
 
 ---
 
-## 1.2 Implement AckHalt
+## 1.2 Implement AckHalt ✅ COMPLETED
 
-### Problem
-`AckHalt` decision is defined but doesn't stop processing. Code has explicit TODO:
+**Status:** Implemented using exception-based approach with halt isolation.
 
-```haskell
--- Processor.hs:62-65
-case decision of
-  AckHalt _ -> pure () -- For now, just continue. Runner should handle halt.
-  _ -> pure ()
-```
+### Summary
+`AckHalt` now properly stops processing. When a handler returns `AckHalt`, only that processor stops while other processors continue running independently.
 
-### Files to Modify
-- `src/Shibuya/Runner/Processor.hs` - Signal halt
-- `src/Shibuya/Runner/Supervised.hs` - Handle halt signal
-- `src/Shibuya/Runner/Metrics.hs` - Add `Halted` state (optional)
+### Architecture
+- **Exception-based signaling**: `ProcessorHalt` exception thrown on `AckHalt`
+- **Halt isolation**: `runSupervised` catches `ProcessorHalt` to prevent propagation via `link`
+- **Metrics update**: State set to `Failed` with halt reason text before stopping
 
-### Implementation Plan
+### Key Changes
+- `Halt.hs` (new): Defines `ProcessorHalt` exception type
+- `Supervised.hs`: Throws `ProcessorHalt` after updating metrics; catches for halt isolation
+- `Processor.hs`: Removed TODO comment, cleaned up unused import
 
-#### Step 1: Define halt signaling mechanism
-Options:
-- **Option A:** Throw a custom `HaltException` that supervisor catches
-- **Option B:** Return `Either HaltReason ()` from processor loop
-- **Option C:** Use `MVar`/`TVar` to signal halt condition
+### Behavior
+- **Halt stops processing**: Handler returning `AckHalt` terminates that processor
+- **Halt isolation**: Other processors continue unaffected
+- **Unexpected exceptions propagate**: Bugs/resource errors still propagate via `link`
+- **Metrics reflect state**: Processor state shows `Failed` with halt reason
 
-Recommendation: **Option A** - fits NQE supervision model, allows supervisor to decide restart behavior.
-
-#### Step 2: Create HaltException type
-```haskell
--- New in Supervised.hs or a shared module
-data ProcessorHalt = ProcessorHalt !HaltReason
-  deriving (Show)
-
-instance Exception ProcessorHalt
-```
-
-#### Step 3: Update Processor to throw on halt
-```haskell
--- Processor.hs
-processOne handler inbox = do
-  ingested <- receive inbox
-  decision <- handler ingested
-  ingested.ack.finalize decision
-
-  case decision of
-    AckHalt reason -> throwIO (ProcessorHalt reason)
-    _ -> pure ()
-```
-
-#### Step 4: Update Supervised to catch and handle
-```haskell
--- Supervised.hs - in processStream or processMessage
-case result of
-  Right (AckHalt reason) -> do
-    updateHalted metricsVar reason
-    throwIO (ProcessorHalt reason)  -- Propagate to supervisor
-  -- ...
-```
-
-#### Step 5: Update metrics state machine
-Consider adding explicit `Halted` state vs reusing `Failed`:
-```haskell
-data ProcessorState
-  = Idle
-  | Processing !Int !UTCTime
-  | Failed !Text !UTCTime
-  | Halted !HaltReason !UTCTime  -- New
-  | Stopped
-```
-
-#### Step 6: Add tests
-- Test `AckHalt` stops processing
-- Test correct state transition
-- Test supervisor receives the halt
-
-### Breaking Changes
-- `ProcessorState` gains new constructor (if adding `Halted`)
-- Behavior change: processing actually stops now
-
-### Test Plan
-1. Handler returns `AckHalt` on specific message
-2. Verify no subsequent messages processed
-3. Verify metrics show halted state
-4. Verify supervisor is notified
+### Tests Added
+- `stops processing when handler returns AckHalt`
+- `updates metrics to halted state on AckHalt`
+- `halt in one supervised processor doesn't affect others`
 
 ---
 
@@ -337,18 +240,16 @@ None - documentation only.
 
 ## Implementation Order
 
-Recommended order to implement these fixes:
+Recommended order to implement remaining fixes:
 
 1. **1.4 Document Actual Behavior** - Quick win, sets expectations
 2. **1.3 Validate Policies** - Catches misconfigurations early
-3. **1.2 Implement AckHalt** - Smaller scope, needed for ordered streams
-4. **1.1 Implement Backpressure** - Largest change, most complex
 
-## Estimated Scope
+## Progress
 
-| Item | Complexity | Files Changed | New Tests |
-|------|------------|---------------|-----------|
-| 1.1 Backpressure | High | 3-4 | 3-5 |
-| 1.2 AckHalt | Medium | 3 | 2-3 |
-| 1.3 Policies | Medium | 2-3 | 2-3 |
-| 1.4 Documentation | Low | 3-4 | 0 |
+| Item | Status | Complexity | Notes |
+|------|--------|------------|-------|
+| 1.1 Backpressure | ✅ Done | High | Commit `31427e2` |
+| 1.2 AckHalt | ✅ Done | Medium | See `ACKHALT_IMPLEMENTATION.md` |
+| 1.3 Policies | 🔲 Pending | Medium | |
+| 1.4 Documentation | 🔲 Pending | Low | |

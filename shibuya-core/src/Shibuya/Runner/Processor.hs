@@ -10,7 +10,6 @@ where
 import Control.Concurrent.NQE.Process (Inbox, mailboxEmpty, receive)
 import Control.Monad (forever, unless)
 import Effectful (Eff, IOE, (:>))
-import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Handler (Handler)
@@ -58,12 +57,8 @@ processOne handler inbox = do
   decision <- handler ingested
 
   -- Finalize the ack (commit, retry, dead-letter, or halt)
+  -- Note: AckHalt is handled by the supervised runner (Supervised.hs throws ProcessorHalt)
   ingested.ack.finalize decision
-
-  -- TODO: Handle AckHalt by propagating up
-  case decision of
-    AckHalt _ -> pure () -- For now, just continue. Runner should handle halt.
-    _ -> pure ()
 
 -- | Drain all remaining messages from inbox until empty.
 -- Used after ingester completes to process buffered messages.

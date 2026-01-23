@@ -3,16 +3,18 @@
 module Shibuya.Runner.SupervisedSpec (spec) where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
+import Control.Concurrent.STM (readTVarIO)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.Core.Ack (AckDecision (..))
+import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Master
   ( Master,
     getAllMetrics,
@@ -31,10 +33,13 @@ import Shibuya.Runner.Supervised
     getMetrics,
     getProcessorState,
     isDone,
+    runSupervised,
     runWithMetrics,
   )
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
+import UnliftIO (try)
+import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
 spec = do
@@ -113,10 +118,105 @@ spec = do
 
         done `shouldBe` True
 
+    describe "AckHalt behavior" $ do
+      it "stops processing when handler returns AckHalt" $ do
+        processedCount <- do
+          processedRef <- newIORef (0 :: Int)
+
+          let handler _ = do
+                count <- liftIO $ readIORef processedRef
+                liftIO $ modifyIORef' processedRef (+ 1)
+                if count >= 2
+                  then pure $ AckHalt (HaltFatal "stopping after 3")
+                  else pure AckOk
+
+          -- Try to run and catch ProcessorHalt
+          result <- try $ runEff $ do
+            messages <- createTestMessages 10
+            let adapter = testAdapter messages
+                procId = ProcessorId "halting-processor"
+            runWithMetrics 10 procId adapter handler
+
+          -- Verify ProcessorHalt was thrown
+          case result of
+            Left (ProcessorHalt reason) ->
+              reason `shouldBe` HaltFatal "stopping after 3"
+            Right _ ->
+              expectationFailure "Expected ProcessorHalt exception"
+
+          readIORef processedRef
+
+        -- Should have processed exactly 3 messages before halt
+        processedCount `shouldBe` 3
+
+      it "updates metrics to halted state on AckHalt" $ do
+        finalMetrics <- runEff $ do
+          messages <- createTestMessages 5
+
+          let handler _ = pure $ AckHalt (HaltFatal "immediate halt")
+              adapter = testAdapter messages
+
+          master <- startMaster IgnoreAll
+
+          -- runSupervised catches ProcessorHalt, so we can check metrics
+          sp <- runSupervised master 10 (ProcessorId "halt-metrics") adapter handler
+
+          -- Wait for processor to halt
+          liftIO $ threadDelay 100000 -- 100ms
+          m <- liftIO $ readTVarIO sp.metrics
+          stopMaster master
+          pure m
+
+        case finalMetrics.state of
+          Failed msg _ -> msg `shouldSatisfy` (Text.isInfixOf "immediate halt")
+          other -> expectationFailure $ "Expected Failed state, got: " ++ show other
+
+      it "halt in one supervised processor doesn't affect others" $ do
+        (countA, countB) <- runEff $ do
+          countARef <- liftIO $ newIORef (0 :: Int)
+          countBRef <- liftIO $ newIORef (0 :: Int)
+
+          messagesA <- createTestMessages 10
+          messagesB <- createTestMessages 10
+
+          -- Handler A halts after 2 messages
+          let handlerA _ = do
+                count <- liftIO $ readIORef countARef
+                liftIO $ modifyIORef' countARef (+ 1)
+                if count >= 1
+                  then pure $ AckHalt (HaltFatal "A stopping")
+                  else pure AckOk
+
+          -- Handler B processes all messages
+          let handlerB _ = do
+                liftIO $ modifyIORef' countBRef (+ 1)
+                pure AckOk
+
+          let adapterA = testAdapter messagesA
+              adapterB = testAdapter messagesB
+
+          master <- startMaster IgnoreAll
+
+          _spA <- runSupervised master 10 (ProcessorId "A") adapterA handlerA
+          _spB <- runSupervised master 10 (ProcessorId "B") adapterB handlerB
+
+          -- Wait for both to complete
+          liftIO $ threadDelay 500000 -- 500ms
+          cA <- liftIO $ readIORef countARef
+          cB <- liftIO $ readIORef countBRef
+
+          stopMaster master
+          pure (cA, cB)
+
+        -- A should have stopped after 2 messages
+        countA `shouldBe` 2
+        -- B should have processed all 10
+        countB `shouldBe` 10
+
 -- Test helpers
 
 testTime :: UTCTime
-testTime = UTCTime (fromGregorian 2024 1 1) 0
+testTime = UTCTime (fromGregorian 2026 1 1) 0
 
 createTestMessages :: (IOE :> es) => Int -> Eff es [Ingested es String]
 createTestMessages n = mapM createMessage [1 .. n]
