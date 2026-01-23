@@ -14,19 +14,17 @@ exposed-modules:
   Shibuya.Runner.Ingester    -- Internal: stream-to-inbox bridge
   Shibuya.Runner.Processor   -- Internal: inbox-to-handler loop
   Shibuya.Runner.Serial      -- Internal: alternative runner
+  Shibuya.Runner.Halt        -- Internal: halt exception type
 ```
 
 Users may depend on these, making refactoring difficult.
 
 ### Files to Modify
 - `shibuya-core.cabal`
-- Possibly rename modules to `Shibuya.Internal.*`
 
 ### Implementation Plan
 
-#### Option A: Move to other-modules (Simple)
-
-##### Step 1: Update cabal file
+#### Step 1: Move to other-modules
 ```cabal
 library
   exposed-modules:
@@ -49,43 +47,14 @@ library
     Shibuya.Stream
 
   other-modules:
+    Shibuya.Runner.Halt       -- Hidden
     Shibuya.Runner.Ingester   -- Hidden
     Shibuya.Runner.Processor  -- Hidden
     Shibuya.Runner.Serial     -- Hidden
 ```
 
-##### Step 2: Verify builds
+#### Step 2: Verify builds
 Ensure the library still builds and tests pass.
-
-#### Option B: Create Internal namespace (More Explicit)
-
-##### Step 1: Create internal module hierarchy
-```
-src/Shibuya/Internal/
-  Ingester.hs
-  Processor.hs
-  Serial.hs
-```
-
-##### Step 2: Update imports in Supervised.hs, etc.
-```haskell
--- Old
-import Shibuya.Runner.Ingester (runIngester)
-
--- New
-import Shibuya.Internal.Ingester (runIngester)
-```
-
-##### Step 3: Update cabal
-```cabal
-other-modules:
-  Shibuya.Internal.Ingester
-  Shibuya.Internal.Processor
-  Shibuya.Internal.Serial
-```
-
-### Recommendation
-**Option A** is simpler and sufficient. Option B is better if you want to clearly signal "internal" in import statements.
 
 ### Breaking Changes
 - Users importing hidden modules will get compilation errors
@@ -97,6 +66,7 @@ other-modules:
 
 ### Removed Exports
 The following modules are no longer publicly exported:
+- `Shibuya.Runner.Halt` - Internal exception type
 - `Shibuya.Runner.Ingester` - Use `Shibuya.App.runApp` instead
 - `Shibuya.Runner.Processor` - Use `Shibuya.App.runApp` instead
 - `Shibuya.Runner.Serial` - Use `Shibuya.App.runApp` instead
@@ -126,25 +96,7 @@ import Shibuya.Core
 
 ### Implementation Plan
 
-#### Step 1: Audit what's needed to use runApp
-```haskell
--- To call runApp, users need:
-runApp :: Strategy -> Int -> [(ProcessorId, QueueProcessor es)] -> ...
-
--- Therefore they need:
--- - Strategy (already exported)
--- - ProcessorId (already exported)
--- - QueueProcessor (MISSING)
-
--- To use the result, they need:
--- - AppHandle (MISSING)
--- - AppError (MISSING - wait, this IS exported)
--- - waitApp (MISSING)
--- - stopApp (MISSING)
--- - getAppMetrics (MISSING)
-```
-
-#### Step 2: Add missing exports to Core.hs
+#### Step 1: Add missing exports to Core.hs
 ```haskell
 module Shibuya.Core
   ( -- ... existing exports ...
@@ -171,7 +123,7 @@ import Shibuya.App
   )
 ```
 
-#### Step 3: Update documentation
+#### Step 2: Update documentation
 Add example in module haddock:
 ```haskell
 -- | Shibuya Core - Public API
@@ -183,109 +135,22 @@ Add example in module haddock:
 --
 -- main = runEff $ do
 --   let processor = QueueProcessor myAdapter myHandler
---   result <- runApp IgnoreAll 100 [(ProcessorId "main", processor)]
+--   result <- runApp IgnoreAll 100 [(ProcessorId \"main\", processor)]
 --   case result of
 --     Right handle -> waitApp handle
 --     Left err -> print err
 -- @
 ```
 
-#### Step 4: Verify example compiles with single import
+#### Step 3: Verify example compiles with single import
 Create a test file that only imports `Shibuya.Core` and uses all common operations.
 
 ### Breaking Changes
 None - only additions.
 
-### Consideration: Re-export Everything?
-Should `Core.hs` also re-export:
-- `listAdapter` from `Adapter.Mock`?
-- Stream utilities from `Shibuya.Stream`?
-
-Recommendation: Keep `Core.hs` focused on the main API. Users needing mock adapters or stream utilities can import those modules directly.
-
 ---
 
-## 2.3 Remove Unused Parameters
-
-### Problem
-Several functions have parameters documented as "unused" or that have no effect:
-
-```haskell
--- Supervised.hs:141
-runWithMetrics ::
-  Natural ->  -- "Inbox size (unused, for API compatibility)"
-  ProcessorId ->
-  ...
-
--- Serial.hs:29
-runSerial ::
-  Natural ->  -- "Inbox size (unused in serial mode, for API compatibility)"
-  ...
-```
-
-### Files to Modify
-- `src/Shibuya/Runner/Supervised.hs`
-- `src/Shibuya/Runner/Serial.hs`
-- `src/Shibuya/Core.hs` (if these are exported)
-
-### Implementation Plan
-
-#### Decision Point: Remove or Implement?
-
-**If backpressure will be implemented (Priority 1.1):**
-- Keep the parameter, it will be used soon
-- Update comment to say "Reserved for backpressure implementation"
-
-**If backpressure is deferred:**
-- Remove unused parameters to avoid confusion
-
-#### Path A: Keep and Document (If implementing backpressure soon)
-
-##### Step 1: Update comments
-```haskell
-runWithMetrics ::
-  -- | Inbox size for backpressure.
-  -- Currently unused; will be implemented in a future version.
-  -- See: https://github.com/xxx/shibuya/issues/NN
-  Natural ->
-  ...
-```
-
-#### Path B: Remove (If backpressure is deferred)
-
-##### Step 1: Remove from runWithMetrics
-```haskell
--- Old
-runWithMetrics :: Natural -> ProcessorId -> Adapter es msg -> Handler es msg -> Eff es SupervisedProcessor
-
--- New
-runWithMetrics :: ProcessorId -> Adapter es msg -> Handler es msg -> Eff es SupervisedProcessor
-```
-
-##### Step 2: Update callers
-Search for all uses of `runWithMetrics` and remove the first argument.
-
-##### Step 3: Remove from runSerial (if keeping Serial.hs)
-```haskell
--- Old
-runSerial :: Natural -> Adapter es msg -> Handler es msg -> Eff es ()
-
--- New
-runSerial :: Adapter es msg -> Handler es msg -> Eff es ()
-```
-
-##### Step 4: Update Core.hs exports if affected
-
-### Recommendation
-Given that Priority 1.1 is to implement backpressure, **Path A (keep and document)** is better. Once backpressure is implemented, the parameter becomes meaningful.
-
-### Breaking Changes
-- Path B removes a parameter (breaking for callers)
-- Path A is non-breaking
-
----
-
-## 2.4 Define Own Strategy Type
+## 2.3 Define Own Strategy Type
 
 ### Problem
 `Strategy` is re-exported directly from NQE:
@@ -367,23 +232,6 @@ import Shibuya.Supervision (SupervisionStrategy (..))
 -- Don't export NQE.Strategy
 ```
 
-#### Step 6: Update documentation
-```haskell
--- | Supervision strategy for handling processor failures.
---
--- @
--- -- Keep running even if processors fail
--- runApp IgnoreFailures 100 processors
---
--- -- Stop everything if any processor fails
--- runApp StopAllOnFailure 100 processors
---
--- -- Restart individual failed processors
--- runApp RestartOnFailure 100 processors
--- @
-data SupervisionStrategy = ...
-```
-
 ### Breaking Changes
 - Type name changes from `Strategy` to `SupervisionStrategy`
 - Constructor names change (e.g., `IgnoreAll` → `IgnoreFailures`)
@@ -432,17 +280,15 @@ Recommended order:
 
 1. **2.2 Complete Core.hs Exports** - Quick win, improves ergonomics
 2. **2.1 Hide Internal Modules** - Simple cabal change
-3. **2.3 Remove Unused Parameters** - Depends on Priority 1.1 decision
-4. **2.4 Define Own Strategy Type** - Larger change, can be deferred
+3. **2.3 Define Own Strategy Type** - Larger change, can be deferred
 
-## Estimated Scope
+## Progress
 
-| Item | Complexity | Files Changed | Breaking |
-|------|------------|---------------|----------|
-| 2.1 Hide Internals | Low | 1 (cabal) | Minor |
-| 2.2 Core.hs Exports | Low | 1 | No |
-| 2.3 Unused Params | Low | 2-3 | Maybe |
-| 2.4 Own Strategy | Medium | 3-4 | Yes |
+| Item | Status | Complexity | Breaking |
+|------|--------|------------|----------|
+| 2.1 Hide Internals | 🔲 Pending | Low | Minor |
+| 2.2 Core.hs Exports | 🔲 Pending | Low | No |
+| 2.3 Own Strategy | 🔲 Pending | Medium | Yes |
 
 ## Version Strategy
 
@@ -453,5 +299,4 @@ Consider bundling breaking changes:
 
 **v0.2.0** (breaking):
 - 2.1 Hide internal modules
-- 2.3 Remove unused parameters (if removing)
-- 2.4 Define own Strategy type
+- 2.3 Define own Strategy type
