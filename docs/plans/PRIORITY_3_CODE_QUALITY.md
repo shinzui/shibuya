@@ -91,29 +91,13 @@ catchAny (\e -> pure . Left . HandlerException . Text.pack . show $ e)
 
 ---
 
-## 3.2 Remove Dead Code
+## 3.2 Remove Dead Code ✅ COMPLETED
 
-### Problem
-Several modules and types are defined but never used:
+**Status:** Implemented. Removed unused `Runner.hs` module entirely.
 
-| Code | Location | Issue |
-|------|----------|-------|
-| `RunnerConfig` | `Runner.hs` | Never used by `runApp` |
-| `defaultRunnerConfig` | `Runner.hs` | Never called |
-
-### Recommendation
-Since this is pre-release, remove unused code:
-
-1. Remove `RunnerConfig` and `defaultRunnerConfig` from `Runner.hs`
-2. Remove exports from `Core.hs`
-3. Update cabal if removing modules entirely
-
-### Implementation
-```bash
-# Find any usage before removing
-grep -r "RunnerConfig" .
-grep -r "defaultRunnerConfig" .
-```
+### Summary
+Removed `RunnerConfig` and `defaultRunnerConfig` which were never used by `runApp`.
+The entire `Shibuya.Runner` module was deleted since it only contained this dead code.
 
 ---
 
@@ -162,7 +146,7 @@ Recommended order:
 | Item | Status | Complexity |
 |------|--------|------------|
 | 3.1 Error Handling | 🔲 Pending | High |
-| 3.2 Dead Code | 🔲 Pending | Low |
+| 3.2 Dead Code | ✅ Done | Low |
 | 3.3 Add Eq | ✅ Done | Trivial |
 | 3.4 Replace Polling | ✅ Done | Low |
 

@@ -43,10 +43,6 @@ module Shibuya.Core
     Concurrency (..),
     validatePolicy,
 
-    -- * Runner
-    RunnerConfig (..),
-    defaultRunnerConfig,
-
     -- * App
     runApp,
     AppError (..),
@@ -80,7 +76,6 @@ import Shibuya.Core.Lease (Lease (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
-import Shibuya.Runner (RunnerConfig (..), defaultRunnerConfig)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
 import Prelude hiding (Ordering)
