@@ -10,6 +10,10 @@ common warnings
 
 executable shibuya-example
   import: warnings
+  ghc-options:
+    -threaded
+    -rtsopts
+
   main-is: Main.hs
   hs-source-dirs: app
   default-language: GHC2024
