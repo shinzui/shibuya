@@ -60,42 +60,44 @@ Adapter.source → Ingester (async) → Bounded Inbox → Processor → Handler
 
 ---
 
-## 1.3 Enforce or Remove Policy Types
+## 1.3 Document Policy Types as Planned ✅ COMPLETED
 
-### Problem
-`Ordering` and `Concurrency` policies are defined but never used:
-- `validatePolicy` is never called
-- `Async` and `Ahead` concurrency modes do nothing
-- `RunnerConfig` holds these but is unused
+**Status:** Decision made to keep policy types and document as planned features.
 
-### Files to Modify
-- `src/Shibuya/App.hs` - Add validation
-- `src/Shibuya/Runner/Supervised.hs` - Implement concurrency modes OR
-- `src/Shibuya/Policy.hs` - Simplify if removing
+### Background
+`Ordering` and `Concurrency` policies are defined but not enforced:
+- `validatePolicy` exists but is never called
+- `Async` and `Ahead` concurrency modes are defined but only `Serial` is implemented
+- `RunnerConfig` was removed (Priority 3.2) as it was entirely unused
 
-### Recommendation: Remove Until Needed
+### Decision: Keep Types, Document as Planned
 
-Since this is pre-release, simplify by removing unused code:
+The concurrency modes represent real functionality that will be implemented:
 
-1. Remove `RunnerConfig` (entirely unused)
-2. Simplify `Concurrency` to just `Serial`
-3. Keep `Ordering` for documentation but don't enforce
-4. Remove `validatePolicy` or keep as internal
-
-### Implementation
 ```haskell
--- Simplified Policy.hs
-data Concurrency = Serial
-  deriving stock (Eq, Show, Generic)
-
--- Ordering kept for future use
-data Ordering = StrictInOrder | PartitionedInOrder | Unordered
-  deriving stock (Eq, Show, Generic)
+data Concurrency
+  = Serial       -- ✅ Implemented (one message at a time)
+  | Ahead !Int   -- 🔲 Planned (prefetch N, process in order)
+  | Async !Int   -- 🔲 Planned (process N concurrently)
 ```
 
-### Test Plan
-1. Verify build after removing unused types
-2. Update any imports that reference removed types
+### Rationale
+
+1. **Handler-level vs Stream-level concurrency**: These are distinct concerns.
+   - Stream-level (Streamly): How messages are *fetched* - user controls via adapter
+   - Handler-level (Shibuya): How messages are *processed* - controlled by Concurrency policy
+
+2. **Future implementation path**: `Ahead` and `Async` would use Streamly's `parMapM` internally:
+   - `Ahead n` → `parMapM (maxBuffer n . ordered True)` - concurrent but preserves order
+   - `Async n` → `parMapM (maxBuffer n)` - concurrent, completion order
+
+3. **Ordering semantics matter**: The `Ordering` type documents the message ordering contract.
+
+### Documentation Added
+- Created `docs/architecture/CONCURRENCY.md` with comprehensive concurrency architecture
+- Documents responsibilities: NQE (process supervision), Streamly (stream concurrency), Shibuya (handler concurrency)
+- Explains the difference between stream-level and handler-level concurrency
+- Marks `Ahead`/`Async` as planned for future release
 
 ---
 
@@ -141,10 +143,9 @@ The `Ahead` and `Async` concurrency modes are planned for a future release.
 
 ## Implementation Order
 
-Recommended order to implement remaining fixes:
+Remaining:
 
-1. **1.3 Remove Unused Policies** - Simplify codebase
-2. **1.4 Document Actual Behavior** - Ensure accuracy
+1. **1.4 Document Actual Behavior** - Ensure docs match implementation
 
 ## Progress
 
@@ -152,5 +153,5 @@ Recommended order to implement remaining fixes:
 |------|--------|------------|
 | 1.1 Backpressure | ✅ Done | High |
 | 1.2 AckHalt | ✅ Done | Medium |
-| 1.3 Policies | 🔲 Pending | Low |
+| 1.3 Policies | ✅ Done | Low |
 | 1.4 Documentation | 🔲 Pending | Low |
