@@ -27,12 +27,12 @@ import Control.Concurrent.STM (atomically, check, readTVar)
 import Control.Monad (forM_)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Text (Text)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, (:>))
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..), handlerErrorToText, policyErrorToText, runtimeErrorToText)
 import Shibuya.Handler (Handler)
 import Shibuya.Runner.Master
   ( Master,
@@ -79,15 +79,14 @@ toNQEStrategy = \case
 --------------------------------------------------------------------------------
 
 -- | Application errors.
+-- Uses structured error types from Shibuya.Core.Error.
 data AppError
   = -- | Invalid policy configuration
-    PolicyValidationError !Text
-  | -- | Adapter error
-    AdapterError !Text
-  | -- | Handler error
-    HandlerError !Text
+    AppPolicyError !PolicyError
+  | -- | Handler execution error
+    AppHandlerError !HandlerError
   | -- | Runtime error
-    RuntimeError !Text
+    AppRuntimeError !RuntimeError
   deriving stock (Eq, Show)
 
 -- | A queue processor pairs an adapter with its handler.
@@ -148,7 +147,7 @@ runApp strategy inboxSize namedProcessors = do
               }
     )
     ( \(e :: SomeException) ->
-        pure $ Left $ RuntimeError $ Text.pack $ displayException e
+        pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
     )
 
 -- | Spawn all processors under supervision.

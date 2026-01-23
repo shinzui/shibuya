@@ -12,6 +12,7 @@ module Shibuya.Policy
   )
 where
 
+import Shibuya.Core.Error (PolicyError (..))
 import Shibuya.Prelude
 import Prelude hiding (Ordering)
 
@@ -37,7 +38,7 @@ data Concurrency
 
 -- | Validate policy combinations.
 -- Invariant: StrictInOrder => Serial
-validatePolicy :: Ordering -> Concurrency -> Either Text ()
-validatePolicy StrictInOrder (Ahead _) = Left "StrictInOrder requires Serial concurrency"
-validatePolicy StrictInOrder (Async _) = Left "StrictInOrder requires Serial concurrency"
+validatePolicy :: Ordering -> Concurrency -> Either PolicyError ()
+validatePolicy StrictInOrder (Ahead _) = Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
+validatePolicy StrictInOrder (Async _) = Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
 validatePolicy _ _ = Right ()

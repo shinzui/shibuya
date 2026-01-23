@@ -17,6 +17,7 @@ library
     Shibuya.Core
     Shibuya.Core.Ack
     Shibuya.Core.AckHandle
+    Shibuya.Core.Error
     Shibuya.Core.Ingested
     Shibuya.Core.Lease
     Shibuya.Core.Types

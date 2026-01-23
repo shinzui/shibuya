@@ -6,88 +6,25 @@ These issues affect maintainability, testability, and code cleanliness. While no
 
 ---
 
-## 3.1 Consolidate Error Handling
+## 3.1 Consolidate Error Handling ✅ COMPLETED
 
-### Problem
-Errors are represented inconsistently across the codebase:
+**Status:** Implemented. Created unified error module with structured types.
 
-| Location | Error Representation |
-|----------|---------------------|
-| `App.hs` | `AppError` sum type |
-| `Policy.hs` | `Either Text ()` |
-| `Metrics.hs` | `Failed Text UTCTime` (plain text) |
-| `Supervised.hs` | Catches exceptions → `Text` |
+### Summary
+Created `Shibuya.Core.Error` module with structured error types:
+- `PolicyError` - Policy validation errors
+- `HandlerError` - Handler execution errors
+- `RuntimeError` - Runtime/supervisor errors
 
-This makes error handling unpredictable and loses structured information.
+Updated all error handling to use structured types:
+- `validatePolicy` now returns `Either PolicyError ()`
+- `AppError` uses structured constructors: `AppPolicyError`, `AppHandlerError`, `AppRuntimeError`
+- `Supervised.hs` wraps exceptions in `HandlerException`
 
-### Files to Modify
-- `src/Shibuya/Core/Error.hs` (new)
-- `src/Shibuya/App.hs`
-- `src/Shibuya/Policy.hs`
-- `src/Shibuya/Runner/Metrics.hs`
-- `src/Shibuya/Runner/Supervised.hs`
-
-### Implementation Plan
-
-#### Step 1: Create unified error module
-```haskell
--- New file: src/Shibuya/Core/Error.hs
-module Shibuya.Core.Error
-  ( ShibuyaError (..),
-    PolicyError (..),
-    AdapterError (..),
-    HandlerError (..),
-    RuntimeError (..),
-    errorToText,
-  ) where
-
-data ShibuyaError
-  = ShibuyaPolicyError !PolicyError
-  | ShibuyaAdapterError !AdapterError
-  | ShibuyaHandlerError !HandlerError
-  | ShibuyaRuntimeError !RuntimeError
-  deriving stock (Eq, Show, Generic)
-
-data PolicyError = InvalidPolicyCombo !Ordering !Concurrency !Text
-  deriving stock (Eq, Show, Generic)
-
-data AdapterError
-  = AdapterConnectionFailed !Text
-  | AdapterStreamEnded !Text
-  deriving stock (Eq, Show, Generic)
-
-data HandlerError
-  = HandlerException !Text
-  | HandlerTimeout
-  deriving stock (Eq, Show, Generic)
-
-data RuntimeError
-  = SupervisorFailed !Text
-  | InboxOverflow
-  deriving stock (Eq, Show, Generic)
-```
-
-#### Step 2: Update AppError to use ShibuyaError
-```haskell
-type AppError = ShibuyaError
-```
-
-#### Step 3: Update validatePolicy
-```haskell
-validatePolicy :: Ordering -> Concurrency -> Either PolicyError ()
-```
-
-#### Step 4: Update ProcessorState.Failed
-```haskell
-data ProcessorState = Failed !HandlerError !UTCTime
-```
-
-#### Step 5: Update Supervised.hs exception catching
-```haskell
-catchAny (\e -> pure . Left . HandlerException . Text.pack . show $ e)
-```
-
-#### Step 6: Export from Core.hs
+### Design Decision
+`ProcessorState.Failed` still uses `Text` for simplicity (display-only). The structured
+errors are converted to text at the metrics boundary. This keeps metrics simple while
+providing structured errors at the API level.
 
 ---
 
@@ -145,11 +82,9 @@ Recommended order:
 
 | Item | Status | Complexity |
 |------|--------|------------|
-| 3.1 Error Handling | 🔲 Pending | High |
+| 3.1 Error Handling | ✅ Done | High |
 | 3.2 Dead Code | ✅ Done | Low |
 | 3.3 Add Eq | ✅ Done | Trivial |
 | 3.4 Replace Polling | ✅ Done | Low |
 
-## Dependencies
-
-- 3.1 (errors) can inform Priority 1.3 (policy validation) error types
+All Priority 3 items have been completed.

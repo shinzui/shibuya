@@ -55,6 +55,11 @@ module Shibuya.Core
     -- * Supervision Strategy
     SupervisionStrategy (..),
 
+    -- * Errors
+    PolicyError (..),
+    HandlerError (..),
+    RuntimeError (..),
+
     -- * Metrics
     ProcessorId (..),
     ProcessorState (..),
@@ -71,6 +76,7 @@ import Shibuya.Adapter (Adapter (..))
 import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), SupervisionStrategy (..), getAppMetrics, runApp, stopApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))

@@ -40,6 +40,7 @@ import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Prelude
@@ -279,7 +280,7 @@ processMessageFromInbox metricsVar handler inbox = do
           ingested.ack.finalize decision
           pure (Right decision)
       )
-      (pure . Left . Text.pack . show)
+      (pure . Left . HandlerException . Text.pack . show)
 
   -- Update stats based on result
   case result of
@@ -289,12 +290,12 @@ processMessageFromInbox metricsVar handler inbox = do
     Right (AckHalt reason) -> do
       updateHalted metricsVar reason
       throwIO $ ProcessorHalt reason -- Stops the processing loop
-    Left errMsg -> do
+    Left handlerErr -> do
       now' <- liftIO getCurrentTime
       liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
         m
           { stats = incFailed m.stats,
-            state = Failed errMsg now'
+            state = Failed (handlerErrorToText handlerErr) now'
           }
 
 updateSuccess :: (IOE :> es) => TVar ProcessorMetrics -> Eff es ()
