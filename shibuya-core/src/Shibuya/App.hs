@@ -7,6 +7,7 @@ module Shibuya.App
 
     -- * AppHandle Operations
     getAppMetrics,
+    getAppMaster,
     stopApp,
     waitApp,
 
@@ -170,6 +171,11 @@ spawnProcessors master inboxSize = traverse spawnOne
 -- | Get metrics for all processors.
 getAppMetrics :: (IOE :> es) => AppHandle es -> Eff es MetricsMap
 getAppMetrics appHandle = getAllMetrics appHandle.master
+
+-- | Get the master handle for direct access.
+-- This is useful for integrating with the metrics server.
+getAppMaster :: AppHandle es -> Master
+getAppMaster appHandle = appHandle.master
 
 -- | Gracefully stop all processors and shut down the master.
 stopApp :: (IOE :> es) => AppHandle es -> Eff es ()

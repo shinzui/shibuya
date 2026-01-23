@@ -47,6 +47,7 @@ library
     QuasiQuotes
 
   build-depends:
+    aeson ^>=2.2,
     base ^>=4.21.0.0,
     bytestring ^>=0.12.2.0,
     containers,

@@ -24,12 +24,16 @@ module Shibuya.Runner.Metrics
   )
 where
 
+import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:))
+import Data.Aeson qualified as Aeson
 import Data.Map.Strict (Map)
+import Data.Text qualified as Text
 import Shibuya.Prelude
 
 -- | Processor identifier.
 newtype ProcessorId = ProcessorId {unProcessorId :: Text}
   deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey)
 
 -- | Processor runtime state.
 data ProcessorState
@@ -43,6 +47,32 @@ data ProcessorState
     Stopped
   deriving stock (Eq, Show, Generic)
 
+instance ToJSON ProcessorState where
+  toJSON Idle = object ["status" Aeson..= ("idle" :: Text)]
+  toJSON (Processing count lastActivity) =
+    object
+      [ "status" Aeson..= ("processing" :: Text),
+        "inFlight" Aeson..= count,
+        "lastActivity" Aeson..= lastActivity
+      ]
+  toJSON (Failed err timestamp) =
+    object
+      [ "status" Aeson..= ("failed" :: Text),
+        "error" Aeson..= err,
+        "timestamp" Aeson..= timestamp
+      ]
+  toJSON Stopped = object ["status" Aeson..= ("stopped" :: Text)]
+
+instance FromJSON ProcessorState where
+  parseJSON = withObject "ProcessorState" $ \v -> do
+    status <- v .: "status"
+    case status :: Text of
+      "idle" -> pure Idle
+      "processing" -> Processing <$> v .: "inFlight" <*> v .: "lastActivity"
+      "failed" -> Failed <$> v .: "error" <*> v .: "timestamp"
+      "stopped" -> pure Stopped
+      other -> fail $ "Unknown processor state: " <> Text.unpack other
+
 -- | Stream statistics.
 data StreamStats = StreamStats
   { -- | Messages received from stream
@@ -55,6 +85,7 @@ data StreamStats = StreamStats
     failed :: !Int
   }
   deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
 
 -- | Empty stream stats.
 emptyStreamStats :: StreamStats
@@ -70,6 +101,7 @@ data ProcessorMetrics = ProcessorMetrics
     startedAt :: !UTCTime
   }
   deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
 
 -- | Empty processor metrics.
 emptyProcessorMetrics :: UTCTime -> ProcessorMetrics

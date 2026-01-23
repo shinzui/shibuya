@@ -1,7 +1,8 @@
 -- | Example demonstrating Shibuya with multiple independent queues.
 -- Each queue runs as a separate supervised processor, showing how
 -- a single application can process messages from different sources concurrently.
--- This example also shows how to retrieve and display metrics.
+-- This example also shows how to retrieve and display metrics, including
+-- the metrics web server with JSON, Prometheus, and WebSocket endpoints.
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
@@ -20,6 +21,7 @@ import Shibuya.App
     ProcessorMetrics (..),
     QueueProcessor (..),
     SupervisionStrategy (..),
+    getAppMaster,
     getAppMetrics,
     runApp,
     stopApp,
@@ -28,6 +30,7 @@ import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Metrics (MetricsServerConfig (..), defaultConfig, withMetricsServer)
 import Shibuya.Runner.Metrics (ProcessorState (..), StreamStats (..))
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
@@ -146,10 +149,18 @@ main = runEff $ do
     Right appHandle -> do
       liftIO $ Text.putStrLn "All processors started."
 
-      -- Print metrics every second for 5 iterations
-      replicateM_ 5 $ do
-        liftIO $ threadDelay 1000000 -- 1 second
-        printMetrics appHandle
+      -- Start metrics server
+      liftIO $ Text.putStrLn "\nStarting metrics server on port 9090..."
+      liftIO $ Text.putStrLn "  - JSON:       http://localhost:9090/metrics"
+      liftIO $ Text.putStrLn "  - Prometheus: http://localhost:9090/metrics/prometheus"
+      liftIO $ Text.putStrLn "  - WebSocket:  ws://localhost:9090/ws"
+      liftIO $ Text.putStrLn "  - Health:     http://localhost:9090/health\n"
+
+      liftIO $ withMetricsServer defaultConfig (getAppMaster appHandle) $ \_ -> do
+        -- Print metrics every second for 5 iterations
+        runEff $ replicateM_ 5 $ do
+          liftIO $ threadDelay 1000000 -- 1 second
+          printMetrics appHandle
 
       -- Gracefully stop all processors
       liftIO $ Text.putStrLn "Stopping processors..."

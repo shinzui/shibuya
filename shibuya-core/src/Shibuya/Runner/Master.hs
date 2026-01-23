@@ -20,7 +20,9 @@ module Shibuya.Runner.Master
 
     -- * Introspection
     getAllMetrics,
+    getAllMetricsIO,
     getProcessorMetrics,
+    getProcessorMetricsIO,
 
     -- * Processor Management
     registerProcessor,
@@ -159,11 +161,19 @@ getAllMetrics master =
   liftIO $
     GetAllMetrics `query` master.inbox
 
+-- | Get metrics for all processors (IO version for web servers).
+getAllMetricsIO :: Master -> IO MetricsMap
+getAllMetricsIO master = GetAllMetrics `query` master.inbox
+
 -- | Get metrics for a specific processor.
 getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
 getProcessorMetrics master pid =
   liftIO $
     GetProcessorMetrics pid `query` master.inbox
+
+-- | Get metrics for a specific processor (IO version for web servers).
+getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
+getProcessorMetricsIO master pid = GetProcessorMetrics pid `query` master.inbox
 
 -- | Register a processor with the master.
 -- The processor should call this with its metrics TVar.

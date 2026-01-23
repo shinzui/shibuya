@@ -1,6 +1,7 @@
 packages:
   shibuya-core
   shibuya-example
+  shibuya-metrics
 
 -- Use local NQE with Streamly support
 optional-packages:

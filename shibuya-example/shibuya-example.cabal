@@ -29,5 +29,6 @@ executable shibuya-example
     containers,
     effectful ^>=2.6.1.0,
     shibuya-core,
+    shibuya-metrics,
     streamly-core ^>=0.3,
     text ^>=2.1.3,
