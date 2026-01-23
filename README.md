@@ -16,12 +16,23 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 ## Features
 
 - **Unified Queue Abstraction** - Write handlers once, swap queue backends freely
-- **Supervised Processing** - Automatic restart strategies via NQE supervision
+- **Supervised Processing** - Failure isolation via NQE supervision
 - **Backpressure** - Bounded inboxes prevent memory exhaustion
 - **Explicit Ack Semantics** - Handlers express intent (ack, retry, dead-letter, halt), framework handles mechanics
 - **Metrics & Introspection** - Real-time visibility into processor state and statistics
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
+
+### Current Status (v0.1.0-alpha)
+
+| Feature | Status |
+|---------|--------|
+| Serial Processing | ✅ Implemented |
+| Backpressure (bounded inbox) | ✅ Implemented |
+| Ack Semantics (Ok/Retry/DLQ/Halt) | ✅ Implemented |
+| Metrics & Introspection | ✅ Implemented |
+| NQE Supervision | ✅ Implemented |
+| Concurrent Processing (Ahead/Async) | 🔲 Planned |
 
 ## Installation
 
@@ -71,7 +82,7 @@ main = runEff . runConcurrent $ do
         , handler = handleOrder
         }
 
-  result <- runApp IgnoreAll 100
+  result <- runApp IgnoreFailures 100
     [ (ProcessorId "orders", ordersProcessor)
     ]
 
@@ -95,13 +106,13 @@ AckHalt (HaltFatal reason)         -- Stop processing entirely
 
 ```haskell
 -- runApp takes:
---   Strategy   - Supervision strategy (IgnoreAll, KillAll, etc.)
---   Int        - Inbox size for backpressure
+--   SupervisionStrategy - How to handle processor failures
+--   Natural             - Inbox size for backpressure
 --   [(ProcessorId, QueueProcessor es)] - Named processors
 
 result <- runApp
-  IgnoreAll   -- Keep running even if a processor fails
-  500         -- Inbox buffer size
+  IgnoreFailures   -- Keep running even if a processor fails
+  500              -- Inbox buffer size
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   ]
@@ -122,7 +133,7 @@ main = runEff . runConcurrent $ do
         , handler = handleEvents
         }
 
-  result <- runApp IgnoreAll 100
+  result <- runApp IgnoreFailures 100
     [ (ProcessorId "orders", ordersProcessor)
     , (ProcessorId "events", eventsProcessor)
     ]
@@ -155,16 +166,16 @@ shibuya-core/
 │   │   ├── Ack.hs           -- AckDecision, RetryDelay, DeadLetterReason
 │   │   ├── Lease.hs         -- Visibility timeout extension
 │   │   ├── AckHandle.hs     -- Ack finalization
-│   │   └── Ingested.hs      -- What handlers receive
+│   │   ├── Ingested.hs      -- What handlers receive
+│   │   └── Error.hs         -- Structured error types
 │   ├── Handler.hs           -- Handler type
 │   ├── Adapter.hs           -- Adapter interface
 │   ├── Policy.hs            -- Ordering and concurrency policies
-│   ├── Runner.hs            -- RunnerConfig
 │   ├── Runner/
 │   │   ├── Master.hs        -- Supervision coordinator
 │   │   ├── Supervised.hs    -- Supervised processor runner
 │   │   ├── Metrics.hs       -- ProcessorState, StreamStats
-│   │   └── Serial.hs        -- Sequential runner
+│   │   └── Ingester.hs      -- Stream to inbox ingestion
 │   ├── App.hs               -- runApp, QueueProcessor, AppHandle
 │   └── Stream.hs            -- Stream utilities
 ```

@@ -101,51 +101,36 @@ data Concurrency
 
 ---
 
-## 1.4 Document Actual Behavior
+## 1.4 Document Actual Behavior ✅ COMPLETED
 
-### Problem
-Documentation may describe features inaccurately. Need to ensure docs match implementation.
+**Status:** Implemented. All documentation updated to reflect actual implementation.
 
-### Files to Review
-- `docs/USAGE_GUIDE.md`
-- `docs/HIGH_LEVEL_ARCHITECTURE.md`
-- `docs/UNIFIED_ARCHITECTURE.md`
-- `README.md`
+### Summary
 
-### Implementation Plan
+Updated all user-facing documentation to accurately reflect the current implementation:
 
-#### Step 1: Update feature status in docs
-```markdown
-| Feature | Status |
-|---------|--------|
-| Serial Processing | ✅ Implemented |
-| Metrics & Introspection | ✅ Implemented |
-| NQE Supervision | ✅ Implemented |
-| Backpressure | ✅ Implemented |
-| Halt-on-Error (AckHalt) | ✅ Implemented |
-| Async Processing | 🔲 Planned |
-```
+1. **README.md**:
+   - Added feature status table showing implemented vs planned features
+   - Updated code examples to use `IgnoreFailures` (new `SupervisionStrategy`)
+   - Fixed `runApp` signature comments to show `SupervisionStrategy` and `Natural`
+   - Updated project structure (removed `Runner.hs`, added `Error.hs`, `Ingester.hs`)
 
-#### Step 2: Add "Current Limitations" section
-```markdown
-## Current Limitations
+2. **USAGE_GUIDE.md**:
+   - Updated all code examples to use `IgnoreFailures`
+   - Fixed `runApp` signature documentation
+   - Replaced outdated supervision strategies table with correct `SupervisionStrategy` values
+   - Added "Current Limitations" section documenting Serial-only processing and lack of restart semantics
+   - Added link to CONCURRENCY.md for detailed concurrency documentation
 
-### Concurrency Modes
-Currently all processing is **serial** (one message at a time per processor).
-The `Ahead` and `Async` concurrency modes are planned for a future release.
-```
-
-#### Step 3: Ensure README is accurate
-- Update feature list to match reality
-- Remove claims about unimplemented features
+3. **UNIFIED_ARCHITECTURE.md**:
+   - Removed outdated `Runner.hs` / `RunnerConfig` section (Layer 9)
+   - Updated `runApp` signature to use `SupervisionStrategy` and `Natural`
+   - Updated supervision strategies section to show Shibuya's `SupervisionStrategy` type
+   - Added `Eq` to `ProcessorMetrics` deriving clause in documentation
+   - Updated test count (45 tests)
+   - Added Related Documentation section linking to CONCURRENCY.md
 
 ---
-
-## Implementation Order
-
-Remaining:
-
-1. **1.4 Document Actual Behavior** - Ensure docs match implementation
 
 ## Progress
 
@@ -154,4 +139,6 @@ Remaining:
 | 1.1 Backpressure | ✅ Done | High |
 | 1.2 AckHalt | ✅ Done | Medium |
 | 1.3 Policies | ✅ Done | Low |
-| 1.4 Documentation | 🔲 Pending | Low |
+| 1.4 Documentation | ✅ Done | Low |
+
+All Priority 1 items have been completed.

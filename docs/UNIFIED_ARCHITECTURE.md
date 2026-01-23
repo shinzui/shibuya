@@ -68,7 +68,6 @@ Shibuya/
 ├── Adapter/
 │   └── Mock.hs            -- Mock adapter for testing
 ├── Policy.hs              -- Ordering and Concurrency policies
-├── Runner.hs              -- RunnerConfig and execution
 ├── Runner/
 │   ├── Metrics.hs         -- ProcessorState, StreamStats, ProcessorMetrics
 │   ├── Master.hs          -- Master process (NQE supervision + metrics)
@@ -325,45 +324,7 @@ validatePolicy _ _ = Right ()
 
 ---
 
-## Layer 9: Runner Configuration
-
-User-facing configuration combining adapter, handler, and policies.
-
-### Shibuya.Runner
-
-```haskell
-module Shibuya.Runner
-  ( RunnerConfig(..)
-  , defaultRunnerConfig
-  ) where
-
-import Shibuya.Adapter (Adapter)
-import Shibuya.Handler (Handler)
-import Shibuya.Policy (Ordering(..), Concurrency(..))
-
--- | Complete runner configuration
-data RunnerConfig es msg = RunnerConfig
-  { adapter     :: !(Adapter es msg)
-  , handler     :: !(Handler es msg)
-  , ordering    :: !Ordering
-  , concurrency :: !Concurrency
-  , inboxSize   :: !Int
-  }
-
--- | Default configuration (unordered, serial, inbox size 100)
-defaultRunnerConfig :: Adapter es msg -> Handler es msg -> RunnerConfig es msg
-defaultRunnerConfig adapter handler = RunnerConfig
-  { adapter     = adapter
-  , handler     = handler
-  , ordering    = Unordered
-  , concurrency = Serial
-  , inboxSize   = 100
-  }
-```
-
----
-
-## Layer 10: Application Entry Point
+## Layer 9: Application Entry Point
 
 Where Streamly wiring, supervision, ack lifecycle, and halt semantics are applied.
 
@@ -381,10 +342,11 @@ module Shibuya.App
   , waitApp
     -- * Errors
   , AppError(..)
+    -- * Supervision
+  , SupervisionStrategy(..)
     -- * Re-exports
   , ProcessorId(..)
   , ProcessorMetrics(..)
-  , Strategy(..)
   ) where
 
 -- | A queue processor pairs an adapter with its handler.
@@ -411,8 +373,8 @@ data AppError
 -- | Run queue processors concurrently under NQE supervision.
 runApp
   :: (IOE :> es)
-  => Strategy                          -- ^ Supervision strategy
-  -> Int                               -- ^ Inbox size for backpressure
+  => SupervisionStrategy               -- ^ How to handle processor failures
+  -> Natural                           -- ^ Inbox size for backpressure
   -> [(ProcessorId, QueueProcessor es)] -- ^ Named processors
   -> Eff es (Either AppError (AppHandle es))
 
@@ -470,7 +432,7 @@ data ProcessorMetrics = ProcessorMetrics
   , pmStats     :: !StreamStats
   , pmStartedAt :: !UTCTime
   }
-  deriving stock (Show, Generic)
+  deriving stock (Eq, Show, Generic)
 
 -- | Map of processor IDs to their metrics
 type MetricsMap = Map ProcessorId ProcessorMetrics
@@ -512,7 +474,7 @@ data Master = Master
   }
 
 -- | Start the master process
-startMaster :: (IOE :> es) => Strategy -> Eff es Master
+startMaster :: (IOE :> es) => SupervisionStrategy -> Eff es Master
 
 -- | Stop the master and all child processors
 stopMaster :: (IOE :> es) => Master -> Eff es ()
@@ -565,14 +527,19 @@ runWithMetrics
 
 ### Supervision Strategies
 
-NQE provides supervision strategies that control behavior when a child dies:
+Shibuya defines its own `SupervisionStrategy` type that maps to NQE strategies:
 
-| Strategy | Behavior |
-|----------|----------|
-| `IgnoreAll` | Keep running, ignore dead children |
-| `IgnoreGraceful` | Keep running unless child threw exception |
-| `KillAll` | Stop all children and propagate exception |
-| `Notify mailbox` | Send notification to mailbox when child dies |
+| SupervisionStrategy | NQE Strategy | Behavior |
+|---------------------|--------------|----------|
+| `IgnoreFailures` | `IgnoreAll` | Keep running, ignore dead children |
+| `StopAllOnFailure` | `KillAll` | Stop all children and propagate exception |
+
+```haskell
+data SupervisionStrategy
+  = IgnoreFailures    -- Other processors continue if one fails
+  | StopAllOnFailure  -- All processors stop if any fails
+  deriving stock (Eq, Show, Generic)
+```
 
 ---
 
@@ -682,7 +649,7 @@ Each layer can be tested independently:
 | Runner | Integration with mock adapter |
 | App | Full integration tests |
 
-Current test count: **42 tests passing**
+Current test count: **45 tests passing**
 
 ---
 
@@ -736,6 +703,13 @@ jobToIngested pool job = Ingested
   , lease = Nothing -- Postgres uses row locks, not visibility timeout
   }
 ```
+
+---
+
+## Related Documentation
+
+- [CONCURRENCY.md](architecture/CONCURRENCY.md) - Detailed concurrency architecture
+- [USAGE_GUIDE.md](USAGE_GUIDE.md) - User guide with examples
 
 ---
 

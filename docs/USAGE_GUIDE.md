@@ -44,7 +44,7 @@ main = runEff . runConcurrent $ do
         }
 
   -- 3. Run with supervision!
-  result <- runApp IgnoreAll 100
+  result <- runApp IgnoreFailures 100
     [ (ProcessorId "orders", ordersProcessor)
     ]
 
@@ -148,8 +148,8 @@ handleEvent ingested = do
 ```haskell
 -- runApp signature:
 runApp
-  :: Strategy                          -- Supervision strategy
-  -> Int                               -- Inbox size for backpressure
+  :: SupervisionStrategy               -- How to handle processor failures
+  -> Natural                           -- Inbox size for backpressure
   -> [(ProcessorId, QueueProcessor es)] -- Named processors
   -> Eff es (Either AppError (AppHandle es))
 ```
@@ -157,7 +157,7 @@ runApp
 ### Example: Single Processor
 
 ```haskell
-result <- runApp IgnoreAll 100
+result <- runApp IgnoreFailures 100
   [ (ProcessorId "orders", ordersProcessor)
   ]
 ```
@@ -165,7 +165,7 @@ result <- runApp IgnoreAll 100
 ### Example: Multiple Processors
 
 ```haskell
-result <- runApp IgnoreAll 500
+result <- runApp IgnoreFailures 500
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   , (ProcessorId "notifications", notificationsProcessor)
@@ -230,7 +230,7 @@ main = runEff . runConcurrent $ do
         }
 
   -- Run all processors under supervision
-  result <- runApp IgnoreAll 100
+  result <- runApp IgnoreFailures 100
     [ (ProcessorId "orders", ordersProcessor)
     , (ProcessorId "notifications", notificationsProcessor)
     , (ProcessorId "analytics", analyticsProcessor)
@@ -360,7 +360,7 @@ main = runEff . runConcurrent $ do
 
   liftIO $ putStrLn "Starting order processor..."
 
-  result <- runApp IgnoreAll 200
+  result <- runApp IgnoreFailures 200
     [ (ProcessorId "orders", ordersProcessor)
     ]
 
@@ -379,18 +379,25 @@ Choose a supervision strategy when calling `runApp`:
 
 | Strategy | Behavior | Use Case |
 |----------|----------|----------|
-| `IgnoreAll` | Continue running, ignore failures | Independent processors |
-| `IgnoreGraceful` | Continue unless exception thrown | Graceful shutdown handling |
-| `KillAll` | Stop all processors on any failure | Coordinated shutdown |
-| `OneForOne` | Restart only the failed processor | Default for most apps |
+| `IgnoreFailures` | Continue running if a processor fails | Independent processors |
+| `StopAllOnFailure` | Stop all processors on any failure | Coordinated shutdown |
 
 ```haskell
 -- Independent processors - failures don't affect each other
-result <- runApp IgnoreAll 100 processors
+result <- runApp IgnoreFailures 100 processors
 
 -- All-or-nothing - if one fails, stop everything
-result <- runApp KillAll 100 processors
-
--- Restart failed processors individually
-result <- runApp OneForOne 100 processors
+result <- runApp StopAllOnFailure 100 processors
 ```
+
+## Current Limitations (v0.1.0-alpha)
+
+### Concurrency Modes
+
+All message processing is currently **serial** (one message at a time per processor). The `Ahead` and `Async` concurrency modes defined in `Policy.hs` are planned for a future release.
+
+For concurrent message fetching, configure your `Adapter` stream using Streamly's concurrent combinators (e.g., `parMapM`). See [CONCURRENCY.md](architecture/CONCURRENCY.md) for details on the concurrency model.
+
+### Restart Semantics
+
+Failed processors are not automatically restarted. With `IgnoreFailures`, other processors continue running but the failed processor stays stopped. Implement application-level restart logic if needed.
