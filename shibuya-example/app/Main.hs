@@ -19,7 +19,7 @@ import Shibuya.App
     ProcessorId (..),
     ProcessorMetrics (..),
     QueueProcessor (..),
-    Strategy (..),
+    SupervisionStrategy (..),
     getAppMetrics,
     runApp,
     stopApp,
@@ -135,7 +135,7 @@ main = runEff $ do
   -- Run all processors concurrently under supervision
   result <-
     runApp
-      IgnoreAll -- Keep running even if a processor fails
+      IgnoreFailures -- Keep running even if a processor fails
       100 -- Inbox size
       [ (ProcessorId "orders", ordersProcessor),
         (ProcessorId "events", eventsProcessor)

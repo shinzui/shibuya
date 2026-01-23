@@ -10,7 +10,7 @@
 --
 -- main = runEff $ do
 --   let processor = QueueProcessor myAdapter myHandler
---   result <- runApp IgnoreAll 100 [(ProcessorId "main", processor)]
+--   result <- runApp IgnoreFailures 100 [(ProcessorId "main", processor)]
 --   case result of
 --     Right handle -> waitApp handle
 --     Left err -> print err
@@ -56,21 +56,8 @@ module Shibuya.Core
     stopApp,
     getAppMetrics,
 
-    -- * Master & Supervision
-    Master (..),
-    startMaster,
-    stopMaster,
-    getAllMetrics,
-    getProcessorMetrics,
-    Strategy (..),
-
-    -- * Supervised Processors
-    SupervisedProcessor (..),
-    runSupervised,
-    runWithMetrics,
-    getMetrics,
-    getProcessorState,
-    isDone,
+    -- * Supervision Strategy
+    SupervisionStrategy (..),
 
     -- * Metrics
     ProcessorId (..),
@@ -84,9 +71,8 @@ module Shibuya.Core
   )
 where
 
-import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), getAppMetrics, runApp, stopApp, waitApp)
+import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), SupervisionStrategy (..), getAppMetrics, runApp, stopApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
@@ -96,7 +82,5 @@ import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner (RunnerConfig (..), defaultRunnerConfig)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
-import Shibuya.Runner.Master (Master (..), getAllMetrics, getProcessorMetrics, startMaster, stopMaster)
 import Shibuya.Runner.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
-import Shibuya.Runner.Supervised (SupervisedProcessor (..), getMetrics, getProcessorState, isDone, runSupervised, runWithMetrics)
 import Prelude hiding (Ordering)

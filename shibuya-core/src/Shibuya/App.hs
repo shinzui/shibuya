@@ -10,22 +10,25 @@ module Shibuya.App
     stopApp,
     waitApp,
 
+    -- * Supervision Strategy
+    SupervisionStrategy (..),
+
     -- * Errors
     AppError (..),
 
     -- * Re-exports
     ProcessorId (..),
     ProcessorMetrics (..),
-    Strategy (..),
   )
 where
 
-import Control.Concurrent.NQE.Supervisor (Strategy (..))
+import Control.Concurrent.NQE.Supervisor qualified as NQE
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, (:>))
+import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Handler (Handler)
@@ -47,6 +50,33 @@ import Shibuya.Runner.Supervised
   )
 import UnliftIO (SomeException, catch, displayException)
 import UnliftIO.Concurrent (threadDelay)
+
+--------------------------------------------------------------------------------
+-- Supervision Strategy
+--------------------------------------------------------------------------------
+
+-- | Supervision strategy for processor failures.
+--
+-- This is Shibuya's own type that maps to NQE's supervision strategies,
+-- decoupling users from the NQE library.
+data SupervisionStrategy
+  = -- | Ignore all child exits, keep running.
+    -- Failed processors are marked as Failed in metrics but don't affect others.
+    IgnoreFailures
+  | -- | Stop all processors if any fails.
+    -- A single processor failure triggers shutdown of all processors.
+    StopAllOnFailure
+  deriving stock (Eq, Show, Generic)
+
+-- | Convert Shibuya's strategy type to NQE's internal type.
+toNQEStrategy :: SupervisionStrategy -> NQE.Strategy
+toNQEStrategy = \case
+  IgnoreFailures -> NQE.IgnoreAll
+  StopAllOnFailure -> NQE.KillAll
+
+--------------------------------------------------------------------------------
+-- Errors
+--------------------------------------------------------------------------------
 
 -- | Application errors.
 data AppError
@@ -86,7 +116,7 @@ data AppHandle es = AppHandle
 -- Example:
 --
 -- @
--- result <- runApp OneForOne 100
+-- result <- runApp IgnoreFailures 100
 --   [ ("orders", QueueProcessor ordersAdapter ordersHandler)
 --   , ("events", QueueProcessor eventsAdapter eventsHandler)
 --   ]
@@ -94,17 +124,18 @@ data AppHandle es = AppHandle
 runApp ::
   (IOE :> es) =>
   -- | Supervision strategy
-  Strategy ->
+  SupervisionStrategy ->
   -- | Inbox size for backpressure
   Int ->
   -- | Named processors
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (Either AppError (AppHandle es))
 runApp strategy inboxSize namedProcessors = do
+  let nqeStrategy = toNQEStrategy strategy
   catch
     ( do
         -- Start the master coordinator
-        master <- startMaster strategy
+        master <- startMaster nqeStrategy
 
         -- Spawn each processor under supervision
         processors <- spawnProcessors master (fromIntegral inboxSize) namedProcessors

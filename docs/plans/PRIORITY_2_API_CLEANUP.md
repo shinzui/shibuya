@@ -50,79 +50,45 @@ Added usage example to module haddock.
 
 ---
 
-## 2.3 Define Own Strategy Type
+## 2.3 Define Own Strategy Type ✅ COMPLETED
 
-### Problem
-`Strategy` is re-exported directly from NQE:
+**Status:** Implemented. Shibuya now has its own `SupervisionStrategy` type.
 
+### Summary
+Users are decoupled from NQE's internal API. The public API now uses Shibuya's own `SupervisionStrategy` type which is converted internally to NQE's `Strategy`.
+
+### Changes Made
+
+#### Shibuya's SupervisionStrategy type (in App.hs)
 ```haskell
--- App.hs
-import Control.Concurrent.NQE.Supervisor (Strategy (..))
-
--- Core.hs
-import Control.Concurrent.NQE.Supervisor (Strategy (..))
-```
-
-This couples users to NQE's API. If NQE changes `Strategy`, Shibuya's API breaks.
-
-### Files to Modify
-- `src/Shibuya/App.hs` - Define and convert
-- `src/Shibuya/Core.hs` - Export own type
-- `src/Shibuya/Runner/Master.hs` - Use own type
-
-### Implementation Plan
-
-#### Step 1: Define Shibuya's own Strategy type
-```haskell
--- In App.hs or new Shibuya/Supervision.hs
-
--- | Supervision strategy for processor failures.
 data SupervisionStrategy
-  = -- | Ignore all child exits, keep running
+  = -- | Ignore all child exits, keep running.
+    -- Failed processors are marked as Failed in metrics but don't affect others.
     IgnoreFailures
-  | -- | Stop all processors if any fails
+  | -- | Stop all processors if any fails.
+    -- A single processor failure triggers shutdown of all processors.
     StopAllOnFailure
-  | -- | Restart failed processor (one-for-one)
-    RestartOnFailure
   deriving stock (Eq, Show, Generic)
 ```
 
-#### Step 2: Create internal conversion function
+#### Internal conversion (in App.hs)
 ```haskell
 toNQEStrategy :: SupervisionStrategy -> NQE.Strategy
 toNQEStrategy = \case
   IgnoreFailures -> NQE.IgnoreAll
   StopAllOnFailure -> NQE.KillAll
-  RestartOnFailure -> NQE.OneForOne
 ```
 
-#### Step 3: Update runApp signature
-```haskell
-runApp :: SupervisionStrategy -> Int -> [(ProcessorId, QueueProcessor es)] -> ...
-```
+#### Core.hs exports
+- Exports `SupervisionStrategy (..)` instead of NQE's `Strategy`
+- Removed low-level `startMaster`/`stopMaster` exports (users should use `runApp`)
+- Users who need low-level Master API can import from `Shibuya.Runner.Master` directly
 
-#### Step 4: Update Core.hs exports
-```haskell
--- Export Shibuya's type, not NQE's
-import Shibuya.App (SupervisionStrategy (..))
-```
-
-### Consideration: Which NQE strategies to expose?
-NQE has: `IgnoreAll`, `IgnoreGraceful`, `KillAll`, `OneForOne`, `OneForAll`
-
-Start with the three most common:
-- `IgnoreFailures` (IgnoreAll)
-- `StopAllOnFailure` (KillAll)
-- `RestartOnFailure` (OneForOne)
-
-Add others if needed.
+### Note on NQE Strategies
+NQE supports: `Notify`, `KillAll`, `IgnoreGraceful`, `IgnoreAll` (no restart semantics).
+Shibuya exposes the two most common strategies. Additional strategies can be added if needed.
 
 ---
-
-## Implementation Order
-
-1. **2.2 Complete Core.hs Exports** - Quick win, improves ergonomics
-2. **2.3 Define Own Strategy Type** - Decouples from NQE
 
 ## Progress
 
@@ -130,4 +96,6 @@ Add others if needed.
 |------|--------|------------|
 | 2.1 Hide Internals | ✅ Done | Low |
 | 2.2 Core.hs Exports | ✅ Done | Low |
-| 2.3 Own Strategy | 🔲 Pending | Medium |
+| 2.3 Own Strategy | ✅ Done | Medium |
+
+All Priority 2 items have been completed.

@@ -2,14 +2,13 @@
 
 module Shibuya.RunnerSpec (spec) where
 
-import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppError (..), QueueProcessor (..), runApp, waitApp)
+import Shibuya.App (AppError (..), QueueProcessor (..), SupervisionStrategy (..), runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
@@ -38,7 +37,7 @@ spec = do
         -- Run the app
         res <-
           runApp
-            IgnoreAll
+            IgnoreFailures
             100
             [ (ProcessorId "test", processor)
             ]
@@ -68,7 +67,7 @@ spec = do
         -- Run the app
         res <-
           runApp
-            IgnoreAll
+            IgnoreFailures
             100
             [ (ProcessorId "test", processor)
             ]
@@ -101,7 +100,7 @@ spec = do
 
         res <-
           runApp
-            IgnoreAll
+            IgnoreFailures
             100
             [ (ProcessorId "proc1", proc1),
               (ProcessorId "proc2", proc2)
