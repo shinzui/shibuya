@@ -60,6 +60,9 @@ module Shibuya.Core
     ProcessorMetrics (..),
     StreamStats (..),
     MetricsMap,
+
+    -- * Halt
+    ProcessorHalt (..),
   )
 where
 
@@ -74,6 +77,7 @@ import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner (RunnerConfig (..), defaultRunnerConfig)
+import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Master (Master (..), getAllMetrics, getProcessorMetrics, startMaster, stopMaster)
 import Shibuya.Runner.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
 import Shibuya.Runner.Supervised (SupervisedProcessor (..), getMetrics, getProcessorState, isDone, runSupervised, runWithMetrics)

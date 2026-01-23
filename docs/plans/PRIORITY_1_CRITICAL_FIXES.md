@@ -1,6 +1,8 @@
 # Priority 1: Critical Fixes (API/Behavior Mismatch)
 
-These issues represent gaps between documented/expected behavior and actual implementation. Users relying on advertised features will experience unexpected behavior.
+> **Note:** This is pre-release development (v0.1.0.0). Breaking changes are expected and not a concern until the first stable release.
+
+These issues represent gaps between documented/expected behavior and actual implementation.
 
 ---
 
@@ -71,170 +73,69 @@ Adapter.source → Ingester (async) → Bounded Inbox → Processor → Handler
 - `src/Shibuya/Runner/Supervised.hs` - Implement concurrency modes OR
 - `src/Shibuya/Policy.hs` - Simplify if removing
 
-### Implementation Plan
+### Recommendation: Remove Until Needed
 
-Two paths: **Implement** or **Remove**. Recommend: **Validate now, implement concurrency later**.
+Since this is pre-release, simplify by removing unused code:
 
-#### Path A: Validate and Stub (Recommended)
+1. Remove `RunnerConfig` (entirely unused)
+2. Simplify `Concurrency` to just `Serial`
+3. Keep `Ordering` for documentation but don't enforce
+4. Remove `validatePolicy` or keep as internal
 
-##### Step 1: Add policy to QueueProcessor
+### Implementation
 ```haskell
-data QueueProcessor es where
-  QueueProcessor ::
-    { adapter :: Adapter es msg,
-      handler :: Handler es msg,
-      ordering :: Ordering,      -- New
-      concurrency :: Concurrency -- New
-    } ->
-    QueueProcessor es
-```
-
-##### Step 2: Validate in runApp
-```haskell
-runApp strategy inboxSize namedProcessors = do
-  -- Validate all policies first
-  let validations = map validateProcessor namedProcessors
-  case sequence validations of
-    Left err -> pure $ Left $ PolicyValidationError err
-    Right _ -> do
-      -- ... existing logic
-
-validateProcessor (procId, QueueProcessor{ordering, concurrency}) =
-  case validatePolicy ordering concurrency of
-    Left err -> Left $ unProcessorId procId <> ": " <> err
-    Right () -> Right ()
-```
-
-##### Step 3: Warn on unimplemented modes
-```haskell
--- In runSupervised or spawnProcessors
-case concurrency of
-  Serial -> pure ()  -- Implemented
-  Ahead n -> liftIO $ hPutStrLn stderr $
-    "Warning: Ahead mode not yet implemented, using Serial"
-  Async n -> liftIO $ hPutStrLn stderr $
-    "Warning: Async mode not yet implemented, using Serial"
-```
-
-##### Step 4: Update documentation
-Document that only `Serial` is currently implemented.
-
-#### Path B: Remove Until Implemented
-
-##### Step 1: Remove from Policy.hs
-```haskell
--- Keep only what's used
+-- Simplified Policy.hs
 data Concurrency = Serial
   deriving stock (Eq, Show, Generic)
 
--- Remove Ordering entirely, or keep as documentation
+-- Ordering kept for future use
+data Ordering = StrictInOrder | PartitionedInOrder | Unordered
+  deriving stock (Eq, Show, Generic)
 ```
 
-##### Step 2: Remove RunnerConfig.hs
-This module is entirely unused.
-
-##### Step 3: Update Core.hs exports
-Remove unused policy exports.
-
-### Recommendation
-Go with **Path A** - validate policies, warn on unimplemented modes. This:
-- Catches invalid configurations early
-- Preserves API for future implementation
-- Makes limitations explicit
-
-### Breaking Changes
-- Path A: `QueueProcessor` gains fields (breaking)
-- Path B: Removes types (breaking)
-
 ### Test Plan
-1. Test `StrictInOrder` + `Async` returns `PolicyValidationError`
-2. Test `Unordered` + `Async` passes validation (with warning)
-3. Test invalid policy doesn't start any processors
+1. Verify build after removing unused types
+2. Update any imports that reference removed types
 
 ---
 
 ## 1.4 Document Actual Behavior
 
 ### Problem
-Documentation describes features that aren't implemented:
-- Usage guide shows backpressure configuration
-- Architecture docs describe concurrent processing
-- No mention of current limitations
+Documentation may describe features inaccurately. Need to ensure docs match implementation.
 
-### Files to Modify
+### Files to Review
 - `docs/USAGE_GUIDE.md`
 - `docs/HIGH_LEVEL_ARCHITECTURE.md`
 - `docs/UNIFIED_ARCHITECTURE.md`
-- `README.md` (if exists)
+- `README.md`
 
 ### Implementation Plan
 
-#### Step 1: Add "Current Limitations" section to USAGE_GUIDE.md
-```markdown
-## Current Limitations
-
-Shibuya is under active development. The following features are planned but not yet implemented:
-
-### Concurrency Modes
-Currently all processing is **serial** (one message at a time per processor).
-The `Ahead` and `Async` concurrency modes are defined but not yet functional.
-
-### Backpressure
-The `inboxSize` parameter is accepted but backpressure is not yet enforced.
-Fast producers may cause memory growth with slow consumers.
-
-### Halt Semantics
-`AckHalt` is recorded in metrics but does not currently stop processing.
-```
-
-#### Step 2: Update architecture docs
-Add "Implementation Status" indicators:
+#### Step 1: Update feature status in docs
 ```markdown
 | Feature | Status |
 |---------|--------|
-| Serial Processing | Implemented |
-| Metrics & Introspection | Implemented |
-| NQE Supervision | Implemented |
-| Backpressure | Planned |
-| Async Processing | Planned |
-| Halt-on-Error | Planned |
+| Serial Processing | ✅ Implemented |
+| Metrics & Introspection | ✅ Implemented |
+| NQE Supervision | ✅ Implemented |
+| Backpressure | ✅ Implemented |
+| Halt-on-Error (AckHalt) | ✅ Implemented |
+| Async Processing | 🔲 Planned |
 ```
 
-#### Step 3: Update code comments
-Add notes in key locations:
-```haskell
--- | Inbox size for backpressure.
--- NOTE: Backpressure not yet implemented. This parameter is reserved
--- for future use.
-inboxSize :: Int
-```
-
-#### Step 4: Add CHANGELOG.md
-Track what's implemented in each version:
+#### Step 2: Add "Current Limitations" section
 ```markdown
-# Changelog
+## Current Limitations
 
-## 0.1.0.0 (Unreleased)
-
-### Implemented
-- Core types (MessageId, Envelope, AckDecision, etc.)
-- Serial message processing
-- NQE-based supervision
-- Metrics collection
-
-### Not Yet Implemented
-- Backpressure (inboxSize parameter)
-- Concurrent processing (Async/Ahead modes)
-- Halt semantics (AckHalt)
+### Concurrency Modes
+Currently all processing is **serial** (one message at a time per processor).
+The `Ahead` and `Async` concurrency modes are planned for a future release.
 ```
 
-### Breaking Changes
-None - documentation only.
-
-### Verification
-- Review all public docs for accuracy
-- Ensure no feature is claimed that doesn't work
-- Add issue/PR links for planned features
+#### Step 3: Ensure README is accurate
+- Update feature list to match reality
+- Remove claims about unimplemented features
 
 ---
 
@@ -242,14 +143,14 @@ None - documentation only.
 
 Recommended order to implement remaining fixes:
 
-1. **1.4 Document Actual Behavior** - Quick win, sets expectations
-2. **1.3 Validate Policies** - Catches misconfigurations early
+1. **1.3 Remove Unused Policies** - Simplify codebase
+2. **1.4 Document Actual Behavior** - Ensure accuracy
 
 ## Progress
 
-| Item | Status | Complexity | Notes |
-|------|--------|------------|-------|
-| 1.1 Backpressure | ✅ Done | High | Commit `31427e2` |
-| 1.2 AckHalt | ✅ Done | Medium | See `ACKHALT_IMPLEMENTATION.md` |
-| 1.3 Policies | 🔲 Pending | Medium | |
-| 1.4 Documentation | 🔲 Pending | Low | |
+| Item | Status | Complexity |
+|------|--------|------------|
+| 1.1 Backpressure | ✅ Done | High |
+| 1.2 AckHalt | ✅ Done | Medium |
+| 1.3 Policies | 🔲 Pending | Low |
+| 1.4 Documentation | 🔲 Pending | Low |

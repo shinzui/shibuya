@@ -11,14 +11,6 @@ common warnings
 library
   import: warnings
   exposed-modules:
-    -- Core Types (Phase 1)
-    -- Effectful Types (Phase 2)
-    -- Handler (Phase 3)
-    -- Policy (Phase 4)
-    -- Adapter (Phase 5)
-    -- Runner (Phase 6)
-    -- Stream Utilities (Phase 7)
-    -- App (Phase 9)
     Shibuya.Adapter
     Shibuya.Adapter.Mock
     Shibuya.App
@@ -32,14 +24,16 @@ library
     Shibuya.Policy
     Shibuya.Prelude
     Shibuya.Runner
-    Shibuya.Runner.Halt
-    Shibuya.Runner.Ingester
     Shibuya.Runner.Master
     Shibuya.Runner.Metrics
-    Shibuya.Runner.Processor
-    Shibuya.Runner.Serial
     Shibuya.Runner.Supervised
     Shibuya.Stream
+
+  other-modules:
+    Shibuya.Runner.Halt
+    Shibuya.Runner.Ingester
+    Shibuya.Runner.Processor
+    Shibuya.Runner.Serial
 
   default-extensions:
     DeriveAnyClass
