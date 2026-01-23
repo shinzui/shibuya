@@ -117,31 +117,12 @@ grep -r "defaultRunnerConfig" .
 
 ---
 
-## 3.3 Add Eq Instance to ProcessorMetrics
+## 3.3 Add Eq Instance to ProcessorMetrics ✅ COMPLETED
 
-### Problem
-`ProcessorMetrics` has `Show` but not `Eq`, making testing difficult:
+**Status:** Implemented. `ProcessorMetrics` now derives `Eq`.
 
-```haskell
-data ProcessorMetrics = ProcessorMetrics
-  { state :: !ProcessorState,
-    stats :: !StreamStats,
-    startedAt :: !UTCTime
-  }
-  deriving stock (Show, Generic)  -- No Eq!
-```
-
-### Implementation
-```haskell
-data ProcessorMetrics = ProcessorMetrics
-  { state :: !ProcessorState,
-    stats :: !StreamStats,
-    startedAt :: !UTCTime
-  }
-  deriving stock (Eq, Show, Generic)  -- Add Eq
-```
-
-All nested types (`ProcessorState`, `StreamStats`, `UTCTime`) already have `Eq`.
+### Summary
+Added `Eq` to `ProcessorMetrics` deriving clause, enabling equality comparisons in tests.
 
 ---
 
@@ -199,7 +180,7 @@ Recommended order:
 |------|--------|------------|
 | 3.1 Error Handling | 🔲 Pending | High |
 | 3.2 Dead Code | 🔲 Pending | Low |
-| 3.3 Add Eq | 🔲 Pending | Trivial |
+| 3.3 Add Eq | ✅ Done | Trivial |
 | 3.4 Replace Polling | 🔲 Pending | Low |
 
 ## Dependencies

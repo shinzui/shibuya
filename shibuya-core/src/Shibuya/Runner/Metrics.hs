@@ -69,7 +69,7 @@ data ProcessorMetrics = ProcessorMetrics
     -- | When the processor started
     startedAt :: !UTCTime
   }
-  deriving stock (Show, Generic)
+  deriving stock (Eq, Show, Generic)
 
 -- | Empty processor metrics.
 emptyProcessorMetrics :: UTCTime -> ProcessorMetrics
