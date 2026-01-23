@@ -23,6 +23,8 @@ module Shibuya.App
 where
 
 import Control.Concurrent.NQE.Supervisor qualified as NQE
+import Control.Concurrent.STM (atomically, check, readTVar)
+import Control.Monad (forM_)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
@@ -45,11 +47,9 @@ import Shibuya.Runner.Metrics
   )
 import Shibuya.Runner.Supervised
   ( SupervisedProcessor (..),
-    isDone,
     runSupervised,
   )
 import UnliftIO (SomeException, catch, displayException)
-import UnliftIO.Concurrent (threadDelay)
 
 --------------------------------------------------------------------------------
 -- Supervision Strategy
@@ -185,16 +185,11 @@ stopApp appHandle = do
 -- | Wait for all processors to complete.
 -- For infinite streams, this will block forever.
 -- Use 'stopApp' to gracefully terminate.
+--
+-- Uses STM to block efficiently until all processors are done,
+-- rather than polling.
 waitApp :: (IOE :> es) => AppHandle es -> Eff es ()
-waitApp appHandle = waitAll (Map.elems appHandle.processors)
-  where
-    waitAll [] = pure ()
-    waitAll procs = do
-      -- Check if all are done
-      allDone <- and <$> traverse (\(sp, _) -> isDone sp) procs
-      if allDone
-        then pure ()
-        else do
-          -- Poll every 100ms
-          liftIO $ threadDelay 100000
-          waitAll procs
+waitApp appHandle = liftIO $ atomically $ do
+  -- Block until all done TVars are True
+  forM_ (Map.elems appHandle.processors) $ \(sp, _) ->
+    readTVar sp.done >>= check
