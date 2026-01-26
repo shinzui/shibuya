@@ -1,0 +1,89 @@
+cabal-version: 3.14
+name: shibuya-pgmq-adapter
+version: 0.1.0.0
+synopsis: PGMQ adapter for the Shibuya queue processing framework
+description:
+  A Shibuya adapter that integrates with pgmq (PostgreSQL Message Queue)
+  using the pgmq-hs client library. Provides visibility timeout-based
+  leasing, automatic retry handling, and optional dead-letter queue support.
+
+author: Nadeem Bitar
+maintainer: nadeem@gmail.com
+license: MIT
+build-type: Simple
+category: Concurrency, Database
+
+common warnings
+  ghc-options: -Wall
+
+library
+  import: warnings
+  exposed-modules:
+    Shibuya.Adapter.Pgmq
+    Shibuya.Adapter.Pgmq.Config
+    Shibuya.Adapter.Pgmq.Convert
+
+  other-modules:
+    Shibuya.Adapter.Pgmq.Internal
+
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  build-depends:
+    aeson ^>=2.2,
+    base ^>=4.21.0.0,
+    effectful-core ^>=2.6.1.0,
+    pgmq-core,
+    pgmq-effectful,
+    pgmq-hasql,
+    shibuya-core,
+    stm,
+    streamly ^>=0.11,
+    streamly-core ^>=0.3,
+    text ^>=2.1.3,
+    time,
+    vector ^>=0.13,
+
+  hs-source-dirs: src
+  default-language: GHC2024
+
+test-suite shibuya-pgmq-adapter-test
+  import: warnings
+  default-language: GHC2024
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  other-modules:
+    Shibuya.Adapter.Pgmq.ConvertSpec
+
+  build-depends:
+    QuickCheck ^>=2.15,
+    aeson,
+    base ^>=4.21.0.0,
+    effectful-core,
+    hspec ^>=2.11,
+    pgmq-core,
+    shibuya-core,
+    shibuya-pgmq-adapter,
+    text,
+    time,
+    vector,
