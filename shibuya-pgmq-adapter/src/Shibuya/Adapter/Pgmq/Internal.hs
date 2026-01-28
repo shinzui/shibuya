@@ -3,8 +3,14 @@
 module Shibuya.Adapter.Pgmq.Internal
   ( -- * Stream Construction
     pgmqSource,
+    pgmqSourceWithPrefetch,
     pgmqChunks,
+    pgmqChunksPrefetch,
     pgmqMessages,
+    pgmqMessagesPrefetch,
+
+    -- * Prefetch Configuration
+    defaultPrefetchConfig,
 
     -- * Ingested Construction
     mkIngested,
@@ -77,6 +83,7 @@ import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
+import Streamly.Data.Stream.Prelude qualified as StreamP
 import Streamly.Data.Unfold qualified as Unfold
 
 -- | Convert NominalDiffTime to seconds as Int32 for pgmq.
@@ -298,3 +305,64 @@ pgmqSource ::
 pgmqSource config =
   pgmqMessages config
     & Stream.mapMaybeM (mkIngested config) -- Convert + filter auto-DLQ'd messages
+
+-- | Default configuration for concurrent prefetching.
+-- Buffers up to 4 batches ahead of consumption.
+-- This balances latency reduction with visibility timeout safety.
+defaultPrefetchConfig :: StreamP.Config -> StreamP.Config
+defaultPrefetchConfig = StreamP.maxBuffer 4
+
+-- | Stream of message batches with concurrent prefetching.
+-- Uses parBuffered to poll the next batch while current batch is being processed.
+-- This reduces latency by overlapping polling with message processing.
+--
+-- Note: Prefetched messages have their visibility timeout ticking. Ensure
+-- bufferSize * batchSize * avgProcessingTime < visibilityTimeout to avoid
+-- messages re-appearing before they're processed.
+pgmqChunksPrefetch ::
+  (Pgmq :> es, IOE :> es) =>
+  (StreamP.Config -> StreamP.Config) ->
+  PgmqAdapterConfig ->
+  Stream (Eff es) (Vector Pgmq.Message)
+pgmqChunksPrefetch prefetchConfig config =
+  pgmqChunks config
+    & StreamP.parBuffered prefetchConfig
+
+-- | Flatten prefetched message chunks into individual messages.
+-- Like pgmqMessages but with concurrent prefetching of batches.
+pgmqMessagesPrefetch ::
+  (Pgmq :> es, IOE :> es) =>
+  (StreamP.Config -> StreamP.Config) ->
+  PgmqAdapterConfig ->
+  Stream (Eff es) Pgmq.Message
+pgmqMessagesPrefetch prefetchConfig config =
+  pgmqChunksPrefetch prefetchConfig config
+    & Stream.filter (not . Vector.null) -- Skip empty batches
+    & Stream.unfoldEach vectorUnfold -- Flatten Vector to individual elements
+  where
+    vectorUnfold = Unfold.unfoldr Vector.uncons
+
+-- | Create message source stream with concurrent prefetching.
+-- Polls the next batch while current messages are being processed.
+--
+-- This provides lower latency than pgmqSource by keeping messages ready
+-- in a buffer for immediate consumption. The trade-off is that prefetched
+-- messages have their visibility timeout ticking.
+--
+-- Usage:
+--
+-- @
+-- -- With default prefetch settings (4 batches ahead)
+-- source = pgmqSourceWithPrefetch defaultPrefetchConfig config
+--
+-- -- With custom buffer size
+-- source = pgmqSourceWithPrefetch (StreamP.maxBuffer 2) config
+-- @
+pgmqSourceWithPrefetch ::
+  (Pgmq :> es, IOE :> es) =>
+  (StreamP.Config -> StreamP.Config) ->
+  PgmqAdapterConfig ->
+  Stream (Eff es) (Ingested es Value)
+pgmqSourceWithPrefetch prefetchConfig config =
+  pgmqMessagesPrefetch prefetchConfig config
+    & Stream.mapMaybeM (mkIngested config)
