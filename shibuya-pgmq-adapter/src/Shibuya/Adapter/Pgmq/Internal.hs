@@ -3,6 +3,8 @@
 module Shibuya.Adapter.Pgmq.Internal
   ( -- * Stream Construction
     pgmqSource,
+    pgmqChunks,
+    pgmqMessages,
 
     -- * Ingested Construction
     mkIngested,
@@ -28,6 +30,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value)
+import Data.Function ((&))
 import Data.Int (Int32)
 import Data.Text qualified as Text
 import Data.Time (NominalDiffTime, nominalDiffTimeToSeconds)
@@ -74,6 +77,7 @@ import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
+import Streamly.Data.Unfold qualified as Unfold
 
 -- | Convert NominalDiffTime to seconds as Int32 for pgmq.
 nominalToSeconds :: NominalDiffTime -> Int32
@@ -224,22 +228,15 @@ mkIngested config msg = do
               lease = Just (mkLease config.queueName msg.messageId)
             }
 
--- | Create the message source stream.
--- This stream polls pgmq and yields Ingested messages.
-pgmqSource ::
+-- | Stream of message batches from pgmq.
+-- Each element is a Vector of messages from a single poll.
+-- This is the lowest-level stream that handles polling logic.
+pgmqChunks ::
   (Pgmq :> es, IOE :> es) =>
   PgmqAdapterConfig ->
-  Stream (Eff es) (Ingested es Value)
-pgmqSource config =
-  Stream.catMaybes $ Stream.repeatM pollAndConvert
+  Stream (Eff es) (Vector Pgmq.Message)
+pgmqChunks config = Stream.repeatM poll
   where
-    pollAndConvert :: (Pgmq :> es, IOE :> es) => Eff es (Maybe (Ingested es Value))
-    pollAndConvert = do
-      msgs <- poll
-      case Vector.uncons msgs of
-        Nothing -> pure Nothing
-        Just (msg, _rest) -> mkIngested config msg
-
     poll :: (Pgmq :> es, IOE :> es) => Eff es (Vector Pgmq.Message)
     poll = case config.fifoConfig of
       Nothing -> pollNonFifo
@@ -275,3 +272,29 @@ pgmqSource config =
 
     nominalToMicros :: NominalDiffTime -> Int
     nominalToMicros t = floor (nominalDiffTimeToSeconds t * 1_000_000)
+
+-- | Flatten message chunks into individual messages.
+-- Uses Streamly's unfoldEach to expand each Vector into individual elements,
+-- ensuring ALL messages from each batch are processed (not just the first).
+pgmqMessages ::
+  (Pgmq :> es, IOE :> es) =>
+  PgmqAdapterConfig ->
+  Stream (Eff es) Pgmq.Message
+pgmqMessages config =
+  pgmqChunks config
+    & Stream.filter (not . Vector.null) -- Skip empty batches
+    & Stream.unfoldEach vectorUnfold -- Flatten Vector to individual elements
+  where
+    -- Unfold a Vector into a stream of elements using uncons
+    vectorUnfold = Unfold.unfoldr Vector.uncons
+
+-- | Create the message source stream.
+-- This stream polls pgmq and yields Ingested messages.
+-- Uses unfoldEach to process ALL messages from each batch, not just the first.
+pgmqSource ::
+  (Pgmq :> es, IOE :> es) =>
+  PgmqAdapterConfig ->
+  Stream (Eff es) (Ingested es Value)
+pgmqSource config =
+  pgmqMessages config
+    & Stream.mapMaybeM (mkIngested config) -- Convert + filter auto-DLQ'd messages
