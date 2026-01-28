@@ -9,9 +9,6 @@ module Shibuya.Adapter.Pgmq.Internal
     pgmqMessages,
     pgmqMessagesPrefetch,
 
-    -- * Prefetch Configuration
-    defaultPrefetchConfig,
-
     -- * Ingested Construction
     mkIngested,
 
@@ -305,12 +302,6 @@ pgmqSource ::
 pgmqSource config =
   pgmqMessages config
     & Stream.mapMaybeM (mkIngested config) -- Convert + filter auto-DLQ'd messages
-
--- | Default configuration for concurrent prefetching.
--- Buffers up to 4 batches ahead of consumption.
--- This balances latency reduction with visibility timeout safety.
-defaultPrefetchConfig :: StreamP.Config -> StreamP.Config
-defaultPrefetchConfig = StreamP.maxBuffer 4
 
 -- | Stream of message batches with concurrent prefetching.
 -- Uses parBuffered to poll the next batch while current batch is being processed.

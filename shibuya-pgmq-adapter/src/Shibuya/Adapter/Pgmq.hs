@@ -60,10 +60,12 @@ module Shibuya.Adapter.Pgmq
     DeadLetterConfig (..),
     FifoConfig (..),
     FifoReadStrategy (..),
+    PrefetchConfig (..),
 
     -- * Defaults
     defaultConfig,
     defaultPollingConfig,
+    defaultPrefetchConfig,
 
     -- * Re-exports from pgmq
     QueueName,
@@ -85,12 +87,15 @@ import Shibuya.Adapter.Pgmq.Config
     FifoReadStrategy (..),
     PgmqAdapterConfig (..),
     PollingConfig (..),
+    PrefetchConfig (..),
     defaultConfig,
     defaultPollingConfig,
+    defaultPrefetchConfig,
   )
-import Shibuya.Adapter.Pgmq.Internal (pgmqSource)
+import Shibuya.Adapter.Pgmq.Internal (pgmqSource, pgmqSourceWithPrefetch)
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
+import Streamly.Data.Stream.Prelude qualified as StreamP
 
 -- | Create a PGMQ adapter with the given configuration.
 --
@@ -101,6 +106,7 @@ import Streamly.Data.Stream qualified as Stream
 -- * Lease extension capability for long-running handlers
 -- * Dead-letter queue support (optional)
 -- * FIFO ordering support (optional)
+-- * Concurrent prefetching (optional, via 'prefetchConfig')
 --
 -- == Effect Requirements
 --
@@ -116,6 +122,15 @@ import Streamly.Data.Stream qualified as Stream
 --   [ (ProcessorId "my-processor", QueueProcessor adapter myHandler)
 --   ]
 -- @
+--
+-- == Prefetching
+--
+-- To enable concurrent prefetching (polls next batch while processing current):
+--
+-- @
+-- let config = (defaultConfig queueName) { prefetchConfig = Just defaultPrefetchConfig }
+-- adapter <- pgmqAdapter config
+-- @
 pgmqAdapter ::
   (Pgmq :> es, IOE :> es) =>
   PgmqAdapterConfig ->
@@ -124,10 +139,20 @@ pgmqAdapter config = do
   -- Create shutdown signal
   shutdownVar <- liftIO $ newTVarIO False
 
+  -- Select source based on prefetch configuration
+  let messageSource = case config.prefetchConfig of
+        Nothing ->
+          -- No prefetching - simple sequential polling
+          pgmqSource config
+        Just prefetch ->
+          -- Concurrent prefetching enabled
+          let prefetchSettings = StreamP.maxBuffer (fromIntegral prefetch.bufferSize)
+           in pgmqSourceWithPrefetch prefetchSettings config
+
   pure
     Adapter
       { adapterName = "pgmq:" <> queueNameToText config.queueName,
-        source = takeUntilShutdown shutdownVar (pgmqSource config),
+        source = takeUntilShutdown shutdownVar messageSource,
         shutdown = liftIO $ atomically $ writeTVar shutdownVar True
       }
 

@@ -13,15 +13,20 @@ module Shibuya.Adapter.Pgmq.Config
     FifoConfig (..),
     FifoReadStrategy (..),
 
+    -- * Prefetch Configuration
+    PrefetchConfig (..),
+
     -- * Defaults
     defaultConfig,
     defaultPollingConfig,
+    defaultPrefetchConfig,
   )
 where
 
 import Data.Int (Int32, Int64)
 import Data.Time (NominalDiffTime)
 import GHC.Generics (Generic)
+import Numeric.Natural (Natural)
 import Pgmq.Types (QueueName)
 
 -- | Configuration for the PGMQ adapter.
@@ -41,7 +46,10 @@ data PgmqAdapterConfig = PgmqAdapterConfig
     -- Based on pgmq's readCount field
     maxRetries :: !Int64,
     -- | Optional FIFO mode configuration
-    fifoConfig :: !(Maybe FifoConfig)
+    fifoConfig :: !(Maybe FifoConfig),
+    -- | Optional concurrent prefetch configuration
+    -- When enabled, polls ahead while processing current messages
+    prefetchConfig :: !(Maybe PrefetchConfig)
   }
   deriving stock (Show, Eq, Generic)
 
@@ -91,15 +99,39 @@ data FifoReadStrategy
     RoundRobin
   deriving stock (Show, Eq, Generic)
 
+-- | Configuration for concurrent prefetching.
+-- When enabled, polls the next batch while current messages are being processed.
+--
+-- Trade-off: Lower latency at the cost of visibility timeout pressure.
+-- Prefetched messages have their visibility timeout ticking, so ensure:
+-- @bufferSize * batchSize * avgProcessingTime < visibilityTimeout@
+data PrefetchConfig = PrefetchConfig
+  { -- | Number of batches to buffer ahead of consumption (default: 4)
+    -- Higher values reduce latency but increase visibility timeout pressure
+    bufferSize :: !Natural
+  }
+  deriving stock (Show, Eq, Generic)
+
 -- | Default polling configuration using standard polling with 1 second interval.
 defaultPollingConfig :: PollingConfig
 defaultPollingConfig = StandardPolling {pollInterval = 1}
+
+-- | Default prefetch configuration.
+-- Buffers 4 batches ahead, balancing latency with visibility timeout safety.
+defaultPrefetchConfig :: PrefetchConfig
+defaultPrefetchConfig = PrefetchConfig {bufferSize = 4}
 
 -- | Default adapter configuration.
 -- Note: You must set 'queueName' before using.
 --
 -- @
 -- let config = defaultConfig { queueName = myQueueName }
+-- @
+--
+-- To enable prefetching:
+--
+-- @
+-- let config = (defaultConfig myQueueName) { prefetchConfig = Just defaultPrefetchConfig }
 -- @
 defaultConfig :: QueueName -> PgmqAdapterConfig
 defaultConfig name =
@@ -110,5 +142,6 @@ defaultConfig name =
       polling = defaultPollingConfig,
       deadLetterConfig = Nothing,
       maxRetries = 3,
-      fifoConfig = Nothing
+      fifoConfig = Nothing,
+      prefetchConfig = Nothing -- Disabled by default
     }
