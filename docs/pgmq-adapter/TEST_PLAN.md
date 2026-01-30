@@ -15,13 +15,60 @@ This document provides a comprehensive test plan for the shibuya-pgmq-adapter, c
 
 ## Test Categories Overview
 
-| Category | Scope | Dependencies | Runtime |
-|----------|-------|--------------|---------|
-| Unit | Pure functions, type conversions | None | Fast (< 1s) |
-| Property | Invariants, roundtrips | QuickCheck | Fast (< 5s) |
-| Integration | pgmq operations, streams | PostgreSQL + pgmq | Medium (< 30s) |
-| End-to-End | Full Shibuya + pgmq | PostgreSQL + pgmq | Slow (< 2min) |
-| Performance | Throughput, latency | PostgreSQL + pgmq | Variable |
+| Category | Scope | Dependencies | Runtime | Tag |
+|----------|-------|--------------|---------|-----|
+| Unit | Pure functions, type conversions | None | Fast (< 1s) | - |
+| Property | Invariants, roundtrips | QuickCheck | Fast (< 5s) | - |
+| Integration | pgmq operations, streams | PostgreSQL + pgmq | Medium (< 30s) | `integration` |
+| End-to-End | Full Shibuya + pgmq | PostgreSQL + pgmq | Slow (< 2min) | `e2e`, `slow` |
+| Performance | Throughput, latency | PostgreSQL + pgmq | Variable | `benchmark`, `slow` |
+
+## Running Tests
+
+### Quick Tests (No Database Required)
+
+Run only unit and property tests:
+
+```bash
+cabal test shibuya-pgmq-adapter-test --test-option='--pattern=!/integration/ && !/e2e/ && !/benchmark/'
+```
+
+Or using the Tasty pattern:
+
+```bash
+cabal test shibuya-pgmq-adapter-test --test-option='-p' --test-option='!/Slow/'
+```
+
+### Integration Tests
+
+Run integration tests (requires tmp-postgres):
+
+```bash
+cabal test shibuya-pgmq-adapter-test --test-option='-p' --test-option='/Integration/'
+```
+
+### All Tests
+
+Run the full test suite:
+
+```bash
+cabal test shibuya-pgmq-adapter-test
+```
+
+### Excluding Slow Tests
+
+Skip e2e and benchmark tests for faster CI:
+
+```bash
+cabal test shibuya-pgmq-adapter-test --test-option='-p' --test-option='!/Slow/'
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PGMQ_TEST_SKIP_SLOW` | Set to `1` to skip slow tests | - |
+| `PGMQ_TEST_SKIP_DB` | Set to `1` to skip all database tests | - |
 
 ## Unit Tests
 
@@ -485,43 +532,13 @@ instance Arbitrary DeadLetterReason where
 
 ## Integration Tests
 
-Integration tests require a running PostgreSQL instance with the pgmq extension. Use testcontainers or a local database.
+Integration tests use tmp-postgres to create a temporary PostgreSQL instance with the pgmq extension. See [Test Infrastructure](#test-infrastructure) for setup details.
 
 **File**: `test/Shibuya/Adapter/Pgmq/IntegrationSpec.hs`
 
-### Test Setup
+**Run**: `cabal test --test-option='-p' --test-option='/Integration/'`
 
-```haskell
--- | Test fixture for integration tests
-data TestFixture = TestFixture
-  { pool :: Pool,
-    queueName :: QueueName,
-    dlqName :: QueueName
-  }
-
--- | Create test fixture with fresh queues
-withTestFixture :: (TestFixture -> IO a) -> IO a
-withTestFixture action = do
-  pool <- Pool.acquire poolSettings
-
-  let Right queueName = parseQueueName $ "test_" <> randomSuffix
-      Right dlqName = parseQueueName $ "test_dlq_" <> randomSuffix
-
-  -- Create queues
-  runEff . runPgmq pool $ do
-    createQueue queueName
-    createQueue dlqName
-
-  result <- action TestFixture{pool, queueName, dlqName}
-
-  -- Cleanup
-  runEff . runPgmq pool $ do
-    dropQueue queueName
-    dropQueue dlqName
-
-  Pool.release pool
-  pure result
-```
+**Skip**: Set `PGMQ_TEST_SKIP_DB=1` or use pattern `!/Integration/`
 
 ### 1. Basic Message Processing
 
@@ -1140,9 +1157,13 @@ describe "AckHalt behavior" $ do
 
 ## End-to-End Tests
 
-Full Shibuya integration with pgmq adapter.
+Full Shibuya integration with pgmq adapter. These tests are tagged as "Slow" and can be skipped for faster CI runs.
 
 **File**: `test/Shibuya/Adapter/Pgmq/E2ESpec.hs`
+
+**Run**: `cabal test --test-option='-p' --test-option='/E2E/'`
+
+**Skip**: Set `PGMQ_TEST_SKIP_SLOW=1` or use pattern `!/Slow/`
 
 ```haskell
 describe "End-to-end with Shibuya" $ do
@@ -1250,7 +1271,13 @@ describe "End-to-end with Shibuya" $ do
 
 ## Performance Tests
 
+Performance benchmarks for throughput and latency measurements. These tests are tagged as "Slow" and can be skipped for faster CI runs.
+
 **File**: `test/Shibuya/Adapter/Pgmq/BenchmarkSpec.hs`
+
+**Run**: `cabal test --test-option='-p' --test-option='/Benchmark/'`
+
+**Skip**: Set `PGMQ_TEST_SKIP_SLOW=1` or use pattern `!/Slow/`
 
 ```haskell
 describe "Performance benchmarks" $ do
@@ -1355,56 +1382,487 @@ describe "Performance benchmarks" $ do
 
 ## Test Infrastructure
 
-### PostgreSQL Test Container
+### Dependencies
+
+Add tmp-postgres from GitHub master (not Hackage) in `cabal.project`:
+
+```cabal
+source-repository-package
+  type: git
+  location: https://github.com/jfischoff/tmp-postgres
+  tag: 7f2467a6d6d5f6db7eed59919a6773fe006cf22b
+```
+
+The pgmq-hs libraries should also be available (either as local packages or from a source-repository-package).
+
+Add to test-suite in `.cabal` file:
+
+```cabal
+test-suite shibuya-pgmq-adapter-test
+  build-depends:
+    , tmp-postgres
+    , pgmq-migration          -- For installing pgmq schema
+    , tasty
+    , tasty-hunit
+    , hasql
+    , hasql-pool
+```
+
+**Note**: The `pgmq-migration` package is from [pgmq-hs](https://github.com/topagentnetwork/pgmq-hs) and provides SQL migrations to install the pgmq schema without requiring the PostgreSQL extension.
+
+### Test Module Structure
+
+```
+test/
+├── Main.hs                           -- Test runner with filtering
+├── TestUtils.hs                      -- Shared test utilities
+├── Shibuya/Adapter/Pgmq/
+│   ├── ConvertSpec.hs                -- Unit tests (no DB)
+│   ├── ConfigSpec.hs                 -- Unit tests (no DB)
+│   ├── PropertySpec.hs               -- Property tests (no DB)
+│   ├── InternalSpec.hs               -- Unit tests (no DB)
+│   ├── IntegrationSpec.hs            -- Integration tests (DB)
+│   ├── E2ESpec.hs                    -- End-to-end tests (DB, slow)
+│   └── BenchmarkSpec.hs              -- Performance tests (DB, slow)
+└── TmpPostgres.hs                    -- tmp-postgres setup
+```
+
+### tmp-postgres Setup
+
+**File**: `test/TmpPostgres.hs`
 
 ```haskell
--- | Configuration for testcontainers
-pgmqContainerConfig :: ContainerRequest
-pgmqContainerConfig =
-  setImage "quay.io/tembo/pgmq-pg:latest"
-    $ setWaitingFor (waitUntilReady $ waitForLogLine "database system is ready")
-    $ setEnv [("POSTGRES_PASSWORD", "test")]
-    $ containerRequest
+module TmpPostgres
+  ( withPgmqPool,
+    withPgmqPoolTree,
+    TestFixture (..),
+    withTestFixture,
+    runSession,
+  )
+where
 
--- | Run tests with testcontainer
-withPgmqContainer :: (Pool -> IO a) -> IO a
-withPgmqContainer action = do
-  runContainerWith pgmqContainerConfig $ \container -> do
-    let host = containerHost container
-        port = containerPort container 5432
-        connSettings = settings host port "postgres" "test" "postgres"
-    pool <- Pool.acquire 10 Nothing connSettings
+import Control.Exception (bracket)
+import Data.ByteString (ByteString)
+import Database.Postgres.Temp
+  ( Config,
+    DB,
+    defaultConfig,
+    startConfig,
+    stop,
+    toConnectionString,
+  )
+import Database.Postgres.Temp.Internal.Config (initDbConfig, createDbConfig)
+import Hasql.Connection qualified as Connection
+import Hasql.Pool qualified as Pool
+import Hasql.Session (run)
+import Pgmq.Migration qualified  -- From pgmq-hs for schema installation
+import System.Environment (lookupEnv, setEnv, unsetEnv)
+import Test.Tasty (TestTree, withResource)
 
-    -- Install pgmq extension
-    runEff . runPgmq pool $ installPgmq
+-- | Configuration for tmp-postgres
+-- Uses --no-sync for faster test startup
+pgmqConfig :: Config
+pgmqConfig =
+  defaultConfig
+    <> mempty
+      { initDbConfig = mempty {commandLine = mempty {keyBased = [("--no-sync", Nothing)]}},
+        createDbConfig = mempty {commandLine = mempty {keyBased = [("--no-sync", Nothing)]}}
+      }
 
-    result <- action pool
-    Pool.release pool
-    pure result
+-- | Install pgmq schema using pgmq-migration
+-- This uses the SQL migrations from pgmq-hs, not the PostgreSQL extension
+installPgmq :: ByteString -> IO ()
+installPgmq connStr = do
+  conn <- either (error . show) id <$> Connection.acquire connStr
+  result <- run Pgmq.Migration.migrate conn
+  Connection.release conn
+  case result of
+    Right (Right ()) -> pure ()
+    Right (Left migrationErr) -> error $ "Migration failed: " <> show migrationErr
+    Left sessionErr -> error $ "Session failed: " <> show sessionErr
+
+-- | Clear PostgreSQL environment variables that interfere with tmp-postgres
+withCleanPgEnv :: IO a -> IO a
+withCleanPgEnv action =
+  bracket
+    ( do
+        oldPgHost <- lookupEnv "PGHOST"
+        oldPgData <- lookupEnv "PGDATA"
+        oldPgUser <- lookupEnv "PGUSER"
+        unsetEnv "PGHOST"
+        unsetEnv "PGDATA"
+        unsetEnv "PGUSER"
+        pure (oldPgHost, oldPgData, oldPgUser)
+    )
+    ( \(oldPgHost, oldPgData, oldPgUser) -> do
+        maybe (pure ()) (setEnv "PGHOST") oldPgHost
+        maybe (pure ()) (setEnv "PGDATA") oldPgData
+        maybe (pure ()) (setEnv "PGUSER") oldPgUser
+    )
+    (const action)
+
+-- | Start tmp-postgres and create a connection pool
+withPgmqPool :: (Pool.Pool -> IO a) -> IO a
+withPgmqPool action = withCleanPgEnv $ do
+  bracket
+    (either (error . show) id <$> startConfig pgmqConfig)
+    stop
+    $ \db -> do
+      let connStr = toConnectionString db
+      -- Install pgmq schema via pgmq-migration
+      installPgmq connStr
+      -- Create pool
+      bracket
+        (Pool.acquire poolSettings connStr)
+        Pool.release
+        action
+  where
+    poolSettings =
+      Pool.settings
+        [ Pool.size 10,
+          Pool.acquisitionTimeout 10,
+          Pool.agingTimeout 60,
+          Pool.idlenessTimeout 60
+        ]
+
+-- | Tasty-compatible resource wrapper for tmp-postgres pool
+withPgmqPoolTree :: (IO Pool.Pool -> TestTree) -> TestTree
+withPgmqPoolTree = withResource startPool stopPool
+  where
+    startPool = withCleanPgEnv $ do
+      db <- either (error . show) id <$> startConfig pgmqConfig
+      let connStr = toConnectionString db
+      installPgmq connStr
+      pool <- Pool.acquire poolSettings connStr
+      pure (db, pool)
+
+    stopPool (db, pool) = do
+      Pool.release pool
+      stop db
+
+    poolSettings =
+      Pool.settings
+        [ Pool.size 10,
+          Pool.acquisitionTimeout 10,
+          Pool.agingTimeout 60,
+          Pool.idlenessTimeout 60
+        ]
+
+-- | Test fixture with queue names
+data TestFixture = TestFixture
+  { pool :: Pool.Pool,
+    queueName :: QueueName,
+    dlqName :: QueueName
+  }
+
+-- | Create a test fixture with fresh queues
+-- Uses random suffixes to avoid queue name collisions
+withTestFixture :: Pool.Pool -> (TestFixture -> IO a) -> IO a
+withTestFixture pool action = do
+  -- Generate unique queue names
+  suffix <- randomSuffix
+  let Right queueName = parseQueueName $ "test_" <> suffix
+      Right dlqName = parseQueueName $ "test_dlq_" <> suffix
+
+  -- Create queues
+  runSession pool $ do
+    createQueue queueName
+    createQueue dlqName
+
+  -- Run test
+  result <- action TestFixture {pool, queueName, dlqName}
+
+  -- Cleanup queues
+  runSession pool $ do
+    dropQueue queueName
+    dropQueue dlqName
+
+  pure result
+  where
+    randomSuffix :: IO Text
+    randomSuffix = do
+      uuid <- randomIO :: IO Word64
+      pure $ Text.pack $ showHex uuid ""
+
+-- | Run a session against the pool, failing on error
+runSession :: Pool.Pool -> Session a -> IO a
+runSession pool session =
+  Pool.use pool session >>= either (error . show) pure
+```
+
+### Test Main with Filtering
+
+**File**: `test/Main.hs`
+
+```haskell
+module Main (main) where
+
+import System.Environment (lookupEnv)
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.Ingredients.Basic (includingOptions)
+import Test.Tasty.Options
+import Test.Tasty.Patterns.Types (Expr)
+import TmpPostgres (withPgmqPoolTree)
+
+-- Import test modules
+import Shibuya.Adapter.Pgmq.ConvertSpec qualified as ConvertSpec
+import Shibuya.Adapter.Pgmq.ConfigSpec qualified as ConfigSpec
+import Shibuya.Adapter.Pgmq.PropertySpec qualified as PropertySpec
+import Shibuya.Adapter.Pgmq.InternalSpec qualified as InternalSpec
+import Shibuya.Adapter.Pgmq.IntegrationSpec qualified as IntegrationSpec
+import Shibuya.Adapter.Pgmq.E2ESpec qualified as E2ESpec
+import Shibuya.Adapter.Pgmq.BenchmarkSpec qualified as BenchmarkSpec
+
+main :: IO ()
+main = do
+  -- Check environment variables for test filtering
+  skipSlow <- lookupEnv "PGMQ_TEST_SKIP_SLOW"
+  skipDb <- lookupEnv "PGMQ_TEST_SKIP_DB"
+
+  let unitTests = testGroup "Unit Tests"
+        [ ConvertSpec.tests,
+          ConfigSpec.tests,
+          InternalSpec.tests
+        ]
+
+      propertyTests = testGroup "Property Tests"
+        [ PropertySpec.tests
+        ]
+
+      -- Database tests are wrapped with withPgmqPoolTree
+      integrationTests = withPgmqPoolTree $ \pool ->
+        testGroup "Integration Tests"
+          [ IntegrationSpec.tests pool
+          ]
+
+      e2eTests = withPgmqPoolTree $ \pool ->
+        testGroup "Slow" -- Tag for filtering
+          [ testGroup "E2E Tests"
+              [ E2ESpec.tests pool
+              ]
+          ]
+
+      benchmarkTests = withPgmqPoolTree $ \pool ->
+        testGroup "Slow" -- Tag for filtering
+          [ testGroup "Benchmark Tests"
+              [ BenchmarkSpec.tests pool
+              ]
+          ]
+
+      -- Build test tree based on environment
+      allTests = case (skipDb, skipSlow) of
+        (Just "1", _) ->
+          -- Skip all database tests
+          testGroup "shibuya-pgmq-adapter"
+            [ unitTests,
+              propertyTests
+            ]
+        (_, Just "1") ->
+          -- Skip slow tests only
+          testGroup "shibuya-pgmq-adapter"
+            [ unitTests,
+              propertyTests,
+              integrationTests
+            ]
+        _ ->
+          -- Run all tests
+          testGroup "shibuya-pgmq-adapter"
+            [ unitTests,
+              propertyTests,
+              integrationTests,
+              e2eTests,
+              benchmarkTests
+            ]
+
+  defaultMain allTests
 ```
 
 ### Test Helpers
 
+**File**: `test/TestUtils.hs`
+
 ```haskell
--- | Get queue length
-getQueueLength :: (Pgmq :> es) => QueueName -> Eff es Int
-getQueueLength queueName = do
-  -- Implementation using pgmq metrics or direct query
+module TestUtils
+  ( -- * Database utilities
+    runSession,
+    tx,
 
--- | Get archive length
-getArchiveLength :: (Pgmq :> es) => QueueName -> Eff es Int
-getArchiveLength queueName = do
-  -- Implementation using direct SQL query
+    -- * Queue helpers
+    getQueueLength,
+    getArchiveLength,
+    sendMessageWithHeaders,
+    cleanupQueue,
 
--- | Send message with headers
+    -- * Test conditions
+    skipIfNoDb,
+    skipIfSlow,
+  )
+where
+
+import Control.Monad (when)
+import Data.Aeson (Value (..), object, (.=))
+import Hasql.Pool qualified as Pool
+import Hasql.Session (Session)
+import Hasql.Transaction (Transaction, statement)
+import Hasql.Transaction.Sessions (transaction, IsolationLevel (..), Mode (..))
+import Pgmq.Types (QueueName)
+import System.Environment (lookupEnv)
+import Test.Tasty.HUnit (assertFailure)
+
+-- | Run a session, failing test on error
+runSession :: Pool.Pool -> Session a -> IO a
+runSession pool session =
+  Pool.use pool session >>= either (assertFailure . show) pure
+
+-- | Run a transaction with Serializable isolation
+tx :: Transaction a -> Session a
+tx = transaction Serializable Write
+
+-- | Get the number of messages in a queue
+getQueueLength :: Pool.Pool -> QueueName -> IO Int
+getQueueLength pool queueName =
+  runSession pool $ do
+    -- Use pgmq.metrics or direct query
+    result <- statement () [Statement.stmt|
+      SELECT count(*)::int FROM pgmq.q_$1
+      |]
+    pure result
+
+-- | Get the number of archived messages
+getArchiveLength :: Pool.Pool -> QueueName -> IO Int
+getArchiveLength pool queueName =
+  runSession pool $ do
+    result <- statement () [Statement.stmt|
+      SELECT count(*)::int FROM pgmq.a_$1
+      |]
+    pure result
+
+-- | Send a message with custom headers (for FIFO testing)
 sendMessageWithHeaders ::
-  (Pgmq :> es) =>
+  Pool.Pool ->
   QueueName ->
-  Value ->
-  Value ->
-  Eff es ()
-sendMessageWithHeaders queueName body headers = do
-  -- Implementation using pgmq with headers
+  Value ->   -- body
+  Value ->   -- headers
+  IO ()
+sendMessageWithHeaders pool queueName body headers =
+  runSession pool $ do
+    statement (queueName, body, headers) [Statement.stmt|
+      SELECT pgmq.send($1, $2::jsonb, $3::jsonb)
+      |]
+
+-- | Clean up all messages from a queue
+cleanupQueue :: Pool.Pool -> QueueName -> IO ()
+cleanupQueue pool queueName =
+  runSession pool $ do
+    statement queueName [Statement.stmt|
+      DELETE FROM pgmq.q_$1
+      |]
+
+-- | Skip test if PGMQ_TEST_SKIP_DB is set
+skipIfNoDb :: IO () -> IO ()
+skipIfNoDb action = do
+  skipDb <- lookupEnv "PGMQ_TEST_SKIP_DB"
+  when (skipDb /= Just "1") action
+
+-- | Skip test if PGMQ_TEST_SKIP_SLOW is set
+skipIfSlow :: IO () -> IO ()
+skipIfSlow action = do
+  skipSlow <- lookupEnv "PGMQ_TEST_SKIP_SLOW"
+  when (skipSlow /= Just "1") action
+```
+
+### Integration Test Structure
+
+**File**: `test/Shibuya/Adapter/Pgmq/IntegrationSpec.hs`
+
+```haskell
+module Shibuya.Adapter.Pgmq.IntegrationSpec (tests) where
+
+import Hasql.Pool qualified as Pool
+import Test.Tasty
+import Test.Tasty.HUnit
+import TmpPostgres (TestFixture (..), withTestFixture)
+import TestUtils (runSession)
+
+tests :: IO Pool.Pool -> TestTree
+tests getPool = testGroup "Integration"
+  [ testCase "processes a single message" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- Test implementation
+        pure (),
+
+    testCase "visibility timeout prevents double processing" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- Test implementation
+        pure ()
+
+    -- ... more tests
+  ]
+```
+
+### E2E Test Structure with Slow Tag
+
+**File**: `test/Shibuya/Adapter/Pgmq/E2ESpec.hs`
+
+```haskell
+module Shibuya.Adapter.Pgmq.E2ESpec (tests) where
+
+import Hasql.Pool qualified as Pool
+import Test.Tasty
+import Test.Tasty.HUnit
+import TmpPostgres (TestFixture (..), withTestFixture)
+
+-- | E2E tests - these are slow and require full Shibuya setup
+-- Run with: cabal test --test-option='-p' --test-option='/E2E/'
+-- Skip with: cabal test --test-option='-p' --test-option='!/Slow/'
+tests :: IO Pool.Pool -> TestTree
+tests getPool = testGroup "E2E"
+  [ testCase "processes messages through full Shibuya pipeline" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- Full pipeline test
+        pure (),
+
+    testCase "dead-letters poison messages via Shibuya handler" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- DLQ test
+        pure ()
+  ]
+```
+
+### Benchmark Structure with Slow Tag
+
+**File**: `test/Shibuya/Adapter/Pgmq/BenchmarkSpec.hs`
+
+```haskell
+module Shibuya.Adapter.Pgmq.BenchmarkSpec (tests) where
+
+import Hasql.Pool qualified as Pool
+import Test.Tasty
+import Test.Tasty.HUnit
+import TmpPostgres (TestFixture (..), withTestFixture)
+
+-- | Benchmark tests - these are slow
+-- Run with: cabal test --test-option='-p' --test-option='/Benchmark/'
+-- Skip with: cabal test --test-option='-p' --test-option='!/Slow/'
+tests :: IO Pool.Pool -> TestTree
+tests getPool = testGroup "Benchmark"
+  [ testCase "throughput: 1000 messages, batchSize=1" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- Throughput test
+        pure (),
+
+    testCase "throughput: 1000 messages, batchSize=100" $ do
+      pool <- getPool
+      withTestFixture pool $ \fixture -> do
+        -- Throughput test with batching
+        pure ()
+  ]
 ```
 
 ## Test Matrix
