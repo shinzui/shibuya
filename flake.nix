@@ -38,9 +38,29 @@
             pkgs.haskell.compiler."${ghcVersion}"
             pkgs.postgresql
             pkgs.pkg-config
+            pkgs.process-compose
+            pkgs.jq
           ];
           shellHook = ''
             ${self.checks.${system}.pre-commit-check.shellHook}
+
+            # Database paths - all relative to project root
+            export PGHOST="$PWD/db"
+            export PGDATA="$PGHOST/db"
+            export PGLOG=$PGHOST/postgres.log
+            export PGDATABASE=shibuya
+
+            # Connection string for application use
+            export PG_CONNECTION_STRING=postgresql://$(jq -rn --arg x $PGHOST '$x|@uri')/$PGDATABASE
+
+            # Create directories
+            mkdir -p $PGHOST
+            mkdir -p .dev
+
+            # Initialize database cluster on first entry
+            if [ ! -d $PGDATA ]; then
+              initdb --auth=trust --no-locale --encoding=UTF8
+            fi
           '';
         };
       }

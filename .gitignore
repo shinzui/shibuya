@@ -11,3 +11,7 @@ cabal.project.local
 
 .claude/
 .config/
+
+# PostgreSQL dev database and process-compose
+db/
+.dev/
