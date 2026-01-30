@@ -10,3 +10,10 @@ optional-packages:
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-core/pgmq-core.cabal
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-hasql/pgmq-hasql.cabal
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-effectful/pgmq-effectful.cabal
+  /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-migration/pgmq-migration.cabal
+
+-- tmp-postgres from GitHub (not on Hackage)
+source-repository-package
+  type: git
+  location: https://github.com/jfischoff/tmp-postgres
+  tag: 7f2467a6d6d5f6db7eed59919a6773fe006cf22b
