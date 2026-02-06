@@ -101,6 +101,7 @@ extractPartitionSpec = describe "extractPartition via pgmqMessageToEnvelope" $ d
           { messageId = Pgmq.MessageId 42,
             visibilityTime = sampleTime,
             enqueuedAt = sampleTime,
+            lastReadAt = Nothing,
             readCount = 1,
             body = Pgmq.MessageBody (String "test"),
             headers = hdrs
@@ -145,6 +146,7 @@ pgmqMessageToEnvelopeSpec = describe "pgmqMessageToEnvelope" $ do
           { messageId = Pgmq.MessageId mid,
             visibilityTime = sampleTime,
             enqueuedAt = sampleTime,
+            lastReadAt = Nothing,
             readCount = 1,
             body = Pgmq.MessageBody body,
             headers = hdrs
@@ -191,6 +193,7 @@ mkDlqPayloadSpec = describe "mkDlqPayload" $ do
           { messageId = Pgmq.MessageId 42,
             visibilityTime = sampleTime,
             enqueuedAt = sampleTime,
+            lastReadAt = Just sampleTime,
             readCount = 5,
             body = Pgmq.MessageBody (object ["data" .= ("test" :: Text.Text)]),
             headers = Just $ object ["x-pgmq-group" .= ("group1" :: Text.Text)]
@@ -246,6 +249,12 @@ mkDlqPayloadSpec = describe "mkDlqPayload" $ do
       let Pgmq.MessageBody payload = mkDlqPayload sampleMessage MaxRetriesExceeded True
       case payload of
         Object obj -> KeyMap.member "original_headers" obj `shouldBe` True
+        _ -> expectationFailure "Expected Object"
+
+    it "includes last_read_at" $ do
+      let Pgmq.MessageBody payload = mkDlqPayload sampleMessage MaxRetriesExceeded True
+      case payload of
+        Object obj -> KeyMap.member "last_read_at" obj `shouldBe` True
         _ -> expectationFailure "Expected Object"
 
   describe "reason formatting" $ do

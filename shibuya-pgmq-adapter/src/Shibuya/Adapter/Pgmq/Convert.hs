@@ -87,6 +87,7 @@ mkDlqPayload msg reason includeMetadata =
       | includeMetadata =
           [ "original_message_id" .= Pgmq.unMessageId msg.messageId,
             "original_enqueued_at" .= msg.enqueuedAt,
+            "last_read_at" .= msg.lastReadAt,
             "read_count" .= msg.readCount,
             "original_headers" .= msg.headers
           ]

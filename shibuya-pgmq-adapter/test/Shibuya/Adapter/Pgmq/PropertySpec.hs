@@ -100,6 +100,7 @@ mkTestMessage n =
     { messageId = Pgmq.MessageId n,
       visibilityTime = testTime,
       enqueuedAt = testTime,
+      lastReadAt = Nothing,
       readCount = 1,
       body = Pgmq.MessageBody Null,
       headers = Nothing
