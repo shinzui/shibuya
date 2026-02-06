@@ -14,13 +14,15 @@ nix fmt                            # Format all files
 
 ## Before Committing
 
-Always run `nix fmt` before committing to ensure code is properly formatted:
+**IMPORTANT**: Always run `nix fmt` before committing:
 
 ```bash
-nix fmt && git add -p && git commit
+nix fmt
+git add <files>
+git commit
 ```
 
-The pre-commit hook runs treefmt which will reject commits with formatting issues. Running `nix fmt` first avoids failed commits due to formatting.
+The pre-commit hook runs treefmt which will reject commits with formatting issues. If a commit fails due to formatting, the hook will auto-format the files - just re-stage them with `git add` and commit again.
 
 ## Project Structure
 
