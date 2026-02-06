@@ -3,6 +3,7 @@ packages:
   shibuya-example
   shibuya-metrics
   shibuya-pgmq-adapter
+  shibuya-pgmq-adapter-bench
 
 -- Use local NQE with Streamly support
 optional-packages:
