@@ -33,6 +33,7 @@ import Control.Concurrent.STM
     writeTVar,
   )
 import Control.Monad (unless)
+import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
@@ -43,19 +44,23 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
 import Shibuya.Runner.Metrics
-  ( ProcessorId (..),
+  ( InFlightInfo (..),
+    ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
-    StreamStats (..),
     emptyProcessorMetrics,
     incFailed,
     incProcessed,
   )
+import Streamly.Data.Fold qualified as Fold
+import Streamly.Data.Stream qualified as Stream
+import Streamly.Data.Stream.Prelude qualified as StreamP
 import UnliftIO (Async, catch, catchAny, finally, throwIO)
 import UnliftIO qualified as UIO
 
@@ -100,12 +105,14 @@ runSupervised ::
   Natural ->
   -- | Processor identifier
   ProcessorId ->
+  -- | Concurrency mode
+  Concurrency ->
   -- | Queue adapter
   Adapter es msg ->
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId adapter handler = do
+runSupervised master inboxSize procId concurrency adapter handler = do
   now <- liftIO getCurrentTime
 
   -- Initialize state
@@ -123,7 +130,7 @@ runSupervised master inboxSize procId adapter handler = do
       runInIO $
         -- Catch ProcessorHalt to prevent propagation via link
         -- (Halt is intentional, not a failure - other processors should continue)
-        ( runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler
+        ( runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
             `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
         )
           `finally` unregisterProcessor master procId
@@ -189,10 +196,11 @@ runIngesterAndProcessor ::
   TVar ProcessorMetrics ->
   TVar Bool ->
   Natural ->
+  Concurrency ->
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler = do
+runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -208,37 +216,70 @@ runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler = do
 
     UIO.withAsync ingesterWithSignal $ \_ ->
       -- Processor: process messages, exit when stream done and inbox empty
-      runInIO $ processUntilDrained metricsVar handler inbox streamDoneVar
+      runInIO $ processUntilDrained metricsVar concurrency handler inbox streamDoneVar
 
   -- Mark done when processor exits
   liftIO $ atomically $ writeTVar doneVar True
 
+-- | Convert inbox to a stream for use with streamly.
+-- Respects both the stream-done signal and halt flag.
+inboxToStream ::
+  Inbox (Ingested es msg) ->
+  TVar Bool ->
+  IORef (Maybe HaltReason) ->
+  Stream.Stream IO (Ingested es msg)
+inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
+  where
+    step _ = do
+      -- Check halt flag first
+      halted <- readIORef haltRef
+      case halted of
+        Just _ -> pure Nothing -- Stop reading
+        Nothing -> do
+          done <- readTVarIO streamDoneVar
+          empty <- mailboxEmpty inbox
+          if done && empty
+            then pure Nothing
+            else Just . (,()) <$> receive inbox
+
 -- | Process messages from inbox until stream is done and inbox is empty.
--- This handles both infinite streams (runs until cancelled) and
--- finite streams (drains remaining messages then exits).
+-- Supports Serial, Ahead, and Async concurrency modes.
 processUntilDrained ::
   (IOE :> es) =>
   TVar ProcessorMetrics ->
+  Concurrency ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained metricsVar handler inbox streamDoneVar = go
-  where
-    go = do
-      -- Check if we should exit: stream done AND inbox empty
-      shouldExit <- liftIO $ do
-        done <- readTVarIO streamDoneVar
-        if done
-          then mailboxEmpty inbox
-          else pure False
+processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
+  haltRef <- liftIO $ newIORef Nothing
 
-      if shouldExit
-        then pure () -- All done, exit
-        else do
-          -- Process one message (blocks if inbox empty but stream not done)
-          processMessageFromInbox metricsVar handler inbox
-          go
+  let maxConc = case concurrency of
+        Serial -> 1
+        Ahead n -> n
+        Async n -> n
+
+  withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
+    let inboxStream = inboxToStream inbox streamDoneVar haltRef
+        processAction = runInIO . processOne metricsVar maxConc haltRef handler
+
+    case concurrency of
+      Serial ->
+        Stream.fold Fold.drain $
+          Stream.mapM processAction inboxStream
+      Ahead n ->
+        Stream.fold Fold.drain $
+          StreamP.parMapM (StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
+      Async n ->
+        Stream.fold Fold.drain $
+          StreamP.parMapM (StreamP.maxBuffer n) processAction inboxStream
+
+    -- After draining, check if we halted
+    maybeHalt <- readIORef haltRef
+    case maybeHalt of
+      Just reason -> throwIO $ ProcessorHalt reason
+      Nothing -> pure ()
 
 -- | Drain inbox until empty, with metrics tracking.
 -- Used for testing with finite streams.
@@ -248,29 +289,39 @@ drainInboxWithMetrics ::
   Handler es msg ->
   Inbox (Ingested es msg) ->
   Eff es ()
-drainInboxWithMetrics metricsVar handler inbox = go
+drainInboxWithMetrics metricsVar handler inbox = do
+  haltRef <- liftIO $ newIORef Nothing
+  go haltRef
   where
-    go = do
+    go haltRef = do
       empty <- liftIO $ mailboxEmpty inbox
       unless empty $ do
-        processMessageFromInbox metricsVar handler inbox
-        go
+        ingested <- liftIO $ receive inbox
+        processOne metricsVar 1 haltRef handler ingested
+        -- Check if halted
+        halted <- liftIO $ readIORef haltRef
+        case halted of
+          Just reason -> throwIO $ ProcessorHalt reason
+          Nothing -> go haltRef
 
--- | Process a single message from inbox with metrics tracking.
-processMessageFromInbox ::
+-- | Process a single message with metrics tracking.
+-- Thread-safe for concurrent execution.
+processOne ::
   (IOE :> es) =>
   TVar ProcessorMetrics ->
+  Int ->
+  IORef (Maybe HaltReason) ->
   Handler es msg ->
-  Inbox (Ingested es msg) ->
+  Ingested es msg ->
   Eff es ()
-processMessageFromInbox metricsVar handler inbox = do
-  -- Receive from inbox (blocks if empty)
-  ingested <- liftIO $ receive inbox
-
-  -- Update state to Processing
+processOne metricsVar maxConc haltRef handler ingested = do
+  -- Increment in-flight
   now <- liftIO getCurrentTime
   liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-    m & #state .~ Processing (m.stats.processed + 1) now
+    let current = case m.state of
+          Processing info _ -> info.inFlight
+          _ -> 0
+     in m & #state .~ Processing (InFlightInfo (current + 1) maxConc) now
 
   -- Call handler and finalize
   result <-
@@ -282,35 +333,39 @@ processMessageFromInbox metricsVar handler inbox = do
       )
       (pure . Left . HandlerException . Text.pack . show)
 
-  -- Update stats based on result
+  -- Decrement in-flight and update stats
+  now' <- liftIO getCurrentTime
+  liftIO $ atomically $ modifyTVar' metricsVar $ decrementAndUpdate result now'
+
+  -- Handle halt (set flag, don't throw - let stream drain)
   case result of
-    Right AckOk -> updateSuccess metricsVar
-    Right (AckRetry _) -> updateSuccess metricsVar
-    Right (AckDeadLetter _) -> updateFailed metricsVar
-    Right (AckHalt reason) -> do
-      updateHalted metricsVar reason
-      throwIO $ ProcessorHalt reason -- Stops the processing loop
-    Left handlerErr -> do
-      now' <- liftIO getCurrentTime
-      liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-        m
-          { stats = incFailed m.stats,
-            state = Failed (handlerErrorToText handlerErr) now'
-          }
+    Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
+    _ -> pure ()
 
-updateSuccess :: (IOE :> es) => TVar ProcessorMetrics -> Eff es ()
-updateSuccess metricsVar = liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-  m {stats = incProcessed m.stats, state = Idle}
-
-updateFailed :: (IOE :> es) => TVar ProcessorMetrics -> Eff es ()
-updateFailed metricsVar = liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-  m {stats = incFailed m.stats, state = Idle}
-
-updateHalted :: (IOE :> es) => TVar ProcessorMetrics -> HaltReason -> Eff es ()
-updateHalted metricsVar reason = do
-  now <- liftIO getCurrentTime
-  liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-    m & #state .~ Failed (haltReasonText reason) now
+-- | Decrement in-flight count and update stats based on result.
+decrementAndUpdate ::
+  Either HandlerError AckDecision ->
+  UTCTime ->
+  ProcessorMetrics ->
+  ProcessorMetrics
+decrementAndUpdate result now m =
+  let newState = case m.state of
+        Processing info _ ->
+          if info.inFlight <= 1
+            then Idle
+            else Processing (info {inFlight = info.inFlight - 1}) now
+        other -> other
+      newStats = case result of
+        Right AckOk -> incProcessed m.stats
+        Right (AckRetry _) -> incProcessed m.stats
+        Right (AckDeadLetter _) -> incFailed m.stats
+        Right (AckHalt _) -> m.stats -- Mark as failed with halt message
+        Left _ -> incFailed m.stats
+      finalState = case result of
+        Right (AckHalt reason) -> Failed (haltReasonText reason) now
+        Left err -> Failed (handlerErrorToText err) now
+        _ -> newState
+   in m {state = finalState, stats = newStats}
   where
     haltReasonText (HaltOrderedStream t) = t
     haltReasonText (HaltFatal t) = t

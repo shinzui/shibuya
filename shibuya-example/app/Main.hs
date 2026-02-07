@@ -19,10 +19,10 @@ import Shibuya.App
   ( AppHandle,
     ProcessorId (..),
     ProcessorMetrics (..),
-    QueueProcessor (..),
     SupervisionStrategy (..),
     getAppMaster,
     getAppMetrics,
+    mkProcessor,
     runApp,
     stopApp,
   )
@@ -123,17 +123,16 @@ main = runEff $ do
   tracking <- newTrackingAck
 
   -- Define our processors - each with its own adapter and handler
+  -- Using mkProcessor which provides default policies (Unordered, Serial)
   let ordersProcessor =
-        QueueProcessor
-          { adapter = counterAdapter tracking "orders" 1 1, -- 1, 2, 3, ...
-            handler = printHandler "orders"
-          }
+        mkProcessor
+          (counterAdapter tracking "orders" 1 1) -- 1, 2, 3, ...
+          (printHandler "orders")
 
       eventsProcessor =
-        QueueProcessor
-          { adapter = counterAdapter tracking "events" 100 10, -- 100, 110, 120, ...
-            handler = printHandler "events"
-          }
+        mkProcessor
+          (counterAdapter tracking "events" 100 10) -- 100, 110, 120, ...
+          (printHandler "events")
 
   -- Run all processors concurrently under supervision
   result <-

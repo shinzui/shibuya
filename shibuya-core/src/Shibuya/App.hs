@@ -3,6 +3,7 @@ module Shibuya.App
   ( -- * Running Processors
     runApp,
     QueueProcessor (..),
+    mkProcessor,
     AppHandle (..),
 
     -- * AppHandle Operations
@@ -26,6 +27,7 @@ where
 import Control.Concurrent.NQE.Supervisor qualified as NQE
 import Control.Concurrent.STM (atomically, check, readTVar)
 import Control.Monad (forM_)
+import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
@@ -35,6 +37,7 @@ import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..), handlerErrorToText, policyErrorToText, runtimeErrorToText)
 import Shibuya.Handler (Handler)
+import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner.Master
   ( Master,
     getAllMetrics,
@@ -51,6 +54,7 @@ import Shibuya.Runner.Supervised
     runSupervised,
   )
 import UnliftIO (SomeException, catch, displayException)
+import Prelude hiding (Ordering)
 
 --------------------------------------------------------------------------------
 -- Supervision Strategy
@@ -95,9 +99,16 @@ data AppError
 data QueueProcessor es where
   QueueProcessor ::
     { adapter :: Adapter es msg,
-      handler :: Handler es msg
+      handler :: Handler es msg,
+      ordering :: Ordering,
+      concurrency :: Concurrency
     } ->
     QueueProcessor es
+
+-- | Convenience constructor with default policies (Unordered + Serial).
+-- Provides backward compatibility with existing code.
+mkProcessor :: Adapter es msg -> Handler es msg -> QueueProcessor es
+mkProcessor adapter handler = QueueProcessor adapter handler Unordered Serial
 
 -- | Handle for a running multi-queue application.
 -- Provides introspection and control over all processors.
@@ -130,26 +141,36 @@ runApp ::
   -- | Named processors
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (Either AppError (AppHandle es))
-runApp strategy inboxSize namedProcessors = do
-  let nqeStrategy = toNQEStrategy strategy
-  catch
-    ( do
-        -- Start the master coordinator
-        master <- startMaster nqeStrategy
+runApp strategy inboxSize namedProcessors =
+  -- Validate all policies first
+  case validateAllPolicies namedProcessors of
+    Left err -> pure $ Left $ AppPolicyError err
+    Right () -> do
+      let nqeStrategy = toNQEStrategy strategy
+      catch
+        ( do
+            -- Start the master coordinator
+            master <- startMaster nqeStrategy
 
-        -- Spawn each processor under supervision
-        processors <- spawnProcessors master (fromIntegral inboxSize) namedProcessors
+            -- Spawn each processor under supervision
+            processors <- spawnProcessors master (fromIntegral inboxSize) namedProcessors
 
-        pure $
-          Right
-            AppHandle
-              { master = master,
-                processors = Map.fromList processors
-              }
-    )
-    ( \(e :: SomeException) ->
-        pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
-    )
+            pure $
+              Right
+                AppHandle
+                  { master = master,
+                    processors = Map.fromList processors
+                  }
+        )
+        ( \(e :: SomeException) ->
+            pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
+        )
+
+-- | Validate all processor policies before starting.
+validateAllPolicies :: [(ProcessorId, QueueProcessor es)] -> Either PolicyError ()
+validateAllPolicies = traverse_ validateOne
+  where
+    validateOne (_, QueueProcessor _ _ ord conc) = validatePolicy ord conc
 
 -- | Spawn all processors under supervision.
 spawnProcessors ::
@@ -160,8 +181,8 @@ spawnProcessors ::
   Eff es [(ProcessorId, (SupervisedProcessor, QueueProcessor es))]
 spawnProcessors master inboxSize = traverse spawnOne
   where
-    spawnOne (procId, qp@(QueueProcessor adapter handler)) = do
-      sp <- runSupervised master inboxSize procId adapter handler
+    spawnOne (procId, qp@(QueueProcessor adapter handler _ordering concurrency)) = do
+      sp <- runSupervised master inboxSize procId concurrency adapter handler
       pure (procId, (sp, qp))
 
 --------------------------------------------------------------------------------
@@ -185,7 +206,7 @@ stopApp appHandle = do
   -- Stop the master
   stopMaster appHandle.master
   where
-    shutdownAdapter (_, QueueProcessor adapter _) = adapter.shutdown
+    shutdownAdapter (_, QueueProcessor adapter _ _ _) = adapter.shutdown
 
 -- | Wait for all processors to complete.
 -- For infinite streams, this will block forever.

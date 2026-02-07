@@ -15,6 +15,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master
   ( Master,
     getAllMetrics,
@@ -159,7 +160,7 @@ spec = do
           master <- startMaster IgnoreAll
 
           -- runSupervised catches ProcessorHalt, so we can check metrics
-          sp <- runSupervised master 10 (ProcessorId "halt-metrics") adapter handler
+          sp <- runSupervised master 10 (ProcessorId "halt-metrics") Serial adapter handler
 
           -- Wait for processor to halt
           liftIO $ threadDelay 100000 -- 100ms
@@ -197,8 +198,8 @@ spec = do
 
           master <- startMaster IgnoreAll
 
-          _spA <- runSupervised master 10 (ProcessorId "A") adapterA handlerA
-          _spB <- runSupervised master 10 (ProcessorId "B") adapterB handlerB
+          _spA <- runSupervised master 10 (ProcessorId "A") Serial adapterA handlerA
+          _spB <- runSupervised master 10 (ProcessorId "B") Serial adapterB handlerB
 
           -- Wait for both to complete
           liftIO $ threadDelay 500000 -- 500ms
@@ -212,6 +213,171 @@ spec = do
         countA `shouldBe` 2
         -- B should have processed all 10
         countB `shouldBe` 10
+
+    describe "Concurrency modes" $ do
+      describe "Ahead mode" $ do
+        it "processes all messages successfully" $ do
+          countRef <- newIORef (0 :: Int)
+
+          finalCount <- runEff $ do
+            messages <- createTestMessages 5
+
+            let handler _ = do
+                  liftIO $ modifyIORef' countRef (+ 1)
+                  liftIO $ threadDelay 10000 -- 10ms
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 10 (ProcessorId "ahead") (Ahead 3) adapter handler
+
+            -- Wait for completion
+            liftIO $ threadDelay 300000 -- 300ms
+            stopMaster master
+            liftIO $ readIORef countRef
+
+          finalCount `shouldBe` 5
+
+        it "respects maxBuffer limit" $ do
+          -- This tests that we don't start too many concurrent tasks
+          maxInFlightRef <- newIORef (0 :: Int)
+          currentInFlightRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 10
+
+            let handler _ = do
+                  -- Increment current in-flight
+                  cur <- liftIO $ do
+                    modifyIORef' currentInFlightRef (+ 1)
+                    readIORef currentInFlightRef
+                  -- Update max
+                  liftIO $ modifyIORef' maxInFlightRef (\m -> max m cur)
+                  -- Simulate some work
+                  liftIO $ threadDelay 50000 -- 50ms
+                  -- Decrement in-flight
+                  liftIO $ modifyIORef' currentInFlightRef (\c -> c - 1)
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            -- Use Ahead with max 3 concurrent
+            sp <- runSupervised master 10 (ProcessorId "ahead-limit") (Ahead 3) adapter handler
+
+            liftIO $ threadDelay 1000000 -- 1s to let it complete
+            stopMaster master
+
+          maxInFlight <- readIORef maxInFlightRef
+          -- Max in-flight should not exceed buffer size + 1 (buffer + currently processing)
+          maxInFlight `shouldSatisfy` (<= 4)
+
+      describe "Async mode" $ do
+        it "processes all messages concurrently" $ do
+          countRef <- newIORef (0 :: Int)
+
+          finalCount <- runEff $ do
+            messages <- createTestMessages 5
+
+            let handler _ = do
+                  liftIO $ modifyIORef' countRef (+ 1)
+                  liftIO $ threadDelay 10000 -- 10ms
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 10 (ProcessorId "async") (Async 5) adapter handler
+
+            -- Wait for completion
+            liftIO $ threadDelay 300000 -- 300ms
+            stopMaster master
+            liftIO $ readIORef countRef
+
+          finalCount `shouldBe` 5
+
+        it "respects concurrency limit" $ do
+          maxInFlightRef <- newIORef (0 :: Int)
+          currentInFlightRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 10
+
+            let handler _ = do
+                  cur <- liftIO $ do
+                    modifyIORef' currentInFlightRef (+ 1)
+                    readIORef currentInFlightRef
+                  liftIO $ modifyIORef' maxInFlightRef (\m -> max m cur)
+                  liftIO $ threadDelay 50000 -- 50ms
+                  liftIO $ modifyIORef' currentInFlightRef (\c -> c - 1)
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 10 (ProcessorId "async-limit") (Async 3) adapter handler
+
+            liftIO $ threadDelay 1000000 -- 1s
+            stopMaster master
+
+          maxInFlight <- readIORef maxInFlightRef
+          maxInFlight `shouldSatisfy` (<= 4)
+
+      describe "Halt with concurrency" $ do
+        it "waits for in-flight to complete before halting" $ do
+          processedRef <- newIORef ([] :: [Int])
+
+          _ <- runEff $ do
+            messages <- createTestMessages 10
+
+            let handler ingested = do
+                  let msgNum = case ingested.envelope.cursor of
+                        Just (CursorInt n) -> n
+                        _ -> 0
+                  -- Simulate work
+                  liftIO $ threadDelay 50000 -- 50ms
+                  liftIO $ modifyIORef' processedRef (msgNum :)
+                  -- Halt on message 3
+                  if msgNum == 3
+                    then pure $ AckHalt (HaltFatal "halt on 3")
+                    else pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 10 (ProcessorId "halt-concurrent") (Async 3) adapter handler
+
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          processed <- readIORef processedRef
+          -- With Async 3, messages 1, 2, 3 start together
+          -- When 3 halts, 1 and 2 should complete
+          length processed `shouldSatisfy` (>= 3)
+
+        it "stops reading new messages after halt decision" $ do
+          processedRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 20
+
+            let handler _ = do
+                  count <- liftIO $ do
+                    modifyIORef' processedRef (+ 1)
+                    readIORef processedRef
+                  liftIO $ threadDelay 20000 -- 20ms
+                  -- Halt after processing 5 messages
+                  if count >= 5
+                    then pure $ AckHalt (HaltFatal "halt at 5")
+                    else pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 10 (ProcessorId "halt-stop-read") (Async 3) adapter handler
+
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          processed <- readIORef processedRef
+          -- Should process around 5-8 messages (5 before halt + a few in-flight)
+          -- but definitely not all 20
+          processed `shouldSatisfy` (< 15)
 
 -- Test helpers
 

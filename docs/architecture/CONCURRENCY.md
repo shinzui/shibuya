@@ -137,30 +137,32 @@ myAdapter = Adapter
 | Metrics | Tracking received/processed/failed counts |
 | Handler-level concurrency | Serial/Async/Ahead modes (see below) |
 
-**Current implementation (v0.1.0-alpha):**
+**Current implementation (v0.1.0):**
 
-All processing is **Serial** - one message at a time per processor:
+Shibuya supports three handler concurrency modes:
 
 ```
-Adapter.source → Ingester → Inbox → Processor → Handler (one at a time)
+Adapter.source → Ingester → Inbox → Processor → Handler(s)
                               │
                               └── Backpressure via bounded inbox
 ```
 
 ---
 
-## Handler-Level Concurrency (Planned)
+## Handler-Level Concurrency
 
 Shibuya defines three handler concurrency modes in `Policy.hs`:
 
 ```haskell
 data Concurrency
-  = Serial       -- Process one message at a time (IMPLEMENTED)
-  | Ahead !Int   -- Prefetch N, process in order (PLANNED)
-  | Async !Int   -- Process N concurrently (PLANNED)
+  = Serial       -- Process one message at a time
+  | Ahead !Int   -- Prefetch N, process in order
+  | Async !Int   -- Process N concurrently
 ```
 
-### Serial (Current)
+All three modes are fully implemented and can be configured per `QueueProcessor`.
+
+### Serial
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -185,7 +187,7 @@ data Concurrency
 
 ---
 
-### Ahead (Planned)
+### Ahead
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -215,12 +217,17 @@ data Concurrency
 - Better throughput than Serial for I/O-bound handlers
 - Use case: When order matters but handlers are slow
 
-**Implementation approach:**
-Would use Streamly's `parMapM (maxBuffer n . ordered True)` internally.
+**Implementation:**
+Uses Streamly's `parMapM (maxBuffer n . ordered True)` internally.
+
+**Usage:**
+```haskell
+QueueProcessor adapter handler PartitionedInOrder (Ahead 3)
+```
 
 ---
 
-### Async (Planned)
+### Async
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -252,8 +259,13 @@ Would use Streamly's `parMapM (maxBuffer n . ordered True)` internally.
 - Maximum throughput
 - Use case: When order doesn't matter (e.g., independent events)
 
-**Implementation approach:**
-Would use Streamly's `parMapM (maxBuffer n)` (without `ordered`).
+**Implementation:**
+Uses Streamly's `parMapM (maxBuffer n)` (without `ordered`).
+
+**Usage:**
+```haskell
+QueueProcessor adapter handler Unordered (Async 10)
+```
 
 ---
 
@@ -270,15 +282,25 @@ data Ordering
 
 ### Policy Validation
 
-Certain combinations are invalid:
+Certain combinations are invalid and will be rejected by `runApp`:
 
 | Ordering | Serial | Ahead | Async |
 |----------|--------|-------|-------|
-| StrictInOrder | ✅ | ✅ | ❌ |
+| StrictInOrder | ✅ | ❌ | ❌ |
 | PartitionedInOrder | ✅ | ✅ | ✅ |
 | Unordered | ✅ | ✅ | ✅ |
 
-`StrictInOrder` + `Async` is invalid because Async doesn't preserve order.
+`StrictInOrder` requires `Serial` because it demands exact ordering.
+`PartitionedInOrder` allows all concurrency modes since ordering is per-partition.
+`Unordered` allows all concurrency modes since there are no ordering guarantees.
+
+**Validation is enforced at startup:**
+```haskell
+-- runApp validates all policies before starting processors
+case validateAllPolicies namedProcessors of
+  Left err -> pure $ Left $ AppPolicyError err
+  Right () -> -- proceed with startup
+```
 
 ---
 
@@ -314,7 +336,6 @@ Certain combinations are invalid:
 │                                                                           │
 │  User configures via:                                                     │
 │    Concurrency = Serial | Ahead 10 | Async 10                           │
-│    (NOTE: Only Serial implemented in v0.1.0-alpha)                       │
 │                                                                           │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                           │
@@ -335,47 +356,69 @@ Certain combinations are invalid:
 
 ---
 
-## Current Limitations (v0.1.0-alpha)
+## Current Limitations (v0.1.0)
 
-1. **Handler concurrency**: Only `Serial` is implemented. `Ahead` and `Async` are defined but not enforced.
+1. **No restart semantics**: NQE doesn't have one-for-one restart. Failed processors stay failed (with `IgnoreFailures`) or all stop (with `StopAllOnFailure`).
 
-2. **Policy validation**: `validatePolicy` exists but is not called. Invalid combinations are not rejected.
-
-3. **No restart semantics**: NQE doesn't have one-for-one restart. Failed processors stay failed (with `IgnoreFailures`) or all stop (with `StopAllOnFailure`).
+2. **Halt behavior with concurrency**: When `AckHalt` is returned during concurrent processing, in-flight handlers are allowed to complete before the processor halts. No new messages are read after a halt decision.
 
 ---
 
-## Future Work
+## Implementation Details
 
-### Implementing Ahead/Async
+### How Concurrency Is Implemented
 
-When implementing handler-level concurrency, Shibuya would use Streamly internally:
+Shibuya uses Streamly's `parMapM` internally to implement handler-level concurrency:
 
 ```haskell
--- Conceptual implementation
-processorLoop :: Concurrency -> Handler es msg -> Stream m (Ingested es msg) -> m ()
-processorLoop concurrency handler inboxStream = case concurrency of
-  Serial ->
-    Stream.fold Fold.drain $ Stream.mapM (processOne handler) inboxStream
+processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
+  haltRef <- liftIO $ newIORef Nothing
 
-  Ahead n ->
-    Stream.fold Fold.drain $
-      parMapM (maxBuffer n . ordered True) (processOne handler) inboxStream
+  let inboxStream = inboxToStream inbox streamDoneVar haltRef
+      processAction = processOne metricsVar maxConc haltRef handler
 
-  Async n ->
-    Stream.fold Fold.drain $
-      parMapM (maxBuffer n) (processOne handler) inboxStream
+  case concurrency of
+    Serial ->
+      Stream.fold Fold.drain $
+        Stream.mapM processAction inboxStream
+
+    Ahead n ->
+      Stream.fold Fold.drain $
+        StreamP.parMapM (StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
+
+    Async n ->
+      Stream.fold Fold.drain $
+        StreamP.parMapM (StreamP.maxBuffer n) processAction inboxStream
 ```
 
-### Considerations
+### In-Flight Tracking
 
-1. **Ack ordering**: With Async, acks may complete out of order. The adapter must handle this.
+The `ProcessorMetrics` tracks concurrent in-flight messages via `InFlightInfo`:
 
-2. **Error propagation**: With concurrent handlers, how do failures affect other in-flight handlers?
+```haskell
+data InFlightInfo = InFlightInfo
+  { inFlight :: !Int,        -- Currently processing
+    maxConcurrency :: !Int   -- Configured max (1 for Serial)
+  }
+```
 
-3. **Backpressure**: The bounded inbox already provides backpressure, but handler concurrency adds another buffer.
+This is exposed via Prometheus metrics for observability.
 
-4. **Metrics accuracy**: With concurrent handlers, "currently processing" count becomes more complex.
+### Halt Behavior
+
+When a handler returns `AckHalt`:
+1. The halt flag is set atomically
+2. No new messages are read from the inbox
+3. In-flight handlers are allowed to complete
+4. After all in-flight complete, `ProcessorHalt` is thrown
+
+## Future Work
+
+1. **Ack ordering**: With Async, acks may complete out of order. Adapters should be aware of this.
+
+2. **Per-partition concurrency**: For `PartitionedInOrder`, implement per-partition processing with concurrent partitions.
+
+3. **Restart semantics**: Add one-for-one restart capability to recover individual failed processors.
 
 ---
 

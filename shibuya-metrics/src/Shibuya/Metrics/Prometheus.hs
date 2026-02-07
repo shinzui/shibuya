@@ -13,7 +13,8 @@ import Network.HTTP.Types (hContentType, status200)
 import Network.Wai (Application, Response, responseLBS)
 import Shibuya.Runner.Master (Master, getAllMetricsIO)
 import Shibuya.Runner.Metrics
-  ( MetricsMap,
+  ( InFlightInfo (..),
+    MetricsMap,
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
@@ -103,5 +104,5 @@ stateToInt Stopped = 4
 
 -- | Get in-flight count from processor state.
 inFlightCount :: ProcessorState -> Int
-inFlightCount (Processing count _) = count
+inFlightCount (Processing info _) = info.inFlight
 inFlightCount _ = 0

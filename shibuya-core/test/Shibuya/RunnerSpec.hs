@@ -8,7 +8,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppError (..), QueueProcessor (..), SupervisionStrategy (..), runApp, waitApp)
+import Shibuya.App (AppError (..), SupervisionStrategy (..), mkProcessor, runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
@@ -32,7 +32,7 @@ spec = do
         -- Create adapter and handler
         let adapter = testAdapter messages
             handler = testHandler processedRef
-            processor = QueueProcessor adapter handler
+            processor = mkProcessor adapter handler
 
         -- Run the app
         res <-
@@ -62,7 +62,7 @@ spec = do
         -- Create adapter and handler
         let adapter = testAdapter messages
             handler = alwaysAckOk
-            processor = QueueProcessor adapter handler
+            processor = mkProcessor adapter handler
 
         -- Run the app
         res <-
@@ -95,8 +95,8 @@ spec = do
         let adapter1 = testAdapter messages1
             adapter2 = testAdapter messages2
             handler = alwaysAckOk
-            proc1 = QueueProcessor adapter1 handler
-            proc2 = QueueProcessor adapter2 handler
+            proc1 = mkProcessor adapter1 handler
+            proc2 = mkProcessor adapter2 handler
 
         res <-
           runApp

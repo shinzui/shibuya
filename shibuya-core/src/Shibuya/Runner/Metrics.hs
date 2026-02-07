@@ -5,6 +5,10 @@ module Shibuya.Runner.Metrics
     ProcessorState (..),
     ProcessorId (..),
 
+    -- * In-Flight Tracking
+    InFlightInfo (..),
+    emptyInFlightInfo,
+
     -- * Stream Statistics
     StreamStats (..),
     emptyStreamStats,
@@ -35,12 +39,38 @@ newtype ProcessorId = ProcessorId {unProcessorId :: Text}
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey)
 
+-- | Tracks concurrent in-flight messages.
+data InFlightInfo = InFlightInfo
+  { -- | Currently processing count
+    inFlight :: !Int,
+    -- | Configured max concurrency (1 for Serial)
+    maxConcurrency :: !Int
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance ToJSON InFlightInfo where
+  toJSON info =
+    object
+      [ "inFlight" Aeson..= info.inFlight,
+        "maxConcurrency" Aeson..= info.maxConcurrency
+      ]
+
+instance FromJSON InFlightInfo where
+  parseJSON = withObject "InFlightInfo" $ \v ->
+    InFlightInfo
+      <$> v .: "inFlight"
+      <*> v .: "maxConcurrency"
+
+-- | Create empty in-flight info with given max concurrency.
+emptyInFlightInfo :: Int -> InFlightInfo
+emptyInFlightInfo maxConc = InFlightInfo 0 maxConc
+
 -- | Processor runtime state.
 data ProcessorState
   = -- | Waiting for messages
     Idle
-  | -- | Currently processing (count, last activity time)
-    Processing !Int !UTCTime
+  | -- | Currently processing (in-flight info, last activity time)
+    Processing !InFlightInfo !UTCTime
   | -- | Failed with error (error message, timestamp)
     Failed !Text !UTCTime
   | -- | Processor has been stopped
@@ -49,10 +79,11 @@ data ProcessorState
 
 instance ToJSON ProcessorState where
   toJSON Idle = object ["status" Aeson..= ("idle" :: Text)]
-  toJSON (Processing count lastActivity) =
+  toJSON (Processing info lastActivity) =
     object
       [ "status" Aeson..= ("processing" :: Text),
-        "inFlight" Aeson..= count,
+        "inFlight" Aeson..= info.inFlight,
+        "maxConcurrency" Aeson..= info.maxConcurrency,
         "lastActivity" Aeson..= lastActivity
       ]
   toJSON (Failed err timestamp) =
@@ -68,7 +99,11 @@ instance FromJSON ProcessorState where
     status <- v .: "status"
     case status :: Text of
       "idle" -> pure Idle
-      "processing" -> Processing <$> v .: "inFlight" <*> v .: "lastActivity"
+      "processing" -> do
+        inFlightCount <- v .: "inFlight"
+        maxConc <- v .: "maxConcurrency"
+        lastActivity <- v .: "lastActivity"
+        pure $ Processing (InFlightInfo inFlightCount maxConc) lastActivity
       "failed" -> Failed <$> v .: "error" <*> v .: "timestamp"
       "stopped" -> pure Stopped
       other -> fail $ "Unknown processor state: " <> Text.unpack other

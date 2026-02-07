@@ -47,6 +47,7 @@ module Shibuya.Core
     runApp,
     AppError (..),
     QueueProcessor (..),
+    mkProcessor,
     AppHandle (..),
     waitApp,
     stopApp,
@@ -65,6 +66,7 @@ module Shibuya.Core
     ProcessorState (..),
     ProcessorMetrics (..),
     StreamStats (..),
+    InFlightInfo (..),
     MetricsMap,
 
     -- * Halt
@@ -73,7 +75,7 @@ module Shibuya.Core
 where
 
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), SupervisionStrategy (..), getAppMetrics, runApp, stopApp, waitApp)
+import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), SupervisionStrategy (..), getAppMetrics, mkProcessor, runApp, stopApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
@@ -83,5 +85,5 @@ import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
-import Shibuya.Runner.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
+import Shibuya.Runner.Metrics (InFlightInfo (..), MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
 import Prelude hiding (Ordering)
