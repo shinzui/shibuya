@@ -74,7 +74,7 @@ readMessages :: Pool.Pool -> QueueName -> Int -> IO [MessageId]
 readMessages pool queue n = do
   let req = Q.ReadMessage {queueName = queue, delay = 300, batchSize = Just (fromIntegral n), conditional = Nothing}
   msgs <- runSession pool $ Pgmq.readMessage req
-  pure $ V.toList $ V.map (\(Message mid _ _ _ _ _) -> mid) msgs
+  pure $ V.toList $ V.map (\(Message mid _ _ _ _ _ _) -> mid) msgs
 
 runDeleteSingle :: Pool.Pool -> QueueName -> IO ()
 runDeleteSingle pool queue = do

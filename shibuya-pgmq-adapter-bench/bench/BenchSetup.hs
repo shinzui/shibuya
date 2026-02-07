@@ -82,8 +82,6 @@ runSession pool session = do
 -- | Install pgmq schema into a PostgreSQL database.
 installPgmqSchema :: Pool.Pool -> IO ()
 installPgmqSchema pool = do
-  let connStr = "" -- We need to use the pool differently for migrations
-  -- Actually, we can run migrate through the pool
   result <- Pool.use pool Migration.migrate
   case result of
     Left sessionErr -> error $ "Migration session error: " <> show sessionErr

@@ -98,7 +98,7 @@ runReadAll pool queues batchSize = do
   forM_ queues $ \queue -> do
     let req = Q.ReadMessage {queueName = queue, delay = 30, batchSize = Just (fromIntegral batchSize), conditional = Nothing}
     msgs <- runSession pool $ Pgmq.readMessage req
-    let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _) -> mid) msgs
+    let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _ _) -> mid) msgs
     if null msgIds
       then pure ()
       else do

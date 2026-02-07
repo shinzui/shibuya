@@ -114,7 +114,7 @@ rawDelete pool queue = do
   let readReq = Q.ReadMessage {queueName = queue, delay = 300, batchSize = Just 1, conditional = Nothing}
   msgs <- runSession pool $ Pgmq.readMessage readReq
   case V.toList msgs of
-    (Message msgId _ _ _ _ _ : _) -> do
+    (Message msgId _ _ _ _ _ _ : _) -> do
       _ <- runSession pool $ Pgmq.deleteMessage Q.MessageQuery {queueName = queue, messageId = msgId}
       pure ()
     [] -> pure ()
@@ -154,14 +154,14 @@ effDelete pool queue = do
   let readReq = Q.ReadMessage {queueName = queue, delay = 300, batchSize = Just 1, conditional = Nothing}
   msgs <- runSession pool $ Pgmq.readMessage readReq
   case V.toList msgs of
-    (Message msgId _ _ _ _ _ : _) -> runEffectful pool $ do
+    (Message msgId _ _ _ _ _ _ : _) -> runEffectful pool $ do
       _ <- Eff.deleteMessage Q.MessageQuery {queueName = queue, messageId = msgId}
       pure ()
     [] -> pure ()
 
 deleteMessages :: Pool.Pool -> QueueName -> V.Vector Message -> IO ()
 deleteMessages pool queue msgs = do
-  let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _) -> mid) msgs
+  let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _ _) -> mid) msgs
   if null msgIds
     then pure ()
     else do

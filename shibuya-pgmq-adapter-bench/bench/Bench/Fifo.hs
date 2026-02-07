@@ -76,7 +76,7 @@ runReadGroupedRR pool queue batchSize = do
 
 deleteMessages :: Pool.Pool -> QueueName -> V.Vector Message -> IO ()
 deleteMessages pool queue msgs = do
-  let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _) -> mid) msgs
+  let msgIds = V.toList $ V.map (\(Message mid _ _ _ _ _ _) -> mid) msgs
   if null msgIds
     then pure ()
     else do
