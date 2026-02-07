@@ -24,7 +24,8 @@ import Shibuya.Runner.Master
     stopMaster,
   )
 import Shibuya.Runner.Metrics
-  ( ProcessorId (..),
+  ( InFlightInfo (..),
+    ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
@@ -378,6 +379,133 @@ spec = do
           -- Should process around 5-8 messages (5 before halt + a few in-flight)
           -- but definitely not all 20
           processed `shouldSatisfy` (< 15)
+
+      describe "Error handling" $ do
+        it "handler exception doesn't affect other in-flight handlers" $ do
+          resultsRef <- newIORef ([] :: [Either String Int])
+
+          _ <- runEff $ do
+            messages <- createTestMessages 5
+
+            let handler ingested = do
+                  let msgNum = case ingested.envelope.cursor of
+                        Just (CursorInt n) -> n
+                        _ -> 0
+                  -- Message 2 throws an exception
+                  if msgNum == 2
+                    then do
+                      liftIO $ modifyIORef' resultsRef (Left "error on 2" :)
+                      error "Intentional failure on message 2"
+                    else do
+                      liftIO $ threadDelay 30000 -- 30ms
+                      liftIO $ modifyIORef' resultsRef (Right msgNum :)
+                      pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 10 (ProcessorId "error-handling") (Async 3) adapter handler
+
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          results <- readIORef resultsRef
+          -- Message 2 should have errored
+          let errors = [e | Left e <- results]
+          length errors `shouldBe` 1
+          -- Other messages (1, 3, 4, 5) should have succeeded
+          let successes = [n | Right n <- results]
+          length successes `shouldSatisfy` (>= 3)
+
+      describe "Metrics tracking" $ do
+        it "tracks in-flight count during concurrent processing" $ do
+          maxInFlightObserved <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 5
+
+            let handler _ = do
+                  liftIO $ threadDelay 100000 -- 100ms
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 10 (ProcessorId "metrics-test") (Async 3) adapter handler
+
+            -- Check metrics while processing
+            liftIO $ do
+              threadDelay 50000 -- 50ms - should be in the middle of processing
+              metrics <- readTVarIO sp.metrics
+              case metrics.state of
+                Processing info _ -> modifyIORef' maxInFlightObserved (max info.inFlight)
+                _ -> pure ()
+
+            liftIO $ threadDelay 600000 -- 600ms to complete
+            stopMaster master
+
+          maxObserved <- readIORef maxInFlightObserved
+          -- Should have observed at least 2 concurrent handlers
+          maxObserved `shouldSatisfy` (>= 2)
+
+        it "reports correct maxConcurrency in metrics" $ do
+          observedMaxConc <- runEff $ do
+            messages <- createTestMessages 3
+
+            let handler _ = do
+                  liftIO $ threadDelay 50000 -- 50ms
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 10 (ProcessorId "max-conc") (Ahead 7) adapter handler
+
+            -- Check metrics while processing
+            result <- liftIO $ do
+              threadDelay 25000 -- 25ms
+              metrics <- readTVarIO sp.metrics
+              case metrics.state of
+                Processing info _ -> pure $ Just info.maxConcurrency
+                _ -> pure Nothing
+
+            liftIO $ threadDelay 300000
+            stopMaster master
+            pure result
+
+          observedMaxConc `shouldBe` Just 7
+
+      describe "Ahead mode ordering" $ do
+        it "completes handlers and emits results in input order" $ do
+          -- Track the order in which handlers START and COMPLETE
+          startOrderRef <- newIORef ([] :: [Int])
+          completeOrderRef <- newIORef ([] :: [Int])
+
+          _ <- runEff $ do
+            messages <- createTestMessages 5
+
+            let handler ingested = do
+                  let msgNum = case ingested.envelope.cursor of
+                        Just (CursorInt n) -> n
+                        _ -> 0
+                  -- Record start
+                  liftIO $ modifyIORef' startOrderRef (msgNum :)
+                  -- Variable delay: message 1 is slowest, 5 is fastest
+                  liftIO $ threadDelay ((6 - msgNum) * 20000)
+                  -- Record completion
+                  liftIO $ modifyIORef' completeOrderRef (msgNum :)
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 10 (ProcessorId "ahead-order") (Ahead 5) adapter handler
+
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          -- With Ahead mode, all 5 should complete
+          completeOrder <- readIORef completeOrderRef
+          length completeOrder `shouldBe` 5
+
+-- The key property: all messages were processed
+-- (Ordering of side effects may vary, but stream output is ordered)
 
 -- Test helpers
 

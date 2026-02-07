@@ -8,15 +8,18 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppError (..), SupervisionStrategy (..), mkProcessor, runApp, waitApp)
+import Shibuya.App (AppError (..), QueueProcessor (..), SupervisionStrategy (..), mkProcessor, runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Error (PolicyError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
+import Prelude hiding (Ordering)
 
 spec :: Spec
 spec = do
@@ -113,6 +116,75 @@ spec = do
             pure $ Right ()
 
       result `shouldBe` Right ()
+
+  describe "Policy validation" $ do
+    it "rejects StrictInOrder with Async" $ do
+      result <- runEff $ do
+        messages <- createTestMessages 3
+        let adapter = testAdapter messages
+            handler = alwaysAckOk
+            -- Invalid combination: StrictInOrder requires Serial
+            processor = QueueProcessor adapter handler StrictInOrder (Async 5)
+
+        runApp IgnoreFailures 100 [(ProcessorId "invalid", processor)]
+
+      case result of
+        Left (AppPolicyError (InvalidPolicyCombo _)) -> pure ()
+        Left err -> expectationFailure $ "Expected AppPolicyError, got: " ++ show err
+        Right _ -> expectationFailure "Expected policy validation to fail"
+
+    it "rejects StrictInOrder with Ahead" $ do
+      result <- runEff $ do
+        messages <- createTestMessages 3
+        let adapter = testAdapter messages
+            handler = alwaysAckOk
+            processor = QueueProcessor adapter handler StrictInOrder (Ahead 5)
+
+        runApp IgnoreFailures 100 [(ProcessorId "invalid", processor)]
+
+      case result of
+        Left (AppPolicyError (InvalidPolicyCombo _)) -> pure ()
+        Left err -> expectationFailure $ "Expected AppPolicyError, got: " ++ show err
+        Right _ -> expectationFailure "Expected policy validation to fail"
+
+    it "accepts valid policy combinations" $ do
+      result <- runEff $ do
+        messages <- createTestMessages 2
+        let adapter = testAdapter messages
+            handler = alwaysAckOk
+            -- Valid combinations
+            proc1 = QueueProcessor adapter handler Unordered (Async 3)
+            proc2 = QueueProcessor adapter handler PartitionedInOrder (Ahead 3)
+
+        res <-
+          runApp
+            IgnoreFailures
+            100
+            [ (ProcessorId "async", proc1),
+              (ProcessorId "ahead", proc2)
+            ]
+        case res of
+          Left err -> pure $ Left err
+          Right appHandle -> do
+            waitApp appHandle
+            pure $ Right ()
+
+      result `shouldBe` Right ()
+
+  describe "mkProcessor" $ do
+    it "creates processor with Unordered ordering" $ do
+      messages <- runEff $ createTestMessages 1
+      let adapter = testAdapter messages
+          handler = alwaysAckOk
+          QueueProcessor _ _ ordering _ = mkProcessor adapter handler
+      ordering `shouldBe` Unordered
+
+    it "creates processor with Serial concurrency" $ do
+      messages <- runEff $ createTestMessages 1
+      let adapter = testAdapter messages
+          handler = alwaysAckOk
+          QueueProcessor _ _ _ concurrency = mkProcessor adapter handler
+      concurrency `shouldBe` Serial
 
 -- Test helpers
 
