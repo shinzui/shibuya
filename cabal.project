@@ -1,5 +1,6 @@
 packages:
   shibuya-core
+  shibuya-core-bench
   shibuya-example
   shibuya-metrics
   shibuya-pgmq-adapter
