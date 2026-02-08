@@ -29,9 +29,8 @@ module Shibuya.App
   )
 where
 
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor qualified as NQE
-import Control.Concurrent.STM (STM, atomically, check, readTVar, readTVarIO)
+import Control.Concurrent.STM (STM, atomically, check, orElse, readTVar, registerDelay)
 import Control.Monad (forM_, void)
 import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
@@ -258,27 +257,19 @@ stopAppGracefully config appHandle = do
 
 -- | Wait for all processors to be done, with timeout.
 -- Returns True if all drained cleanly, False if timeout occurred.
--- Uses polling to avoid requiring -threaded RTS.
+-- Note: Requires -threaded RTS for registerDelay to work properly.
 waitForDrainWithTimeout :: Int -> [(SupervisedProcessor, a)] -> IO Bool
-waitForDrainWithTimeout timeoutMicros processors = go timeoutMicros
+waitForDrainWithTimeout timeoutMicros processors = do
+  -- Create a timeout TVar that becomes True after the deadline
+  timeoutVar <- registerDelay timeoutMicros
+
+  -- Wait for either all done or timeout
+  atomically $
+    (allDone processors >> pure True)
+      `orElse` (readTVar timeoutVar >>= check >> pure False)
   where
-    -- Poll interval: 50ms
-    pollInterval :: Int
-    pollInterval = 50000
-
-    go :: Int -> IO Bool
-    go remaining
-      | remaining <= 0 = pure False -- Timeout
-      | otherwise = do
-          allDone <- checkAllDone processors
-          if allDone
-            then pure True
-            else do
-              threadDelay (min pollInterval remaining)
-              go (remaining - pollInterval)
-
-    checkAllDone :: [(SupervisedProcessor, a)] -> IO Bool
-    checkAllDone procs = and <$> mapM (\(sp, _) -> readTVarIO sp.done) procs
+    allDone :: [(SupervisedProcessor, a)] -> STM ()
+    allDone procs = forM_ procs $ \(sp, _) -> readTVar sp.done >>= check
 
 -- | Wait for all processors to complete.
 -- For infinite streams, this will block forever.
