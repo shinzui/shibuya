@@ -16,6 +16,7 @@ import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (runWithMetrics)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
 import Test.Tasty.Bench (Benchmark, bcompare, bench, bgroup, env, nfIO)
@@ -110,28 +111,29 @@ setupMessages n = pure [BenchMessage i (Text.pack $ "payload-" <> show i) | i <-
 
 -- | Run pre-created messages through shibuya
 runShibuyaWithMessages :: [BenchMessage] -> IO Int
-runShibuyaWithMessages payloads = runEff $ do
+runShibuyaWithMessages payloads = do
   -- Create counter for processed messages
-  counterRef <- liftIO $ newIORef (0 :: Int)
+  counterRef <- newIORef (0 :: Int)
 
-  -- Wrap payloads as Ingested messages
-  msgs <- wrapAsIngested payloads
-  let adapter = listAdapter msgs
+  runEff $ runTracingNoop $ do
+    -- Wrap payloads as Ingested messages
+    msgs <- wrapAsIngested payloads
+    let adapter = listAdapter msgs
 
-  -- Simple handler that just counts
-  let handler :: Handler '[IOE] BenchMessage
-      handler _ingested = do
-        liftIO $ atomicModifyIORef' counterRef (\c -> (c + 1, ()))
-        pure AckOk
+    -- Simple handler that just counts
+    let handler :: (IOE :> es) => Handler es BenchMessage
+        handler _ingested = do
+          liftIO $ atomicModifyIORef' counterRef (\c -> (c + 1, ()))
+          pure AckOk
 
-  -- Run through framework
-  -- NOTE: inbox size must be >= message count for runWithMetrics
-  -- because it runs ingester sequentially before draining
-  let inboxSize = fromIntegral $ length payloads
-  _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
+    -- Run through framework
+    -- NOTE: inbox size must be >= message count for runWithMetrics
+    -- because it runs ingester sequentially before draining
+    let inboxSize = fromIntegral $ length payloads
+    _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
 
-  -- Return count
-  liftIO $ readIORef counterRef
+    -- Return count
+    liftIO $ readIORef counterRef
 
 -- | Wrap payloads as Ingested messages
 wrapAsIngested :: (IOE :> es) => [BenchMessage] -> Eff es [Ingested es BenchMessage]
@@ -148,6 +150,7 @@ wrapAsIngested payloads = do
                 cursor = Nothing,
                 partition = Nothing,
                 enqueuedAt = Just now,
+                traceContext = Nothing,
                 payload = payload
               }
        in Ingested

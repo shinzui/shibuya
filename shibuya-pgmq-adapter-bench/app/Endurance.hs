@@ -57,6 +57,7 @@ import Shibuya.App
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Runner.Metrics (ProcessorId (..))
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import System.Environment (getEnv, lookupEnv)
 import System.IO (Handle, IOMode (..), hFlush, hPutStrLn, withFile)
 import Text.Read (readMaybe)
@@ -323,7 +324,7 @@ runEnduranceTest config pool queueName = do
     samplerAsync <- async $ runSampler config startTime producedVar processedRef failedRef csvHandle
 
     let adapterConfig = defaultConfig queueName
-    eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmq pool $ do
+    eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmq pool $ runTracingNoop $ do
       adapter <- pgmqAdapter adapterConfig
       let handler = makeHandler processedRef failedRef
           processor = mkProcessor adapter handler

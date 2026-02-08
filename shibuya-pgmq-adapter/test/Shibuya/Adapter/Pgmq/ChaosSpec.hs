@@ -41,6 +41,7 @@ import Shibuya.App
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Runner.Metrics (ProcessorId (..))
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import System.Environment (lookupEnv)
 import Test.Hspec
 import TmpPostgres (TestFixture (..), runPgmqSession, withPgmqDb, withTestFixture)
@@ -150,7 +151,7 @@ poisonMessageSpec = describe "Poison messages" $ do
             }
 
     -- Run processor that dead-letters the message
-    runAdapterIO pool $ do
+    runAdapterIO pool $ runTracingNoop $ do
       adapter <- pgmqAdapter config
       let handler = deadLetterHandler processedRef
           processor = mkProcessor adapter handler
@@ -221,7 +222,7 @@ longHandlerSpec = describe "Long-running handlers" $ do
             }
 
     -- Start processor with slow handler
-    processorAsync <- async $ runAdapterIO pool $ do
+    processorAsync <- async $ runAdapterIO pool $ runTracingNoop $ do
       adapter <- pgmqAdapter config
       let handler = slowHandler processedRef 2000000 -- 2 second delay
           processor = mkProcessor adapter handler
@@ -290,7 +291,7 @@ gracefulShutdownSpec = describe "Graceful shutdown" $ do
             }
 
     -- Run processor with slow handler
-    runAdapterIO pool $ do
+    runAdapterIO pool $ runTracingNoop $ do
       adapter <- pgmqAdapter config
       let handler = slowHandler processedRef 50000 -- 0.05 second delay per message
           processor = mkProcessor adapter handler
@@ -333,7 +334,7 @@ gracefulShutdownSpec = describe "Graceful shutdown" $ do
               polling = StandardPolling {pollInterval = 0.5} -- Slower polling
             }
 
-    runAdapterIO pool $ do
+    runAdapterIO pool $ runTracingNoop $ do
       adapter <- pgmqAdapter config
       let handler = countingHandler processedRef
           processor = mkProcessor adapter handler

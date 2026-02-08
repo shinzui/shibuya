@@ -16,6 +16,7 @@ import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (runWithMetrics)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Test.Tasty.Bench (Benchmark, bench, bgroup, nfIO)
 
 -- | Simple message type for benchmarking
@@ -67,25 +68,25 @@ ioHandlerBenchmarks =
     ]
 
 -- | Minimal no-op handler
-noopHandler :: Handler '[IOE] BenchMessage
+noopHandler :: (IOE :> es) => Handler es BenchMessage
 noopHandler _ingested = pure AckOk
 
 -- | Light computation handler
-lightComputeHandler :: Handler '[IOE] BenchMessage
+lightComputeHandler :: (IOE :> es) => Handler es BenchMessage
 lightComputeHandler ingested = do
   let result = ingested.envelope.payload.msgId * 2
   result `seq` pure AckOk
 
 -- | Medium computation handler (sum of payload chars)
-mediumComputeHandler :: Handler '[IOE] BenchMessage
+mediumComputeHandler :: (IOE :> es) => Handler es BenchMessage
 mediumComputeHandler ingested = do
   let payload = ingested.envelope.payload.msgPayload
       result = Text.length payload * ingested.envelope.payload.msgId
   result `seq` pure AckOk
 
 -- | Run framework with a specific handler
-runWithHandler :: Handler '[IOE] BenchMessage -> Int -> IO Int
-runWithHandler handler n = runEff $ do
+runWithHandler :: (forall es. (IOE :> es) => Handler es BenchMessage) -> Int -> IO Int
+runWithHandler handler n = runEff $ runTracingNoop $ do
   msgs <- createIngestedMessages n
   let adapter = listAdapter msgs
   -- inbox size must be >= message count for runWithMetrics (sequential ingestion)
@@ -94,20 +95,21 @@ runWithHandler handler n = runEff $ do
 
 -- | Run with counting handler (includes IO overhead)
 runCountingHandler :: Int -> IO Int
-runCountingHandler n = runEff $ do
-  counterRef <- liftIO $ newIORef (0 :: Int)
-  msgs <- createIngestedMessages n
+runCountingHandler n = do
+  counterRef <- newIORef (0 :: Int)
+  runEff $ runTracingNoop $ do
+    msgs <- createIngestedMessages n
 
-  let handler :: Handler '[IOE] BenchMessage
-      handler _ingested = do
-        liftIO $ atomicModifyIORef' counterRef (\c -> (c + 1, ()))
-        pure AckOk
+    let handler :: (IOE :> es) => Handler es BenchMessage
+        handler _ingested = do
+          liftIO $ atomicModifyIORef' counterRef (\c -> (c + 1, ()))
+          pure AckOk
 
-  let adapter = listAdapter msgs
-  -- inbox size must be >= message count for runWithMetrics (sequential ingestion)
-  _ <- runWithMetrics (fromIntegral n) (ProcessorId "bench") adapter handler
+    let adapter = listAdapter msgs
+    -- inbox size must be >= message count for runWithMetrics (sequential ingestion)
+    _ <- runWithMetrics (fromIntegral n) (ProcessorId "bench") adapter handler
 
-  liftIO $ readIORef counterRef
+    liftIO $ readIORef counterRef
 
 -- | Create ingested messages for testing
 createIngestedMessages :: (IOE :> es) => Int -> Eff es [Ingested es BenchMessage]
@@ -127,6 +129,7 @@ createIngestedMessages n = do
                 cursor = Nothing,
                 partition = Nothing,
                 enqueuedAt = Just now,
+                traceContext = Nothing,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
        in Ingested

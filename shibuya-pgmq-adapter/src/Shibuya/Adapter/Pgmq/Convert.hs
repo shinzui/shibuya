@@ -62,6 +62,7 @@ pgmqMessageToEnvelope msg =
       cursor = Just (pgmqMessageIdToCursor msg.messageId),
       partition = extractPartition msg.headers,
       enqueuedAt = Just msg.enqueuedAt,
+      traceContext = Nothing, -- TODO: Extract from headers when available
       payload = Pgmq.unMessageBody msg.body
     }
 

@@ -22,6 +22,7 @@ import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (SupervisedProcessor, isDone, runSupervised, runWithMetrics)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Tasty.Bench (Benchmark, bcompare, bench, bgroup, nfIO)
 
@@ -135,45 +136,46 @@ concurrencyLevelBenchmarks =
 -- | Run benchmark with specific concurrency mode.
 -- For Serial: uses runWithMetrics (simpler, no async overhead).
 -- For Ahead/Async: uses runSupervised (designed for I/O-bound handlers).
-runWithConcurrency :: Concurrency -> (IORef Int -> Handler '[IOE] BenchMessage) -> Int -> IO Int
-runWithConcurrency concurrency mkHandler n = runEff $ do
+runWithConcurrency :: Concurrency -> (forall es. (IOE :> es) => IORef Int -> Handler es BenchMessage) -> Int -> IO Int
+runWithConcurrency concurrency mkHandler n = do
   -- Create counter to track processed messages
-  counterRef <- liftIO $ newIORef 0
+  counterRef <- newIORef 0
 
-  -- Create messages
-  msgs <- createIngestedMessages n
+  runEff $ runTracingNoop $ do
+    -- Create messages
+    msgs <- createIngestedMessages n
 
-  -- Create handler
-  let handler = mkHandler counterRef
+    -- Create handler
+    let handler = mkHandler counterRef
 
-  -- Create adapter
-  let adapter =
-        Adapter
-          { adapterName = "bench:list",
-            source = Stream.fromList msgs,
-            shutdown = pure ()
-          }
+    -- Create adapter
+    let adapter =
+          Adapter
+            { adapterName = "bench:list",
+              source = Stream.fromList msgs,
+              shutdown = pure ()
+            }
 
-  case concurrency of
-    Serial -> do
-      -- For Serial mode, use runWithMetrics (simpler, no async overhead)
-      -- NOTE: inbox size must be >= message count for runWithMetrics
-      let inboxSize = fromIntegral n
-      _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
-      pure ()
-    _ -> do
-      -- For concurrent modes, use runSupervised.
-      -- NOTE: This requires handlers with I/O (threadDelay) to allow
-      -- proper thread scheduling. CPU-bound handlers may cause STM blocking.
-      master <- startMaster IgnoreAll
-      sp <- runSupervised master 100 (ProcessorId "bench") concurrency adapter handler
-      waitForDone sp
-      stopMaster master
+    case concurrency of
+      Serial -> do
+        -- For Serial mode, use runWithMetrics (simpler, no async overhead)
+        -- NOTE: inbox size must be >= message count for runWithMetrics
+        let inboxSize = fromIntegral n
+        _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
+        pure ()
+      _ -> do
+        -- For concurrent modes, use runSupervised.
+        -- NOTE: This requires handlers with I/O (threadDelay) to allow
+        -- proper thread scheduling. CPU-bound handlers may cause STM blocking.
+        master <- startMaster IgnoreAll
+        sp <- runSupervised master 100 (ProcessorId "bench") concurrency adapter handler
+        waitForDone sp
+        stopMaster master
 
-  liftIO $ readIORef counterRef
+    liftIO $ readIORef counterRef
 
 -- | Wait for processor to complete
-waitForDone :: SupervisedProcessor -> Eff '[IOE] ()
+waitForDone :: (IOE :> es) => SupervisedProcessor -> Eff es ()
 waitForDone sp = go
   where
     go = do
@@ -185,7 +187,7 @@ waitForDone sp = go
           go
 
 -- | CPU-bound handler: minimal work, just ack
-cpuBoundHandler :: IORef Int -> Handler '[IOE] BenchMessage
+cpuBoundHandler :: (IOE :> es) => IORef Int -> Handler es BenchMessage
 cpuBoundHandler counterRef ingested = do
   -- Light computation to prevent optimizer from eliminating the handler
   let result = ingested.envelope.payload.msgId * 2
@@ -197,7 +199,7 @@ cpuBoundHandler counterRef ingested = do
   pure AckOk
 
 -- | IO-bound handler: simulates IO latency with threadDelay
-ioBoundHandler :: Int -> IORef Int -> Handler '[IOE] BenchMessage
+ioBoundHandler :: (IOE :> es) => Int -> IORef Int -> Handler es BenchMessage
 ioBoundHandler delayMicros counterRef _ingested = do
   liftIO $ threadDelay delayMicros
 
@@ -223,6 +225,7 @@ createIngestedMessages n = mapM createMessage [1 .. n]
                 cursor = Nothing,
                 partition = Nothing,
                 enqueuedAt = Just benchTime,
+                traceContext = Nothing,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack

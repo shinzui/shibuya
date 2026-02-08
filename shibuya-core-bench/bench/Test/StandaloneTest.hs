@@ -20,6 +20,7 @@ import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (runSupervised)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 
 -- | Simple message type
@@ -48,29 +49,30 @@ runOnce iteration = do
   pure result
 
 -- | IO-bound handler for testing async
-ioBoundHandler :: Int -> IORef Int -> Handler '[IOE] BenchMessage
+ioBoundHandler :: (IOE :> es) => Int -> IORef Int -> Handler es BenchMessage
 ioBoundHandler delayMicros counterRef _ingested = do
   liftIO $ threadDelay delayMicros
   _ <- liftIO $ atomicModifyIORef' counterRef (\c -> (c + 1, c + 1))
   pure AckOk
 
 -- | Run with specific concurrency mode
-runWithConcurrency :: Concurrency -> (IORef Int -> Handler '[IOE] BenchMessage) -> Int -> IO Int
-runWithConcurrency concurrency mkHandler n = runEff $ do
-  counterRef <- liftIO $ newIORef 0
-  msgs <- createIngestedMessages n
-  let handler = mkHandler counterRef
-  let adapter =
-        Adapter
-          { adapterName = "test:list",
-            source = Stream.fromList msgs,
-            shutdown = pure ()
-          }
-  master <- startMaster IgnoreAll
-  _ <- runSupervised master 100 (ProcessorId "test") concurrency adapter handler
-  liftIO $ waitForCount counterRef n
-  stopMaster master
-  liftIO $ readIORef counterRef
+runWithConcurrency :: Concurrency -> (forall es. (IOE :> es) => IORef Int -> Handler es BenchMessage) -> Int -> IO Int
+runWithConcurrency concurrency mkHandler n = do
+  counterRef <- newIORef 0
+  runEff $ runTracingNoop $ do
+    msgs <- createIngestedMessages n
+    let handler = mkHandler counterRef
+    let adapter =
+          Adapter
+            { adapterName = "test:list",
+              source = Stream.fromList msgs,
+              shutdown = pure ()
+            }
+    master <- startMaster IgnoreAll
+    _ <- runSupervised master 100 (ProcessorId "test") concurrency adapter handler
+    liftIO $ waitForCount counterRef n
+    stopMaster master
+    liftIO $ readIORef counterRef
 
 -- | Wait for counter
 waitForCount :: IORef Int -> Int -> IO ()
@@ -88,7 +90,7 @@ waitForCount counterRef expected = go 0
               go (attempts + 1)
 
 -- | CPU-bound handler
-cpuBoundHandler :: IORef Int -> Handler '[IOE] BenchMessage
+cpuBoundHandler :: (IOE :> es) => IORef Int -> Handler es BenchMessage
 cpuBoundHandler counterRef ingested = do
   let result = ingested.envelope.payload.msgId * 2
   result `seq` pure ()
@@ -111,6 +113,7 @@ createIngestedMessages n = mapM createMessage [1 .. n]
                 cursor = Nothing,
                 partition = Nothing,
                 enqueuedAt = Just benchTime,
+                traceContext = Nothing,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
           ackHandle = AckHandle $ \_ -> pure ()
