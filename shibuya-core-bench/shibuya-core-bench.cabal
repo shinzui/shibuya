@@ -30,6 +30,7 @@ benchmark shibuya-core-bench
 
   other-modules:
     Bench.Baseline
+    Bench.Concurrency
     Bench.Framework
     Bench.Handler
 
@@ -48,9 +49,44 @@ benchmark shibuya-core-bench
     base ^>=4.21.0.0,
     deepseq,
     effectful-core ^>=2.6,
+    nqe,
     shibuya-core,
+    stm,
     streamly ^>=0.11,
     streamly-core ^>=0.3,
     tasty-bench ^>=0.4,
+    text ^>=2.1,
+    time,
+
+executable standalone-test
+  import: warnings
+  main-is: Test/StandaloneTest.hs
+  hs-source-dirs: bench
+  default-language: GHC2024
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+    -O2
+
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  build-depends:
+    base ^>=4.21.0.0,
+    deepseq,
+    effectful-core ^>=2.6,
+    nqe,
+    shibuya-core,
+    streamly ^>=0.11,
+    streamly-core ^>=0.3,
     text ^>=2.1,
     time,
