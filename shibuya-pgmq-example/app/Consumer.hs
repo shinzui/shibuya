@@ -45,7 +45,6 @@ import Shibuya.Adapter.Pgmq
     FifoReadStrategy (..),
     PgmqAdapterConfig (..),
     PollingConfig (..),
-    defaultPrefetchConfig,
     pgmqAdapter,
   )
 import Shibuya.Adapter.Pgmq qualified as Pgmq
@@ -206,14 +205,15 @@ paymentsAdapterConfig =
       maxRetries = 3
     }
 
--- | Notifications adapter config: batch=20, prefetch, short VT
+-- | Notifications adapter config: batch=20, short VT
+-- NOTE: prefetch is disabled due to STM deadlock issue with streamly parBuffered
 notificationsAdapterConfig :: PgmqAdapterConfig
 notificationsAdapterConfig =
   (Pgmq.defaultConfig notificationsQueueName)
     { batchSize = 20,
       visibilityTimeout = 10, -- Short VT for fast processing
       polling = StandardPolling {pollInterval = 0.5},
-      prefetchConfig = Just defaultPrefetchConfig,
+      prefetchConfig = Nothing,
       maxRetries = 1 -- Don't retry notifications much
     }
 
@@ -268,7 +268,6 @@ runConsumer pool tracer metricsPort shutdownVar = do
     let ordersProc = mkProcessor ordersAdapter ordersHandler
         paymentsProc = mkProcessor paymentsAdapter paymentsHandler
         notificationsProc = mkProcessor notificationsAdapter notificationsHandler
-
     -- Start the application
     result <-
       runApp

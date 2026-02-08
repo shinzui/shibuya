@@ -1,12 +1,17 @@
 -- | OpenTelemetry setup for the PGMQ example.
 --
--- Note: Due to proto-lens compatibility issues with GHC 9.12, the full SDK
--- with OTLP export is not available. This module provides a basic tracer
--- setup. For production use with GHC 9.10 or earlier, you can use the full
--- hs-opentelemetry-sdk.
+-- Uses the hs-opentelemetry-sdk with OTLP exporter. Configuration is
+-- done via environment variables:
 --
--- When tracing is enabled, spans will be created but not exported unless
--- you configure an exporter manually.
+-- - OTEL_SERVICE_NAME: Service name (defaults to "shibuya-pgmq-example")
+-- - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint (defaults to http://localhost:4317)
+-- - OTEL_TRACES_EXPORTER: Exporter type (defaults to "otlp")
+-- - OTEL_SDK_DISABLED: Set to "true" to disable SDK
+--
+-- For Jaeger, start it with OTLP support:
+--   jaeger --collector.otlp.enabled=true
+--
+-- Then traces will be visible at http://localhost:16686
 module Example.Telemetry
   ( -- * Tracer Provider Setup
     withTracing,
@@ -16,37 +21,35 @@ module Example.Telemetry
   )
 where
 
+import Control.Exception (bracket)
 import Data.Text (Text)
 import OpenTelemetry.Attributes qualified as Attr
-import OpenTelemetry.Trace.Core qualified as OTel
+import OpenTelemetry.Trace qualified as OTel
 
 -- | Run an action with tracing configured.
 --
--- When tracing is enabled, creates a TracerProvider. Note that due to
--- GHC 9.12 compatibility, OTLP export is not automatically configured.
--- For production use, consider using GHC 9.10 with the full SDK.
---
--- When disabled, creates a no-op tracer with zero overhead.
+-- When tracing is enabled, initializes the global TracerProvider with
+-- OTLP exporter (configured via environment variables). When disabled,
+-- creates a no-op tracer with zero overhead.
 withTracing :: Bool -> Text -> (OTel.Tracer -> IO a) -> IO a
 withTracing enabled serviceName action
   | enabled = withRealTracing serviceName action
-  | otherwise = withNoopTracing action
+  | otherwise = withNoopTracing serviceName action
 
--- | Create a tracer provider and run action.
+-- | Initialize the global tracer provider and run action.
 --
--- Note: This creates a basic tracer without OTLP export due to proto-lens
--- compatibility issues with GHC 9.12. The tracing effect will still work
--- for creating spans and adding context, but spans won't be exported
--- unless you manually configure an exporter.
+-- Uses environment variables for configuration:
+-- - OTEL_EXPORTER_OTLP_ENDPOINT (default: http://localhost:4317)
+-- - OTEL_SERVICE_NAME (overridden by serviceName parameter if not set)
+-- - OTEL_TRACES_EXPORTER (default: otlp)
 withRealTracing :: Text -> (OTel.Tracer -> IO a) -> IO a
-withRealTracing serviceName action = do
-  -- Create a basic tracer provider
-  -- For GHC 9.10 with full SDK, use initializeGlobalTracerProvider
-  provider <- OTel.createTracerProvider [] OTel.emptyTracerProviderOptions
-  let tracer = OTel.makeTracer provider instrumentationLib OTel.tracerOptions
-  result <- action tracer
-  OTel.shutdownTracerProvider provider
-  pure result
+withRealTracing serviceName action =
+  bracket
+    OTel.initializeGlobalTracerProvider
+    OTel.shutdownTracerProvider
+    $ \provider -> do
+      let tracer = OTel.makeTracer provider instrumentationLib OTel.tracerOptions
+      action tracer
   where
     instrumentationLib =
       OTel.InstrumentationLibrary
@@ -57,8 +60,8 @@ withRealTracing serviceName action = do
         }
 
 -- | Create a no-op tracer and run action.
-withNoopTracing :: (OTel.Tracer -> IO a) -> IO a
-withNoopTracing action = do
+withNoopTracing :: Text -> (OTel.Tracer -> IO a) -> IO a
+withNoopTracing _serviceName action = do
   provider <- OTel.createTracerProvider [] OTel.emptyTracerProviderOptions
   let tracer = OTel.makeTracer provider noopLib OTel.tracerOptions
   action tracer

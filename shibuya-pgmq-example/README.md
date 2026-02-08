@@ -15,7 +15,7 @@ This package provides two executables:
 |-------|-------|---------|----------|------------------|
 | orders | 5 | Standard (1s) | DLQ | 10% random retry, JSON validation |
 | payments | 1 | Long (10s) | FIFO + DLQ | DLQs negative/large amounts |
-| notifications | 20 | Standard (0.5s) | Prefetch | Fast processing, no DLQ |
+| notifications | 20 | Standard (0.5s) | High throughput | Fast processing, no DLQ |
 
 ## Prerequisites
 
@@ -153,6 +153,7 @@ docker-compose up -d
 export DATABASE_URL="postgres://postgres:postgres@localhost:5432/pgmq"
 export OTEL_TRACING_ENABLED=true
 export OTEL_SERVICE_NAME=shibuya-pgmq-example
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318  # HTTP/protobuf
 
 # Start consumer
 cabal run shibuya-pgmq-consumer
@@ -164,11 +165,11 @@ cabal run shibuya-pgmq-simulator -- --queue orders --count 10
 
 View traces at http://localhost:16686
 
-### GHC 9.12 Compatibility Note
+The OTLP exporter uses HTTP/protobuf protocol (port 4318), not gRPC (port 4317).
 
-Due to `proto-lens` compatibility issues with GHC 9.12, the full OpenTelemetry SDK with OTLP export is not available. The tracing effect still works for creating spans and propagating context, but traces are not exported to Jaeger.
+### Known Issues
 
-For full OTLP export support, use GHC 9.10 or earlier with the `hs-opentelemetry-sdk` package.
+**Prefetch Configuration**: The prefetch feature (`prefetchConfig`) is currently disabled in this example due to an STM deadlock issue with streamly's `parBuffered` operator. When enabled, the processor thread blocks indefinitely in an STM transaction. The high-throughput notifications queue uses standard polling with a large batch size as a workaround. See `docs/plans/PREFETCH_STM_BUG.md` for details.
 
 ## Metrics Endpoints
 
