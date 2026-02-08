@@ -244,18 +244,20 @@ describe "Chaos: Database disconnect" $ do
 
 ## Phase 5: Documentation & Runbooks
 
+See [docs/operations/](../operations/) for complete documentation.
+
 ### Production Deployment Guide
-- [ ] Kubernetes deployment example (Deployment, Service, PodDisruptionBudget)
-- [ ] Recommended resource limits (CPU, memory)
-- [ ] Prometheus scrape configuration
-- [ ] Alerting rules (processor stuck, high failure rate, memory)
+- [x] Kubernetes deployment example (Deployment, Service, PodDisruptionBudget)
+- [x] Recommended resource limits (CPU, memory)
+- [x] Prometheus scrape configuration
+- [x] Alerting rules (processor stuck, high failure rate, memory)
 
 ### Runbooks
-- [ ] Graceful restart procedure
-- [ ] Scaling up/down
-- [ ] Handling stuck processors
-- [ ] Investigating message failures
-- [ ] Dead letter queue processing
+- [x] Graceful restart procedure
+- [x] Scaling up/down
+- [x] Handling stuck processors
+- [x] Investigating message failures
+- [x] Dead letter queue processing
 
 ---
 
