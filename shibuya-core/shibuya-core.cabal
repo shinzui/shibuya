@@ -85,6 +85,11 @@ test-suite shibuya-core-test
     OverloadedStrings
     QuasiQuotes
 
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+
   other-modules:
     Shibuya.Core.AckSpec
     Shibuya.Core.TypesSpec
