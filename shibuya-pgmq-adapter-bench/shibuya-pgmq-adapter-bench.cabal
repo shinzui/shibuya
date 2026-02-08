@@ -71,3 +71,44 @@ benchmark shibuya-pgmq-adapter-bench
     text ^>=2.1,
     time,
     vector ^>=0.13,
+
+executable endurance-test
+  import: warnings
+  main-is: Endurance.hs
+  hs-source-dirs: app
+  default-language: GHC2024
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N -T"
+    -O2
+
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  build-depends:
+    aeson ^>=2.2,
+    async ^>=2.2,
+    base ^>=4.21.0.0,
+    bytestring,
+    containers,
+    effectful-core ^>=2.6,
+    hasql ^>=1.9,
+    hasql-pool ^>=1.3,
+    pgmq-core,
+    pgmq-effectful,
+    pgmq-hasql,
+    pgmq-migration,
+    shibuya-core,
+    shibuya-pgmq-adapter,
+    stm,
+    text ^>=2.1,
+    time,

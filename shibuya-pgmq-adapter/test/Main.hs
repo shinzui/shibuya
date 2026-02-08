@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Shibuya.Adapter.Pgmq.ChaosSpec qualified as ChaosSpec
 import Shibuya.Adapter.Pgmq.ConfigSpec qualified as ConfigSpec
 import Shibuya.Adapter.Pgmq.ConvertSpec qualified as ConvertSpec
 import Shibuya.Adapter.Pgmq.IntegrationSpec qualified as IntegrationSpec
@@ -16,3 +17,4 @@ main = hspec $ do
   describe "Property Tests" $ do
     describe "Shibuya.Adapter.Pgmq Properties" PropertySpec.spec
   describe "Integration Tests" IntegrationSpec.spec
+  describe "Chaos Tests" ChaosSpec.spec

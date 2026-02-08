@@ -10,8 +10,8 @@
 | Backpressure | ✅ Ready | Bounded inbox provides rate limiting |
 | Health Checks | ✅ Ready | Liveness, readiness, stuck detection, dependency checks |
 | Graceful Shutdown | ✅ Ready | Configurable drain timeout, returns drain status |
-| Load Testing | ⚠️ Missing | Need hours-long endurance test |
-| Chaos Testing | ⚠️ Missing | Need failure injection tests |
+| Load Testing | ✅ Ready | Endurance test implemented |
+| Chaos Testing | ✅ Ready | Poison message, lease, shutdown tests |
 | OpenTelemetry | 🔲 Planned | Not blocking for initial deployment |
 
 ---
@@ -197,11 +197,11 @@ main = do
 | Stuck processors | 0 |
 
 ### Tasks
-- [ ] Add `executable endurance-test` to existing bench cabal
-- [ ] Implement continuous producer loop
-- [ ] Add memory sampling via RTS stats (`-T` flag)
-- [ ] Write metrics to CSV for post-analysis
-- [ ] Print pass/fail summary at end
+- [x] Add `executable endurance-test` to existing bench cabal
+- [x] Implement continuous producer loop
+- [x] Add memory sampling via RTS stats (`-T` flag)
+- [x] Write metrics to CSV for post-analysis
+- [x] Print pass/fail summary at end
 
 ---
 
@@ -234,11 +234,11 @@ describe "Chaos: Database disconnect" $ do
 | Graceful shutdown | SIGTERM during processing | Drains cleanly |
 
 ### Tasks
-- [ ] Add `test/Chaos/` directory to pgmq-adapter tests
-- [ ] Database disconnect test
-- [ ] Poison message test (already partially tested)
-- [ ] Long handler lease extension test
-- [ ] Graceful shutdown test (after Phase 1)
+- [x] Add `test/Chaos/` directory to pgmq-adapter tests
+- [x] Poison message test (retry and DLQ scenarios)
+- [x] Long handler lease extension test
+- [x] Graceful shutdown test
+- [ ] Database disconnect test (deferred - requires tmp-postgres stop/restart)
 
 ---
 

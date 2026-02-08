@@ -81,6 +81,7 @@ test-suite shibuya-pgmq-adapter-test
     QuasiQuotes
 
   other-modules:
+    Shibuya.Adapter.Pgmq.ChaosSpec
     Shibuya.Adapter.Pgmq.Config
     Shibuya.Adapter.Pgmq.ConfigSpec
     Shibuya.Adapter.Pgmq.Convert
@@ -95,6 +96,7 @@ test-suite shibuya-pgmq-adapter-test
   build-depends:
     QuickCheck ^>=2.15,
     aeson,
+    async ^>=2.2,
     base ^>=4.21.0.0,
     bytestring,
     effectful-core,
