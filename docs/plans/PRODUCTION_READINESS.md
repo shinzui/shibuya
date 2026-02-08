@@ -8,7 +8,7 @@
 | PGMQ Adapter | ✅ Ready | Complete with retries, DLQ, FIFO |
 | Metrics/Prometheus | ✅ Ready | Full observability |
 | Backpressure | ✅ Ready | Bounded inbox provides rate limiting |
-| Health Checks | ⚠️ Basic | Needs readiness + dependency checks |
+| Health Checks | ✅ Ready | Liveness, readiness, stuck detection, dependency checks |
 | Graceful Shutdown | ✅ Ready | Configurable drain timeout, returns drain status |
 | Load Testing | ⚠️ Missing | Need hours-long endurance test |
 | Chaos Testing | ⚠️ Missing | Need failure injection tests |
@@ -158,13 +158,13 @@ type DependencyCheck = IO DependencyStatus
 ```
 
 ### Tasks
-- [ ] Create `Metrics/Health.hs` module
-- [ ] Add `/health/live` endpoint (simple, fast)
-- [ ] Add `/health/ready` endpoint (checks processor states)
-- [ ] Add dependency check registration mechanism
-- [ ] Add PGMQ adapter dependency check (database ping)
-- [ ] Add "stuck processor" detection (processing for > N seconds)
-- [ ] Update documentation
+- [x] Create `Metrics/Health.hs` module
+- [x] Add `/health/live` endpoint (simple, fast)
+- [x] Add `/health/ready` endpoint (checks processor states)
+- [x] Add dependency check registration mechanism
+- [ ] Add PGMQ adapter dependency check (database ping) - deferred to adapter
+- [x] Add "stuck processor" detection (processing for > N seconds)
+- [ ] Update documentation - deferred
 
 ---
 

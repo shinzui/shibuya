@@ -1,37 +1,53 @@
--- | JSON HTTP endpoints for metrics.
+-- | JSON HTTP endpoints for metrics and health checks.
 module Shibuya.Metrics.JSON
   ( jsonApp,
+    jsonAppWithHealth,
   )
 where
 
 import Data.Aeson (encode, object, (.=))
 import Data.ByteString.Lazy qualified as LBS
-import Data.Map.Strict qualified as Map
 import Data.Text (Text)
-import Data.Text.Encoding qualified as Text
 import Network.HTTP.Types
   ( Status,
     hContentType,
     status200,
     status404,
+    status503,
   )
-import Network.Wai (Application, Request, Response, pathInfo, responseLBS)
+import Network.Wai (Application, Response, pathInfo, responseLBS)
+import Shibuya.Metrics.Health
+  ( DependencyCheck,
+    HealthConfig,
+    LivenessStatus (..),
+    ReadinessStatus (..),
+    checkDetailedHealth,
+    checkLiveness,
+    checkReadiness,
+    defaultHealthConfig,
+  )
 import Shibuya.Runner.Master (Master, getAllMetricsIO, getProcessorMetricsIO)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 
--- | WAI application for JSON endpoints.
+-- | WAI application for JSON endpoints (without dependency checks).
 -- Handles:
 --   GET /metrics       - all processor metrics
 --   GET /metrics/:id   - single processor metrics
---   GET /health        - health check
+--   GET /health        - detailed health status
+--   GET /health/live   - liveness probe
+--   GET /health/ready  - readiness probe
 jsonApp :: Master -> Application
-jsonApp master req respond = do
+jsonApp master = jsonAppWithHealth defaultHealthConfig master []
+
+-- | WAI application for JSON endpoints with dependency checks.
+jsonAppWithHealth :: HealthConfig -> Master -> [DependencyCheck] -> Application
+jsonAppWithHealth config master depChecks req respond = do
   let path = pathInfo req
-  response <- routeRequest master path
+  response <- routeRequest config master depChecks path
   respond response
 
-routeRequest :: Master -> [Text] -> IO Response
-routeRequest master path = case path of
+routeRequest :: HealthConfig -> Master -> [DependencyCheck] -> [Text] -> IO Response
+routeRequest config master depChecks path = case path of
   -- GET /metrics - all processor metrics
   ["metrics"] -> do
     metrics <- getAllMetricsIO master
@@ -50,16 +66,29 @@ routeRequest master path = case path of
                 [ "error" .= ("Processor not found" :: Text),
                   "processor" .= procIdText
                 ]
-  -- GET /health - health check
+  -- GET /health/live - liveness probe (fast, simple)
+  ["health", "live"] -> do
+    liveness <- checkLiveness config master
+    let LivenessStatus {alive} = liveness
+        status = if alive then status200 else status503
+    pure $ jsonResponse status $ encode liveness
+  -- GET /health/ready - readiness probe (checks processors and dependencies)
+  ["health", "ready"] -> do
+    readiness <- checkReadiness config master depChecks
+    let ReadinessStatus {ready} = readiness
+        status = if ready then status200 else status503
+    pure $ jsonResponse status $ encode readiness
+  -- GET /health - detailed health status (for debugging)
   ["health"] -> do
-    metrics <- getAllMetricsIO master
-    let processorCount = Map.size metrics
+    (readiness, metrics) <- checkDetailedHealth config master depChecks
+    let ReadinessStatus {ready} = readiness
+        status = if ready then status200 else status503
     pure $
-      jsonResponse status200 $
+      jsonResponse status $
         encode $
           object
-            [ "status" .= ("ok" :: Text),
-              "processorCount" .= processorCount
+            [ "status" .= readiness,
+              "processors" .= metrics
             ]
   -- Not found
   _ ->

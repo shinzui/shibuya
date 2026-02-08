@@ -18,6 +18,7 @@ library
   exposed-modules:
     Shibuya.Metrics
     Shibuya.Metrics.Config
+    Shibuya.Metrics.Health
     Shibuya.Metrics.JSON
     Shibuya.Metrics.Prometheus
     Shibuya.Metrics.Server
