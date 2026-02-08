@@ -22,14 +22,17 @@ module Shibuya.Runner.Supervised
   )
 where
 
-import Control.Concurrent.NQE.Process (Inbox, mailboxEmpty, newBoundedInbox, receive)
+import Control.Concurrent.NQE.Process (Inbox, mailboxEmpty, mailboxEmptySTM, newBoundedInbox, receive, receiveSTM)
 import Control.Concurrent.NQE.Supervisor (addChild)
 import Control.Concurrent.STM
   ( TVar,
     atomically,
     modifyTVar',
     newTVarIO,
+    orElse,
+    readTVar,
     readTVarIO,
+    retry,
     writeTVar,
   )
 import Control.Monad (unless)
@@ -210,9 +213,10 @@ runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
   -- Run ingester async, processor in main thread
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     -- Ingester: run until stream exhausts, then signal done
-    let ingesterWithSignal = do
-          runInIO $ runIngesterWithMetrics metricsVar adapter.source inbox
-          atomically $ writeTVar streamDoneVar True
+    -- Use finally to ensure streamDoneVar is always set, even if ingester fails
+    let ingesterWithSignal =
+          (runInIO $ runIngesterWithMetrics metricsVar adapter.source inbox)
+            `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \_ ->
       -- Processor: process messages, exit when stream done and inbox empty
@@ -223,6 +227,10 @@ runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
 
 -- | Convert inbox to a stream for use with streamly.
 -- Respects both the stream-done signal and halt flag.
+--
+-- Uses STM to atomically check done/empty and receive, avoiding a race
+-- condition where the processor could block on receive after the stream
+-- has completed but before the done flag was checked.
 inboxToStream ::
   Inbox (Ingested es msg) ->
   TVar Bool ->
@@ -231,16 +239,28 @@ inboxToStream ::
 inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
   where
     step _ = do
-      -- Check halt flag first
+      -- Check halt flag first (outside STM since it's an IORef)
       halted <- readIORef haltRef
       case halted of
         Just _ -> pure Nothing -- Stop reading
         Nothing -> do
-          done <- readTVarIO streamDoneVar
-          empty <- mailboxEmpty inbox
-          if done && empty
-            then pure Nothing
-            else Just . (,()) <$> receive inbox
+          -- Atomically either receive a message or detect completion.
+          -- This avoids TOCTOU race where we check done/empty separately
+          -- and then block on receive after the stream has completed.
+          result <-
+            atomically $
+              -- Try to receive a message
+              (Just <$> receiveSTM inbox)
+                `orElse`
+                -- Or check if we're done (stream exhausted and inbox empty)
+                ( do
+                    done <- readTVar streamDoneVar
+                    empty <- mailboxEmptySTM inbox
+                    if done && empty
+                      then pure Nothing
+                      else retry -- Inbox empty but stream not done, wait for message
+                )
+          pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.
 -- Supports Serial, Ahead, and Async concurrency modes.

@@ -33,6 +33,7 @@ where
 import Control.Concurrent.NQE.Process
   ( Inbox,
     Listen,
+    Process (..),
     newInbox,
     query,
     receive,
@@ -116,8 +117,13 @@ startMaster strategy = liftIO $ do
       }
 
 -- | Stop the master and all child processors.
+-- Cancels the supervisor first (which cancels all children via NQE's stopAll),
+-- then cancels the master message loop.
 stopMaster :: (IOE :> es) => Master -> Eff es ()
 stopMaster master = liftIO $ do
+  -- Cancel the supervisor first - this triggers NQE's stopAll which cancels all children
+  cancel (getProcessAsync master.state.supervisor)
+  -- Then cancel the master message loop
   cancel (master ^. #handle)
 
 -- | The master process main loop.
