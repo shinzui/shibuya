@@ -41,11 +41,13 @@ import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
+import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
+import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
@@ -60,6 +62,31 @@ import Shibuya.Runner.Metrics
     emptyProcessorMetrics,
     incFailed,
     incProcessed,
+  )
+import Shibuya.Telemetry.Effect
+  ( Tracing,
+    addAttribute,
+    addEvent,
+    recordException,
+    setStatus,
+    withExtractedContext,
+    withSpan',
+  )
+import Shibuya.Telemetry.Propagation (extractTraceContext)
+import Shibuya.Telemetry.Semantic
+  ( attrMessagingDestinationPartitionId,
+    attrMessagingMessageId,
+    attrMessagingSystem,
+    attrShibuyaAckDecision,
+    attrShibuyaInflightCount,
+    attrShibuyaInflightMax,
+    consumerSpanArgs,
+    eventAckDecision,
+    eventHandlerCompleted,
+    eventHandlerException,
+    eventHandlerStarted,
+    mkEvent,
+    processMessageSpanName,
   )
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
@@ -102,7 +129,7 @@ isDone sp = liftIO $ readTVarIO sp.done
 --
 -- Returns immediately with a handle for introspection.
 runSupervised ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   Master ->
   -- | Inbox size (for backpressure)
   Natural ->
@@ -153,7 +180,7 @@ runSupervised master inboxSize procId concurrency adapter handler = do
 -- Useful for testing or simple single-processor setups.
 -- This blocks until the stream is exhausted and all messages are processed.
 runWithMetrics ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   -- | Inbox size (for backpressure)
   Natural ->
   -- | Processor identifier
@@ -195,7 +222,7 @@ runWithMetrics inboxSize procId adapter handler = do
 -- Ingester reads from adapter stream, processor calls handler.
 -- When stream exhausts, processor drains remaining messages and exits.
 runIngesterAndProcessor ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   TVar Bool ->
   Natural ->
@@ -265,7 +292,7 @@ inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
 -- | Process messages from inbox until stream is done and inbox is empty.
 -- Supports Serial, Ahead, and Async concurrency modes.
 processUntilDrained ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   Concurrency ->
   Handler es msg ->
@@ -304,7 +331,7 @@ processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
 -- | Drain inbox until empty, with metrics tracking.
 -- Used for testing with finite streams.
 drainInboxWithMetrics ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
@@ -324,10 +351,10 @@ drainInboxWithMetrics metricsVar handler inbox = do
           Just reason -> throwIO $ ProcessorHalt reason
           Nothing -> go haltRef
 
--- | Process a single message with metrics tracking.
+-- | Process a single message with metrics tracking and tracing.
 -- Thread-safe for concurrent execution.
 processOne ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   Int ->
   IORef (Maybe HaltReason) ->
@@ -335,32 +362,102 @@ processOne ::
   Ingested es msg ->
   Eff es ()
 processOne metricsVar maxConc haltRef handler ingested = do
-  -- Increment in-flight
-  now <- liftIO getCurrentTime
-  liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-    let current = case m.state of
+  -- Extract parent context from message headers for distributed tracing
+  let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
+
+  withExtractedContext parentCtx $
+    withSpan' processMessageSpanName consumerSpanArgs $ \traceSpan -> do
+      -- Add messaging attributes
+      let MessageId msgIdText = ingested.envelope.messageId
+      addAttribute traceSpan attrMessagingSystem ("shibuya" :: Text)
+      addAttribute traceSpan attrMessagingMessageId msgIdText
+
+      -- Add partition if present
+      case ingested.envelope.partition of
+        Just p -> addAttribute traceSpan attrMessagingDestinationPartitionId p
+        Nothing -> pure ()
+
+      -- Increment in-flight and add inflight attributes
+      now <- liftIO getCurrentTime
+      currentInflight <- liftIO $ atomically $ do
+        modifyTVar' metricsVar $ \m ->
+          let current = case m.state of
+                Processing info _ -> info.inFlight
+                _ -> 0
+           in m & #state .~ Processing (InFlightInfo (current + 1) maxConc) now
+        m <- readTVar metricsVar
+        pure $ case m.state of
           Processing info _ -> info.inFlight
-          _ -> 0
-     in m & #state .~ Processing (InFlightInfo (current + 1) maxConc) now
+          _ -> 1
 
-  -- Call handler and finalize
-  result <-
-    catchAny
-      ( do
-          decision <- handler ingested
-          ingested.ack.finalize decision
-          pure (Right decision)
-      )
-      (pure . Left . HandlerException . Text.pack . show)
+      addAttribute traceSpan attrShibuyaInflightCount currentInflight
+      addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-  -- Decrement in-flight and update stats
-  now' <- liftIO getCurrentTime
-  liftIO $ atomically $ modifyTVar' metricsVar $ decrementAndUpdate result now'
+      -- Record handler start event
+      addEvent traceSpan (mkEvent eventHandlerStarted [])
 
-  -- Handle halt (set flag, don't throw - let stream drain)
-  case result of
-    Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
-    _ -> pure ()
+      -- Call handler and finalize
+      result <-
+        catchAny
+          ( do
+              decision <- handler ingested
+              ingested.ack.finalize decision
+              pure (Right decision)
+          )
+          ( \ex -> do
+              recordException traceSpan ex
+              addEvent traceSpan (mkEvent eventHandlerException [])
+              pure $ Left $ HandlerException $ Text.pack $ show ex
+          )
+
+      -- Record completion event and set status
+      case result of
+        Right decision -> do
+          let decisionText = showAckDecision decision
+          addEvent traceSpan $
+            mkEvent
+              eventHandlerCompleted
+              [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+          addAttribute traceSpan attrShibuyaAckDecision decisionText
+
+          -- Set span status based on decision
+          case decision of
+            AckOk -> setStatus traceSpan OTel.Ok
+            AckRetry _ -> setStatus traceSpan OTel.Ok
+            AckDeadLetter reason ->
+              setStatus traceSpan $ OTel.Error $ showDeadLetterReason reason
+            AckHalt reason ->
+              setStatus traceSpan $ OTel.Error $ showHaltReason reason
+        Left err -> do
+          addEvent traceSpan $
+            mkEvent
+              eventAckDecision
+              [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+          setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+
+      -- Decrement in-flight and update stats
+      now' <- liftIO getCurrentTime
+      liftIO $ atomically $ modifyTVar' metricsVar $ decrementAndUpdate result now'
+
+      -- Handle halt (set flag, don't throw - let stream drain)
+      case result of
+        Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
+        _ -> pure ()
+  where
+    showAckDecision :: AckDecision -> Text
+    showAckDecision AckOk = "ack_ok"
+    showAckDecision (AckRetry _) = "ack_retry"
+    showAckDecision (AckDeadLetter _) = "ack_dead_letter"
+    showAckDecision (AckHalt _) = "ack_halt"
+
+    showDeadLetterReason :: DeadLetterReason -> Text
+    showDeadLetterReason (PoisonPill t) = "poison_pill: " <> t
+    showDeadLetterReason (InvalidPayload t) = "invalid_payload: " <> t
+    showDeadLetterReason MaxRetriesExceeded = "max_retries_exceeded"
+
+    showHaltReason :: HaltReason -> Text
+    showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t
+    showHaltReason (HaltFatal t) = "halt_fatal: " <> t
 
 -- | Decrement in-flight count and update stats based on result.
 decrementAndUpdate ::

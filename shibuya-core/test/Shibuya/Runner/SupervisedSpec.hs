@@ -48,6 +48,7 @@ import Shibuya.Runner.Supervised
     runSupervised,
     runWithMetrics,
   )
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import UnliftIO (SomeException, try)
@@ -57,14 +58,14 @@ spec :: Spec
 spec = do
   describe "Shibuya.Runner.Master" $ do
     it "starts and stops cleanly" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         master <- startMaster IgnoreAll
         stopMaster master
         pure ()
       result `shouldBe` ()
 
     it "returns empty metrics initially" $ do
-      metrics <- runEff $ do
+      metrics <- runEff $ runTracingNoop $ do
         master <- startMaster IgnoreAll
         m <- getAllMetrics master
         stopMaster master
@@ -74,7 +75,7 @@ spec = do
   describe "Shibuya.Runner.Supervised" $ do
     describe "runWithMetrics" $ do
       it "processes messages and tracks metrics" $ do
-        (finalMetrics, processedMsgs) <- runEff $ do
+        (finalMetrics, processedMsgs) <- runEff $ runTracingNoop $ do
           -- Track processed messages
           processedRef <- liftIO $ newIORef ([] :: [String])
 
@@ -104,7 +105,7 @@ spec = do
         length processedMsgs `shouldBe` 3
 
       it "tracks failed messages" $ do
-        finalMetrics <- runEff $ do
+        finalMetrics <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 3
 
           let adapter = testAdapter messages
@@ -118,7 +119,7 @@ spec = do
         finalMetrics.stats.failed `shouldBe` 3
 
       it "marks processor as done when stream exhausted" $ do
-        done <- runEff $ do
+        done <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 2
 
           let adapter = testAdapter messages
@@ -143,7 +144,7 @@ spec = do
                   else pure AckOk
 
           -- Try to run and catch ProcessorHalt
-          result <- try $ runEff $ do
+          result <- try $ runEff $ runTracingNoop $ do
             messages <- createTestMessages 10
             let adapter = testAdapter messages
                 procId = ProcessorId "halting-processor"
@@ -162,7 +163,7 @@ spec = do
         processedCount `shouldBe` 3
 
       it "updates metrics to halted state on AckHalt" $ do
-        finalMetrics <- runEff $ do
+        finalMetrics <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 5
 
           let handler _ = pure $ AckHalt (HaltFatal "immediate halt")
@@ -184,7 +185,7 @@ spec = do
           other -> expectationFailure $ "Expected Failed state, got: " ++ show other
 
       it "halt in one supervised processor doesn't affect others" $ do
-        (countA, countB) <- runEff $ do
+        (countA, countB) <- runEff $ runTracingNoop $ do
           countARef <- liftIO $ newIORef (0 :: Int)
           countBRef <- liftIO $ newIORef (0 :: Int)
 
@@ -230,7 +231,7 @@ spec = do
         it "processes all messages successfully" $ do
           countRef <- newIORef (0 :: Int)
 
-          finalCount <- runEff $ do
+          finalCount <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 5
 
             let handler _ = do
@@ -254,7 +255,7 @@ spec = do
           maxInFlightRef <- newIORef (0 :: Int)
           currentInFlightRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 10
 
             let handler _ = do
@@ -286,7 +287,7 @@ spec = do
         it "processes all messages concurrently" $ do
           countRef <- newIORef (0 :: Int)
 
-          finalCount <- runEff $ do
+          finalCount <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 5
 
             let handler _ = do
@@ -309,7 +310,7 @@ spec = do
           maxInFlightRef <- newIORef (0 :: Int)
           currentInFlightRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 10
 
             let handler _ = do
@@ -335,7 +336,7 @@ spec = do
         it "waits for in-flight to complete before halting" $ do
           processedRef <- newIORef ([] :: [Int])
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 10
 
             let handler ingested = do
@@ -365,7 +366,7 @@ spec = do
         it "stops reading new messages after halt decision" $ do
           processedRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 20
 
             let handler _ = do
@@ -394,7 +395,7 @@ spec = do
         it "handler exception doesn't affect other in-flight handlers" $ do
           resultsRef <- newIORef ([] :: [Either String Int])
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 5
 
             let handler ingested = do
@@ -430,7 +431,7 @@ spec = do
         it "tracks in-flight count during concurrent processing" $ do
           maxInFlightObserved <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 5
 
             let handler _ = do
@@ -457,7 +458,7 @@ spec = do
           maxObserved `shouldSatisfy` (>= 2)
 
         it "reports correct maxConcurrency in metrics" $ do
-          observedMaxConc <- runEff $ do
+          observedMaxConc <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 3
 
             let handler _ = do
@@ -488,7 +489,7 @@ spec = do
           startOrderRef <- newIORef ([] :: [Int])
           completeOrderRef <- newIORef ([] :: [Int])
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 5
 
             let handler ingested = do
@@ -522,7 +523,7 @@ spec = do
         it "handles adapter source throwing mid-stream" $ do
           processedRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             -- Create an adapter where source throws after 3 messages
             goodMessages <- createTestMessages 3
             -- Use fromEffect to throw after yielding good messages
@@ -560,7 +561,7 @@ spec = do
       describe "Rapid start/stop cycles" $ do
         it "handles rapid start/stop without resource leaks" $ do
           -- Run 50 rapid cycles
-          results <- replicateM 50 $ runEff $ do
+          results <- replicateM 50 $ runEff $ runTracingNoop $ do
             master <- startMaster IgnoreAll
             messages <- createTestMessages 5
 
@@ -583,7 +584,7 @@ spec = do
           -- Run 20 concurrent cycles
           countRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             master <- startMaster IgnoreAll
 
             -- Start 10 processors rapidly
@@ -609,7 +610,7 @@ spec = do
           countARef <- newIORef (0 :: Int)
           countBRef <- newIORef (0 :: Int)
 
-          result :: Either SomeException () <- try $ runEff $ do
+          result :: Either SomeException () <- try $ runEff $ runTracingNoop $ do
             messagesB <- createTestMessages 20
 
             -- Adapter A throws after 3 messages (ingester crash, not handler)
@@ -665,7 +666,7 @@ spec = do
           haltCountRef <- newIORef (0 :: Int)
           processedRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 10
 
             let handler ingested = do
@@ -700,7 +701,7 @@ spec = do
         it "processes many messages without issues" $ do
           processedRef <- newIORef (0 :: Int)
 
-          finalCount <- runEff $ do
+          finalCount <- runEff $ runTracingNoop $ do
             -- 500 messages
             messages <- createTestMessages 500
 
@@ -723,7 +724,7 @@ spec = do
           successRef <- newIORef (0 :: Int)
           failRef <- newIORef (0 :: Int)
 
-          _ <- runEff $ do
+          _ <- runEff $ runTracingNoop $ do
             messages <- createTestMessages 200
 
             let handler ingested = do
@@ -759,7 +760,7 @@ spec = do
       it "drains in-flight messages before stopping" $ do
         processedRef <- newIORef (0 :: Int)
 
-        drained <- runEff $ do
+        drained <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 10
 
           let handler _ = do
@@ -791,7 +792,7 @@ spec = do
       it "respects timeout when processors are slow" $ do
         processedRef <- newIORef (0 :: Int)
 
-        drained <- runEff $ do
+        drained <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 20
 
           let handler _ = do
@@ -822,7 +823,7 @@ spec = do
         processed `shouldSatisfy` (< 20)
 
       it "returns True when all processors finish quickly" $ do
-        drained <- runEff $ do
+        drained <- runEff $ runTracingNoop $ do
           messages <- createTestMessages 5
 
           let handler _ = pure AckOk -- Instant processing
@@ -868,7 +869,8 @@ createTestMessages n = mapM createMessage [1 .. n]
           }
 
 -- | Create a single message (for use in streaming contexts)
-createSingleMessage :: Int -> IO (Ingested '[IOE] String)
+-- Polymorphic over effect stack for use with tracing.
+createSingleMessage :: (IOE :> es) => Int -> IO (Ingested es String)
 createSingleMessage i = do
   let msgId = MessageId $ "msg-" <> Text.pack (show i)
       env =

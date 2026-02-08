@@ -59,6 +59,7 @@ import Shibuya.Runner.Supervised
   ( SupervisedProcessor (..),
     runSupervised,
   )
+import Shibuya.Telemetry.Effect (Tracing)
 import UnliftIO (SomeException, catch, displayException)
 import Prelude hiding (Ordering)
 
@@ -156,7 +157,7 @@ data AppHandle es = AppHandle
 --   ]
 -- @
 runApp ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   -- | Supervision strategy
   SupervisionStrategy ->
   -- | Inbox size for backpressure
@@ -197,7 +198,7 @@ validateAllPolicies = traverse_ validateOne
 
 -- | Spawn all processors under supervision.
 spawnProcessors ::
-  (IOE :> es) =>
+  (IOE :> es, Tracing :> es) =>
   Master ->
   Natural ->
   [(ProcessorId, QueueProcessor es)] ->

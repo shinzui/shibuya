@@ -32,6 +32,7 @@ import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Metrics (MetricsServerConfig (..), defaultConfig, withMetricsServer)
 import Shibuya.Runner.Metrics (ProcessorState (..), StreamStats (..))
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
 
@@ -115,7 +116,7 @@ printMetrics appHandle = do
     formatState Stopped = "Stopped"
 
 main :: IO ()
-main = runEff $ do
+main = runEff $ runTracingNoop $ do
   liftIO $ Text.putStrLn "Starting Shibuya example with multiple independent queues..."
   liftIO $ Text.putStrLn "Each queue runs as a separate supervised processor."
   liftIO $ Text.putStrLn "Will show metrics every second for 5 iterations.\n"
@@ -158,7 +159,7 @@ main = runEff $ do
 
       liftIO $ withMetricsServer defaultConfig (getAppMaster appHandle) $ \_ -> do
         -- Print metrics every second for 5 iterations
-        runEff $ replicateM_ 5 $ do
+        runEff $ runTracingNoop $ replicateM_ 5 $ do
           liftIO $ threadDelay 1000000 -- 1 second
           printMetrics appHandle
 

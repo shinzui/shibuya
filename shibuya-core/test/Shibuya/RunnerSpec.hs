@@ -17,6 +17,7 @@ import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Metrics (ProcessorId (..))
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import Prelude hiding (Ordering)
@@ -25,7 +26,7 @@ spec :: Spec
 spec = do
   describe "runApp" $ do
     it "processes messages from mock adapter" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         -- Track processed messages
         processedRef <- liftIO $ newIORef ([] :: [String])
 
@@ -55,7 +56,7 @@ spec = do
       result `shouldBe` Right ()
 
     it "calls finalize for each message" $ do
-      (decisions, result) <- runEff $ do
+      (decisions, result) <- runEff $ runTracingNoop $ do
         -- Track ack decisions
         tracking <- newTrackingAck
 
@@ -91,7 +92,7 @@ spec = do
       all ((== AckOk) . snd) decisions `shouldBe` True
 
     it "returns AppHandle for multiple processors" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         messages1 <- createTestMessages 2
         messages2 <- createTestMessages 2
 
@@ -119,7 +120,7 @@ spec = do
 
   describe "Policy validation" $ do
     it "rejects StrictInOrder with Async" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         messages <- createTestMessages 3
         let adapter = testAdapter messages
             handler = alwaysAckOk
@@ -134,7 +135,7 @@ spec = do
         Right _ -> expectationFailure "Expected policy validation to fail"
 
     it "rejects StrictInOrder with Ahead" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         messages <- createTestMessages 3
         let adapter = testAdapter messages
             handler = alwaysAckOk
@@ -148,7 +149,7 @@ spec = do
         Right _ -> expectationFailure "Expected policy validation to fail"
 
     it "accepts valid policy combinations" $ do
-      result <- runEff $ do
+      result <- runEff $ runTracingNoop $ do
         messages <- createTestMessages 2
         let adapter = testAdapter messages
             handler = alwaysAckOk
