@@ -53,6 +53,7 @@ spec = do
       mapped.cursor `shouldBe` env.cursor
       mapped.partition `shouldBe` env.partition
       mapped.enqueuedAt `shouldBe` env.enqueuedAt
+      mapped.traceContext `shouldBe` env.traceContext
       mapped.payload `shouldBe` 5
 
 -- Test helper
@@ -63,6 +64,7 @@ testEnvelope msg =
       cursor = Just (CursorInt 42),
       partition = Just "partition-0",
       enqueuedAt = Just testTime,
+      traceContext = Nothing,
       payload = msg
     }
 

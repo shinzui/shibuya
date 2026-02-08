@@ -73,6 +73,7 @@ mkIngested tracking sourceName n = do
               cursor = Nothing,
               partition = Nothing,
               enqueuedAt = Nothing,
+              traceContext = Nothing,
               payload = n
             },
         ack = trackingAckHandle tracking msgId,

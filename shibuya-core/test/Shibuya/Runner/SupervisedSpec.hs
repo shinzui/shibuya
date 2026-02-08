@@ -856,6 +856,7 @@ createTestMessages n = mapM createMessage [1 .. n]
                 cursor = Just (CursorInt i),
                 partition = Nothing,
                 enqueuedAt = Just testTime,
+                traceContext = Nothing,
                 payload = "message-" <> show i
               }
           ackHandle = AckHandle $ \_ -> pure ()
@@ -876,6 +877,7 @@ createSingleMessage i = do
             cursor = Just (CursorInt i),
             partition = Nothing,
             enqueuedAt = Just testTime,
+            traceContext = Nothing,
             payload = "message-" <> show i
           }
       ackHandle = AckHandle $ \_ -> pure ()

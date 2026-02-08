@@ -10,9 +10,13 @@ module Shibuya.Core.Types
 
     -- * Message Envelope
     Envelope (..),
+
+    -- * Trace Context
+    TraceHeaders,
   )
 where
 
+import Data.ByteString (ByteString)
 import Data.String (IsString)
 import Shibuya.Prelude
 
@@ -29,6 +33,10 @@ data Cursor
   | CursorText !Text
   deriving stock (Eq, Ord, Show, Generic)
 
+-- | W3C Trace Context headers for distributed tracing.
+-- Contains traceparent and optionally tracestate headers.
+type TraceHeaders = [(ByteString, ByteString)]
+
 -- | Normalized message envelope (Broadway.Message equivalent).
 -- Contains message metadata plus the payload.
 data Envelope msg = Envelope
@@ -40,6 +48,8 @@ data Envelope msg = Envelope
     partition :: !(Maybe Text),
     -- | When the message was enqueued
     enqueuedAt :: !(Maybe UTCTime),
+    -- | W3C trace context headers for distributed tracing
+    traceContext :: !(Maybe TraceHeaders),
     -- | The actual message payload
     payload :: !msg
   }

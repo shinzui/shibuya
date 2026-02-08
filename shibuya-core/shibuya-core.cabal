@@ -28,6 +28,11 @@ library
     Shibuya.Runner.Metrics
     Shibuya.Runner.Supervised
     Shibuya.Stream
+    Shibuya.Telemetry
+    Shibuya.Telemetry.Config
+    Shibuya.Telemetry.Effect
+    Shibuya.Telemetry.Propagation
+    Shibuya.Telemetry.Semantic
 
   other-modules:
     Shibuya.Runner.Halt
@@ -54,6 +59,8 @@ library
     effectful ^>=2.6.1.0,
     effectful-core ^>=2.6.1.0,
     generic-lens ^>=2.3.0.0,
+    hs-opentelemetry-api ^>=0.3,
+    hs-opentelemetry-propagator-w3c ^>=0.1,
     lens ^>=5.3.5,
     nqe ^>=0.6,
     stm,
@@ -62,6 +69,7 @@ library
     text ^>=2.1.3,
     time,
     unliftio ^>=0.2,
+    unordered-containers,
     uuid,
     vector,
 
