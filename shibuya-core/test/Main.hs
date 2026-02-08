@@ -7,6 +7,8 @@ import Shibuya.Core.TypesSpec qualified
 import Shibuya.PolicySpec qualified
 import Shibuya.Runner.SupervisedSpec qualified
 import Shibuya.RunnerSpec qualified
+import Shibuya.Telemetry.EffectSpec qualified
+import Shibuya.Telemetry.PropagationSpec qualified
 import Test.Hspec
 
 main :: IO ()
@@ -16,3 +18,5 @@ main = hspec $ do
   describe "Shibuya.Policy" Shibuya.PolicySpec.spec
   describe "Shibuya.Runner" Shibuya.RunnerSpec.spec
   Shibuya.Runner.SupervisedSpec.spec
+  Shibuya.Telemetry.EffectSpec.spec
+  Shibuya.Telemetry.PropagationSpec.spec

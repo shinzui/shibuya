@@ -1,0 +1,37 @@
+# Docker Compose for local OpenTelemetry testing with Jaeger
+#
+# Usage:
+#   docker compose -f docker-compose.otel.yaml up -d
+#
+# Access:
+#   - Jaeger UI: http://localhost:16686
+#   - OTLP gRPC: localhost:4317
+#   - OTLP HTTP: localhost:4318
+#
+# To send traces from shibuya-example, set these environment variables:
+#   export OTEL_SERVICE_NAME=shibuya-example
+#   export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+#   export OTEL_TRACES_SAMPLER=always_on
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    ports:
+      # Jaeger UI
+      - "16686:16686"
+      # OTLP gRPC receiver
+      - "4317:4317"
+      # OTLP HTTP receiver
+      - "4318:4318"
+      # Jaeger thrift compact (for legacy clients)
+      - "6831:6831/udp"
+      # Jaeger thrift binary
+      - "6832:6832/udp"
+    environment:
+      # Enable OTLP receiver
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686"]
+      interval: 5s
+      timeout: 3s
+      retries: 3

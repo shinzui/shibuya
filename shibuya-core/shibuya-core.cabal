@@ -104,12 +104,17 @@ test-suite shibuya-core-test
     Shibuya.PolicySpec
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec
+    Shibuya.Telemetry.EffectSpec
+    Shibuya.Telemetry.PropagationSpec
 
   build-depends:
     QuickCheck ^>=2.15,
     base ^>=4.21.0.0,
+    bytestring,
     effectful,
+    hs-opentelemetry-api,
     hspec ^>=2.11,
+    memory,
     nqe,
     shibuya-core,
     stm,

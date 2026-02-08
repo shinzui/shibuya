@@ -33,6 +33,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | Metrics & Introspection | ✅ Implemented |
 | NQE Supervision | ✅ Implemented |
 | Concurrent Processing (Ahead/Async) | ✅ Implemented |
+| OpenTelemetry Tracing | ✅ Implemented |
 
 ## Installation
 
@@ -117,6 +118,64 @@ result <- runApp
   , (ProcessorId "events", eventsProcessor)
   ]
 ```
+
+## Distributed Tracing
+
+Shibuya includes built-in OpenTelemetry tracing support for distributed observability.
+
+### Enabling Tracing
+
+```haskell
+import Shibuya.Telemetry.Effect (runTracing, runTracingNoop)
+import OpenTelemetry.Trace qualified as OTel
+
+main :: IO ()
+main = do
+  -- Initialize OpenTelemetry (via SDK or your preferred method)
+  provider <- initTracerProvider  -- Your initialization
+  let tracer = OTel.makeTracer provider "my-service" OTel.tracerOptions
+
+  -- Run with tracing enabled
+  runEff $ runTracing tracer $ do
+    result <- runApp IgnoreFailures 100 processors
+    -- ...
+
+  -- Or run with tracing disabled (zero overhead)
+  runEff $ runTracingNoop $ do
+    result <- runApp IgnoreFailures 100 processors
+    -- ...
+```
+
+### What Gets Traced
+
+Each message creates a span with:
+- **Span name**: `shibuya.process.message`
+- **Span kind**: `Consumer`
+- **Attributes**:
+  - `messaging.system`: "shibuya"
+  - `messaging.message.id`: The message ID
+  - `messaging.destination.partition.id`: Partition (if present)
+  - `shibuya.inflight.count`: Current in-flight messages
+  - `shibuya.inflight.max`: Max concurrency
+  - `shibuya.ack.decision`: Handler's ack decision
+- **Events**: `handler.started`, `handler.completed`, `handler.exception`
+- **Context propagation**: Parent context from `traceContext` message headers
+
+### Local Testing with Jaeger
+
+```bash
+# Start Jaeger
+docker compose -f docker-compose.otel.yaml up -d
+
+# View traces at http://localhost:16686
+```
+
+### Environment Variables
+
+Configure tracing via standard OpenTelemetry environment variables:
+- `OTEL_SERVICE_NAME` - Service name in traces
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP collector endpoint
+- `OTEL_TRACES_SAMPLER` - Sampling strategy (e.g., `always_on`, `parentbased_always_on`)
 
 ## Running Multiple Processors
 
