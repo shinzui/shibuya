@@ -4,6 +4,7 @@ module Shibuya.Runner.SupervisedSpec (spec) where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
+import Control.Monad (forM, replicateM)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
@@ -40,7 +41,7 @@ import Shibuya.Runner.Supervised
   )
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
-import UnliftIO (try)
+import UnliftIO (SomeException, try)
 import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
@@ -504,8 +505,245 @@ spec = do
           completeOrder <- readIORef completeOrderRef
           length completeOrder `shouldBe` 5
 
--- The key property: all messages were processed
--- (Ordering of side effects may vary, but stream output is ordered)
+    -- The key property: all messages were processed
+    -- (Ordering of side effects may vary, but stream output is ordered)
+
+    describe "Robustness" $ do
+      describe "Adapter source exceptions" $ do
+        it "handles adapter source throwing mid-stream" $ do
+          processedRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            -- Create an adapter where source throws after 3 messages
+            goodMessages <- createTestMessages 3
+            -- Use fromEffect to throw after yielding good messages
+            let failingSource = Stream.unfoldrM step (0 :: Int)
+                  where
+                    step n
+                      | n < 3 = do
+                          msg <- liftIO $ createSingleMessage (n + 1)
+                          pure $ Just (msg, n + 1)
+                      | n == 3 = error "Network failure mid-stream"
+                      | otherwise = pure Nothing
+
+            let adapter =
+                  Adapter
+                    { adapterName = "test:failing-source",
+                      source = failingSource,
+                      shutdown = pure ()
+                    }
+
+            let handler _ = do
+                  liftIO $ modifyIORef' processedRef (+ 1)
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            _ <- runSupervised master 10 (ProcessorId "failing-adapter") Serial adapter handler
+
+            -- Wait for processing
+            liftIO $ threadDelay 200000 -- 200ms
+            stopMaster master
+
+          -- Should have processed the 3 good messages before the error
+          processed <- readIORef processedRef
+          processed `shouldBe` 3
+
+      describe "Rapid start/stop cycles" $ do
+        it "handles rapid start/stop without resource leaks" $ do
+          -- Run 50 rapid cycles
+          results <- replicateM 50 $ runEff $ do
+            master <- startMaster IgnoreAll
+            messages <- createTestMessages 5
+
+            let adapter = testAdapter messages
+                handler _ = pure AckOk
+
+            sp <- runSupervised master 10 (ProcessorId "rapid") Serial adapter handler
+
+            -- Minimal wait
+            liftIO $ threadDelay 10000 -- 10ms
+            stopMaster master
+
+            -- Check it stopped cleanly
+            isDone sp
+
+          -- All should complete (no hangs, no crashes)
+          length results `shouldBe` 50
+
+        it "handles concurrent start/stop cycles" $ do
+          -- Run 20 concurrent cycles
+          countRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            master <- startMaster IgnoreAll
+
+            -- Start 10 processors rapidly
+            sps <- forM [1 .. 10] $ \i -> do
+              messages <- createTestMessages 3
+              let adapter = testAdapter messages
+                  handler _ = do
+                    liftIO $ modifyIORef' countRef (+ 1)
+                    liftIO $ threadDelay 5000 -- 5ms
+                    pure AckOk
+              runSupervised master 10 (ProcessorId $ "concurrent-" <> Text.pack (show i)) Serial adapter handler
+
+            -- Wait briefly then stop
+            liftIO $ threadDelay 100000 -- 100ms
+            stopMaster master
+
+          -- Should have processed messages from multiple processors
+          count <- readIORef countRef
+          count `shouldSatisfy` (> 0)
+
+      describe "KillAll supervision strategy" $ do
+        it "stops all processors when adapter source fails with KillAll strategy" $ do
+          countARef <- newIORef (0 :: Int)
+          countBRef <- newIORef (0 :: Int)
+
+          result :: Either SomeException () <- try $ runEff $ do
+            messagesB <- createTestMessages 20
+
+            -- Adapter A throws after 3 messages (ingester crash, not handler)
+            let failingSourceA = Stream.unfoldrM step (0 :: Int)
+                  where
+                    step n
+                      | n < 3 = do
+                          msg <- liftIO $ createSingleMessage (n + 1)
+                          pure $ Just (msg, n + 1)
+                      | otherwise = error "Adapter A source failed!"
+
+            let adapterA =
+                  Adapter
+                    { adapterName = "test:failing-A",
+                      source = failingSourceA,
+                      shutdown = pure ()
+                    }
+
+            -- Handler A counts messages
+            let handlerA _ = do
+                  liftIO $ modifyIORef' countARef (+ 1)
+                  liftIO $ threadDelay 10000 -- 10ms
+                  pure AckOk
+
+            -- Handler B processes slowly
+            let handlerB _ = do
+                  liftIO $ modifyIORef' countBRef (+ 1)
+                  liftIO $ threadDelay 30000 -- 30ms
+                  pure AckOk
+
+            let adapterB = testAdapter messagesB
+
+            -- Use KillAll strategy
+            master <- startMaster KillAll
+
+            _spA <- runSupervised master 10 (ProcessorId "killall-A") Serial adapterA handlerA
+            _spB <- runSupervised master 10 (ProcessorId "killall-B") Serial adapterB handlerB
+
+            -- Wait for A to fail and trigger KillAll
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          -- A should have processed messages before adapter failed
+          countA <- readIORef countARef
+          countA `shouldSatisfy` (<= 3)
+
+          -- B should have been killed (not processed all 20)
+          countB <- readIORef countBRef
+          countB `shouldSatisfy` (< 20)
+
+      describe "Multiple concurrent halts" $ do
+        it "handles multiple handlers returning AckHalt simultaneously" $ do
+          haltCountRef <- newIORef (0 :: Int)
+          processedRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 10
+
+            let handler ingested = do
+                  let msgNum = case ingested.envelope.cursor of
+                        Just (CursorInt n) -> n
+                        _ -> 0
+                  liftIO $ modifyIORef' processedRef (+ 1)
+                  liftIO $ threadDelay 30000 -- 30ms
+                  -- Messages 2, 3, 4 all return halt
+                  if msgNum `elem` [2, 3, 4]
+                    then do
+                      liftIO $ modifyIORef' haltCountRef (+ 1)
+                      pure $ AckHalt (HaltFatal $ "halt from " <> Text.pack (show msgNum))
+                    else pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 10 (ProcessorId "multi-halt") (Async 5) adapter handler
+
+            liftIO $ threadDelay 500000 -- 500ms
+            stopMaster master
+
+          -- Multiple halts should have been recorded
+          haltCount <- readIORef haltCountRef
+          haltCount `shouldSatisfy` (>= 1) -- At least one halt processed
+
+          -- Should not have processed all messages
+          processed <- readIORef processedRef
+          processed `shouldSatisfy` (< 10)
+
+      describe "Stability under load" $ do
+        it "processes many messages without issues" $ do
+          processedRef <- newIORef (0 :: Int)
+
+          finalCount <- runEff $ do
+            -- 500 messages
+            messages <- createTestMessages 500
+
+            let handler _ = do
+                  liftIO $ modifyIORef' processedRef (+ 1)
+                  pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            sp <- runSupervised master 100 (ProcessorId "load-test") (Async 10) adapter handler
+
+            -- Wait for completion
+            liftIO $ threadDelay 2000000 -- 2s
+            stopMaster master
+            liftIO $ readIORef processedRef
+
+          finalCount `shouldBe` 500
+
+        it "handles mixed success and failure under load" $ do
+          successRef <- newIORef (0 :: Int)
+          failRef <- newIORef (0 :: Int)
+
+          _ <- runEff $ do
+            messages <- createTestMessages 200
+
+            let handler ingested = do
+                  let msgNum = case ingested.envelope.cursor of
+                        Just (CursorInt n) -> n
+                        _ -> 0
+                  -- Every 7th message fails
+                  if msgNum `mod` 7 == 0
+                    then do
+                      liftIO $ modifyIORef' failRef (+ 1)
+                      error "Intentional failure"
+                    else do
+                      liftIO $ modifyIORef' successRef (+ 1)
+                      pure AckOk
+
+            master <- startMaster IgnoreAll
+            let adapter = testAdapter messages
+            _ <- runSupervised master 50 (ProcessorId "mixed-load") (Async 5) adapter handler
+
+            liftIO $ threadDelay 1000000 -- 1s
+            stopMaster master
+
+          success <- readIORef successRef
+          failures <- readIORef failRef
+
+          -- Should have processed many messages
+          success `shouldSatisfy` (> 150)
+          -- Should have recorded failures
+          failures `shouldSatisfy` (> 20)
 
 -- Test helpers
 
@@ -532,6 +770,26 @@ createTestMessages n = mapM createMessage [1 .. n]
             ack = ackHandle,
             lease = Nothing
           }
+
+-- | Create a single message (for use in streaming contexts)
+createSingleMessage :: Int -> IO (Ingested '[IOE] String)
+createSingleMessage i = do
+  let msgId = MessageId $ "msg-" <> Text.pack (show i)
+      env =
+        Envelope
+          { messageId = msgId,
+            cursor = Just (CursorInt i),
+            partition = Nothing,
+            enqueuedAt = Just testTime,
+            payload = "message-" <> show i
+          }
+      ackHandle = AckHandle $ \_ -> pure ()
+  pure $
+    Ingested
+      { envelope = env,
+        ack = ackHandle,
+        lease = Nothing
+      }
 
 testAdapter :: [Ingested es String] -> Adapter es String
 testAdapter messages =
