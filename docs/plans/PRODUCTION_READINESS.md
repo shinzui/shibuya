@@ -172,118 +172,36 @@ type DependencyCheck = IO DependencyStatus
 
 **Goal**: Verify stability over extended periods with production-like load.
 
-### Test Design
+### Approach
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      LOAD TEST HARNESS                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Producer (separate process)                                    │
-│  ├─ Sends N messages/second to PGMQ                            │
-│  ├─ Varies payload sizes (1KB - 100KB)                         │
-│  └─ Records send latencies                                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Shibuya Processor (system under test)                          │
-│  ├─ Reads from PGMQ with configurable concurrency              │
-│  ├─ Simulates work (configurable delay)                        │
-│  ├─ Mix of outcomes: 90% AckOk, 5% AckRetry, 5% exception       │
-│  └─ Exposes metrics on :8080                                    │
-├─────────────────────────────────────────────────────────────────┤
-│  Monitor (prometheus + assertions)                              │
-│  ├─ Scrapes metrics every 15s                                  │
-│  ├─ Tracks memory usage via RTS stats                          │
-│  ├─ Alerts on: memory growth, stuck processors, high failure % │
-│  └─ Generates report at end                                     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Implementation
-
-**Directory**: `shibuya-load-test/`
-
-```
-shibuya-load-test/
-├── shibuya-load-test.cabal
-├── app/
-│   ├── Producer.hs      -- Message producer
-│   ├── Processor.hs     -- Shibuya processor under test
-│   └── Monitor.hs       -- Metrics collector & reporter
-├── src/
-│   └── LoadTest/
-│       ├── Config.hs    -- Test configuration
-│       ├── Report.hs    -- Generate HTML/JSON report
-│       └── Assertions.hs -- Pass/fail criteria
-└── scripts/
-    └── run-load-test.sh -- Orchestrates the test
-```
-
-### Configuration
+Add an executable to existing `shibuya-pgmq-adapter-bench/` that runs for hours:
 
 ```haskell
-data LoadTestConfig = LoadTestConfig
-  { duration :: NominalDiffTime      -- e.g., 4 hours
-  , targetThroughput :: Int          -- messages/second
-  , concurrency :: Concurrency       -- Serial, Ahead 5, Async 10
-  , handlerDelayMs :: (Int, Int)     -- (min, max) simulated work
-  , outcomeDistribution :: OutcomeDistribution
-  , payloadSizeBytes :: (Int, Int)   -- (min, max)
-  , checkpointIntervalSecs :: Int    -- How often to record stats
-  }
+-- shibuya-pgmq-adapter-bench/app/Endurance.hs
+main = do
+  duration <- fromMaybe 14400 <$> lookupEnv "DURATION_SECS"  -- 4 hours default
 
-data OutcomeDistribution = OutcomeDistribution
-  { ackOkPercent :: Int       -- e.g., 90
-  , ackRetryPercent :: Int    -- e.g., 5
-  , exceptionPercent :: Int   -- e.g., 5
-  }
+  -- Start producer thread (continuous message injection)
+  -- Start processor with shibuya-pgmq-adapter
+  -- Sample metrics every 30s, write to CSV
+  -- At end, check assertions and print summary
 ```
 
 ### Pass/Fail Criteria
 
-```haskell
-data LoadTestResult = LoadTestResult
-  { passed :: Bool
-  , metrics :: LoadTestMetrics
-  , failures :: [AssertionFailure]
-  }
-
-data LoadTestMetrics = LoadTestMetrics
-  { totalMessages :: Int
-  , totalDuration :: NominalDiffTime
-  , throughputAvg :: Double           -- msgs/sec
-  , throughputP99 :: Double
-  , latencyAvgMs :: Double
-  , latencyP99Ms :: Double
-  , memoryStartMB :: Double
-  , memoryEndMB :: Double
-  , memoryPeakMB :: Double
-  , failedMessages :: Int
-  , retriedMessages :: Int
-  }
-
--- Assertions
-assertions :: [LoadTestMetrics -> Maybe AssertionFailure]
-assertions =
-  [ \m -> if m.memoryEndMB > m.memoryStartMB * 2
-          then Just "Memory grew more than 2x (possible leak)"
-          else Nothing
-  , \m -> if m.failedMessages > m.totalMessages `div` 100
-          then Just "More than 1% messages failed"
-          else Nothing
-  , \m -> if m.latencyP99Ms > 5000
-          then Just "P99 latency exceeded 5 seconds"
-          else Nothing
-  ]
-```
+| Metric | Threshold |
+|--------|-----------|
+| Memory growth | < 2x start |
+| Failed messages | < 1% |
+| P99 latency | < 5 seconds |
+| Stuck processors | 0 |
 
 ### Tasks
-- [ ] Create `shibuya-load-test` package
-- [ ] Implement Producer (uses pgmq-hs directly)
-- [ ] Implement Processor (uses shibuya-pgmq-adapter)
-- [ ] Implement Monitor (scrapes Prometheus endpoint)
-- [ ] Add memory tracking via RTS stats
-- [ ] Add report generation (JSON + summary)
-- [ ] Create run script with docker-compose for PostgreSQL
-- [ ] Document how to run: `./scripts/run-load-test.sh --duration 4h`
+- [ ] Add `executable endurance-test` to existing bench cabal
+- [ ] Implement continuous producer loop
+- [ ] Add memory sampling via RTS stats (`-T` flag)
+- [ ] Write metrics to CSV for post-analysis
+- [ ] Print pass/fail summary at end
 
 ---
 
@@ -291,109 +209,36 @@ assertions =
 
 **Goal**: Verify system recovers gracefully from failures.
 
-### Test Scenarios
+### Approach
 
-| Scenario | Injection | Expected Behavior |
-|----------|-----------|-------------------|
-| Database disconnect | Kill PostgreSQL | Adapter errors, processor retries on reconnect |
-| Database slow | Add latency (tc) | Backpressure kicks in, no OOM |
-| Message poison | Send unparseable message | Goes to DLQ, processing continues |
-| Handler crash | Random exceptions | Message retried, other handlers unaffected |
-| Processor kill | SIGKILL one processor | Other processors continue, supervisor logs |
-| Full restart | SIGTERM + restart | Graceful drain, no message loss |
-| Memory pressure | Limit to 256MB | OOM killer triggers, clean restart |
-| Long handler | Handler takes 5 minutes | Lease extended, no redelivery |
-
-### Implementation
-
-**Directory**: `shibuya-chaos-test/`
+Add chaos scenarios to existing test suite using `tmp-postgres` (already a dependency):
 
 ```haskell
--- Chaos injection interface
-data ChaosAction
-  = KillPostgres
-  | RestartPostgres
-  | AddNetworkLatency Milliseconds
-  | RemoveNetworkLatency
-  | SendPoisonMessage
-  | KillProcessor ProcessorId
-  | TriggerOOM
-  | PauseProcessor ProcessorId Seconds
-
--- Test harness
-data ChaosTest = ChaosTest
-  { name :: Text
-  , setup :: IO ChaosEnv
-  , injection :: ChaosEnv -> IO ()
-  , expectedBehavior :: ChaosEnv -> IO ChaosResult
-  , cleanup :: ChaosEnv -> IO ()
-  }
-
-runChaosTest :: ChaosTest -> IO TestResult
-runChaosTest test = do
-  env <- test.setup
-  -- Start processor, let it stabilize
-  threadDelay 5_000_000
-  -- Record baseline metrics
-  baseline <- captureMetrics env
-  -- Inject chaos
-  test.injection env
-  -- Wait for system to respond
-  threadDelay 10_000_000
-  -- Check expected behavior
-  result <- test.expectedBehavior env
-  -- Cleanup
-  test.cleanup env
-  pure result
+-- shibuya-pgmq-adapter/test/Chaos/DatabaseSpec.hs
+describe "Chaos: Database disconnect" $ do
+  it "recovers after database restart" $ withTmpPostgres $ \pg -> do
+    -- Start processing
+    -- Kill postgres (pg.stop)
+    -- Wait
+    -- Restart postgres (pg.start)
+    -- Verify processing resumes
 ```
 
-### Test: Database Disconnect Recovery
+### Priority Scenarios
 
-```haskell
-databaseDisconnectTest :: ChaosTest
-databaseDisconnectTest = ChaosTest
-  { name = "Database disconnect and reconnect"
-  , setup = do
-      pg <- startPostgres
-      processor <- startProcessor pg.connectionString
-      producer <- startProducer pg.connectionString
-      pure ChaosEnv { pg, processor, producer }
-  , injection = \env -> do
-      -- Record messages processed so far
-      beforeCount <- getProcessedCount env.processor
-      -- Kill postgres
-      stopPostgres env.pg
-      -- Wait 30 seconds (system should be failing)
-      threadDelay 30_000_000
-      -- Restart postgres
-      startPostgres env.pg
-  , expectedBehavior = \env -> do
-      -- Wait for recovery
-      threadDelay 10_000_000
-      -- Check processor resumed
-      afterCount <- getProcessedCount env.processor
-      state <- getProcessorState env.processor
-      pure $ ChaosResult
-        { passed = state == Idle || state == Processing
-        , details = "Processed " <> show (afterCount - beforeCount) <> " after recovery"
-        }
-  , cleanup = \env -> do
-      stopProcessor env.processor
-      stopPostgres env.pg
-  }
-```
+| Scenario | Test Method | Expected |
+|----------|-------------|----------|
+| DB disconnect/reconnect | Stop/start tmp-postgres | Resumes processing |
+| Poison message | Insert malformed JSON | Goes to DLQ |
+| Long handler | Handler with 60s delay | Lease extended |
+| Graceful shutdown | SIGTERM during processing | Drains cleanly |
 
 ### Tasks
-- [ ] Create `shibuya-chaos-test` package
-- [ ] Implement ChaosTest harness
-- [ ] Add database disconnect/reconnect test
-- [ ] Add poison message test
-- [ ] Add handler crash test
-- [ ] Add graceful restart test (SIGTERM)
-- [ ] Add lease extension test (long handler)
-- [ ] Add memory pressure test
-- [ ] Document how to run chaos tests
-- [ ] Integrate with CI (optional, requires Docker)
+- [ ] Add `test/Chaos/` directory to pgmq-adapter tests
+- [ ] Database disconnect test
+- [ ] Poison message test (already partially tested)
+- [ ] Long handler lease extension test
+- [ ] Graceful shutdown test (after Phase 1)
 
 ---
 
@@ -416,25 +261,22 @@ databaseDisconnectTest = ChaosTest
 
 ## Implementation Order
 
-1. **Phase 1: Graceful Shutdown** (1-2 days)
-   - Critical for deployments
-   - Prevents message loss
+| Phase | Scope | Estimate | Notes |
+|-------|-------|----------|-------|
+| 1. Graceful Shutdown | Add drain timeout to `stopApp` | 2 hours | Small change to App.hs |
+| 2. Health Checks | Add `/health/live`, `/health/ready` | 2 hours | Extend existing metrics server |
+| 3. Load Testing | Extend benchmarks for endurance | 4 hours | Infrastructure exists |
+| 4. Chaos Testing | Test harness + scenarios | 4 hours | Scripts with docker-compose |
+| 5. Documentation | Runbooks | 2 hours | Can do incrementally |
 
-2. **Phase 2: Health Checks** (1 day)
-   - Required for Kubernetes
-   - Simple implementation
+**Total: ~2 days**
 
-3. **Phase 3: Load Testing** (3-4 days)
-   - Builds confidence
-   - May reveal issues
+### Why This Is Fast
 
-4. **Phase 4: Chaos Testing** (3-4 days)
-   - Validates recovery
-   - Requires more infrastructure
-
-5. **Phase 5: Documentation** (1-2 days)
-   - Enables team adoption
-   - Can be done incrementally
+- Benchmark infrastructure already exists (`shibuya-pgmq-adapter-bench/`)
+- Metrics server already exists (`shibuya-metrics/`)
+- PGMQ adapter is complete with retries, DLQ, lease extension
+- Just extending existing code, not building from scratch
 
 ---
 
