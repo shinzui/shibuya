@@ -32,7 +32,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | Ack Semantics (Ok/Retry/DLQ/Halt) | ✅ Implemented |
 | Metrics & Introspection | ✅ Implemented |
 | NQE Supervision | ✅ Implemented |
-| Concurrent Processing (Ahead/Async) | 🔲 Planned |
+| Concurrent Processing (Ahead/Async) | ✅ Implemented |
 
 ## Installation
 
