@@ -81,6 +81,7 @@ test-suite shibuya-pgmq-adapter-test
     QuasiQuotes
 
   other-modules:
+    Shibuya.Adapter.Pgmq
     Shibuya.Adapter.Pgmq.ChaosSpec
     Shibuya.Adapter.Pgmq.Config
     Shibuya.Adapter.Pgmq.ConfigSpec
