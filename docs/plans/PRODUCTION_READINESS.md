@@ -9,7 +9,7 @@
 | Metrics/Prometheus | ✅ Ready | Full observability |
 | Backpressure | ✅ Ready | Bounded inbox provides rate limiting |
 | Health Checks | ⚠️ Basic | Needs readiness + dependency checks |
-| Graceful Shutdown | ⚠️ Partial | Needs drain period before termination |
+| Graceful Shutdown | ✅ Ready | Configurable drain timeout, returns drain status |
 | Load Testing | ⚠️ Missing | Need hours-long endurance test |
 | Chaos Testing | ⚠️ Missing | Need failure injection tests |
 | OpenTelemetry | 🔲 Planned | Not blocking for initial deployment |
@@ -82,11 +82,11 @@ waitForDrain deadline processors = go
 ```
 
 ### Tasks
-- [ ] Add `ShutdownConfig` type
-- [ ] Implement `stopAppGracefully`
-- [ ] Add `waitForDrain` helper
-- [ ] Update `stopApp` to use graceful shutdown by default
-- [ ] Add tests for graceful shutdown behavior
+- [x] Add `ShutdownConfig` type
+- [x] Implement `stopAppGracefully`
+- [x] Add `waitForDrain` helper
+- [x] Update `stopApp` to use graceful shutdown by default
+- [x] Add tests for graceful shutdown behavior
 
 ---
 

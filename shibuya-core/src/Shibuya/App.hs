@@ -10,7 +10,12 @@ module Shibuya.App
     getAppMetrics,
     getAppMaster,
     stopApp,
+    stopAppGracefully,
     waitApp,
+
+    -- * Shutdown Configuration
+    ShutdownConfig (..),
+    defaultShutdownConfig,
 
     -- * Supervision Strategy
     SupervisionStrategy (..),
@@ -24,18 +29,20 @@ module Shibuya.App
   )
 where
 
+import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor qualified as NQE
-import Control.Concurrent.STM (atomically, check, readTVar)
-import Control.Monad (forM_)
+import Control.Concurrent.STM (STM, atomically, check, readTVar, readTVarIO)
+import Control.Monad (forM_, void)
 import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
+import Data.Time.Clock (NominalDiffTime)
 import Effectful (Eff, IOE, liftIO, (:>))
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..), handlerErrorToText, policyErrorToText, runtimeErrorToText)
+import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner.Master
@@ -78,6 +85,23 @@ toNQEStrategy :: SupervisionStrategy -> NQE.Strategy
 toNQEStrategy = \case
   IgnoreFailures -> NQE.IgnoreAll
   StopAllOnFailure -> NQE.KillAll
+
+--------------------------------------------------------------------------------
+-- Shutdown Configuration
+--------------------------------------------------------------------------------
+
+-- | Configuration for graceful shutdown behavior.
+data ShutdownConfig = ShutdownConfig
+  { -- | Maximum time to wait for in-flight messages to drain.
+    -- After this timeout, remaining processors are forcefully stopped.
+    -- Default: 30 seconds.
+    drainTimeout :: !NominalDiffTime
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | Default shutdown configuration with 30 second drain timeout.
+defaultShutdownConfig :: ShutdownConfig
+defaultShutdownConfig = ShutdownConfig {drainTimeout = 30}
 
 --------------------------------------------------------------------------------
 -- Errors
@@ -198,15 +222,63 @@ getAppMetrics appHandle = getAllMetrics appHandle.master
 getAppMaster :: AppHandle es -> Master
 getAppMaster appHandle = appHandle.master
 
--- | Gracefully stop all processors and shut down the master.
+-- | Gracefully stop all processors with default configuration.
+-- Uses 'defaultShutdownConfig' (30 second drain timeout).
+-- For custom timeout, use 'stopAppGracefully'.
 stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
-stopApp appHandle = do
-  -- Shutdown all adapters
+stopApp = void . stopAppGracefully defaultShutdownConfig
+
+-- | Gracefully stop all processors with configurable drain timeout.
+--
+-- Shutdown sequence:
+-- 1. Signal all adapters to stop producing (close source streams)
+-- 2. Wait for processors to drain in-flight messages (with timeout)
+-- 3. Force stop any remaining processors after timeout
+-- 4. Stop the master coordinator
+--
+-- Returns whether all processors drained cleanly (True) or were forced (False).
+stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
+stopAppGracefully config appHandle = do
+  -- 1. Signal adapters to stop producing
   mapM_ shutdownAdapter (Map.elems appHandle.processors)
-  -- Stop the master
+
+  -- 2. Wait for drain with timeout
+  let timeoutMicros = floor (config.drainTimeout * 1_000_000)
+  drained <- liftIO $ waitForDrainWithTimeout timeoutMicros (Map.elems appHandle.processors)
+
+  -- 3. Log warning if forced shutdown (caller can check return value)
+  -- Note: We don't log here to avoid IO dependencies, caller can log if needed
+
+  -- 4. Stop master (cancels any remaining processors)
   stopMaster appHandle.master
+
+  pure drained
   where
     shutdownAdapter (_, QueueProcessor adapter _ _ _) = adapter.shutdown
+
+-- | Wait for all processors to be done, with timeout.
+-- Returns True if all drained cleanly, False if timeout occurred.
+-- Uses polling to avoid requiring -threaded RTS.
+waitForDrainWithTimeout :: Int -> [(SupervisedProcessor, a)] -> IO Bool
+waitForDrainWithTimeout timeoutMicros processors = go timeoutMicros
+  where
+    -- Poll interval: 50ms
+    pollInterval :: Int
+    pollInterval = 50000
+
+    go :: Int -> IO Bool
+    go remaining
+      | remaining <= 0 = pure False -- Timeout
+      | otherwise = do
+          allDone <- checkAllDone processors
+          if allDone
+            then pure True
+            else do
+              threadDelay (min pollInterval remaining)
+              go (remaining - pollInterval)
+
+    checkAllDone :: [(SupervisedProcessor, a)] -> IO Bool
+    checkAllDone procs = and <$> mapM (\(sp, _) -> readTVarIO sp.done) procs
 
 -- | Wait for all processors to complete.
 -- For infinite streams, this will block forever.

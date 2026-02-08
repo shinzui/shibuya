@@ -10,6 +10,15 @@ import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.App
+  ( AppHandle (..),
+    QueueProcessor (..),
+    ShutdownConfig (..),
+    SupervisionStrategy (..),
+    mkProcessor,
+    runApp,
+    stopAppGracefully,
+  )
 import Shibuya.Core (ProcessorHalt (..))
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
@@ -744,6 +753,92 @@ spec = do
           success `shouldSatisfy` (> 150)
           -- Should have recorded failures
           failures `shouldSatisfy` (> 20)
+
+  describe "Graceful Shutdown" $ do
+    describe "stopAppGracefully" $ do
+      it "drains in-flight messages before stopping" $ do
+        processedRef <- newIORef (0 :: Int)
+
+        drained <- runEff $ do
+          messages <- createTestMessages 10
+
+          let handler _ = do
+                liftIO $ do
+                  threadDelay 50000 -- 50ms per message
+                  modifyIORef' processedRef (+ 1)
+                pure AckOk
+
+          let adapter = testAdapter messages
+              processor = mkProcessor adapter handler
+
+          result <- runApp IgnoreFailures 10 [(ProcessorId "drain-test", processor)]
+          case result of
+            Left _ -> pure False
+            Right appHandle -> do
+              -- Give some time for processing to start
+              liftIO $ threadDelay 100000 -- 100ms
+
+              -- Graceful shutdown with generous timeout
+              let config = ShutdownConfig {drainTimeout = 5} -- 5 seconds
+              stopAppGracefully config appHandle
+
+        drained `shouldBe` True
+
+        -- All messages should have been processed
+        processed <- readIORef processedRef
+        processed `shouldBe` 10
+
+      it "respects timeout when processors are slow" $ do
+        processedRef <- newIORef (0 :: Int)
+
+        drained <- runEff $ do
+          messages <- createTestMessages 20
+
+          let handler _ = do
+                liftIO $ do
+                  threadDelay 500000 -- 500ms per message - very slow
+                  modifyIORef' processedRef (+ 1)
+                pure AckOk
+
+          let adapter = testAdapter messages
+              processor = mkProcessor adapter handler
+
+          result <- runApp IgnoreFailures 5 [(ProcessorId "timeout-test", processor)]
+          case result of
+            Left _ -> pure True -- Treat error as "drained" for simplicity
+            Right appHandle -> do
+              -- Start immediately
+              liftIO $ threadDelay 100000 -- 100ms
+
+              -- Very short timeout (0.3 seconds)
+              let config = ShutdownConfig {drainTimeout = 0.3}
+              stopAppGracefully config appHandle
+
+        -- Should timeout (not all drained)
+        drained `shouldBe` False
+
+        -- Should have processed only some messages
+        processed <- readIORef processedRef
+        processed `shouldSatisfy` (< 20)
+
+      it "returns True when all processors finish quickly" $ do
+        drained <- runEff $ do
+          messages <- createTestMessages 5
+
+          let handler _ = pure AckOk -- Instant processing
+          let adapter = testAdapter messages
+              processor = mkProcessor adapter handler
+
+          result <- runApp IgnoreFailures 10 [(ProcessorId "quick-test", processor)]
+          case result of
+            Left _ -> pure False
+            Right appHandle -> do
+              -- Give time to complete
+              liftIO $ threadDelay 200000 -- 200ms
+              let config = ShutdownConfig {drainTimeout = 1}
+              stopAppGracefully config appHandle
+
+        drained `shouldBe` True
 
 -- Test helpers
 

@@ -51,7 +51,12 @@ module Shibuya.Core
     AppHandle (..),
     waitApp,
     stopApp,
+    stopAppGracefully,
     getAppMetrics,
+
+    -- * Shutdown Configuration
+    ShutdownConfig (..),
+    defaultShutdownConfig,
 
     -- * Supervision Strategy
     SupervisionStrategy (..),
@@ -75,7 +80,7 @@ module Shibuya.Core
 where
 
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), SupervisionStrategy (..), getAppMetrics, mkProcessor, runApp, stopApp, waitApp)
+import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), ShutdownConfig (..), SupervisionStrategy (..), defaultShutdownConfig, getAppMetrics, mkProcessor, runApp, stopApp, stopAppGracefully, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
