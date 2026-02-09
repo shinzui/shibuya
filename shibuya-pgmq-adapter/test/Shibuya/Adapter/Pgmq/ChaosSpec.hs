@@ -12,7 +12,8 @@ module Shibuya.Adapter.Pgmq.ChaosSpec (spec) where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, cancel)
 import Control.Monad (forM_)
-import Data.Aeson (Value (..))
+import Data.Aeson (Value (..), object, (.=))
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Vector qualified as Vector
@@ -22,8 +23,8 @@ import Hasql.Pool qualified as Pool
 import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)
 import Pgmq.Effectful qualified as PgmqEff
 import Pgmq.Hasql.Sessions qualified as Sessions
-import Pgmq.Hasql.Statements.Types (ReadMessage (..), SendMessage (..))
-import Pgmq.Types (MessageBody (..))
+import Pgmq.Hasql.Statements.Types (ReadMessage (..), SendMessage (..), SendMessageWithHeaders (..))
+import Pgmq.Types (MessageBody (..), MessageHeaders (..))
 import Shibuya.Adapter.Pgmq
   ( PgmqAdapterConfig (..),
     PollingConfig (..),
@@ -191,6 +192,78 @@ poisonMessageSpec = describe "Poison messages" $ do
               conditional = Nothing
             }
     Vector.length mainCount `shouldBe` 0
+
+  it "preserves trace headers when moving to DLQ" $ \TestFixture {pool, queueName, dlqName} -> do
+    -- Send a message with trace headers
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        tracestate = "vendor=opaque" :: Text.Text
+        traceHeaders = object ["traceparent" .= traceparent, "tracestate" .= tracestate]
+
+    runPgmqSession pool $ do
+      _ <-
+        Sessions.sendMessageWithHeaders $
+          SendMessageWithHeaders
+            { queueName = queueName,
+              messageBody = MessageBody (String "trace-to-dlq"),
+              messageHeaders = MessageHeaders traceHeaders,
+              delay = Just 0
+            }
+      pure ()
+
+    processedRef <- newIORef (0 :: Int)
+
+    -- Create adapter with DLQ configured
+    let config =
+          (defaultConfig queueName)
+            { visibilityTimeout = 5,
+              batchSize = 1,
+              polling = StandardPolling {pollInterval = 0.1},
+              deadLetterConfig = Just DeadLetterConfig {dlqQueueName = dlqName, includeMetadata = True}
+            }
+
+    -- Run processor that dead-letters the message
+    runAdapterIO pool $ runTracingNoop $ do
+      adapter <- pgmqAdapter config
+      let handler = deadLetterHandler processedRef
+          processor = mkProcessor adapter handler
+
+      result <- runApp IgnoreFailures 100 [(ProcessorId "dlq-trace-test", processor)]
+      case result of
+        Left err -> liftIO $ expectationFailure $ "Failed to start app: " <> show err
+        Right appHandle -> do
+          -- Wait for message to be processed
+          liftIO $ waitForProcessed processedRef 1 3000000
+
+          -- Stop the app
+          let shutdownConfig = ShutdownConfig {drainTimeout = 5}
+          _ <- stopAppGracefully shutdownConfig appHandle
+          pure ()
+
+    -- Read the DLQ message and verify trace headers are preserved
+    dlqMsgs <-
+      runPgmqSession pool $
+        Sessions.readMessage $
+          ReadMessage
+            { queueName = dlqName,
+              delay = 30,
+              batchSize = Just 10,
+              conditional = Nothing
+            }
+
+    Vector.length dlqMsgs `shouldBe` 1
+    let dlqMsg = Vector.head dlqMsgs
+
+    -- Verify trace headers are in the DLQ message headers
+    case dlqMsg.headers of
+      Nothing -> expectationFailure "DLQ message should have headers"
+      Just (Object hdrs) -> do
+        case KeyMap.lookup "traceparent" hdrs of
+          Just (String tp) -> tp `shouldBe` traceparent
+          _ -> expectationFailure "traceparent header should be a string"
+        case KeyMap.lookup "tracestate" hdrs of
+          Just (String ts) -> ts `shouldBe` tracestate
+          _ -> expectationFailure "tracestate header should be a string"
+      Just _ -> expectationFailure "DLQ message headers should be an object"
 
 --------------------------------------------------------------------------------
 -- Long Handler Tests

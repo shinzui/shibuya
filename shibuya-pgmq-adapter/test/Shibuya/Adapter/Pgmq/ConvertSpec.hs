@@ -18,6 +18,7 @@ spec = do
   messageIdToPgmqSpec
   pgmqMessageIdToCursorSpec
   extractPartitionSpec
+  extractTraceHeadersSpec
   pgmqMessageToEnvelopeSpec
   mkDlqPayloadSpec
 
@@ -137,6 +138,63 @@ extractPartitionSpec = describe "extractPartition via pgmqMessageToEnvelope" $ d
         env = pgmqMessageToEnvelope (mkMessage headers)
     getPartition env `shouldBe` Just ""
 
+-- | Tests for extractTraceHeaders
+extractTraceHeadersSpec :: Spec
+extractTraceHeadersSpec = describe "extractTraceHeaders" $ do
+  it "extracts traceparent header only" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        headers = Just $ object ["traceparent" .= traceparent]
+    extractTraceHeaders headers
+      `shouldBe` Just [("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")]
+
+  it "extracts both traceparent and tracestate headers" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        tracestate = "congo=t61rcWkgMzE" :: Text.Text
+        headers = Just $ object ["traceparent" .= traceparent, "tracestate" .= tracestate]
+        result = extractTraceHeaders headers
+    result `shouldSatisfy` \case
+      Just hs ->
+        ("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01") `elem` hs
+          && ("tracestate", "congo=t61rcWkgMzE") `elem` hs
+      Nothing -> False
+
+  it "returns Nothing when headers is Nothing" $ do
+    extractTraceHeaders Nothing `shouldBe` Nothing
+
+  it "returns Nothing when headers is not an object" $ do
+    let headers = Just $ String "not an object"
+    extractTraceHeaders headers `shouldBe` Nothing
+
+  it "returns Nothing when traceparent is missing" $ do
+    let headers = Just $ object ["tracestate" .= ("congo=t61rcWkgMzE" :: Text.Text)]
+    extractTraceHeaders headers `shouldBe` Nothing
+
+  it "returns Nothing when traceparent is not a string" $ do
+    let headers = Just $ object ["traceparent" .= (42 :: Int)]
+    extractTraceHeaders headers `shouldBe` Nothing
+
+  it "ignores tracestate when it's not a string" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        headers = Just $ object ["traceparent" .= traceparent, "tracestate" .= (42 :: Int)]
+    extractTraceHeaders headers
+      `shouldBe` Just [("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")]
+
+  it "handles empty traceparent string" $ do
+    let headers = Just $ object ["traceparent" .= ("" :: Text.Text)]
+    extractTraceHeaders headers `shouldBe` Just [("traceparent", "")]
+
+  it "preserves traceparent with other headers present" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        headers =
+          Just $
+            object
+              [ "traceparent" .= traceparent,
+                "x-pgmq-group" .= ("customer-1" :: Text.Text),
+                "x-custom" .= ("value" :: Text.Text)
+              ]
+    extractTraceHeaders headers
+      `shouldBe` Just [("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")]
+
 -- | Tests for pgmqMessageToEnvelope
 pgmqMessageToEnvelopeSpec :: Spec
 pgmqMessageToEnvelopeSpec = describe "pgmqMessageToEnvelope" $ do
@@ -183,6 +241,36 @@ pgmqMessageToEnvelopeSpec = describe "pgmqMessageToEnvelope" $ do
     let msg = mkMessage 42 (String "test") Nothing
         Envelope {partition = envPartition} = pgmqMessageToEnvelope msg
     envPartition `shouldBe` Nothing
+
+  it "extracts traceContext from headers with traceparent" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        hdrs = Just $ object ["traceparent" .= traceparent]
+        msg = mkMessage 42 (String "test") hdrs
+        Envelope {traceContext = envTraceContext} = pgmqMessageToEnvelope msg
+    envTraceContext `shouldBe` Just [("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")]
+
+  it "extracts traceContext with both traceparent and tracestate" $ do
+    let traceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" :: Text.Text
+        tracestate = "vendor=opaque" :: Text.Text
+        hdrs = Just $ object ["traceparent" .= traceparent, "tracestate" .= tracestate]
+        msg = mkMessage 42 (String "test") hdrs
+        Envelope {traceContext = envTraceContext} = pgmqMessageToEnvelope msg
+    envTraceContext `shouldSatisfy` \case
+      Just hs ->
+        ("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01") `elem` hs
+          && ("tracestate", "vendor=opaque") `elem` hs
+      Nothing -> False
+
+  it "sets traceContext to Nothing when no headers" $ do
+    let msg = mkMessage 42 (String "test") Nothing
+        Envelope {traceContext = envTraceContext} = pgmqMessageToEnvelope msg
+    envTraceContext `shouldBe` Nothing
+
+  it "sets traceContext to Nothing when no traceparent in headers" $ do
+    let hdrs = Just $ object ["x-pgmq-group" .= ("customer-1" :: Text.Text)]
+        msg = mkMessage 42 (String "test") hdrs
+        Envelope {traceContext = envTraceContext} = pgmqMessageToEnvelope msg
+    envTraceContext `shouldBe` Nothing
 
 -- | Tests for mkDlqPayload
 mkDlqPayloadSpec :: Spec
