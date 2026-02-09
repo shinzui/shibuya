@@ -21,7 +21,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Data.Time.Clock (secondsToNominalDiffTime)
-import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import Effectful (IOE, liftIO, runEff, (:>))
 import Effectful.Error.Static (runErrorNoCallStack)
 import Example.Config (AppConfig (..))
 import Example.Config qualified as Config
@@ -37,7 +37,7 @@ import Example.Database
 import Example.Telemetry (withTracing)
 import Hasql.Pool qualified as Pool
 import OpenTelemetry.Trace.Core qualified as OTel
-import Pgmq.Effectful (runPgmq)
+import Pgmq.Effectful (runPgmqTraced)
 import Pgmq.Effectful.Interpreter (PgmqError)
 import Shibuya.Adapter.Pgmq
   ( DeadLetterConfig (..),
@@ -256,7 +256,7 @@ runConsumer ::
   MVar () ->
   IO ()
 runConsumer pool tracer metricsPort shutdownVar = do
-  eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmq pool $ runTracing tracer $ do
+  eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmqTraced pool tracer $ runTracing tracer $ do
     -- Create adapters
     ordersAdapter <- pgmqAdapter ordersAdapterConfig
     paymentsAdapter <- pgmqAdapter paymentsAdapterConfig
