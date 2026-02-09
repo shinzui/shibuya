@@ -4,8 +4,6 @@ This document describes how to run Jaeger locally for testing OpenTelemetry trac
 
 ## Starting Jaeger
 
-### Option 1: Binary
-
 Download Jaeger from [jaegertracing/jaeger releases](https://github.com/jaegertracing/jaeger/releases) and run:
 
 ```bash
@@ -17,33 +15,6 @@ Or if you have it in a custom location:
 
 ```bash
 ~/.local/bin/jaeger --collector.otlp.enabled=true
-```
-
-### Option 2: Docker
-
-```bash
-docker run -d --name jaeger \
-  -e COLLECTOR_OTLP_ENABLED=true \
-  -p 16686:16686 \
-  -p 4317:4317 \
-  -p 4318:4318 \
-  jaegertracing/all-in-one:latest
-```
-
-### Option 3: Docker Compose
-
-Add to your `docker-compose.yml`:
-
-```yaml
-services:
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "16686:16686"  # Jaeger UI
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
 ```
 
 ## Jaeger Ports
@@ -63,8 +34,6 @@ services:
 ```bash
 # Using process-compose (from project root)
 just process-up
-
-# Or start PostgreSQL manually with PGMQ extension
 ```
 
 ### 2. Start Jaeger
@@ -189,11 +158,8 @@ lsof -i :4318
 ## Cleanup
 
 ```bash
-# Stop Jaeger (if running as process)
+# Stop Jaeger
 pkill -f jaeger
-
-# Stop Jaeger (if running in Docker)
-docker stop jaeger && docker rm jaeger
 
 # Stop consumer
 pkill -f shibuya-pgmq-consumer
