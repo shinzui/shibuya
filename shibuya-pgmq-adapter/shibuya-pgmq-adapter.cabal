@@ -40,6 +40,7 @@ library
   build-depends:
     aeson ^>=2.2,
     base ^>=4.21.0.0,
+    bytestring,
     effectful-core ^>=2.6.1.0,
     pgmq-core,
     pgmq-effectful,

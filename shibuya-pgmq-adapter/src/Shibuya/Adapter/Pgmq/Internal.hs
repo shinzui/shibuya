@@ -52,6 +52,7 @@ import Pgmq.Effectful.Effect
     readMessage,
     readWithPoll,
     sendMessage,
+    sendMessageWithHeaders,
   )
 import Pgmq.Hasql.Statements.Types
   ( MessageQuery (..),
@@ -60,6 +61,7 @@ import Pgmq.Hasql.Statements.Types
     ReadMessage (..),
     ReadWithPollMessage (..),
     SendMessage (..),
+    SendMessageWithHeaders (..),
     VisibilityTimeoutQuery (..),
   )
 import Pgmq.Types qualified as Pgmq
@@ -181,15 +183,29 @@ mkAckHandle config msg = AckHandle $ \decision -> do
           -- No DLQ configured - just archive the message
           void $ archiveMessage (MessageQuery queueName msgId)
         Just dlqConfig -> do
-          -- Send to DLQ with metadata
+          -- Send to DLQ with metadata, preserving trace context if present
           let dlqBody = mkDlqPayload msg reason dlqConfig.includeMetadata
-          void $
-            sendMessage $
-              SendMessage
-                { queueName = dlqConfig.dlqQueueName,
-                  messageBody = dlqBody,
-                  delay = Nothing
-                }
+          -- Preserve original headers (including trace context) in DLQ message
+          case msg.headers of
+            Just headers -> do
+              -- Send with preserved headers for trace continuity
+              void $
+                sendMessageWithHeaders $
+                  SendMessageWithHeaders
+                    { queueName = dlqConfig.dlqQueueName,
+                      messageBody = dlqBody,
+                      messageHeaders = Pgmq.MessageHeaders headers,
+                      delay = Nothing
+                    }
+            Nothing ->
+              -- No headers to preserve, use simple send
+              void $
+                sendMessage $
+                  SendMessage
+                    { queueName = dlqConfig.dlqQueueName,
+                      messageBody = dlqBody,
+                      delay = Nothing
+                    }
           -- Delete from original queue
           void $ deleteMessage (MessageQuery queueName msgId)
     AckHalt _reason -> do

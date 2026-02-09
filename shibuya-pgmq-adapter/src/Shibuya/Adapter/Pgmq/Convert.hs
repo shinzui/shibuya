@@ -8,6 +8,9 @@ module Shibuya.Adapter.Pgmq.Convert
     -- * Cursor Conversion
     pgmqMessageIdToCursor,
 
+    -- * Trace Context
+    extractTraceHeaders,
+
     -- * DLQ Payload
     mkDlqPayload,
   )
@@ -19,9 +22,10 @@ import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Int (Int64)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Text.Encoding qualified as TE
 import Pgmq.Types qualified as Pgmq
 import Shibuya.Core.Ack (DeadLetterReason (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), TraceHeaders)
 
 -- | Convert a pgmq MessageId to a Shibuya MessageId.
 -- pgmq uses Int64, Shibuya uses Text.
@@ -53,8 +57,29 @@ extractPartition headers = do
     String group -> Just group
     _ -> Nothing
 
+-- | Extract W3C trace headers from pgmq message headers.
+-- Looks for traceparent and tracestate header keys.
+-- Returns Nothing if traceparent is not present (it's required for valid context).
+extractTraceHeaders :: Maybe Value -> Maybe TraceHeaders
+extractTraceHeaders Nothing = Nothing
+extractTraceHeaders (Just (Object obj)) = do
+  -- traceparent is required
+  traceparentValue <- KeyMap.lookup (Key.fromText "traceparent") obj
+  traceparent <- asText traceparentValue
+  -- tracestate is optional
+  let tracestate = KeyMap.lookup (Key.fromText "tracestate") obj >>= asText
+  pure $
+    ("traceparent", TE.encodeUtf8 traceparent)
+      : maybe [] (\ts -> [("tracestate", TE.encodeUtf8 ts)]) tracestate
+  where
+    asText :: Value -> Maybe Text
+    asText (String t) = Just t
+    asText _ = Nothing
+extractTraceHeaders _ = Nothing
+
 -- | Convert a pgmq Message to a Shibuya Envelope.
 -- The payload is the raw JSON Value from pgmq.
+-- Extracts W3C trace context from headers if present.
 pgmqMessageToEnvelope :: Pgmq.Message -> Envelope Value
 pgmqMessageToEnvelope msg =
   Envelope
@@ -62,7 +87,7 @@ pgmqMessageToEnvelope msg =
       cursor = Just (pgmqMessageIdToCursor msg.messageId),
       partition = extractPartition msg.headers,
       enqueuedAt = Just msg.enqueuedAt,
-      traceContext = Nothing, -- TODO: Extract from headers when available
+      traceContext = extractTraceHeaders msg.headers,
       payload = Pgmq.unMessageBody msg.body
     }
 

@@ -1,11 +1,14 @@
 -- | Message simulator for the PGMQ example.
 --
--- Produces realistic test messages to various queues.
+-- Produces realistic test messages to various queues with OpenTelemetry
+-- distributed tracing. Each message includes W3C Trace Context headers
+-- that link producer spans to consumer spans.
 --
 -- Usage:
 --
 -- @
 -- export DATABASE_URL="postgres://user:pass@localhost/pgmq"
+-- export OTEL_TRACING_ENABLED=true
 -- cabal run shibuya-pgmq-simulator -- --queue orders --count 100
 -- cabal run shibuya-pgmq-simulator -- --queue payments --count 50 --rate 10
 -- cabal run shibuya-pgmq-simulator -- --queue notifications --count 1000 --batch 50
@@ -22,6 +25,8 @@ import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
+import Effectful qualified
+import Effectful.Error.Static (runErrorNoCallStack)
 import Example.Config
   ( QueueTarget (..),
     parseQueueTarget,
@@ -33,15 +38,16 @@ import Example.Database
     paymentsQueueName,
     withDatabasePool,
   )
+import Example.Telemetry (withTracing)
 import Hasql.Pool qualified as Pool
-import Pgmq.Hasql.Sessions qualified as Pgmq
-import Pgmq.Hasql.Statements.Types qualified as Q
+import OpenTelemetry.Trace qualified as OTel
+import Pgmq.Effectful (PgmqError, runPgmq)
+import Pgmq.Effectful.Traced (sendMessageTraced)
 import Pgmq.Types
   ( MessageBody (..),
-    MessageHeaders (..),
     QueueName,
   )
-import System.Environment (getArgs, getEnv)
+import System.Environment (getArgs, getEnv, lookupEnv)
 import System.Random (randomRIO)
 
 --------------------------------------------------------------------------------
@@ -172,12 +178,13 @@ generateNotification idx = do
 
 sendToQueue ::
   Pool.Pool ->
+  OTel.Tracer ->
   QueueTarget ->
   Int ->
   Int ->
   Int ->
   IO ()
-sendToQueue pool target count rate batchSize = do
+sendToQueue pool tracer target count rate batchSize = do
   let queueName = targetToQueueName target
       delayMicros = if rate > 0 then 1_000_000 `div` rate else 0
 
@@ -187,81 +194,89 @@ sendToQueue pool target count rate batchSize = do
   Text.putStrLn ""
 
   case target of
-    OrdersQueue -> sendBatched pool queueName count batchSize delayMicros generateOrder
-    PaymentsQueue -> sendPaymentsFifo pool queueName count delayMicros
-    NotificationsQueue -> sendBatched pool queueName count batchSize delayMicros generateNotification
+    OrdersQueue -> sendBatchedTraced pool tracer queueName count batchSize delayMicros generateOrder
+    PaymentsQueue -> sendPaymentsFifoTraced pool tracer queueName count delayMicros
+    NotificationsQueue -> sendBatchedTraced pool tracer queueName count batchSize delayMicros generateNotification
 
 targetToQueueName :: QueueTarget -> QueueName
 targetToQueueName OrdersQueue = ordersQueueName
 targetToQueueName PaymentsQueue = paymentsQueueName
 targetToQueueName NotificationsQueue = notificationsQueueName
 
--- | Send messages in batches.
-sendBatched ::
+-- | Send messages with tracing, using batched progress reporting.
+-- Each message is sent individually with its own producer span.
+sendBatchedTraced ::
   Pool.Pool ->
+  OTel.Tracer ->
   QueueName ->
   Int ->
   Int ->
   Int ->
   (Int -> IO LBS.ByteString) ->
   IO ()
-sendBatched pool queueName count batchSize delayMicros generator = do
+sendBatchedTraced pool tracer queueName count batchSize delayMicros generator = do
   let batches = [1, 1 + batchSize .. count]
-  forM_ (zip [1 ..] batches) $ \(batchNum, startIdx) -> do
+  forM_ (zip [1 ..] batches) $ \(batchNum :: Int, startIdx) -> do
     let endIdx = min (startIdx + batchSize - 1) count
         indices = [startIdx .. endIdx]
 
-    -- Generate messages for this batch
-    bodies <- mapM generator indices
-    let messageBodies = map (MessageBody . decodePayload) bodies
-        req =
-          Q.BatchSendMessage
-            { queueName = queueName,
-              messageBodies = messageBodies,
-              delay = Nothing
-            }
+    -- Send each message with tracing
+    forM_ indices $ \idx -> do
+      body <- generator idx
+      let payload = MessageBody (decodePayload body)
+      -- Create producer span and send with trace context
+      OTel.inSpan tracer "pgmq.produce" producerSpanArgs $ do
+        result :: Either PgmqError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmq pool $ do
+          _ <- sendMessageTraced tracer queueName payload Nothing
+          pure ()
+        case result of
+          Left err -> Text.putStrLn $ "Error sending message: " <> Text.pack (show err)
+          Right () -> pure ()
 
-    result <- Pool.use pool $ Pgmq.batchSendMessage req
-    case result of
-      Left err -> Text.putStrLn $ "Error sending batch: " <> Text.pack (show err)
-      Right _ -> do
-        when (batchNum `mod` 10 == 0) $
-          Text.putStrLn $
-            "  Sent batch " <> Text.pack (show batchNum) <> " (" <> Text.pack (show endIdx) <> "/" <> Text.pack (show count) <> ")"
+    when (batchNum `mod` 10 == 0) $
+      Text.putStrLn $
+        "  Sent batch " <> Text.pack (show batchNum) <> " (" <> Text.pack (show endIdx) <> "/" <> Text.pack (show count) <> ")"
 
     when (delayMicros > 0) $ threadDelay delayMicros
 
   Text.putStrLn $ "Done! Sent " <> Text.pack (show count) <> " messages."
 
--- | Send payment messages with FIFO grouping by customerId.
-sendPaymentsFifo ::
+-- | Send payment messages with FIFO grouping and tracing.
+-- Each payment gets its own producer span with trace context injected.
+sendPaymentsFifoTraced ::
   Pool.Pool ->
+  OTel.Tracer ->
   QueueName ->
   Int ->
   Int ->
   IO ()
-sendPaymentsFifo pool queueName count delayMicros = do
+sendPaymentsFifoTraced pool tracer queueName count delayMicros = do
   forM_ [1 .. count] $ \idx -> do
     (body, customerId) <- generatePayment idx
-    let req =
-          Q.SendMessageWithHeaders
-            { queueName = queueName,
-              messageBody = MessageBody (decodePayload body),
-              messageHeaders = MessageHeaders $ object ["x-pgmq-group" .= customerId],
-              delay = Nothing
-            }
+    let payload = MessageBody (decodePayload body)
+        -- FIFO headers will be merged with trace headers
+        fifoHeaders = Just $ object ["x-pgmq-group" .= customerId]
 
-    result <- Pool.use pool $ Pgmq.sendMessageWithHeaders req
-    case result of
-      Left err -> Text.putStrLn $ "Error sending payment: " <> Text.pack (show err)
-      Right _ ->
-        when (idx `mod` 50 == 0) $
-          Text.putStrLn $
-            "  Sent " <> Text.pack (show idx) <> "/" <> Text.pack (show count) <> " payments"
+    -- Create producer span and send with trace context + FIFO headers
+    OTel.inSpan tracer "pgmq.produce" producerSpanArgs $ do
+      result :: Either PgmqError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmq pool $ do
+        _ <- sendMessageTraced tracer queueName payload fifoHeaders
+        pure ()
+      case result of
+        Left err -> Text.putStrLn $ "Error sending payment: " <> Text.pack (show err)
+        Right () -> pure ()
+
+    when (idx `mod` 50 == 0) $
+      Text.putStrLn $
+        "  Sent " <> Text.pack (show idx) <> "/" <> Text.pack (show count) <> " payments"
 
     when (delayMicros > 0) $ threadDelay delayMicros
 
   Text.putStrLn $ "Done! Sent " <> Text.pack (show count) <> " payments with FIFO grouping."
+
+-- | Span arguments for producer spans
+producerSpanArgs :: OTel.SpanArguments
+producerSpanArgs = OTel.defaultSpanArguments {OTel.kind = OTel.Producer}
 
 -- | Decode lazy bytestring to Aeson Value.
 decodePayload :: LBS.ByteString -> Value
@@ -281,6 +296,13 @@ main = do
   args <- parseArgs
   connStr <- fmap BS.pack $ getEnv "DATABASE_URL"
 
+  -- Check if tracing is enabled
+  tracingEnabled <- isTracingEnabled
+  let serviceName = "shibuya-pgmq-simulator"
+
+  when tracingEnabled $
+    Text.putStrLn "OpenTelemetry tracing: ENABLED"
+
   now <- getCurrentTime
   Text.putStrLn $ "Started at: " <> Text.pack (formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S" now)
   Text.putStrLn ""
@@ -290,7 +312,19 @@ main = do
     createQueues pool
     Text.putStrLn ""
 
-    sendToQueue pool args.queue args.count args.rate args.batchSize
+    -- Run with tracing (real or no-op depending on config)
+    withTracing tracingEnabled serviceName $ \tracer -> do
+      sendToQueue pool tracer args.queue args.count args.rate args.batchSize
 
   Text.putStrLn ""
   Text.putStrLn "Simulator finished."
+
+-- | Check if OpenTelemetry tracing is enabled via environment variable.
+isTracingEnabled :: IO Bool
+isTracingEnabled = do
+  val <- lookupEnv "OTEL_TRACING_ENABLED"
+  pure $ case val of
+    Just "true" -> True
+    Just "1" -> True
+    Just "yes" -> True
+    _ -> False
