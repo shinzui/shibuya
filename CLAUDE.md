@@ -116,6 +116,66 @@ Test modules mirror source structure in `test/Shibuya/`.
 | `Shibuya/Core/Ack.hs` | AckDecision and related types |
 | `docs/plans/PRIORITY_1_CRITICAL_FIXES.md` | Current development priorities |
 
+## Local Development Environment
+
+### PostgreSQL
+
+The project uses a local PostgreSQL instance with Unix sockets (no TCP). The nix devShell sets up:
+
+```bash
+PGHOST="$PWD/db"           # Socket directory
+PGDATA="$PGHOST/db"        # Data directory
+PGDATABASE=shibuya         # Database name
+```
+
+**Connection string format:**
+```bash
+# URL-encoded Unix socket path
+DATABASE_URL="postgresql://%2FUsers%2F...%2Fshibuya%2Fdb/shibuya"
+
+# Or generate it:
+DATABASE_URL="postgresql://$(jq -rn --arg x $PWD/db '$x|@uri')/shibuya"
+```
+
+**Starting PostgreSQL:**
+```bash
+pg_ctl start -l $PGHOST/postgres.log
+```
+
+**Testing connection:**
+```bash
+psql -h $PWD/db -d shibuya -c "SELECT 1"
+```
+
+### Jaeger (Tracing)
+
+Jaeger binary location: `~/.local/bin/jaeger`
+
+**Starting Jaeger:**
+```bash
+~/.local/bin/jaeger > /tmp/jaeger.log 2>&1 &
+```
+
+**Ports:**
+- UI: http://127.0.0.1:16686
+- OTLP HTTP: http://127.0.0.1:4318 (used by hs-opentelemetry)
+
+**Environment variables for tracing:**
+```bash
+OTEL_TRACING_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318"
+OTEL_SERVICE_NAME="shibuya-consumer"  # or shibuya-simulator
+```
+
+**Checking traces via API:**
+```bash
+# List services
+curl -s "http://127.0.0.1:16686/api/services" | jq '.data[]'
+
+# Get traces for a service
+curl -s "http://127.0.0.1:16686/api/traces?service=shibuya-consumer&limit=5" | jq
+```
+
 ## Development Status
 
 Version 0.1.0.0 (pre-release). Key features implemented:
