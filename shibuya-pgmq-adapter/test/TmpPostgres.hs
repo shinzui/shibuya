@@ -27,7 +27,6 @@ import Database.Postgres.Temp
     toConnectionString,
     with,
   )
-import Effectful (Eff, IOE, runEff, (:>))
 import Hasql.Connection qualified as Connection
 import Hasql.Connection.Setting qualified as Setting
 import Hasql.Connection.Setting.Connection qualified as Connection.Setting
@@ -36,7 +35,6 @@ import Hasql.Pool.Config qualified as PoolConfig
 import Hasql.Session (Session)
 import Hasql.Session qualified as Session
 import Numeric (showHex)
-import Pgmq.Effectful (Pgmq, runPgmq)
 import Pgmq.Hasql.Sessions qualified as Pgmq
 import Pgmq.Migration qualified as Migration
 import Pgmq.Types (QueueName, parseQueueName)
@@ -74,8 +72,12 @@ withTestFixture :: Pool.Pool -> (TestFixture -> IO a) -> IO a
 withTestFixture pool action = do
   -- Generate unique queue names
   suffix <- randomSuffix
-  let Right qName = parseQueueName $ "test_" <> suffix
-      Right dlqName = parseQueueName $ "test_dlq_" <> suffix
+  let qName = case parseQueueName $ "test_" <> suffix of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
+      dlqName = case parseQueueName $ "test_dlq_" <> suffix of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
 
   -- Create queues
   runPgmqSession pool $ do
@@ -87,8 +89,9 @@ withTestFixture pool action = do
 
   -- Cleanup queues
   runPgmqSession pool $ do
-    Pgmq.dropQueue qName
-    Pgmq.dropQueue dlqName
+    _ <- Pgmq.dropQueue qName
+    _ <- Pgmq.dropQueue dlqName
+    pure ()
 
   pure result
   where

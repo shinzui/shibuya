@@ -42,7 +42,9 @@ nominalToSecondsSpec = describe "nominalToSeconds" $ do
 -- | Tests for mkReadMessage
 mkReadMessageSpec :: Spec
 mkReadMessageSpec = describe "mkReadMessage" $ do
-  let Right queueName = parseQueueName "test_queue"
+  let queueName = case parseQueueName "test_queue" of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
       config =
         PgmqAdapterConfig
           { queueName = queueName,
@@ -76,7 +78,9 @@ mkReadMessageSpec = describe "mkReadMessage" $ do
 -- | Tests for mkReadWithPoll
 mkReadWithPollSpec :: Spec
 mkReadWithPollSpec = describe "mkReadWithPoll" $ do
-  let Right queueName = parseQueueName "test_queue"
+  let queueName = case parseQueueName "test_queue" of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
       config =
         PgmqAdapterConfig
           { queueName = queueName,
@@ -118,7 +122,9 @@ mkReadWithPollSpec = describe "mkReadWithPoll" $ do
 -- | Tests for mkReadGrouped
 mkReadGroupedSpec :: Spec
 mkReadGroupedSpec = describe "mkReadGrouped" $ do
-  let Right queueName = parseQueueName "test_queue"
+  let queueName = case parseQueueName "test_queue" of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
       config =
         PgmqAdapterConfig
           { queueName = queueName,

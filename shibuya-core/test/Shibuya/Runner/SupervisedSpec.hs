@@ -11,9 +11,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
-  ( AppHandle (..),
-    QueueProcessor (..),
-    ShutdownConfig (..),
+  ( ShutdownConfig (..),
     SupervisionStrategy (..),
     mkProcessor,
     runApp,
@@ -27,9 +25,7 @@ import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master
-  ( Master,
-    getAllMetrics,
-    getProcessorMetrics,
+  ( getAllMetrics,
     startMaster,
     stopMaster,
   )
@@ -43,12 +39,11 @@ import Shibuya.Runner.Metrics
 import Shibuya.Runner.Supervised
   ( SupervisedProcessor (..),
     getMetrics,
-    getProcessorState,
     isDone,
     runSupervised,
     runWithMetrics,
   )
-import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import UnliftIO (SomeException, try)
@@ -274,7 +269,7 @@ spec = do
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
             -- Use Ahead with max 3 concurrent
-            sp <- runSupervised master 10 (ProcessorId "ahead-limit") (Ahead 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "ahead-limit") (Ahead 3) adapter handler
 
             liftIO $ threadDelay 1000000 -- 1s to let it complete
             stopMaster master
@@ -324,7 +319,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 10 (ProcessorId "async-limit") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "async-limit") (Async 3) adapter handler
 
             liftIO $ threadDelay 1000000 -- 1s
             stopMaster master
@@ -353,7 +348,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 10 (ProcessorId "halt-concurrent") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "halt-concurrent") (Async 3) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -381,7 +376,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 10 (ProcessorId "halt-stop-read") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "halt-stop-read") (Async 3) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -525,7 +520,7 @@ spec = do
 
           _ <- runEff $ runTracingNoop $ do
             -- Create an adapter where source throws after 3 messages
-            goodMessages <- createTestMessages 3
+            _goodMessages <- createTestMessages 3
             -- Use fromEffect to throw after yielding good messages
             let failingSource = Stream.unfoldrM step (0 :: Int)
                   where
@@ -588,7 +583,7 @@ spec = do
             master <- startMaster IgnoreAll
 
             -- Start 10 processors rapidly
-            sps <- forM [1 .. 10] $ \i -> do
+            _sps <- forM [(1 :: Int) .. 10] $ \i -> do
               messages <- createTestMessages 3
               let adapter = testAdapter messages
                   handler _ = do
@@ -610,7 +605,7 @@ spec = do
           countARef <- newIORef (0 :: Int)
           countBRef <- newIORef (0 :: Int)
 
-          result :: Either SomeException () <- try $ runEff $ runTracingNoop $ do
+          _ :: Either SomeException () <- try $ runEff $ runTracingNoop $ do
             messagesB <- createTestMessages 20
 
             -- Adapter A throws after 3 messages (ingester crash, not handler)
@@ -711,7 +706,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 100 (ProcessorId "load-test") (Async 10) adapter handler
+            _sp <- runSupervised master 100 (ProcessorId "load-test") (Async 10) adapter handler
 
             -- Wait for completion
             liftIO $ threadDelay 2000000 -- 2s

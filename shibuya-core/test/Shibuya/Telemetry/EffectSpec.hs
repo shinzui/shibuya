@@ -5,11 +5,10 @@ module Shibuya.Telemetry.EffectSpec (spec) where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (Text)
-import Effectful (IOE, liftIO, runEff, (:>))
+import Effectful (liftIO, runEff)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Telemetry.Effect
-  ( Tracing,
-    addAttribute,
+  ( addAttribute,
     addEvent,
     getTracer,
     isTracingEnabled,
@@ -88,16 +87,16 @@ spec = describe "Shibuya.Telemetry.Effect" $ do
           addAttribute traceSpan "string" ("value" :: Text)
           addAttribute traceSpan "int" (42 :: Int)
           addAttribute traceSpan "bool" True
-          pure "done"
-      result `shouldBe` "done"
+          pure ("done" :: String)
+      result `shouldBe` ("done" :: String)
 
     it "addEvent is a no-op" $ do
       result <- runEff $ runTracingNoop $ do
         withSpan' "test" consumerSpanArgs $ \traceSpan -> do
           addEvent traceSpan (mkEvent "event1" [])
           addEvent traceSpan (mkEvent "event2" [("key", OTel.toAttribute ("val" :: Text))])
-          pure "done"
-      result `shouldBe` "done"
+          pure ("done" :: String)
+      result `shouldBe` ("done" :: String)
 
     it "setStatus is a no-op" $ do
       result <- runEff $ runTracingNoop $ do
@@ -105,5 +104,5 @@ spec = describe "Shibuya.Telemetry.Effect" $ do
           setStatus traceSpan OTel.Ok
           setStatus traceSpan (OTel.Error "test error")
           setStatus traceSpan OTel.Unset
-          pure "done"
-      result `shouldBe` "done"
+          pure ("done" :: String)
+      result `shouldBe` ("done" :: String)

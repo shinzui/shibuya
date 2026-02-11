@@ -55,7 +55,7 @@ metricsBenchmarks :: Pool.Pool -> BenchConfig -> Benchmark
 metricsBenchmarks pool config =
   bgroup
     "metrics"
-    [ bench "single-queue" $ nfIO $ withSeededMultiQueue pool config 1 "metrics" 100 $ \qs -> runSingleMetrics pool (head qs),
+    [ bench "single-queue" $ nfIO $ withSeededMultiQueue pool config 1 "metrics" 100 $ \qs -> case qs of (q : _) -> runSingleMetrics pool q; [] -> error "empty queue list",
       bench "all-queues" $ nfIO $ withSeededMultiQueue pool config 4 "metrics" 100 $ \_ -> runAllMetrics pool
     ]
 

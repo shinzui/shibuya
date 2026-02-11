@@ -13,7 +13,7 @@ import BenchSetup
 import Data.Aeson (object, (.=))
 import Data.Text qualified as Text
 import Data.Vector qualified as V
-import Effectful (Eff, IOE, runEff, (:>))
+import Effectful (Eff, IOE, runEff)
 import Effectful.Error.Static (Error, runErrorNoCallStack)
 import Hasql.Pool qualified as Pool
 import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)

@@ -15,9 +15,7 @@ import Data.Aeson
     ToJSON (..),
     object,
     withObject,
-    withText,
     (.:),
-    (.:?),
     (.=),
   )
 import Data.Text (Text)

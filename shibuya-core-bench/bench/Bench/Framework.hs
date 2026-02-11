@@ -140,7 +140,7 @@ wrapAsIngested :: (IOE :> es) => [BenchMessage] -> Eff es [Ingested es BenchMess
 wrapAsIngested payloads = do
   now <- liftIO getCurrentTime
   tracking <- newTrackingAck
-  pure [mkIngested tracking now i p | (i, p) <- zip [1 ..] payloads]
+  pure [mkIngested tracking now i p | (i, p) <- zip [(1 :: Int) ..] payloads]
   where
     mkIngested tracking now i payload =
       let msgId = MessageId $ Text.pack $ show i

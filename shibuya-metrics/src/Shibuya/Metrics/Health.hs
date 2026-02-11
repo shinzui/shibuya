@@ -32,10 +32,8 @@ import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import Shibuya.Runner.Master (Master, getAllMetricsIO)
 import Shibuya.Runner.Metrics
   ( MetricsMap,
-    ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
-    StreamStats (..),
   )
 import System.Timeout (timeout)
 

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Shibuya.Adapter.Pgmq.PropertySpec (spec) where
 
 import Data.Aeson (Value (..))

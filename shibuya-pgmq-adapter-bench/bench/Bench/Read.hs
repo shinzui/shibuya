@@ -14,7 +14,7 @@ import Data.Vector qualified as V
 import Hasql.Pool qualified as Pool
 import Pgmq.Hasql.Sessions qualified as Pgmq
 import Pgmq.Hasql.Statements.Types qualified as Q
-import Pgmq.Types (Message (..), MessageId, QueueName)
+import Pgmq.Types (Message (..), QueueName)
 import Test.Tasty.Bench (Benchmark, bench, bgroup, nfIO)
 
 benchmarks :: Pool.Pool -> BenchConfig -> Benchmark

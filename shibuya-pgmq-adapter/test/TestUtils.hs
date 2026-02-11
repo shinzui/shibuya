@@ -17,7 +17,7 @@ where
 import Control.Concurrent (threadDelay)
 import Data.Aeson (Value)
 import Data.Int (Int64)
-import Effectful (Eff, IOE, runEff, (:>))
+import Effectful (Eff, IOE, runEff)
 import Effectful.Error.Static (Error, runErrorNoCallStack)
 import Hasql.Pool qualified as Pool
 import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)

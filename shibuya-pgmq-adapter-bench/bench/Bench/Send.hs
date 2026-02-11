@@ -10,7 +10,6 @@ import BenchSetup
     runSession,
   )
 import Data.Aeson (object, (.=))
-import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text qualified as Text
 import Hasql.Pool qualified as Pool
 import Pgmq.Hasql.Sessions qualified as Pgmq

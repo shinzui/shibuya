@@ -31,9 +31,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import Data.Time (secondsToDiffTime)
-import Data.Vector qualified as V
 import Data.Word (Word64)
-import Hasql.Connection qualified as Connection
 import Hasql.Connection.Setting qualified as Setting
 import Hasql.Connection.Setting.Connection qualified as Connection.Setting
 import Hasql.Pool qualified as Pool

@@ -76,7 +76,7 @@ runWithConcurrency concurrency mkHandler n = do
 
 -- | Wait for counter
 waitForCount :: IORef Int -> Int -> IO ()
-waitForCount counterRef expected = go 0
+waitForCount counterRef expected = go (0 :: Int)
   where
     go attempts = do
       count <- readIORef counterRef

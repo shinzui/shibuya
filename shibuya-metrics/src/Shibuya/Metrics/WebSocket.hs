@@ -20,11 +20,9 @@ import Control.Concurrent.STM
 import Control.Exception (finally)
 import Control.Monad (forever, when)
 import Data.Aeson (decode, encode)
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Data.Text (Text)
 import Network.WebSockets qualified as WS
 import Shibuya.Metrics.Config (MetricsServerConfig (..))
 import Shibuya.Metrics.Types (ClientMessage (..), ServerMessage (..))
@@ -202,7 +200,7 @@ pushLoop config master connState conn = forever $ do
         Nothing -> currentMetrics
         Just subs -> Map.filterWithKey (\pid _ -> Set.member pid subs) currentMetrics
   -- Send updates for changed processors
-  Map.traverseWithKey (sendIfChanged lastSent conn) filteredMetrics
+  _ <- Map.traverseWithKey (sendIfChanged lastSent conn) filteredMetrics
   -- Update last sent
   atomically $ writeTVar connState.lastMetrics filteredMetrics
 

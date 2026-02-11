@@ -30,9 +30,9 @@ import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Metrics (MetricsServerConfig (..), defaultConfig, withMetricsServer)
+import Shibuya.Metrics (defaultConfig, withMetricsServer)
 import Shibuya.Runner.Metrics (ProcessorState (..), StreamStats (..))
-import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
 

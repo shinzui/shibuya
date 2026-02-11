@@ -14,7 +14,6 @@ where
 
 import OpenTelemetry.Propagator.W3CTraceContext qualified as W3C
 import OpenTelemetry.Trace.Core (Span, SpanContext)
-import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Core.Types (TraceHeaders)
 
 -- | Extract SpanContext from W3C trace headers.
@@ -44,15 +43,9 @@ extractTraceContext headers =
 -- -- headers contains [("traceparent", "..."), ("tracestate", "...")]
 -- @
 injectTraceContext :: Span -> IO TraceHeaders
-injectTraceContext span = do
-  (traceparent, tracestate) <- W3C.encodeSpanContext span
+injectTraceContext otelSpan = do
+  (traceparent, tracestate) <- W3C.encodeSpanContext otelSpan
   pure
     [ ("traceparent", traceparent),
       ("tracestate", tracestate)
     ]
-
--- | Wrap a remote SpanContext as a Span for use as parent context.
--- This is useful when you have extracted a SpanContext and need to
--- set it as the current span in the context.
-wrapRemoteContext :: SpanContext -> Span
-wrapRemoteContext = OTel.wrapSpanContext

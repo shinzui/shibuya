@@ -13,7 +13,9 @@ spec = do
 -- | Tests for defaultConfig
 defaultConfigSpec :: Spec
 defaultConfigSpec = describe "defaultConfig" $ do
-  let Right queueName = parseQueueName "test_queue"
+  let queueName = case parseQueueName "test_queue" of
+        Right q -> q
+        Left e -> error $ "Unexpected: " <> show e
       config = defaultConfig queueName
 
   it "sets queueName from parameter" $ do
