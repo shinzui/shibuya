@@ -33,8 +33,7 @@ import Data.Word (Word64)
 import Effectful (IOE, liftIO, runEff, (:>))
 import Effectful.Error.Static (runErrorNoCallStack)
 import GHC.Stats (RTSStats (..), getRTSStats, getRTSStatsEnabled)
-import Hasql.Connection.Setting qualified as Setting
-import Hasql.Connection.Setting.Connection qualified as Connection.Setting
+import Hasql.Connection.Settings qualified as Settings
 import Hasql.Pool qualified as Pool
 import Hasql.Pool.Config qualified as PoolConfig
 import Pgmq.Effectful (runPgmq)
@@ -408,7 +407,7 @@ printResult result = do
 
 createPool :: BS.ByteString -> IO Pool.Pool
 createPool connStr = do
-  let connSettings = [Setting.connection (Connection.Setting.string (Text.pack (BS.unpack connStr)))]
+  let connSettings = Settings.connectionString (Text.pack (BS.unpack connStr))
       poolConfig =
         PoolConfig.settings
           [ PoolConfig.size 20,

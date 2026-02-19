@@ -28,12 +28,10 @@ import Database.Postgres.Temp
     with,
   )
 import Hasql.Connection qualified as Connection
-import Hasql.Connection.Setting qualified as Setting
-import Hasql.Connection.Setting.Connection qualified as Connection.Setting
+import Hasql.Connection.Settings qualified as Settings
 import Hasql.Pool qualified as Pool
 import Hasql.Pool.Config qualified as PoolConfig
 import Hasql.Session (Session)
-import Hasql.Session qualified as Session
 import Numeric (showHex)
 import Pgmq.Hasql.Sessions qualified as Pgmq
 import Pgmq.Migration qualified as Migration
@@ -111,12 +109,12 @@ runPgmqSession pool session = do
 -- | Install pgmq schema into a PostgreSQL database.
 installPgmqSchema :: ByteString -> IO ()
 installPgmqSchema connStr = do
-  let connSettings = [Setting.connection (Connection.Setting.string (TE.decodeUtf8 connStr))]
+  let connSettings = Settings.connectionString (TE.decodeUtf8 connStr)
   connResult <- Connection.acquire connSettings
   case connResult of
     Left err -> error $ "Failed to connect for migration: " <> show err
     Right conn -> do
-      result <- Session.run Migration.migrate conn
+      result <- Connection.use conn Migration.migrate
       Connection.release conn
       case result of
         Left sessionErr -> error $ "Migration session error: " <> show sessionErr
@@ -126,7 +124,7 @@ installPgmqSchema connStr = do
 -- | Create a connection pool from a connection string.
 createPool :: ByteString -> IO Pool.Pool
 createPool connStr = do
-  let connSettings = [Setting.connection (Connection.Setting.string (TE.decodeUtf8 connStr))]
+  let connSettings = Settings.connectionString (TE.decodeUtf8 connStr)
       poolConfig =
         PoolConfig.settings
           [ PoolConfig.size 10,
