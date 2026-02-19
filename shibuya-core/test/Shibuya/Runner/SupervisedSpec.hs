@@ -5,7 +5,7 @@ module Shibuya.Runner.SupervisedSpec (spec) where
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
 import Control.Monad (forM, replicateM)
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
@@ -230,7 +230,7 @@ spec = do
             messages <- createTestMessages 5
 
             let handler _ = do
-                  liftIO $ modifyIORef' countRef (+ 1)
+                  liftIO $ atomicModifyIORef' countRef (\n -> (n + 1, ()))
                   liftIO $ threadDelay 10000 -- 10ms
                   pure AckOk
 
@@ -254,16 +254,16 @@ spec = do
             messages <- createTestMessages 10
 
             let handler _ = do
-                  -- Increment current in-flight
-                  cur <- liftIO $ do
-                    modifyIORef' currentInFlightRef (+ 1)
-                    readIORef currentInFlightRef
+                  -- Atomically increment current in-flight and get new value
+                  cur <-
+                    liftIO $
+                      atomicModifyIORef' currentInFlightRef (\n -> let n' = n + 1 in (n', n'))
                   -- Update max
-                  liftIO $ modifyIORef' maxInFlightRef (\m -> max m cur)
+                  liftIO $ atomicModifyIORef' maxInFlightRef (\m -> (max m cur, ()))
                   -- Simulate some work
                   liftIO $ threadDelay 50000 -- 50ms
                   -- Decrement in-flight
-                  liftIO $ modifyIORef' currentInFlightRef (\c -> c - 1)
+                  liftIO $ atomicModifyIORef' currentInFlightRef (\c -> (c - 1, ()))
                   pure AckOk
 
             master <- startMaster IgnoreAll
@@ -286,7 +286,7 @@ spec = do
             messages <- createTestMessages 5
 
             let handler _ = do
-                  liftIO $ modifyIORef' countRef (+ 1)
+                  liftIO $ atomicModifyIORef' countRef (\n -> (n + 1, ()))
                   liftIO $ threadDelay 10000 -- 10ms
                   pure AckOk
 
@@ -309,12 +309,12 @@ spec = do
             messages <- createTestMessages 10
 
             let handler _ = do
-                  cur <- liftIO $ do
-                    modifyIORef' currentInFlightRef (+ 1)
-                    readIORef currentInFlightRef
-                  liftIO $ modifyIORef' maxInFlightRef (\m -> max m cur)
+                  cur <-
+                    liftIO $
+                      atomicModifyIORef' currentInFlightRef (\n -> let n' = n + 1 in (n', n'))
+                  liftIO $ atomicModifyIORef' maxInFlightRef (\m -> (max m cur, ()))
                   liftIO $ threadDelay 50000 -- 50ms
-                  liftIO $ modifyIORef' currentInFlightRef (\c -> c - 1)
+                  liftIO $ atomicModifyIORef' currentInFlightRef (\c -> (c - 1, ()))
                   pure AckOk
 
             master <- startMaster IgnoreAll
@@ -340,7 +340,7 @@ spec = do
                         _ -> 0
                   -- Simulate work
                   liftIO $ threadDelay 50000 -- 50ms
-                  liftIO $ modifyIORef' processedRef (msgNum :)
+                  liftIO $ atomicModifyIORef' processedRef (\xs -> (msgNum : xs, ()))
                   -- Halt on message 3
                   if msgNum == 3
                     then pure $ AckHalt (HaltFatal "halt on 3")
@@ -365,9 +365,9 @@ spec = do
             messages <- createTestMessages 20
 
             let handler _ = do
-                  count <- liftIO $ do
-                    modifyIORef' processedRef (+ 1)
-                    readIORef processedRef
+                  count <-
+                    liftIO $
+                      atomicModifyIORef' processedRef (\n -> let n' = n + 1 in (n', n'))
                   liftIO $ threadDelay 20000 -- 20ms
                   -- Halt after processing 5 messages
                   if count >= 5
@@ -400,11 +400,11 @@ spec = do
                   -- Message 2 throws an exception
                   if msgNum == 2
                     then do
-                      liftIO $ modifyIORef' resultsRef (Left "error on 2" :)
+                      liftIO $ atomicModifyIORef' resultsRef (\xs -> (Left "error on 2" : xs, ()))
                       error "Intentional failure on message 2"
                     else do
                       liftIO $ threadDelay 30000 -- 30ms
-                      liftIO $ modifyIORef' resultsRef (Right msgNum :)
+                      liftIO $ atomicModifyIORef' resultsRef (\xs -> (Right msgNum : xs, ()))
                       pure AckOk
 
             master <- startMaster IgnoreAll
@@ -492,11 +492,11 @@ spec = do
                         Just (CursorInt n) -> n
                         _ -> 0
                   -- Record start
-                  liftIO $ modifyIORef' startOrderRef (msgNum :)
+                  liftIO $ atomicModifyIORef' startOrderRef (\xs -> (msgNum : xs, ()))
                   -- Variable delay: message 1 is slowest, 5 is fastest
                   liftIO $ threadDelay ((6 - msgNum) * 20000)
                   -- Record completion
-                  liftIO $ modifyIORef' completeOrderRef (msgNum :)
+                  liftIO $ atomicModifyIORef' completeOrderRef (\xs -> (msgNum : xs, ()))
                   pure AckOk
 
             master <- startMaster IgnoreAll
@@ -587,7 +587,7 @@ spec = do
               messages <- createTestMessages 3
               let adapter = testAdapter messages
                   handler _ = do
-                    liftIO $ modifyIORef' countRef (+ 1)
+                    liftIO $ atomicModifyIORef' countRef (\n -> (n + 1, ()))
                     liftIO $ threadDelay 5000 -- 5ms
                     pure AckOk
               runSupervised master 10 (ProcessorId $ "concurrent-" <> Text.pack (show i)) Serial adapter handler
@@ -668,12 +668,12 @@ spec = do
                   let msgNum = case ingested.envelope.cursor of
                         Just (CursorInt n) -> n
                         _ -> 0
-                  liftIO $ modifyIORef' processedRef (+ 1)
+                  liftIO $ atomicModifyIORef' processedRef (\n -> (n + 1, ()))
                   liftIO $ threadDelay 30000 -- 30ms
                   -- Messages 2, 3, 4 all return halt
                   if msgNum `elem` [2, 3, 4]
                     then do
-                      liftIO $ modifyIORef' haltCountRef (+ 1)
+                      liftIO $ atomicModifyIORef' haltCountRef (\n -> (n + 1, ()))
                       pure $ AckHalt (HaltFatal $ "halt from " <> Text.pack (show msgNum))
                     else pure AckOk
 
@@ -701,7 +701,7 @@ spec = do
             messages <- createTestMessages 500
 
             let handler _ = do
-                  liftIO $ modifyIORef' processedRef (+ 1)
+                  liftIO $ atomicModifyIORef' processedRef (\n -> (n + 1, ()))
                   pure AckOk
 
             master <- startMaster IgnoreAll
@@ -729,10 +729,10 @@ spec = do
                   -- Every 7th message fails
                   if msgNum `mod` 7 == 0
                     then do
-                      liftIO $ modifyIORef' failRef (+ 1)
+                      liftIO $ atomicModifyIORef' failRef (\n -> (n + 1, ()))
                       error "Intentional failure"
                     else do
-                      liftIO $ modifyIORef' successRef (+ 1)
+                      liftIO $ atomicModifyIORef' successRef (\n -> (n + 1, ()))
                       pure AckOk
 
             master <- startMaster IgnoreAll
