@@ -1,6 +1,6 @@
 -- | Temporary PostgreSQL setup for integration tests.
 --
--- Uses tmp-postgres to create an ephemeral PostgreSQL instance
+-- Uses ephemeral-pg to create an ephemeral PostgreSQL instance
 -- and pgmq-migration to install the pgmq schema.
 module TmpPostgres
   ( -- * Test Execution
@@ -16,17 +16,11 @@ module TmpPostgres
 where
 
 import Control.Exception (bracket)
-import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Text.Encoding qualified as TE
 import Data.Time (secondsToDiffTime)
 import Data.Word (Word64)
-import Database.Postgres.Temp
-  ( StartError,
-    toConnectionString,
-    with,
-  )
+import EphemeralPg (StartError, connectionSettings, with)
 import Hasql.Connection qualified as Connection
 import Hasql.Connection.Settings qualified as Settings
 import Hasql.Pool qualified as Pool
@@ -51,14 +45,14 @@ data TestFixture = TestFixture
 -- and then runs the provided action with a connection pool.
 withPgmqDb :: (Pool.Pool -> IO a) -> IO (Either StartError a)
 withPgmqDb action = with $ \db -> do
-  let connStr = toConnectionString db
+  let connSettings = connectionSettings db
 
   -- Install pgmq schema
-  installPgmqSchema connStr
+  installPgmqSchema connSettings
 
   -- Create and use connection pool
   bracket
-    (createPool connStr)
+    (createPool connSettings)
     Pool.release
     action
 
@@ -107,9 +101,8 @@ runPgmqSession pool session = do
     Right a -> pure a
 
 -- | Install pgmq schema into a PostgreSQL database.
-installPgmqSchema :: ByteString -> IO ()
-installPgmqSchema connStr = do
-  let connSettings = Settings.connectionString (TE.decodeUtf8 connStr)
+installPgmqSchema :: Settings.Settings -> IO ()
+installPgmqSchema connSettings = do
   connResult <- Connection.acquire connSettings
   case connResult of
     Left err -> error $ "Failed to connect for migration: " <> show err
@@ -121,11 +114,10 @@ installPgmqSchema connStr = do
         Right (Left migrationErr) -> error $ "Migration error: " <> show migrationErr
         Right (Right ()) -> pure ()
 
--- | Create a connection pool from a connection string.
-createPool :: ByteString -> IO Pool.Pool
-createPool connStr = do
-  let connSettings = Settings.connectionString (TE.decodeUtf8 connStr)
-      poolConfig =
+-- | Create a connection pool from connection settings.
+createPool :: Settings.Settings -> IO Pool.Pool
+createPool connSettings = do
+  let poolConfig =
         PoolConfig.settings
           [ PoolConfig.size 10,
             PoolConfig.acquisitionTimeout (secondsToDiffTime 10),

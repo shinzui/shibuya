@@ -32,12 +32,6 @@ source-repository-package
   tag: 451dc8cbd800a644090791f64cdf0d4dc9b848ca
   subdir: pgmq-migration
 
--- tmp-postgres from GitHub (not on Hackage)
-source-repository-package
-  type: git
-  location: https://github.com/jfischoff/tmp-postgres
-  tag: 7f2467a6d6d5f6db7eed59919a6773fe006cf22b
-
 -- hs-opentelemetry from GitHub (main branch for GHC 9.12 support)
 source-repository-package
   type: git

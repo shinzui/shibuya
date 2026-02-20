@@ -102,6 +102,7 @@ test-suite shibuya-pgmq-adapter-test
     base ^>=4.21.0.0,
     bytestring,
     effectful-core,
+    ephemeral-pg,
     hasql ^>=1.10,
     hasql-pool ^>=1.4,
     hspec ^>=2.11,
@@ -118,5 +119,4 @@ test-suite shibuya-pgmq-adapter-test
     streamly-core ^>=0.3,
     text,
     time,
-    tmp-postgres,
     vector,
