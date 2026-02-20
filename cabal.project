@@ -7,9 +7,7 @@ packages:
   shibuya-pgmq-adapter-bench
   shibuya-pgmq-example
 
--- Use local NQE with Streamly support
 optional-packages:
-  /Users/shinzui/Keikaku/hub/haskell/nqe/nqe.cabal
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-core/pgmq-core.cabal
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-hasql/pgmq-hasql.cabal
   /Users/shinzui/Keikaku/bokuno/libraries/haskell/pgmq-hs/pgmq-effectful/pgmq-effectful.cabal
