@@ -34,6 +34,8 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | NQE Supervision | ✅ Implemented |
 | Concurrent Processing (Ahead/Async) | ✅ Implemented |
 | OpenTelemetry Tracing | ✅ Implemented |
+| Graceful Shutdown (drain timeout) | ✅ Implemented |
+| Policy Validation | ✅ Implemented |
 
 ## Installation
 
@@ -52,7 +54,7 @@ build-depends:
 module Main where
 
 import Shibuya.App
-import Shibuya.Adapter.Postgres (postgresAdapter)  -- or your adapter of choice
+import Shibuya.Telemetry.Effect (runTracingNoop)
 import Effectful
 import Effectful.Concurrent (runConcurrent)
 
@@ -64,9 +66,9 @@ data OrderEvent = OrderEvent
   deriving (Generic, FromJSON)
 
 -- Your handler - just return what should happen
-handleOrder :: Handler '[IOE] OrderEvent
+handleOrder :: Handler es OrderEvent
 handleOrder ingested = do
-  let order = payload (envelope ingested)
+  let order = ingested.envelope.payload
 
   result <- liftIO $ processOrder order
 
@@ -75,12 +77,12 @@ handleOrder ingested = do
     Left err  -> AckRetry (RetryDelay 30)   -- Retry in 30 seconds
 
 main :: IO ()
-main = runEff . runConcurrent $ do
-  pool <- createConnectionPool "postgresql://localhost/mydb"
-
+main = runEff . runConcurrent . runTracingNoop $ do
   let ordersProcessor = QueueProcessor
-        { adapter = postgresAdapter pool "orders_queue"
+        { adapter = myAdapter       -- your adapter of choice
         , handler = handleOrder
+        , ordering = Unordered
+        , concurrency = Serial
         }
 
   result <- runApp IgnoreFailures 100
@@ -108,7 +110,7 @@ AckHalt (HaltFatal reason)         -- Stop processing entirely
 ```haskell
 -- runApp takes:
 --   SupervisionStrategy - How to handle processor failures
---   Natural             - Inbox size for backpressure
+--   Int                 - Inbox size for backpressure
 --   [(ProcessorId, QueueProcessor es)] - Named processors
 
 result <- runApp
@@ -117,6 +119,12 @@ result <- runApp
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   ]
+
+-- QueueProcessor fields:
+--   adapter     - Queue backend (source stream + shutdown)
+--   handler     - Your message handler
+--   ordering    - Unordered | StrictInOrder
+--   concurrency - Serial | Ahead Natural | Async Natural
 ```
 
 ## Distributed Tracing
@@ -182,14 +190,18 @@ Configure tracing via standard OpenTelemetry environment variables:
 Run multiple independent queues concurrently with `runApp`:
 
 ```haskell
-main = runEff . runConcurrent $ do
+main = runEff . runConcurrent . runTracingNoop $ do
   let ordersProcessor = QueueProcessor
-        { adapter = sqsAdapter "orders-queue"
+        { adapter = ordersAdapter
         , handler = handleOrders
+        , ordering = Unordered
+        , concurrency = Async 10    -- 10 concurrent handlers
         }
       eventsProcessor = QueueProcessor
-        { adapter = kafkaAdapter "events-topic"
+        { adapter = eventsAdapter
         , handler = handleEvents
+        , ordering = Unordered
+        , concurrency = Serial
         }
 
   result <- runApp IgnoreFailures 100
@@ -205,7 +217,7 @@ main = runEff . runConcurrent $ do
       forM_ (Map.toList metrics) $ \(ProcessorId name, pm) ->
         putStrLn $ name <> ": " <> show pm.stats.processed <> " processed"
 
-      -- Wait for completion or use stopApp to shut down
+      -- Wait for completion or use stopApp/stopAppGracefully to shut down
       waitApp appHandle
 ```
 
@@ -213,31 +225,7 @@ main = runEff . runConcurrent $ do
 
 - [Usage Guide](docs/USAGE_GUIDE.md) - Detailed usage examples
 - [Architecture](docs/UNIFIED_ARCHITECTURE.md) - System design and module structure
-
-## Project Structure
-
-```
-shibuya-core/
-├── Shibuya/
-│   ├── Core.hs              -- Public API (import this)
-│   ├── Core/
-│   │   ├── Types.hs         -- MessageId, Cursor, Envelope
-│   │   ├── Ack.hs           -- AckDecision, RetryDelay, DeadLetterReason
-│   │   ├── Lease.hs         -- Visibility timeout extension
-│   │   ├── AckHandle.hs     -- Ack finalization
-│   │   ├── Ingested.hs      -- What handlers receive
-│   │   └── Error.hs         -- Structured error types
-│   ├── Handler.hs           -- Handler type
-│   ├── Adapter.hs           -- Adapter interface
-│   ├── Policy.hs            -- Ordering and concurrency policies
-│   ├── Runner/
-│   │   ├── Master.hs        -- Supervision coordinator
-│   │   ├── Supervised.hs    -- Supervised processor runner
-│   │   ├── Metrics.hs       -- ProcessorState, StreamStats
-│   │   └── Ingester.hs      -- Stream to inbox ingestion
-│   ├── App.hs               -- runApp, QueueProcessor, AppHandle
-│   └── Stream.hs            -- Stream utilities
-```
+- [Architecture Details](docs/architecture/) - Core types, message flow, metrics, concurrency
 
 ## Design Principles
 
