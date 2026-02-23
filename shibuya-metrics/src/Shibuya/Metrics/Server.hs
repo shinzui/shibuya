@@ -48,7 +48,8 @@ startMetricsServerWithDeps config master depChecks = do
   let app = combinedApp config master wsState depChecks
       settings =
         Warp.setPort config.port $
-          Warp.setHost "*" $
+          Warp.setHost
+            "*"
             Warp.defaultSettings
   serverAsync <- async $ Warp.runSettings settings app
   pure
@@ -67,11 +68,10 @@ withMetricsServer ::
   Master ->
   (MetricsServer -> IO a) ->
   IO a
-withMetricsServer config master action =
+withMetricsServer config master =
   bracket
     (startMetricsServer config master)
     stopMetricsServer
-    action
 
 -- | Combined WAI application routing to all endpoints.
 combinedApp ::

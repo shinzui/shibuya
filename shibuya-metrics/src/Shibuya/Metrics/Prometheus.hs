@@ -74,8 +74,7 @@ renderType name typ =
     <> Builder.char8 '\n'
 
 renderGaugeMetrics :: Text -> (ProcessorMetrics -> Double) -> MetricsMap -> Builder.Builder
-renderGaugeMetrics name getValue metrics =
-  Map.foldMapWithKey (renderMetric name getValue) metrics
+renderGaugeMetrics name getValue = Map.foldMapWithKey (renderMetric name getValue)
 
 renderMetric :: Text -> (ProcessorMetrics -> Double) -> ProcessorId -> ProcessorMetrics -> Builder.Builder
 renderMetric name getValue (ProcessorId pid) pm =

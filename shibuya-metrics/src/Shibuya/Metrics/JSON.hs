@@ -98,5 +98,4 @@ routeRequest config master depChecks path = case path of
           object ["error" .= ("Not found" :: Text)]
 
 jsonResponse :: Status -> LBS.ByteString -> Response
-jsonResponse status body =
-  responseLBS status [(hContentType, "application/json")] body
+jsonResponse status = responseLBS status [(hContentType, "application/json")]

@@ -27,6 +27,7 @@ where
 
 import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import Shibuya.Runner.Master (Master, getAllMetricsIO)
@@ -143,7 +144,7 @@ checkLiveness :: HealthConfig -> Master -> IO LivenessStatus
 checkLiveness config master = do
   -- Try to query metrics with timeout
   result <- timeout config.livenessTimeoutMicros $ getAllMetricsIO master
-  pure $ LivenessStatus {alive = maybe False (const True) result}
+  pure $ LivenessStatus {alive = isJust result}
 
 -- | Check readiness - are all processors healthy and dependencies available?
 -- This is suitable for Kubernetes readiness probes.
