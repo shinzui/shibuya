@@ -74,7 +74,7 @@ module Shibuya.Adapter.Pgmq
   )
 where
 
-import Control.Concurrent.STM (TVar, atomically, newTVarIO, readTVar, writeTVar)
+import Control.Concurrent.STM (TVar, atomically, newTVarIO, readTVarIO, writeTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value)
 import Effectful (Eff, IOE, (:>))
@@ -164,5 +164,5 @@ takeUntilShutdown ::
   Stream (Eff es) a
 takeUntilShutdown shutdownVar =
   Stream.takeWhileM $ \_ -> do
-    isShutdown <- liftIO $ atomically $ readTVar shutdownVar
+    isShutdown <- liftIO $ readTVarIO shutdownVar
     pure (not isShutdown)

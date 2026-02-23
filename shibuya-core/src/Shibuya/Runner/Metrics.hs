@@ -63,7 +63,7 @@ instance FromJSON InFlightInfo where
 
 -- | Create empty in-flight info with given max concurrency.
 emptyInFlightInfo :: Int -> InFlightInfo
-emptyInFlightInfo maxConc = InFlightInfo 0 maxConc
+emptyInFlightInfo = InFlightInfo 0
 
 -- | Processor runtime state.
 data ProcessorState

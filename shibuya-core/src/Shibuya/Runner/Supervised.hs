@@ -242,7 +242,7 @@ runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
     -- Ingester: run until stream exhausts, then signal done
     -- Use finally to ensure streamDoneVar is always set, even if ingester fails
     let ingesterWithSignal =
-          (runInIO $ runIngesterWithMetrics metricsVar adapter.source inbox)
+          runInIO (runIngesterWithMetrics metricsVar adapter.source inbox)
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \_ ->
