@@ -7,31 +7,6 @@ packages:
   shibuya-pgmq-adapter-bench
   shibuya-pgmq-example
 
--- pgmq-hs from GitHub (not on Hackage)
-source-repository-package
-  type: git
-  location: https://github.com/topagentnetwork/pgmq-hs
-  tag: 451dc8cbd800a644090791f64cdf0d4dc9b848ca
-  subdir: pgmq-core
-
-source-repository-package
-  type: git
-  location: https://github.com/topagentnetwork/pgmq-hs
-  tag: 451dc8cbd800a644090791f64cdf0d4dc9b848ca
-  subdir: pgmq-hasql
-
-source-repository-package
-  type: git
-  location: https://github.com/topagentnetwork/pgmq-hs
-  tag: 451dc8cbd800a644090791f64cdf0d4dc9b848ca
-  subdir: pgmq-effectful
-
-source-repository-package
-  type: git
-  location: https://github.com/topagentnetwork/pgmq-hs
-  tag: 451dc8cbd800a644090791f64cdf0d4dc9b848ca
-  subdir: pgmq-migration
-
 -- hs-opentelemetry from GitHub (main branch for GHC 9.12 support)
 source-repository-package
   type: git
