@@ -183,7 +183,7 @@ Version 0.1.0.0 (pre-release). Key features implemented:
 - AckHalt stops processing with halt isolation
 - Metrics and introspection
 - NQE supervision
-
-Not yet implemented:
-- Async/Ahead concurrency modes (Serial only)
-- Policy validation enforcement
+- Serial/Ahead/Async concurrency modes
+- Policy validation enforcement (StrictInOrder requires Serial)
+- OpenTelemetry tracing integration
+- Graceful shutdown with drain timeout
