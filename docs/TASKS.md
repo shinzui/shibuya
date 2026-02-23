@@ -1,5 +1,9 @@
 # Shibuya Implementation Tasks
 
+> **Historical Document**
+>
+> This was the original implementation task tracker. Some details (field name prefixes like `envId`/`ssReceived`/`pmState`, `AppError` constructors, test counts) have diverged as the codebase evolved. Phase 11 has been partially fulfilled by the `shibuya-pgmq-adapter` package. See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for current types and architecture.
+
 This document breaks down the Shibuya framework into atomic, testable tasks. Each task is designed to be completed independently with its own tests.
 
 ## Progress Summary
@@ -21,7 +25,7 @@ This document breaks down the Shibuya framework into atomic, testable tasks. Eac
 | Phase 11: Postgres Adapter | ⏳ Pending | - |
 | Phase 12: Kafka Adapter | ⏳ Pending | - |
 
-**Total: 42 tests passing**
+**Total: 91 tests passing**
 
 ### Recent Updates
 - **Phase 9.5**: Added `QueueProcessor` existential type, `AppHandle` for introspection, and unified `runApp` for multi-queue processing with supervision.

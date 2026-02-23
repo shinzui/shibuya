@@ -12,12 +12,23 @@ newtype ProcessorId = ProcessorId { unProcessorId :: Text }
 
 Unique identifier for each processor. Used as key in MetricsMap.
 
+### InFlightInfo
+
+```haskell
+data InFlightInfo = InFlightInfo
+  { inFlight       :: !Int
+  , maxConcurrency :: !Int
+  }
+```
+
+Tracks the number of handlers currently executing and the configured concurrency limit.
+
 ### ProcessorState
 
 ```haskell
 data ProcessorState
   = Idle
-  | Processing !Int !UTCTime
+  | Processing !InFlightInfo !UTCTime
   | Failed !Text !UTCTime
   | Stopped
 ```
@@ -25,7 +36,7 @@ data ProcessorState
 | State | Meaning |
 |-------|---------|
 | `Idle` | Waiting for next message |
-| `Processing count time` | Currently processing message #count |
+| `Processing info time` | Currently processing (tracks in-flight count and max concurrency) |
 | `Failed msg time` | Last processing failed with error |
 | `Stopped` | Processor has been stopped |
 
@@ -105,11 +116,20 @@ done <- isDone sp
 ### From Master
 
 ```haskell
-getAllMetrics       :: Master -> Eff es MetricsMap
-getProcessorMetrics :: Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
+getAllMetrics        :: (IOE :> es) => Master -> Eff es MetricsMap
+getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
 ```
 
 Direct access via Master handle.
+
+### IO Accessor Functions
+
+For use outside of the `Eff` monad (e.g., from Prometheus metrics callbacks):
+
+```haskell
+getAllMetricsIO        :: Master -> IO MetricsMap
+getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
+```
 
 ## Metrics Flow
 
@@ -163,21 +183,17 @@ monitorLoop appHandle = do
 
 ## Supervision Strategies
 
-From NQE's `Strategy`:
+Shibuya defines its own `SupervisionStrategy` type that maps to NQE strategies internally:
 
 ```haskell
-data Strategy
-  = Notify (Listen (Child, Maybe SomeException))
-  | KillAll
-  | IgnoreGraceful
-  | IgnoreAll
+data SupervisionStrategy
+  = IgnoreFailures     -- Other processors continue if one fails
+  | StopAllOnFailure   -- All processors stop if any fails
 ```
 
-| Strategy | On Child Failure |
-|----------|-----------------|
-| `Notify callback` | Notify via callback, continue others |
-| `KillAll` | Kill all children |
-| `IgnoreGraceful` | Ignore normal exits, notify on exceptions |
-| `IgnoreAll` | Ignore all exits |
+| SupervisionStrategy | NQE Strategy | Behavior |
+|---------------------|--------------|----------|
+| `IgnoreFailures` | `IgnoreAll` | Keep running, ignore dead children |
+| `StopAllOnFailure` | `KillAll` | Stop all children and propagate exception |
 
-Recommended: `IgnoreAll` for most queue processing (let individual messages fail without affecting others).
+Recommended: `IgnoreFailures` for most queue processing (let individual processors fail without affecting others).

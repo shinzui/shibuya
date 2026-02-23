@@ -29,11 +29,12 @@ Optional position/offset in ordered streams. Used for:
 
 ```haskell
 data Envelope msg = Envelope
-  { messageId  :: !MessageId
-  , cursor     :: !(Maybe Cursor)
-  , partition  :: !(Maybe Text)
-  , enqueuedAt :: !(Maybe UTCTime)
-  , payload    :: !msg
+  { messageId    :: !MessageId
+  , cursor       :: !(Maybe Cursor)
+  , partition    :: !(Maybe Text)
+  , enqueuedAt   :: !(Maybe UTCTime)
+  , traceContext :: !(Maybe TraceHeaders)
+  , payload      :: !msg
   }
 ```
 
@@ -45,7 +46,16 @@ Normalized message container. Adapters convert queue-specific formats into `Enve
 | `cursor` | Position in stream (optional) |
 | `partition` | Partition key for ordered delivery (optional) |
 | `enqueuedAt` | When message was queued (optional) |
+| `traceContext` | W3C trace context headers for distributed tracing (optional) |
 | `payload` | The actual message data |
+
+### TraceHeaders
+
+```haskell
+type TraceHeaders = [(ByteString, ByteString)]
+```
+
+W3C Trace Context headers for distributed tracing. Typically contains `"traceparent"` and optionally `"tracestate"` headers. Used by the telemetry layer to propagate trace context across queue boundaries.
 
 ## What Handlers Receive
 
@@ -81,13 +91,12 @@ Adapter-provided callback. The framework calls `finalize` after the handler retu
 
 ```haskell
 data Lease es = Lease
-  { extend   :: Eff es ()
-  , cancel   :: Eff es ()
-  , timeLeft :: Eff es NominalDiffTime
+  { leaseId     :: !Text
+  , leaseExtend :: NominalDiffTime -> Eff es ()
   }
 ```
 
-For queues with visibility timeouts (SQS). Handlers can extend their lease for long-running work.
+For queues with visibility timeouts (SQS). Handlers can extend their lease for long-running work by calling `leaseExtend` with a duration.
 
 ## Ack Decisions
 
@@ -161,3 +170,55 @@ Adapters provide:
 - A name for observability
 - A stream of ingested messages
 - A shutdown action for cleanup
+
+## In-Flight Tracking
+
+### InFlightInfo
+
+```haskell
+data InFlightInfo = InFlightInfo
+  { inFlight       :: !Int
+  , maxConcurrency :: !Int
+  }
+```
+
+Tracks concurrent handler executions. Used in the `Processing` state of `ProcessorState`.
+
+| Field | Purpose |
+|-------|---------|
+| `inFlight` | Number of handlers currently executing |
+| `maxConcurrency` | Configured concurrency limit (1 for Serial) |
+
+## Error Types
+
+### Shibuya.Core.Error
+
+```haskell
+data PolicyError
+  = InvalidPolicyCombo !Text
+
+data HandlerError
+  = HandlerException !Text
+  | HandlerTimeout
+
+data RuntimeError
+  = SupervisorFailed !Text
+  | InboxOverflow
+```
+
+Error types used to categorize failures in the framework:
+
+| Type | Purpose |
+|------|---------|
+| `PolicyError` | Invalid ordering/concurrency policy combinations |
+| `HandlerError` | Handler threw an exception or timed out |
+| `RuntimeError` | Supervisor failures or inbox overflow |
+
+These are wrapped by `AppError` in `Shibuya.App`:
+
+```haskell
+data AppError
+  = AppPolicyError !PolicyError
+  | AppHandlerError !HandlerError
+  | AppRuntimeError !RuntimeError
+```

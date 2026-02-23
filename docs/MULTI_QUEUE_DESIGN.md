@@ -1,8 +1,8 @@
 # Multi-Queue Processing Design
 
-> **Status: ✅ Implemented**
+> **Historical Design Document**
 >
-> This design has been implemented. See `Shibuya.App` for the API.
+> This was the original design document for multi-queue processing. The feature has been implemented but some details (supervision strategy names, `QueueProcessor` fields, `AppError` constructors) have diverged from this document. See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for the current architecture.
 
 ## Overview
 

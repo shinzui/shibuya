@@ -41,7 +41,11 @@ main = runEff . runConcurrent $ do
   let ordersProcessor = QueueProcessor
         { adapter = postgresAdapter pool "orders_queue"
         , handler = handleOrder
+        , ordering = Unordered
+        , concurrency = Serial
         }
+  -- Or use the convenience constructor with Serial/Unordered defaults:
+  -- let ordersProcessor = mkProcessor (postgresAdapter pool "orders_queue") handleOrder
 
   -- 3. Run with supervision!
   result <- runApp IgnoreFailures 100
@@ -148,8 +152,9 @@ handleEvent ingested = do
 ```haskell
 -- runApp signature:
 runApp
-  :: SupervisionStrategy               -- How to handle processor failures
-  -> Natural                           -- Inbox size for backpressure
+  :: (IOE :> es, Tracing :> es)
+  => SupervisionStrategy               -- How to handle processor failures
+  -> Int                               -- Inbox size for backpressure
   -> [(ProcessorId, QueueProcessor es)] -- Named processors
   -> Eff es (Either AppError (AppHandle es))
 ```
@@ -215,19 +220,10 @@ import Shibuya.App
 
 main :: IO ()
 main = runEff . runConcurrent $ do
-  -- Define your processors
-  let ordersProcessor = QueueProcessor
-        { adapter = ordersAdapter
-        , handler = handleOrders
-        }
-      notificationsProcessor = QueueProcessor
-        { adapter = notificationsAdapter
-        , handler = handleNotifications
-        }
-      analyticsProcessor = QueueProcessor
-        { adapter = analyticsAdapter
-        , handler = handleAnalytics
-        }
+  -- Define your processors (using mkProcessor for Serial/Unordered defaults)
+  let ordersProcessor = mkProcessor ordersAdapter handleOrders
+      notificationsProcessor = mkProcessor notificationsAdapter handleNotifications
+      analyticsProcessor = mkProcessor analyticsAdapter handleAnalytics
 
   -- Run all processors under supervision
   result <- runApp IgnoreFailures 100
@@ -260,22 +256,27 @@ metrics <- getAppMetrics appHandle
 
 ```haskell
 data ProcessorMetrics = ProcessorMetrics
-  { state     :: ProcessorState  -- Current state
-  , stats     :: StreamStats     -- Cumulative statistics
-  , startedAt :: UTCTime         -- When processor started
+  { state     :: !ProcessorState  -- Current state
+  , stats     :: !StreamStats     -- Cumulative statistics
+  , startedAt :: !UTCTime         -- When processor started
+  }
+
+data InFlightInfo = InFlightInfo
+  { inFlight       :: !Int   -- Currently processing
+  , maxConcurrency :: !Int   -- Configured max (1 for Serial)
   }
 
 data ProcessorState
-  = Idle                      -- Waiting for messages
-  | Processing Int UTCTime    -- (active count, last activity)
-  | Failed Text UTCTime       -- (error message, when)
+  = Idle                            -- Waiting for messages
+  | Processing !InFlightInfo !UTCTime -- (in-flight info, last activity)
+  | Failed !Text !UTCTime           -- (error message, when)
   | Stopped
 
 data StreamStats = StreamStats
-  { received  :: Int  -- Total messages received
-  , dropped   :: Int  -- Dropped due to backpressure
-  , processed :: Int  -- Successfully processed
-  , failed    :: Int  -- Failed processing
+  { received  :: !Int  -- Total messages received
+  , dropped   :: !Int  -- Dropped due to backpressure
+  , processed :: !Int  -- Successfully processed
+  , failed    :: !Int  -- Failed processing
   }
 ```
 
@@ -353,10 +354,7 @@ main :: IO ()
 main = runEff . runConcurrent $ do
   pool <- liftIO $ createConnectionPool "postgresql://localhost/orders"
 
-  let ordersProcessor = QueueProcessor
-        { adapter = postgresAdapter pool "order_events"
-        , handler = handleOrder
-        }
+  let ordersProcessor = mkProcessor (postgresAdapter pool "order_events") handleOrder
 
   liftIO $ putStrLn "Starting order processor..."
 
@@ -390,13 +388,43 @@ result <- runApp IgnoreFailures 100 processors
 result <- runApp StopAllOnFailure 100 processors
 ```
 
+## Graceful Shutdown
+
+Use `ShutdownConfig` and `stopAppGracefully` for controlled shutdown with drain timeout:
+
+```haskell
+data ShutdownConfig = ShutdownConfig
+  { drainTimeout :: !NominalDiffTime
+  }
+
+defaultShutdownConfig :: ShutdownConfig  -- 30 second drain timeout
+
+-- Returns True if shutdown completed within the timeout
+stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
+```
+
+Example:
+
+```haskell
+-- Graceful shutdown with custom timeout
+let config = ShutdownConfig { drainTimeout = 60 }  -- 60 seconds
+success <- stopAppGracefully config appHandle
+unless success $
+  liftIO $ putStrLn "Warning: shutdown timed out, some messages may not have been processed"
+```
+
+## Error Handling
+
+### AppError
+
+```haskell
+data AppError
+  = AppPolicyError !PolicyError      -- Invalid ordering/concurrency combination
+  | AppHandlerError !HandlerError    -- Handler exception or timeout
+  | AppRuntimeError !RuntimeError    -- Supervisor failure or inbox overflow
+```
+
 ## Current Limitations (v0.1.0-alpha)
-
-### Concurrency Modes
-
-All message processing is currently **serial** (one message at a time per processor). The `Ahead` and `Async` concurrency modes defined in `Policy.hs` are planned for a future release.
-
-For concurrent message fetching, configure your `Adapter` stream using Streamly's concurrent combinators (e.g., `parMapM`). See [CONCURRENCY.md](architecture/CONCURRENCY.md) for details on the concurrency model.
 
 ### Restart Semantics
 

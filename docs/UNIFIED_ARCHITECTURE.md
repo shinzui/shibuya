@@ -58,8 +58,9 @@ Shibuya is a supervised queue processing framework for Haskell, inspired by [Bro
 Shibuya/
 ├── Core.hs                 -- Re-exports public API
 ├── Core/
-│   ├── Types.hs           -- MessageId, Cursor, Envelope
+│   ├── Types.hs           -- MessageId, Cursor, Envelope, TraceHeaders
 │   ├── Ack.hs             -- AckDecision, RetryDelay, DeadLetterReason
+│   ├── Error.hs           -- PolicyError, HandlerError, RuntimeError
 │   ├── Lease.hs           -- Optional lease for visibility timeout
 │   ├── AckHandle.hs       -- Effectful ack finalization
 │   └── Ingested.hs        -- Complete message bundle for handlers
@@ -68,14 +69,22 @@ Shibuya/
 ├── Adapter/
 │   └── Mock.hs            -- Mock adapter for testing
 ├── Policy.hs              -- Ordering and Concurrency policies
+├── Prelude.hs             -- Common imports
+├── Telemetry.hs           -- Telemetry re-exports
+├── Telemetry/
+│   ├── Config.hs          -- TracingConfig
+│   ├── Effect.hs          -- Tracing effect for OpenTelemetry spans
+│   ├── Propagation.hs     -- W3C trace context propagation
+│   └── Semantic.hs        -- OpenTelemetry semantic conventions
 ├── Runner/
 │   ├── Metrics.hs         -- ProcessorState, StreamStats, ProcessorMetrics
 │   ├── Master.hs          -- Master process (NQE supervision + metrics)
 │   ├── Supervised.hs      -- Supervised processor runner
 │   ├── Serial.hs          -- Simple sequential runner
 │   ├── Ingester.hs        -- Stream to inbox bridge
-│   └── Processor.hs       -- Inbox to handler bridge
-├── Stream.hs              -- Stream utilities
+│   ├── Processor.hs       -- Inbox to handler bridge
+│   └── Halt.hs            -- Halt handling
+├── Stream.hs              -- Stream utilities (polling, batch, filter)
 └── App.hs                 -- Top-level entry point (runApp)
 ```
 
@@ -92,8 +101,10 @@ module Shibuya.Core.Types
   ( MessageId(..)
   , Cursor(..)
   , Envelope(..)
+  , TraceHeaders
   ) where
 
+import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Time (UTCTime)
 
@@ -107,13 +118,17 @@ data Cursor
   | CursorText !Text
   deriving stock (Eq, Ord, Show)
 
+-- | W3C Trace Context headers for distributed tracing
+type TraceHeaders = [(ByteString, ByteString)]
+
 -- | Normalized message envelope (Broadway.Message equivalent)
 data Envelope msg = Envelope
-  { messageId  :: !MessageId
-  , cursor     :: !(Maybe Cursor)
-  , partition  :: !(Maybe Text)
-  , enqueuedAt :: !(Maybe UTCTime)
-  , payload    :: !msg
+  { messageId    :: !MessageId
+  , cursor       :: !(Maybe Cursor)
+  , partition    :: !(Maybe Text)
+  , enqueuedAt   :: !(Maybe UTCTime)
+  , traceContext :: !(Maybe TraceHeaders)
+  , payload      :: !msg
   }
   deriving stock (Eq, Show, Functor, Generic)
 ```
@@ -316,9 +331,9 @@ data Concurrency
 
 -- | Validate policy combinations
 -- Invariant: StrictInOrder => Serial
-validatePolicy :: Ordering -> Concurrency -> Either Text ()
-validatePolicy StrictInOrder (Ahead _) = Left "StrictInOrder requires Serial concurrency"
-validatePolicy StrictInOrder (Async _) = Left "StrictInOrder requires Serial concurrency"
+validatePolicy :: Ordering -> Concurrency -> Either PolicyError ()
+validatePolicy StrictInOrder (Ahead _) = Left (InvalidPolicyCombo "StrictInOrder requires Serial concurrency")
+validatePolicy StrictInOrder (Async _) = Left (InvalidPolicyCombo "StrictInOrder requires Serial concurrency")
 validatePolicy _ _ = Right ()
 ```
 
@@ -335,11 +350,16 @@ module Shibuya.App
   ( -- * Running Processors
     runApp
   , QueueProcessor(..)
+  , mkProcessor
   , AppHandle(..)
     -- * AppHandle Operations
   , getAppMetrics
   , stopApp
+  , stopAppGracefully
   , waitApp
+    -- * Shutdown
+  , ShutdownConfig(..)
+  , defaultShutdownConfig
     -- * Errors
   , AppError(..)
     -- * Supervision
@@ -353,9 +373,14 @@ module Shibuya.App
 -- The message type is existentially hidden, allowing heterogeneous queues.
 data QueueProcessor es where
   QueueProcessor ::
-    { adapter :: Adapter es msg
-    , handler :: Handler es msg
+    { adapter     :: Adapter es msg
+    , handler     :: Handler es msg
+    , ordering    :: Ordering
+    , concurrency :: Concurrency
     } -> QueueProcessor es
+
+-- | Convenience constructor with Serial/Unordered defaults.
+mkProcessor :: Adapter es msg -> Handler es msg -> QueueProcessor es
 
 -- | Handle for a running multi-queue application.
 data AppHandle es = AppHandle
@@ -363,18 +388,24 @@ data AppHandle es = AppHandle
   , processors :: !(Map ProcessorId (SupervisedProcessor, QueueProcessor es))
   }
 
+-- | Shutdown configuration.
+data ShutdownConfig = ShutdownConfig
+  { drainTimeout :: !NominalDiffTime
+  }
+
+defaultShutdownConfig :: ShutdownConfig
+
 data AppError
-  = PolicyValidationError !Text
-  | AdapterError !Text
-  | HandlerError !Text
-  | RuntimeError !Text
+  = AppPolicyError !PolicyError
+  | AppHandlerError !HandlerError
+  | AppRuntimeError !RuntimeError
   deriving stock (Eq, Show)
 
 -- | Run queue processors concurrently under NQE supervision.
 runApp
-  :: (IOE :> es)
+  :: (IOE :> es, Tracing :> es)
   => SupervisionStrategy               -- ^ How to handle processor failures
-  -> Natural                           -- ^ Inbox size for backpressure
+  -> Int                               -- ^ Inbox size for backpressure
   -> [(ProcessorId, QueueProcessor es)] -- ^ Named processors
   -> Eff es (Either AppError (AppHandle es))
 
@@ -383,6 +414,9 @@ getAppMetrics :: (IOE :> es) => AppHandle es -> Eff es MetricsMap
 
 -- | Gracefully stop all processors.
 stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
+
+-- | Gracefully stop with drain timeout. Returns True if completed within timeout.
+stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
 
 -- | Wait for all processors to complete.
 waitApp :: (IOE :> es) => AppHandle es -> Eff es ()
@@ -409,28 +443,35 @@ module Shibuya.Runner.Metrics
 newtype ProcessorId = ProcessorId { unProcessorId :: Text }
   deriving stock (Eq, Ord, Show, Generic)
 
+-- | In-flight tracking for concurrent processing
+data InFlightInfo = InFlightInfo
+  { inFlight       :: !Int   -- Currently processing
+  , maxConcurrency :: !Int   -- Configured max (1 for Serial)
+  }
+  deriving stock (Eq, Show, Generic)
+
 -- | Processor runtime state
 data ProcessorState
-  = Idle                        -- Waiting for messages
-  | Processing !Int !UTCTime    -- Currently processing (count, last activity)
-  | Failed !Text !UTCTime       -- Failed with error
-  | Stopped                     -- Processor has been stopped
+  = Idle                              -- Waiting for messages
+  | Processing !InFlightInfo !UTCTime -- Currently processing (in-flight info, last activity)
+  | Failed !Text !UTCTime             -- Failed with error
+  | Stopped                           -- Processor has been stopped
   deriving stock (Eq, Show, Generic)
 
 -- | Stream statistics
 data StreamStats = StreamStats
-  { ssReceived  :: !Int   -- Messages received from stream
-  , ssDropped   :: !Int   -- Messages dropped (backpressure)
-  , ssProcessed :: !Int   -- Messages successfully processed
-  , ssFailed    :: !Int   -- Messages that failed processing
+  { received  :: !Int   -- Messages received from stream
+  , dropped   :: !Int   -- Messages dropped (backpressure)
+  , processed :: !Int   -- Messages successfully processed
+  , failed    :: !Int   -- Messages that failed processing
   }
   deriving stock (Eq, Show, Generic)
 
 -- | Combined processor metrics
 data ProcessorMetrics = ProcessorMetrics
-  { pmState     :: !ProcessorState
-  , pmStats     :: !StreamStats
-  , pmStartedAt :: !UTCTime
+  { state     :: !ProcessorState
+  , stats     :: !StreamStats
+  , startedAt :: !UTCTime
   }
   deriving stock (Eq, Show, Generic)
 
@@ -468,13 +509,13 @@ data MasterMessage
 
 -- | Master handle
 data Master = Master
-  { masterAsync :: Async ()
-  , masterState :: MasterState
-  , masterInbox :: Inbox MasterMessage
+  { handle :: !(Async ())
+  , state  :: !MasterState
+  , inbox  :: !(Inbox MasterMessage)
   }
 
 -- | Start the master process
-startMaster :: (IOE :> es) => SupervisionStrategy -> Eff es Master
+startMaster :: (IOE :> es) => Strategy -> Eff es Master
 
 -- | Stop the master and all child processors
 stopMaster :: (IOE :> es) => Master -> Eff es ()
@@ -499,10 +540,10 @@ module Shibuya.Runner.Supervised
 
 -- | Handle for a supervised processor
 data SupervisedProcessor = SupervisedProcessor
-  { spMetrics     :: TVar ProcessorMetrics
-  , spProcessorId :: ProcessorId
-  , spDone        :: TVar Bool
-  , spChild       :: Maybe (Async ())
+  { metrics     :: !(TVar ProcessorMetrics)
+  , processorId :: !ProcessorId
+  , done        :: !(TVar Bool)
+  , child       :: !(Maybe (Async ()))
   }
 
 -- | Run processor under Master's supervision
@@ -583,18 +624,12 @@ Common stream transformations for use with adapters.
 
 ```haskell
 module Shibuya.Stream
-  ( pollingStream
+  ( -- * Stream Sources
+    pollingStream
+    -- * Transformations
   , batchStream
   , filterStream
-  , rateLimitStream
   ) where
-
-import Streamly.Data.Stream (Stream)
-import Streamly.Data.Stream qualified as Stream
-import Streamly.Data.Fold qualified as Fold
-import Data.Time (NominalDiffTime)
-import Effectful (Eff, IOE, liftIO)
-import Control.Concurrent (threadDelay)
 
 -- | Create a polling stream from a poll action
 pollingStream
@@ -602,29 +637,12 @@ pollingStream
   => Int                    -- ^ Poll interval (microseconds)
   -> Eff es (Maybe msg)     -- ^ Poll action
   -> Stream (Eff es) msg
-pollingStream interval poll =
-  Stream.catMaybes $
-    Stream.repeatM $ do
-      mmsg <- poll
-      case mmsg of
-        Nothing -> liftIO (threadDelay interval) >> pure Nothing
-        Just msg -> pure (Just msg)
 
 -- | Batch messages into chunks
 batchStream :: Int -> Stream m msg -> Stream m [msg]
-batchStream n = Stream.foldMany (Fold.take n Fold.toList)
 
--- | Filter messages
+-- | Filter messages based on a predicate
 filterStream :: (msg -> Bool) -> Stream m msg -> Stream m msg
-filterStream = Stream.filter
-
--- | Rate limit (messages per second)
-rateLimitStream
-  :: (IOE :> es)
-  => Int                     -- ^ Max messages per second
-  -> Stream (Eff es) msg
-  -> Stream (Eff es) msg
-rateLimitStream msgsPerSec = undefined -- Implementation uses IORef for timing
 ```
 
 ---
@@ -649,7 +667,7 @@ Each layer can be tested independently:
 | Runner | Integration with mock adapter |
 | App | Full integration tests |
 
-Current test count: **45 tests passing**
+Current test count: **91 tests passing**
 
 ---
 
@@ -689,11 +707,12 @@ postgresStream pool queueName = pollingStream 100_000 $ do
 jobToIngested :: ConnectionPool -> Job -> Ingested es JobPayload
 jobToIngested pool job = Ingested
   { envelope = Envelope
-      { messageId  = MessageId (jobId job)
-      , cursor     = Just (CursorInt (jobPosition job))
-      , partition  = Nothing
-      , enqueuedAt = Just (jobCreatedAt job)
-      , payload    = jobPayload job
+      { messageId    = MessageId (jobId job)
+      , cursor       = Just (CursorInt (jobPosition job))
+      , partition    = Nothing
+      , enqueuedAt   = Just (jobCreatedAt job)
+      , traceContext = Nothing
+      , payload      = jobPayload job
       }
   , ack = AckHandle $ \decision -> case decision of
       AckOk -> liftIO $ markComplete pool (jobId job)

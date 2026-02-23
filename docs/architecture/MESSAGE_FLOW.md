@@ -53,8 +53,8 @@ Each queue processor runs in its own independent pipeline:
 
 ```
 runApp strategy inboxSize
-  [ (ProcessorId "orders", QueueProcessor ordersAdapter ordersHandler)
-  , (ProcessorId "events", QueueProcessor eventsAdapter eventsHandler)
+  [ (ProcessorId "orders", mkProcessor ordersAdapter ordersHandler)
+  , (ProcessorId "events", mkProcessor eventsAdapter eventsHandler)
   ]
 
                     │

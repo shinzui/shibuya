@@ -1,5 +1,9 @@
 # Use Case: Supervised Queue Processors with Streamly Streaming
 
+> **Historical Design Document**
+>
+> This is a pre-implementation design sketch that uses raw NQE/Streamly APIs directly. The actual Shibuya framework wraps these with its own types (`SupervisionStrategy`, `Adapter`, `Handler`, `AckDecision`, etc.). See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for the current architecture.
+
 This document presents an alternative architecture for the queue processors use case, leveraging Streamly for stream-based message ingestion.
 
 ## Motivation

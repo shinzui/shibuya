@@ -222,7 +222,12 @@ Uses Streamly's `parMapM (maxBuffer n . ordered True)` internally.
 
 **Usage:**
 ```haskell
-QueueProcessor adapter handler PartitionedInOrder (Ahead 3)
+QueueProcessor
+  { adapter     = myAdapter
+  , handler     = myHandler
+  , ordering    = PartitionedInOrder
+  , concurrency = Ahead 3
+  }
 ```
 
 ---
@@ -264,7 +269,12 @@ Uses Streamly's `parMapM (maxBuffer n)` (without `ordered`).
 
 **Usage:**
 ```haskell
-QueueProcessor adapter handler Unordered (Async 10)
+QueueProcessor
+  { adapter     = myAdapter
+  , handler     = myHandler
+  , ordering    = Unordered
+  , concurrency = Async 10
+  }
 ```
 
 ---

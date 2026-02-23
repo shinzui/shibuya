@@ -114,7 +114,7 @@ Test modules mirror source structure in `test/Shibuya/`.
 | `Shibuya/Runner/Supervised.hs` | Core processing loop with metrics |
 | `Shibuya/Runner/Master.hs` | Supervisor coordination |
 | `Shibuya/Core/Ack.hs` | AckDecision and related types |
-| `docs/plans/PRIORITY_1_CRITICAL_FIXES.md` | Current development priorities |
+| `docs/plans/archive/PRIORITY_1_CRITICAL_FIXES.md` | Historical development priorities (archived) |
 
 ## Local Development Environment
 

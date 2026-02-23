@@ -83,14 +83,14 @@ Adapter.source (Stream)
 ## Quick Example
 
 ```haskell
-import Shibuya.Core
+import Shibuya.App
 
 main :: IO ()
 main = runEff $ do
   result <- runApp
-    OneForOne           -- Supervision strategy
+    IgnoreFailures      -- Supervision strategy
     100                 -- Inbox size (backpressure)
-    [ (ProcessorId "orders", QueueProcessor ordersAdapter ordersHandler)
+    [ (ProcessorId "orders", mkProcessor ordersAdapter ordersHandler)
     ]
 
   case result of
