@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.1.0-alpha)
+### Current Status (v0.1.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.1.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -39,12 +39,16 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 
 ## Installation
 
-Add to your `cabal` file:
+Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to your `cabal` file:
 
 ```cabal
 build-depends:
-    shibuya-core
+    shibuya-core ^>=0.1.0.0
 ```
+
+Optional packages:
+- [`shibuya-metrics`](https://hackage.haskell.org/package/shibuya-metrics) — HTTP/JSON, Prometheus, and WebSocket metrics endpoints
+- [`shibuya-pgmq-adapter`](https://hackage.haskell.org/package/shibuya-pgmq-adapter) — PostgreSQL message queue adapter
 
 ## Quick Start
 
@@ -244,4 +248,4 @@ main = runEff . runConcurrent . runTracingNoop $ do
 
 ## License
 
-BSD-3-Clause
+MIT
