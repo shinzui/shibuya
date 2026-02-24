@@ -178,7 +178,7 @@ curl -s "http://127.0.0.1:16686/api/traces?service=shibuya-consumer&limit=5" | j
 
 ## Development Status
 
-Version 0.1.0.0 (pre-release). Key features implemented:
+Version 0.1.0.0 — published on [Hackage](https://hackage.haskell.org/package/shibuya-core-0.1.0.0) (pre-release). Key features implemented:
 - Backpressure via bounded inbox
 - AckHalt stops processing with halt isolation
 - Metrics and introspection
