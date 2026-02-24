@@ -8,7 +8,10 @@ description:
 
 author: Nadeem Bitar
 maintainer: nadeem@gmail.com
+license: MIT
 build-type: Simple
+category: Concurrency
+extra-doc-files: CHANGELOG.md
 
 common warnings
   ghc-options: -Wall
@@ -42,13 +45,13 @@ library
     async ^>=2.2,
     base ^>=4.21.0.0,
     bytestring ^>=0.12,
-    containers,
+    containers ^>=0.7,
     http-types ^>=0.12,
     prometheus-client ^>=1.1,
     shibuya-core ^>=0.1.0.0,
-    stm,
+    stm ^>=2.5,
     text ^>=2.1,
-    time,
+    time ^>=1.14,
     unliftio ^>=0.2,
     wai ^>=3.2,
     wai-websockets ^>=3.0,
