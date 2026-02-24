@@ -58,31 +58,68 @@ module Shibuya.Adapter.Pgmq
     PgmqAdapterConfig (..),
     PollingConfig (..),
     DeadLetterConfig (..),
+    DeadLetterTarget (..),
     FifoConfig (..),
     FifoReadStrategy (..),
     PrefetchConfig (..),
+
+    -- * Smart Constructors
+    directDeadLetter,
+    topicDeadLetter,
 
     -- * Defaults
     defaultConfig,
     defaultPollingConfig,
     defaultPrefetchConfig,
 
+    -- * Topic Management (pgmq 1.11.0+)
+    bindQueueTopics,
+    unbindQueueTopics,
+    listQueueTopicBindings,
+    testTopicRouting,
+
     -- * Re-exports from pgmq
     QueueName,
     parseQueueName,
     queueNameToText,
+
+    -- ** Topic Types (pgmq 1.11.0+)
+    RoutingKey,
+    parseRoutingKey,
+    routingKeyToText,
+    TopicPattern,
+    parseTopicPattern,
+    topicPatternToText,
+    TopicBinding (..),
+    RoutingMatch (..),
   )
 where
 
 import Control.Concurrent.STM (TVar, atomically, newTVarIO, readTVarIO, writeTVar)
+import Control.Monad (forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value)
 import Effectful (Eff, IOE, (:>))
 import Pgmq.Effectful.Effect (Pgmq)
-import Pgmq.Types (QueueName, parseQueueName, queueNameToText)
+import Pgmq.Effectful.Effect qualified as PgmqEff
+import Pgmq.Hasql.Statements.Types qualified as PgmqTypes
+import Pgmq.Types
+  ( QueueName,
+    RoutingKey,
+    RoutingMatch (..),
+    TopicBinding (..),
+    TopicPattern,
+    parseQueueName,
+    parseRoutingKey,
+    parseTopicPattern,
+    queueNameToText,
+    routingKeyToText,
+    topicPatternToText,
+  )
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Pgmq.Config
   ( DeadLetterConfig (..),
+    DeadLetterTarget (..),
     FifoConfig (..),
     FifoReadStrategy (..),
     PgmqAdapterConfig (..),
@@ -91,6 +128,8 @@ import Shibuya.Adapter.Pgmq.Config
     defaultConfig,
     defaultPollingConfig,
     defaultPrefetchConfig,
+    directDeadLetter,
+    topicDeadLetter,
   )
 import Shibuya.Adapter.Pgmq.Internal (pgmqSource, pgmqSourceWithPrefetch)
 import Streamly.Data.Stream (Stream)
@@ -166,3 +205,59 @@ takeUntilShutdown shutdownVar =
   Stream.takeWhileM $ \_ -> do
     isShutdown <- liftIO $ readTVarIO shutdownVar
     pure (not isShutdown)
+
+--------------------------------------------------------------------------------
+-- Topic Management (pgmq 1.11.0+)
+--------------------------------------------------------------------------------
+
+-- | Bind multiple topic patterns to a queue.
+-- Each pattern is bound idempotently (re-binding an existing pattern is a no-op).
+--
+-- Example:
+--
+-- @
+-- bindQueueTopics ordersQueueName
+--   [ pattern | Right pattern <- [parseTopicPattern "orders.#", parseTopicPattern "*.created"] ]
+-- @
+bindQueueTopics ::
+  (Pgmq :> es) =>
+  QueueName ->
+  [TopicPattern] ->
+  Eff es ()
+bindQueueTopics queueName patterns =
+  forM_ patterns $ \tp ->
+    PgmqEff.bindTopic
+      PgmqTypes.BindTopic
+        { topicPattern = tp,
+          queueName = queueName
+        }
+
+-- | Unbind multiple topic patterns from a queue.
+-- Returns silently for patterns that were not bound.
+unbindQueueTopics ::
+  (Pgmq :> es) =>
+  QueueName ->
+  [TopicPattern] ->
+  Eff es ()
+unbindQueueTopics queueName patterns =
+  forM_ patterns $ \tp ->
+    PgmqEff.unbindTopic
+      PgmqTypes.UnbindTopic
+        { topicPattern = tp,
+          queueName = queueName
+        }
+
+-- | List all topic bindings for a specific queue.
+listQueueTopicBindings ::
+  (Pgmq :> es) =>
+  QueueName ->
+  Eff es [TopicBinding]
+listQueueTopicBindings = PgmqEff.listTopicBindingsForQueue
+
+-- | Test which queues a routing key would match, without sending any messages.
+-- Useful for validating topic routing configuration.
+testTopicRouting ::
+  (Pgmq :> es) =>
+  RoutingKey ->
+  Eff es [RoutingMatch]
+testTopicRouting = PgmqEff.testRouting

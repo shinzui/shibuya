@@ -53,6 +53,8 @@ import Pgmq.Effectful.Effect
     readWithPoll,
     sendMessage,
     sendMessageWithHeaders,
+    sendTopic,
+    sendTopicWithHeaders,
   )
 import Pgmq.Hasql.Statements.Types
   ( MessageQuery (..),
@@ -62,11 +64,14 @@ import Pgmq.Hasql.Statements.Types
     ReadWithPollMessage (..),
     SendMessage (..),
     SendMessageWithHeaders (..),
+    SendTopic (..),
+    SendTopicWithHeaders (..),
     VisibilityTimeoutQuery (..),
   )
 import Pgmq.Types qualified as Pgmq
 import Shibuya.Adapter.Pgmq.Config
   ( DeadLetterConfig (..),
+    DeadLetterTarget (..),
     FifoConfig (..),
     FifoReadStrategy (..),
     PgmqAdapterConfig (..),
@@ -185,27 +190,47 @@ mkAckHandle config msg = AckHandle $ \decision -> do
         Just dlqConfig -> do
           -- Send to DLQ with metadata, preserving trace context if present
           let dlqBody = mkDlqPayload msg reason dlqConfig.includeMetadata
-          -- Preserve original headers (including trace context) in DLQ message
-          case msg.headers of
-            Just headers -> do
-              -- Send with preserved headers for trace continuity
-              void $
-                sendMessageWithHeaders $
-                  SendMessageWithHeaders
-                    { queueName = dlqConfig.dlqQueueName,
-                      messageBody = dlqBody,
-                      messageHeaders = Pgmq.MessageHeaders headers,
-                      delay = Nothing
-                    }
-            Nothing ->
-              -- No headers to preserve, use simple send
-              void $
-                sendMessage $
-                  SendMessage
-                    { queueName = dlqConfig.dlqQueueName,
-                      messageBody = dlqBody,
-                      delay = Nothing
-                    }
+          case dlqConfig.dlqTarget of
+            DirectQueue dlqQueueName ->
+              -- Send directly to a specific DLQ
+              case msg.headers of
+                Just headers ->
+                  void $
+                    sendMessageWithHeaders $
+                      SendMessageWithHeaders
+                        { queueName = dlqQueueName,
+                          messageBody = dlqBody,
+                          messageHeaders = Pgmq.MessageHeaders headers,
+                          delay = Nothing
+                        }
+                Nothing ->
+                  void $
+                    sendMessage $
+                      SendMessage
+                        { queueName = dlqQueueName,
+                          messageBody = dlqBody,
+                          delay = Nothing
+                        }
+            TopicRoute routingKey ->
+              -- Route via topic pattern matching (pgmq 1.11.0+)
+              case msg.headers of
+                Just headers ->
+                  void $
+                    sendTopicWithHeaders $
+                      SendTopicWithHeaders
+                        { routingKey = routingKey,
+                          messageBody = dlqBody,
+                          messageHeaders = Pgmq.MessageHeaders headers,
+                          delay = Nothing
+                        }
+                Nothing ->
+                  void $
+                    sendTopic $
+                      SendTopic
+                        { routingKey = routingKey,
+                          messageBody = dlqBody,
+                          delay = Nothing
+                        }
           -- Delete from original queue
           void $ deleteMessage (MessageQuery queueName msgId)
     AckHalt _reason -> do

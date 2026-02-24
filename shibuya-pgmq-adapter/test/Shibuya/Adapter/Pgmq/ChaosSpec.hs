@@ -29,9 +29,9 @@ import Shibuya.Adapter.Pgmq
   ( PgmqAdapterConfig (..),
     PollingConfig (..),
     defaultConfig,
+    directDeadLetter,
     pgmqAdapter,
   )
-import Shibuya.Adapter.Pgmq.Config (DeadLetterConfig (..))
 import Shibuya.App
   ( ShutdownConfig (..),
     SupervisionStrategy (..),
@@ -148,7 +148,7 @@ poisonMessageSpec = describe "Poison messages" $ do
             { visibilityTimeout = 5,
               batchSize = 1,
               polling = StandardPolling {pollInterval = 0.1},
-              deadLetterConfig = Just DeadLetterConfig {dlqQueueName = dlqName, includeMetadata = True}
+              deadLetterConfig = Just $ directDeadLetter dlqName True
             }
 
     -- Run processor that dead-letters the message
@@ -218,7 +218,7 @@ poisonMessageSpec = describe "Poison messages" $ do
             { visibilityTimeout = 5,
               batchSize = 1,
               polling = StandardPolling {pollInterval = 0.1},
-              deadLetterConfig = Just DeadLetterConfig {dlqQueueName = dlqName, includeMetadata = True}
+              deadLetterConfig = Just $ directDeadLetter dlqName True
             }
 
     -- Run processor that dead-letters the message

@@ -40,11 +40,11 @@ import OpenTelemetry.Trace.Core qualified as OTel
 import Pgmq.Effectful (runPgmqTraced)
 import Pgmq.Effectful.Interpreter (PgmqError)
 import Shibuya.Adapter.Pgmq
-  ( DeadLetterConfig (..),
-    FifoConfig (..),
+  ( FifoConfig (..),
     FifoReadStrategy (..),
     PgmqAdapterConfig (..),
     PollingConfig (..),
+    directDeadLetter,
     pgmqAdapter,
   )
 import Shibuya.Adapter.Pgmq qualified as Pgmq
@@ -172,12 +172,7 @@ ordersAdapterConfig =
   (Pgmq.defaultConfig ordersQueueName)
     { batchSize = 5,
       polling = StandardPolling {pollInterval = 1},
-      deadLetterConfig =
-        Just
-          DeadLetterConfig
-            { dlqQueueName = dlqOrdersQueueName,
-              includeMetadata = True
-            },
+      deadLetterConfig = Just $ directDeadLetter dlqOrdersQueueName True,
       maxRetries = 3
     }
 
@@ -191,12 +186,7 @@ paymentsAdapterConfig =
           { maxPollSeconds = 10,
             pollIntervalMs = 100
           },
-      deadLetterConfig =
-        Just
-          DeadLetterConfig
-            { dlqQueueName = dlqPaymentsQueueName,
-              includeMetadata = True
-            },
+      deadLetterConfig = Just $ directDeadLetter dlqPaymentsQueueName True,
       fifoConfig =
         Just
           FifoConfig

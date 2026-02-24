@@ -8,6 +8,11 @@ module Shibuya.Adapter.Pgmq.Config
 
     -- * Dead-Letter Queue Configuration
     DeadLetterConfig (..),
+    DeadLetterTarget (..),
+
+    -- * Smart Constructors
+    directDeadLetter,
+    topicDeadLetter,
 
     -- * FIFO Configuration
     FifoConfig (..),
@@ -27,7 +32,7 @@ import Data.Int (Int32, Int64)
 import Data.Time (NominalDiffTime)
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
-import Pgmq.Types (QueueName)
+import Pgmq.Types (QueueName, RoutingKey)
 
 -- | Configuration for the PGMQ adapter.
 data PgmqAdapterConfig = PgmqAdapterConfig
@@ -70,16 +75,44 @@ data PollingConfig
       }
   deriving stock (Show, Eq, Generic)
 
+-- | Target for dead-lettered messages.
+data DeadLetterTarget
+  = -- | Send directly to a specific queue
+    DirectQueue !QueueName
+  | -- | Route via topic pattern matching (pgmq 1.11.0+).
+    -- Messages are sent using @pgmq.send_topic@ with the given routing key,
+    -- allowing fan-out to multiple DLQ consumers based on their topic bindings.
+    TopicRoute !RoutingKey
+  deriving stock (Show, Eq, Generic)
+
 -- | Configuration for dead-letter queue handling.
 -- When a message exceeds maxRetries or receives AckDeadLetter,
--- it will be sent to the configured DLQ.
+-- it will be sent to the configured target.
 data DeadLetterConfig = DeadLetterConfig
-  { -- | Name of the dead-letter queue
-    dlqQueueName :: !QueueName,
+  { -- | Where to send dead-lettered messages
+    dlqTarget :: !DeadLetterTarget,
     -- | Whether to include original message metadata in DLQ message
     includeMetadata :: !Bool
   }
   deriving stock (Show, Eq, Generic)
+
+-- | Create a dead-letter config targeting a specific queue directly.
+directDeadLetter :: QueueName -> Bool -> DeadLetterConfig
+directDeadLetter queueName metadata =
+  DeadLetterConfig
+    { dlqTarget = DirectQueue queueName,
+      includeMetadata = metadata
+    }
+
+-- | Create a dead-letter config using topic-based routing (pgmq 1.11.0+).
+-- Messages are sent via @pgmq.send_topic@ and delivered to all queues
+-- whose topic bindings match the routing key.
+topicDeadLetter :: RoutingKey -> Bool -> DeadLetterConfig
+topicDeadLetter routingKey metadata =
+  DeadLetterConfig
+    { dlqTarget = TopicRoute routingKey,
+      includeMetadata = metadata
+    }
 
 -- | FIFO queue configuration for ordered message processing.
 -- Requires pgmq 1.8.0+ with FIFO indexes.
