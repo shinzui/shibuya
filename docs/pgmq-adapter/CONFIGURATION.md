@@ -150,28 +150,41 @@ polling = LongPolling { maxPollSeconds = 10, pollIntervalMs = 100 }
 Configures dead-letter queue handling when messages fail permanently.
 
 ```haskell
+data DeadLetterTarget
+  = DirectQueue !QueueName   -- Send to a specific queue
+  | TopicRoute !RoutingKey   -- Route via topic pattern matching (pgmq 1.11.0+)
+
 data DeadLetterConfig = DeadLetterConfig
-  { dlqQueueName :: !QueueName,
+  { dlqTarget :: !DeadLetterTarget,
     includeMetadata :: !Bool
   }
+```
+
+### Smart Constructors
+
+```haskell
+directDeadLetter :: QueueName -> Bool -> DeadLetterConfig
+topicDeadLetter  :: RoutingKey -> Bool -> DeadLetterConfig
 ```
 
 ### Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `dlqQueueName` | `QueueName` | Name of the dead-letter queue. |
+| `dlqTarget` | `DeadLetterTarget` | Where to send dead-lettered messages. |
 | `includeMetadata` | `Bool` | Whether to include original message metadata. |
 
 ### Without DeadLetterConfig
 
 When `deadLetterConfig = Nothing`, dead-lettered messages are archived using pgmq's `archiveMessage`. They remain in the archive table but are not sent to a separate queue.
 
-### With DeadLetterConfig
+### With DirectQueue
 
-When configured, dead-lettered messages are:
-1. Sent to the DLQ with a new message body
-2. Deleted from the original queue
+Dead-lettered messages are sent directly to a specific queue and deleted from the original queue.
+
+### With TopicRoute (pgmq 1.11.0+)
+
+Dead-lettered messages are sent via `pgmq.send_topic` with the given routing key, delivering to all queues whose topic bindings match. See the [Dead-Letter Queues guide](../user/pgmq-dead-letter-queues.md) for detailed examples.
 
 ### DLQ Message Format
 
@@ -390,10 +403,7 @@ let config = (defaultConfig queueName)
       { batchSize = 10,
         visibilityTimeout = 30,
         polling = LongPolling { maxPollSeconds = 5, pollIntervalMs = 50 },
-        deadLetterConfig = Just DeadLetterConfig
-            { dlqQueueName = dlqName,
-              includeMetadata = True
-            },
+        deadLetterConfig = Just $ directDeadLetter dlqName True,
         maxRetries = 3,
         prefetchConfig = Just defaultPrefetchConfig
       }
@@ -417,10 +427,7 @@ let config = (defaultConfig queueName)
       { batchSize = 50,
         visibilityTimeout = 300,  -- 5 minutes (orders may take time)
         fifoConfig = Just FifoConfig { readStrategy = ThroughputOptimized },
-        deadLetterConfig = Just DeadLetterConfig
-            { dlqQueueName = ordersDlq,
-              includeMetadata = True
-            },
+        deadLetterConfig = Just $ directDeadLetter ordersDlq True,
         maxRetries = 3
       }
 ```

@@ -113,10 +113,17 @@ handleOrder ingested = do
 
 ```haskell
 let config = (defaultConfig queueName)
-      { deadLetterConfig = Just DeadLetterConfig
-          { dlqQueueName = dlqName,
-            includeMetadata = True
-          },
+      { deadLetterConfig = Just $ directDeadLetter dlqName True,
+        maxRetries = 3
+      }
+```
+
+### With Topic-Routed Dead-Letter (pgmq 1.11.0+)
+
+```haskell
+let Right routingKey = parseRoutingKey "dlq.orders.failed"
+let config = (defaultConfig queueName)
+      { deadLetterConfig = Just $ topicDeadLetter routingKey True,
         maxRetries = 3
       }
 ```
@@ -210,6 +217,7 @@ shibuya-pgmq-adapter/
 
 ## Related Documentation
 
+- [User Guides](../user/README.md) - Task-oriented guides for common use cases
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Data flow, design decisions, message lifecycle
 - [CONFIGURATION.md](./CONFIGURATION.md) - Complete configuration reference
 - [INTERNALS.md](./INTERNALS.md) - Implementation details for code auditing
