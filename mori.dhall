@@ -1,6 +1,6 @@
 let Schema =
-      https://raw.githubusercontent.com/shinzui/mori-schema/28dfc529336f0c92a846f074b5f19c6442394a84/package.dhall
-        sha256:dda2cb9c528a0edac9c5ba7aeb14517d153ec612ec70c30115bb6749f15df15b
+      https://raw.githubusercontent.com/shinzui/mori-schema/4412469f2960b8faa48c123451bf90c0d3400db3/package.dhall
+        sha256:2e416c2d8c28c0b3b217cab47cc6d9e8bb9bec34b87d476edbb0d6d0863d1401
 
 let emptyRuntime = { deployable = False, exposesApi = False }
 
@@ -20,6 +20,7 @@ in  { project =
       , lifecycle = Schema.Lifecycle.Active
       , domains = [ "concurrency", "queue-processing" ]
       , owners = [ "shinzui" ]
+      , origin = Schema.Origin.Own
       }
     , repos =
       [ { name = "shibuya"
