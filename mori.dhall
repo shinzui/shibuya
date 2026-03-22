@@ -1,6 +1,6 @@
 let Schema =
-      https://raw.githubusercontent.com/shinzui/mori-schema/4412469f2960b8faa48c123451bf90c0d3400db3/package.dhall
-        sha256:2e416c2d8c28c0b3b217cab47cc6d9e8bb9bec34b87d476edbb0d6d0863d1401
+      https://raw.githubusercontent.com/shinzui/mori-schema/58523ea11e120f3be1c978e509d67f51311a8280/package.dhall
+        sha256:e4acbb565c9f4e4b3831dabf084e50f8687dda780b7874ced90ae88d6f349f4f
 
 let emptyRuntime = { deployable = False, exposesApi = False }
 
@@ -37,8 +37,10 @@ in  { project =
         , path = Some "shibuya-core"
         , description = Some
             "Core framework: supervision, backpressure, ack semantics, and tracing"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Public
         , runtime = emptyRuntime
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           ]
@@ -51,8 +53,10 @@ in  { project =
         , path = Some "shibuya-metrics"
         , description = Some
             "HTTP/JSON, Prometheus, and WebSocket metrics endpoints"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Public
         , runtime = { deployable = False, exposesApi = True }
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           ]
@@ -65,8 +69,10 @@ in  { project =
         , path = Some "shibuya-pgmq-adapter"
         , description = Some
             "PGMQ adapter with visibility timeout leasing, retry handling, and DLQ support"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Public
         , runtime = emptyRuntime
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           , Schema.Dependency.ByName "shinzui/pgmq-hs"
@@ -81,8 +87,10 @@ in  { project =
         , path = Some "shibuya-example"
         , description = Some
             "Example demonstrating multi-processor setup with mock adapter"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = { deployable = True, exposesApi = False }
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
@@ -93,8 +101,10 @@ in  { project =
         , path = Some "shibuya-pgmq-example"
         , description = Some
             "Real-world example with PGMQ, OpenTelemetry tracing, and Prometheus metrics"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = { deployable = True, exposesApi = True }
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
@@ -105,8 +115,10 @@ in  { project =
         , path = Some "shibuya-core-bench"
         , description = Some
             "Benchmarks for framework overhead vs pure streamly"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = emptyRuntime
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
@@ -117,8 +129,10 @@ in  { project =
         , path = Some "shibuya-pgmq-adapter-bench"
         , description = Some
             "Throughput and concurrency benchmarks for the PGMQ adapter"
+        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = emptyRuntime
+        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
@@ -138,6 +152,7 @@ in  { project =
       ]
     , dependencies =
       [ "effectful/effectful"
+      , "composewell/streamly"
       , "shinzui/pgmq-hs"
       , "hasql/hasql"
       ]
@@ -173,6 +188,8 @@ in  { project =
           ]
         }
       ]
+    , skills = [] : List Schema.Skill
+    , subagents = [] : List Schema.Subagent
     , standards = [] : List Text
     , docs =
       [ { key = "architecture"
