@@ -98,8 +98,10 @@ createMockAdapter n = do
   runEff $ do
     msgs <- wrapAsIngested payloads
     let _adapter = listAdapter msgs
-    -- Force evaluation of messages to ensure they're created
-    length msgs `deepseq` pure (length msgs)
+    -- Force every envelope so the library-provided NFData instances for
+    -- Envelope, MessageId, and Cursor are exercised. If someone deletes
+    -- those instances from Shibuya.Core.Types this line stops compiling.
+    map (.envelope) msgs `deepseq` pure (length msgs)
 
 -- | Run messages through shibuya framework
 runShibuyaProcessing :: Int -> IO Int

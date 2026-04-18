@@ -44,16 +44,33 @@ full work of producing a value rather than just constructing a thunk.
       `shibuya-core/src/Shibuya/Core/Types.hs` and add `deepseq` to the
       `shibuya-core.cabal` library build-depends. (2026-04-18 — library builds clean,
       all 91 core tests pass.)
-- [ ] Milestone 2 — Demonstrate the instances work by removing any redundant orphan or
+- [x] Milestone 2 — Demonstrate the instances work by removing any redundant orphan or
       local derivation inside `shibuya-core-bench/` that is now satisfied by the library
       instances, rebuilding, and running the benchmark suite in smoke-test mode.
+      (2026-04-18 — replaced `length msgs \`deepseq\`` with `map (.envelope) msgs
+      \`deepseq\``; forces `NFData (Envelope BenchMessage)` on every run. Confirmed via
+      `cabal bench shibuya-core-bench --benchmark-options='-p mock-adapter-100'`.)
 - [ ] Milestone 3 — Record the addition in `CHANGELOG.md` under a new `Unreleased`
       section so downstream users know the instances are now available.
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+- 2026-04-18 — The Milestone 2 plan originally said to force the whole `[Ingested es
+  BenchMessage]` list via ``msgs `deepseq` ...``. That does not typecheck: `Ingested`
+  contains an `AckHandle es`, which is a `newtype` around a function
+  `AckDecision -> Eff es ()`. Functions do not have a useful `NFData` instance, and
+  deriving `NFData` for `AckHandle` via Generic fails for the same reason. The fix is
+  to force only the envelope component — ``map (.envelope) msgs `deepseq` ...`` — which
+  still exercises every new library-provided instance (`Envelope`, `MessageId`, and
+  transitively `Maybe Cursor`) and was the actual intent of the milestone. No library
+  change is needed; only the bench edit had to shift.
+
+- 2026-04-18 — `cabal run shibuya-core-bench` is ambiguous: the `shibuya-core-bench`
+  package ships both a `benchmark` component and an `executable standalone-test`, and
+  `cabal run` picks the executable. Use `cabal bench shibuya-core-bench
+  --benchmark-options='...'` to invoke tasty-bench with filters. The Concrete Steps
+  section is updated accordingly.
 
 
 ## Decision Log
@@ -273,11 +290,15 @@ Edits:
 
      with
 
-            msgs `deepseq` pure (length msgs)
+            map (.envelope) msgs `deepseq` pure (length msgs)
 
-     This change forces the entire `[Ingested es BenchMessage]` list, which in turn
-     forces each `Envelope BenchMessage` and its `MessageId`. It compiles only if
-     `NFData` instances are reachable for all three types.
+     This forces every `Envelope BenchMessage` in the list. Note: forcing the
+     `Ingested` values directly does **not** work because `Ingested` contains an
+     `AckHandle` that wraps a function, and functions have no useful `NFData` instance
+     (see Surprises & Discoveries for 2026-04-18). Forcing the envelopes still
+     exercises `NFData (Envelope _)`, `NFData MessageId`, and `NFData (Maybe Cursor)`
+     — exactly the new library instances — so any future regression still turns into
+     a compile-time error.
 
    Rationale: this keeps the benchmark meaningful (the number of messages is still what
    is returned), but makes the benchmark cover the library's new instances so any
@@ -287,20 +308,30 @@ Edits:
 3. Build and smoke-test:
 
         cabal build shibuya-core-bench
-        cabal run shibuya-core-bench -- --timeout 5 --stdev 1000 -p 'adapter-creation/mock-adapter-100'
+        cabal bench shibuya-core-bench \
+          --benchmark-options='--timeout 5 --stdev 1000 -p mock-adapter-100'
 
-   The `--timeout 5` and `--stdev 1000` flags make tasty-bench accept any timing
+   Use `cabal bench` (not `cabal run`): the `shibuya-core-bench` package ships a
+   separate `standalone-test` executable that `cabal run` resolves to by default.
+   The `--timeout 5` and `--stdev 1000` flags let tasty-bench accept any timing
    variance within five seconds of measurement — they exist so we do not pay the full
-   benchmark cost just to verify the change compiles and runs.
+   benchmark cost just to verify the change compiles and runs. The pattern
+   `mock-adapter-100` also matches `mock-adapter-1000` and `mock-adapter-10000`; that
+   is fine for a smoke test.
 
    Expected transcript (timings will vary):
 
         All
           framework-overhead
             adapter-creation
-              mock-adapter-100: OK
+              mock-adapter-100:   OK
+                14.6 μs ± 26 μs, 130 KB allocated, ...
+              mock-adapter-1000:  OK
+                167 μs ± 232 μs, 1.3 MB allocated, ...
+              mock-adapter-10000: OK
+                2.12 ms ± 3.6 ms, 14 MB allocated, ...
 
-        All 1 tests passed (5.01s)
+        All 3 tests passed (0.23s)
 
 4. Commit with the trailer:
 
@@ -385,9 +416,12 @@ All commands below are run from the repository root
 7. Build and smoke-test the benchmark:
 
         cabal build shibuya-core-bench
-        cabal run shibuya-core-bench -- --timeout 5 --stdev 1000 -p 'adapter-creation/mock-adapter-100'
+        cabal bench shibuya-core-bench \
+          --benchmark-options='--timeout 5 --stdev 1000 -p mock-adapter-100'
 
-   Expected: one benchmark runs and passes.
+   Expected: the three `mock-adapter-*` benchmarks run and pass. Using `cabal bench`
+   is important — `cabal run shibuya-core-bench` resolves to the package's
+   `standalone-test` executable instead.
 
 8. Format, stage, commit:
 
