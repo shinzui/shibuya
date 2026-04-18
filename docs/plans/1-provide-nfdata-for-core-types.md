@@ -50,8 +50,8 @@ full work of producing a value rather than just constructing a thunk.
       (2026-04-18 — replaced `length msgs \`deepseq\`` with `map (.envelope) msgs
       \`deepseq\``; forces `NFData (Envelope BenchMessage)` on every run. Confirmed via
       `cabal bench shibuya-core-bench --benchmark-options='-p mock-adapter-100'`.)
-- [ ] Milestone 3 — Record the addition in `CHANGELOG.md` under a new `Unreleased`
-      section so downstream users know the instances are now available.
+- [x] Milestone 3 — Record the addition in `CHANGELOG.md` under a new `Unreleased`
+      section so downstream users know the instances are now available. (2026-04-18)
 
 
 ## Surprises & Discoveries
@@ -102,7 +102,44 @@ full work of producing a value rather than just constructing a thunk.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Completed 2026-04-18 across three commits on `master`:
+
+1. `shibuya-core.cabal` gained a `deepseq ^>=1.5` library dependency and
+   `Shibuya.Core.Types` now derives `NFData` for `MessageId`, `Cursor`, and
+   `Envelope` via `deriving anyclass` atop the existing `Generic` instances.
+2. `shibuya-core-bench/bench/Bench/Framework.hs` was updated to force
+   `map (.envelope) msgs` in `createMockAdapter`, turning any future regression in
+   the library's `NFData` instances into a compile error.
+3. `CHANGELOG.md` got an `Unreleased` section announcing the addition.
+
+Validation:
+
+- `cabal build all` — succeeds with no new warnings.
+- `cabal test shibuya-core-test` — 91 examples, 0 failures.
+- `cabal bench shibuya-core-bench --benchmark-options='-p mock-adapter-100'` — all
+  3 matching benchmarks pass, exercising the new instances on every run.
+- Library-level REPL check (`rnf` on a fully populated `Envelope`) returns `()`
+  with no orphan declarations.
+- `rg 'NFData\s+(MessageId|Cursor|Envelope)'` against the source tree finds zero
+  orphan declarations outside this plan file.
+
+What was achieved vs. purpose: the stated "works out of the box" outcome is met.
+Downstream benchmarks can import `Shibuya.Core` and immediately use `nfIO`, `nf`,
+and `deepseq` on `MessageId`, `Cursor`, and `Envelope a` (where `a : NFData`)
+without declaring any orphans.
+
+Lessons learned:
+
+- The plan's original Milestone 2 instruction (`msgs `deepseq` ...`) would not have
+  typechecked because `Ingested` carries an `AckHandle` wrapping a function, and
+  function types have no meaningful `NFData` instance. The fix — force the
+  envelopes via `map (.envelope)` — is small and preserves the milestone's intent,
+  but worth recording for anyone who later considers making `Ingested` deeply
+  forceable. It probably cannot be without splitting the ack handle out of the
+  forceable portion of the record.
+- `cabal run <pkg>` is ambiguous when a package ships both an executable and a
+  benchmark. Prefer `cabal bench <pkg> --benchmark-options='...'` for tasty-bench
+  invocations.
 
 
 ## Context and Orientation
