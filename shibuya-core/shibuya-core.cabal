@@ -65,6 +65,7 @@ library
     base ^>=4.21.0.0,
     bytestring ^>=0.12.2.0,
     containers ^>=0.7,
+    deepseq ^>=1.5,
     effectful ^>=2.6.1.0,
     effectful-core ^>=2.6.1.0,
     generic-lens ^>=2.3.0.0,

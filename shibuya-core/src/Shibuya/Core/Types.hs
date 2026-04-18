@@ -16,6 +16,7 @@ module Shibuya.Core.Types
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import Data.String (IsString)
 import Shibuya.Prelude
@@ -25,6 +26,7 @@ import Shibuya.Prelude
 newtype MessageId = MessageId {unMessageId :: Text}
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (IsString)
+  deriving anyclass (NFData)
 
 -- | Optional cursor / offset / global position.
 -- Used to track position in ordered streams.
@@ -32,6 +34,7 @@ data Cursor
   = CursorInt !Int
   | CursorText !Text
   deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData)
 
 -- | W3C Trace Context headers for distributed tracing.
 -- Contains traceparent and optionally tracestate headers.
@@ -54,3 +57,4 @@ data Envelope msg = Envelope
     payload :: !msg
   }
   deriving stock (Eq, Show, Functor, Generic)
+  deriving anyclass (NFData)
