@@ -1,17 +1,17 @@
 let Schema =
-      https://raw.githubusercontent.com/shinzui/mori-schema/8415b4b8a746a84eecf982f0f1d7194368bf7b54/package.dhall
-        sha256:d19ae156d6c357d982a1aea0f1b6ba1f01d76d2d848545b150db75ed4c39a8a9
+      https://raw.githubusercontent.com/shinzui/mori-schema/ad9960dd3dd3b33eadd45f17bcf430b0e1ec13bc/package.dhall
+        sha256:83aa1432e98db5da81afde4ab2057dcab7ce4b2e883d0bc7f16c7d25b917dd0c
 
 let emptyRuntime = { deployable = False, exposesApi = False }
 
 let emptyDeps = [] : List Schema.Dependency
 
-let emptyDocs = [] : List Schema.DocRef
+let emptyDocs = [] : List Schema.DocRef.Type
 
-let emptyConfig = [] : List Schema.ConfigItem
+let emptyConfig = [] : List Schema.ConfigItem.Type
 
-in  { project =
-      { name = "shibuya"
+in  Schema.Project::{ project =
+      Schema.ProjectIdentity::{ name = "shibuya"
       , namespace = "shinzui"
       , type = Schema.PackageType.Library
       , description = Some
@@ -20,61 +20,47 @@ in  { project =
       , lifecycle = Schema.Lifecycle.Active
       , domains = [ "concurrency", "queue-processing" ]
       , owners = [ "shinzui" ]
-      , origin = Schema.Origin.Own
       }
     , repos =
-      [ { name = "shibuya"
+      [ Schema.Repo::{ name = "shibuya"
         , github = Some "shinzui/shibuya"
-        , gitlab = None Text
-        , git = None Text
         , localPath = Some "."
         }
       ]
     , packages =
-      [ { name = "shibuya-core"
+      [ Schema.Package::{ name = "shibuya-core"
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "shibuya-core"
         , description = Some
             "Core framework: supervision, backpressure, ack semantics, and tracing"
-        , lifecycle = None Schema.Lifecycle
-        , visibility = Schema.Visibility.Public
         , runtime = emptyRuntime
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           ]
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-metrics"
+      , Schema.Package::{ name = "shibuya-metrics"
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "shibuya-metrics"
         , description = Some
             "HTTP/JSON, Prometheus, and WebSocket metrics endpoints"
-        , lifecycle = None Schema.Lifecycle
-        , visibility = Schema.Visibility.Public
         , runtime = { deployable = False, exposesApi = True }
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           ]
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-pgmq-adapter"
+      , Schema.Package::{ name = "shibuya-pgmq-adapter"
         , type = Schema.PackageType.Library
         , language = Schema.Language.Haskell
         , path = Some "shibuya-pgmq-adapter"
         , description = Some
             "PGMQ adapter with visibility timeout leasing, retry handling, and DLQ support"
-        , lifecycle = None Schema.Lifecycle
-        , visibility = Schema.Visibility.Public
         , runtime = emptyRuntime
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies =
           [ Schema.Dependency.ByName "effectful/effectful"
           , Schema.Dependency.ByName "shinzui/pgmq-hs"
@@ -82,71 +68,58 @@ in  { project =
           ]
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-example"
+      , Schema.Package::{ name = "shibuya-example"
         , type = Schema.PackageType.Application
         , language = Schema.Language.Haskell
         , path = Some "shibuya-example"
         , description = Some
             "Example demonstrating multi-processor setup with mock adapter"
-        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = { deployable = True, exposesApi = False }
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-pgmq-example"
+      , Schema.Package::{ name = "shibuya-pgmq-example"
         , type = Schema.PackageType.Application
         , language = Schema.Language.Haskell
         , path = Some "shibuya-pgmq-example"
         , description = Some
             "Real-world example with PGMQ, OpenTelemetry tracing, and Prometheus metrics"
-        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = { deployable = True, exposesApi = True }
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-core-bench"
+      , Schema.Package::{ name = "shibuya-core-bench"
         , type = Schema.PackageType.Other "Benchmark"
         , language = Schema.Language.Haskell
         , path = Some "shibuya-core-bench"
         , description = Some
             "Benchmarks for framework overhead vs pure streamly"
-        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = emptyRuntime
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
-      , { name = "shibuya-pgmq-adapter-bench"
+      , Schema.Package::{ name = "shibuya-pgmq-adapter-bench"
         , type = Schema.PackageType.Other "Benchmark"
         , language = Schema.Language.Haskell
         , path = Some "shibuya-pgmq-adapter-bench"
         , description = Some
             "Throughput and concurrency benchmarks for the PGMQ adapter"
-        , lifecycle = None Schema.Lifecycle
         , visibility = Schema.Visibility.Internal
         , runtime = emptyRuntime
-        , runtimeEnvironment = None Schema.RuntimeEnvironment
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
-        , apiSource = None Schema.ApiSource
         }
       ]
     , bundles =
-      [ { name = "shibuya-full"
+      [ Schema.PackageBundle::{ name = "shibuya-full"
         , description = Some
             "Complete Shibuya stack with PGMQ adapter and metrics"
         , packages =
@@ -163,9 +136,8 @@ in  { project =
       , "shinzui/pgmq-hs"
       , "hasql/hasql"
       ]
-    , apis = [] : List Schema.Api
     , agents =
-      [ { role = "framework-dev"
+      [ Schema.AgentHint::{ role = "framework-dev"
         , description = Some
             "Core framework development: supervision, processing, and ack semantics"
         , includePaths =
@@ -179,7 +151,7 @@ in  { project =
           [ "shibuya-core"
           ]
         }
-      , { role = "adapter-dev"
+      , Schema.AgentHint::{ role = "adapter-dev"
         , description = Some
             "Queue adapter development: PGMQ integration and benchmarks"
         , includePaths =
@@ -195,30 +167,27 @@ in  { project =
           ]
         }
       ]
-    , skills = [] : List Schema.Skill
-    , subagents = [] : List Schema.Subagent
-    , standards = [] : List Text
     , docs =
-      [ { key = "architecture"
+      [ Schema.DocRef::{ key = "architecture"
         , kind = Schema.DocKind.Reference
         , audience = Schema.DocAudience.Internal
         , description = Some
             "Architecture docs: message flow, core types, metrics"
         , location = Schema.DocLocation.LocalDir "docs/architecture"
         }
-      , { key = "readme"
+      , Schema.DocRef::{ key = "readme"
         , kind = Schema.DocKind.Guide
         , audience = Schema.DocAudience.User
         , description = Some "Project README with quickstart"
         , location = Schema.DocLocation.LocalFile "README.md"
         }
-      , { key = "changelog"
+      , Schema.DocRef::{ key = "changelog"
         , kind = Schema.DocKind.Notes
         , audience = Schema.DocAudience.User
         , description = Some "Release changelog"
         , location = Schema.DocLocation.LocalFile "CHANGELOG.md"
         }
-      , { key = "hackage"
+      , Schema.DocRef::{ key = "hackage"
         , kind = Schema.DocKind.Reference
         , audience = Schema.DocAudience.API
         , description = Some "Hackage package page"
