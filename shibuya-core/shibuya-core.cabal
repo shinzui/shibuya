@@ -71,6 +71,7 @@ library
     generic-lens ^>=2.3.0.0,
     hs-opentelemetry-api ^>=0.3,
     hs-opentelemetry-propagator-w3c ^>=0.1,
+    hs-opentelemetry-semantic-conventions ^>=0.1,
     lens ^>=5.3.5,
     nqe ^>=0.6,
     stm ^>=2.5,

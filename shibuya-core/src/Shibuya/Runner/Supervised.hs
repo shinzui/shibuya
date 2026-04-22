@@ -74,19 +74,20 @@ import Shibuya.Telemetry.Effect
   )
 import Shibuya.Telemetry.Propagation (extractTraceContext)
 import Shibuya.Telemetry.Semantic
-  ( attrMessagingDestinationPartitionId,
+  ( attrMessagingDestinationName,
     attrMessagingMessageId,
+    attrMessagingOperation,
     attrMessagingSystem,
     attrShibuyaAckDecision,
     attrShibuyaInflightCount,
     attrShibuyaInflightMax,
+    attrShibuyaPartition,
     consumerSpanArgs,
     eventAckDecision,
     eventHandlerCompleted,
-    eventHandlerException,
     eventHandlerStarted,
     mkEvent,
-    processMessageSpanName,
+    processSpanName,
   )
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
@@ -160,7 +161,7 @@ runSupervised master inboxSize procId concurrency adapter handler = do
       runInIO $
         -- Catch ProcessorHalt to prevent propagation via link
         -- (Halt is intentional, not a failure - other processors should continue)
-        ( runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
+        ( runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter handler
             `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
         )
           `finally` unregisterProcessor master procId
@@ -205,7 +206,7 @@ runWithMetrics inboxSize procId adapter handler = do
   runIngesterWithMetrics metricsVar adapter.source inbox
 
   -- Drain remaining messages from inbox
-  drainInboxWithMetrics metricsVar handler inbox
+  drainInboxWithMetrics metricsVar procId handler inbox
 
   -- Mark done
   liftIO $ atomically $ writeTVar doneVar True
@@ -224,13 +225,14 @@ runWithMetrics inboxSize procId adapter handler = do
 runIngesterAndProcessor ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
+  ProcessorId ->
   TVar Bool ->
   Natural ->
   Concurrency ->
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler = do
+runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -247,7 +249,7 @@ runIngesterAndProcessor metricsVar doneVar inboxSize concurrency adapter handler
 
     UIO.withAsync ingesterWithSignal $ \_ ->
       -- Processor: process messages, exit when stream done and inbox empty
-      runInIO $ processUntilDrained metricsVar concurrency handler inbox streamDoneVar
+      runInIO $ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar
 
   -- Mark done when processor exits
   liftIO $ atomically $ writeTVar doneVar True
@@ -294,12 +296,13 @@ inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
 processUntilDrained ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
+  ProcessorId ->
   Concurrency ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
+processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar = do
   haltRef <- liftIO $ newIORef Nothing
 
   let maxConc = case concurrency of
@@ -309,7 +312,7 @@ processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar haltRef
-        processAction = runInIO . processOne metricsVar maxConc haltRef handler
+        processAction = runInIO . processOne metricsVar procId maxConc haltRef handler
 
     case concurrency of
       Serial ->
@@ -333,10 +336,11 @@ processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
 drainInboxWithMetrics ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
+  ProcessorId ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
   Eff es ()
-drainInboxWithMetrics metricsVar handler inbox = do
+drainInboxWithMetrics metricsVar procId handler inbox = do
   haltRef <- liftIO $ newIORef Nothing
   go haltRef
   where
@@ -344,7 +348,7 @@ drainInboxWithMetrics metricsVar handler inbox = do
       empty <- liftIO $ mailboxEmpty inbox
       unless empty $ do
         ingested <- liftIO $ receive inbox
-        processOne metricsVar 1 haltRef handler ingested
+        processOne metricsVar procId 1 haltRef handler ingested
         -- Check if halted
         halted <- liftIO $ readIORef haltRef
         case halted of
@@ -356,25 +360,29 @@ drainInboxWithMetrics metricsVar handler inbox = do
 processOne ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
+  ProcessorId ->
   Int ->
   IORef (Maybe HaltReason) ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsVar maxConc haltRef handler ingested = do
+processOne metricsVar procId maxConc haltRef handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
+      ProcessorId pidText = procId
 
   withExtractedContext parentCtx $
-    withSpan' processMessageSpanName consumerSpanArgs $ \traceSpan -> do
+    withSpan' (processSpanName pidText) consumerSpanArgs $ \traceSpan -> do
       -- Add messaging attributes
       let MessageId msgIdText = ingested.envelope.messageId
       addAttribute traceSpan attrMessagingSystem ("shibuya" :: Text)
+      addAttribute traceSpan attrMessagingDestinationName pidText
+      addAttribute traceSpan attrMessagingOperation ("process" :: Text)
       addAttribute traceSpan attrMessagingMessageId msgIdText
 
       -- Add partition if present
       case ingested.envelope.partition of
-        Just p -> addAttribute traceSpan attrMessagingDestinationPartitionId p
+        Just p -> addAttribute traceSpan attrShibuyaPartition p
         Nothing -> pure ()
 
       -- Increment in-flight and add inflight attributes
@@ -406,7 +414,6 @@ processOne metricsVar maxConc haltRef handler ingested = do
           )
           ( \ex -> do
               recordException traceSpan ex
-              addEvent traceSpan (mkEvent eventHandlerException [])
               pure $ Left $ HandlerException $ Text.pack $ show ex
           )
 
