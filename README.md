@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.1.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.1.0.0))
+### Current Status (v0.2.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.2.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -43,7 +43,7 @@ Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.1.0.0
+    shibuya-core ^>=0.2.0.0
 ```
 
 Optional packages:
@@ -161,16 +161,18 @@ main = do
 ### What Gets Traced
 
 Each message creates a span with:
-- **Span name**: `shibuya.process.message`
+- **Span name**: `"<destination> process"` (e.g. `"shibuya-consumer process"`), following the OpenTelemetry messaging-spans recommendation
 - **Span kind**: `Consumer`
 - **Attributes**:
   - `messaging.system`: "shibuya"
+  - `messaging.operation`: "process"
+  - `messaging.destination.name`: The processor id
   - `messaging.message.id`: The message ID
-  - `messaging.destination.partition.id`: Partition (if present)
+  - `shibuya.partition`: Partition (if present)
   - `shibuya.inflight.count`: Current in-flight messages
   - `shibuya.inflight.max`: Max concurrency
   - `shibuya.ack.decision`: Handler's ack decision
-- **Events**: `handler.started`, `handler.completed`, `handler.exception`
+- **Events**: `shibuya.handler.started`, `shibuya.handler.completed`, `shibuya.ack.decision` (plus the standard `exception` event on handler exceptions, via `recordException`)
 - **Context propagation**: Parent context from `traceContext` message headers
 
 ### Local Testing with Jaeger
