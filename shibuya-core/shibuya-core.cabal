@@ -117,6 +117,7 @@ test-suite shibuya-core-test
     Shibuya.RunnerSpec
     Shibuya.Telemetry.EffectSpec
     Shibuya.Telemetry.PropagationSpec
+    Shibuya.Telemetry.SemanticSpec
 
   build-depends:
     QuickCheck ^>=2.15,
@@ -124,6 +125,7 @@ test-suite shibuya-core-test
     bytestring,
     effectful,
     hs-opentelemetry-api,
+    hs-opentelemetry-exporter-in-memory ^>=0.0,
     hspec ^>=2.11,
     memory,
     nqe,
@@ -134,3 +136,5 @@ test-suite shibuya-core-test
     text,
     time,
     unliftio,
+    unordered-containers,
+    vector,

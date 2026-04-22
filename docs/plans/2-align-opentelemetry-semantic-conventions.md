@@ -121,15 +121,32 @@ current state of the work.
     reading the span name in an in-memory exporter test. Done 2026-04-21
     for the threading; confirmation via in-memory exporter test deferred
     to M3.1.
--   [ ] M3.1 — Add a new HSpec file
+-   [x] M3.1 — Add a new HSpec file
     `shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs` that records a span
     end-to-end through `processOne` against an in-memory OTLP exporter and
-    asserts the final attribute names and span name.
--   [ ] M3.2 — Update `docs/plans/OPENTELEMETRY_INTEGRATION.md` to note that
+    asserts the final attribute names and span name. Done 2026-04-21.
+    Drives `processOne` indirectly via the existing public
+    `runWithMetrics` entrypoint (with a one-message `listAdapter`),
+    rather than by exporting `processOne` itself — keeps the public
+    surface unchanged. Required adding
+    `hs-opentelemetry-exporter-in-memory` as a sibling
+    `source-repository-package` (same git tag, `subdir:
+    exporters/in-memory`) and to the test stanza's `build-depends`
+    along with `unordered-containers` and `vector` (used directly by
+    the spec, previously transitively-pulled).
+-   [x] M3.2 — Update `docs/plans/OPENTELEMETRY_INTEGRATION.md` to note that
     attribute keys are now imported from `OpenTelemetry.SemanticConventions`
-    and to reference this plan.
--   [ ] M3.3 — Run `nix fmt` and `nix flake check`; run
+    and to reference this plan. Done 2026-04-21.
+-   [x] M3.3 — Run `nix fmt` and `nix flake check`; run
     `cabal test shibuya-core-test`; verify the example against Jaeger.
+    Done 2026-04-21 for the local gates: `nix fmt`,
+    `nix flake check`, `cabal build all`, and
+    `cabal test shibuya-core-test` (92 examples, 0 failures — the
+    SemanticSpec is the new 92nd example) all clean. The Jaeger
+    end-to-end check (`Validation and Acceptance` section, steps 1–4)
+    is the only remaining manual verification — left to the user
+    because it requires running PostgreSQL, Jaeger, and the pgmq
+    consumer/simulator outside the test sandbox.
 
 
 ## Surprises & Discoveries
@@ -286,7 +303,66 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at
 completion. Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+-   2026-04-21, end of implementation (M1+M2+M3 complete; only the
+    manual Jaeger smoke-check remains):
+
+    -   The original purpose is met. Every messaging-related attribute
+        on a Shibuya processing span is now derived from the typed
+        `AttributeKey` exports of `OpenTelemetry.SemanticConventions`,
+        the per-message span name follows the spec's
+        `<destination> <operation>` pattern,
+        `messaging.operation=process` is always set, the never-defined
+        `messaging.destination.partition.id` is gone (replaced by
+        `shibuya.partition`), handler events are namespaced
+        `shibuya.handler.*`, and the redundant custom
+        `handler.exception` event is gone in favor of the standard
+        `exception` event emitted by `recordException`.
+    -   Test coverage: `shibuya-core-test` went from 91 to 92 passing
+        examples; the new `Shibuya.Telemetry.Semantic (wire-format)`
+        spec drives `processOne` end-to-end through `runWithMetrics`
+        against an in-memory span exporter and asserts the wire
+        names of every attribute and the two `shibuya.handler.*`
+        events. A future upstream rename will break both compilation
+        (in `Shibuya/Telemetry/Semantic.hs`) and this test.
+    -   Build hygiene: clean across `cabal build all` and
+        `nix flake check`. The two new
+        `source-repository-package` entries
+        (`semantic-conventions` and `exporters/in-memory`) reuse
+        the existing tag pin so we don't introduce a new git
+        revision to track.
+
+    -   Gaps:
+        -   The end-to-end Jaeger validation
+            (`Validation and Acceptance` section, steps 1–4) was not
+            executed in this session — it requires PostgreSQL, Jaeger,
+            and the pgmq consumer/simulator running locally. The
+            in-memory exporter test covers the same wire-name
+            guarantees, but the visual confirmation in the Jaeger UI
+            is still a useful smoke-check before declaring the
+            initiative done.
+        -   `attrShibuyaProcessorId` is exported but currently has no
+            call site (the processor id is now exposed via the
+            spec-aligned `messaging.destination.name`). It is
+            preserved for adapters/instrumentation that want to
+            disambiguate processor identity from queue identity in
+            future work.
+
+    -   Lessons:
+        -   Adding a single `build-depends` line wasn't enough — the
+            in-tree `iand675/hs-opentelemetry` packages are pulled by
+            git pin, so the corresponding
+            `source-repository-package` block had to be added to
+            `cabal.project` for both `semantic-conventions` and
+            `exporters/in-memory`. Worth recording for the next
+            person who reaches for one of these subpackages.
+        -   The typed `AttributeKey` newtype is exported from
+            `OpenTelemetry.Attributes` (via `AttributeKey(..)`); no
+            need to dive into `OpenTelemetry.Attributes.Key` as the
+            initial draft hedged.
+        -   `OpenTelemetry.Internal.Trace.Types` is a hidden module;
+            `ImmutableSpan(..)` and `Event(..)` are re-exported from
+            `OpenTelemetry.Trace.Core`. A short detour but easy to
+            miss when scaffolding a new test.
 
 
 ## Context and Orientation

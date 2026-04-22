@@ -772,6 +772,18 @@ data Envelope msg = Envelope
 
 #### 2.1 Semantic conventions
 
+> **Update (2026-04-21):** the attribute-key strings in
+> `Shibuya/Telemetry/Semantic.hs` are now derived from the typed
+> `AttributeKey` values exported by `OpenTelemetry.SemanticConventions`
+> (from `hs-opentelemetry-semantic-conventions`) rather than being
+> hand-written. An upstream rename in the conventions library surfaces
+> as a Haskell compile error in `Semantic.hs`. Span name follows the
+> spec recommendation `<destination> <operation>` — i.e.
+> `"<processor-id> process"` — and `messaging.operation=process` is
+> always set. See
+> [docs/plans/2-align-opentelemetry-semantic-conventions.md](2-align-opentelemetry-semantic-conventions.md)
+> for the full rationale and decision log.
+
 **File: `Shibuya/Telemetry/Semantic.hs`**
 ```haskell
 -- Span names

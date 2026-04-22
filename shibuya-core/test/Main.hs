@@ -9,6 +9,7 @@ import Shibuya.Runner.SupervisedSpec qualified
 import Shibuya.RunnerSpec qualified
 import Shibuya.Telemetry.EffectSpec qualified
 import Shibuya.Telemetry.PropagationSpec qualified
+import Shibuya.Telemetry.SemanticSpec qualified
 import Test.Hspec
 
 main :: IO ()
@@ -20,3 +21,4 @@ main = hspec $ do
   Shibuya.Runner.SupervisedSpec.spec
   Shibuya.Telemetry.EffectSpec.spec
   Shibuya.Telemetry.PropagationSpec.spec
+  Shibuya.Telemetry.SemanticSpec.spec
