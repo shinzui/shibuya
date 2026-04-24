@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0.0 — 2026-04-23
+## 0.3.0.0 — 2026-04-24
 
 Upgraded to `pgmq-hs` 0.2.0.0 series
 (`pgmq-core`, `pgmq-hasql`, `pgmq-effectful`, `pgmq-migration`

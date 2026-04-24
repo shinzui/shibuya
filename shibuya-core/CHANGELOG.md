@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0.0 — 2026-04-24
+
+Version bumped to track the shared release version. No user-visible
+changes to `shibuya-core` itself.
+
 ## 0.2.0.0 — 2026-04-22
 
 ### Breaking Changes

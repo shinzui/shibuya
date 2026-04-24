@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0.0 — 2026-04-24
+
+### Breaking Changes
+
+- `shibuya-pgmq-adapter`: upgrade to `pgmq-hs` 0.2.0.0 series
+  (`pgmq-core`, `pgmq-hasql`, `pgmq-effectful`, `pgmq-migration` all
+  at `0.2.0.0`).
+  - `Pgmq.Effectful.PgmqError` has been renamed to `PgmqRuntimeError`;
+    the old name is re-exported as a deprecated alias for one release.
+  - Traced spans now follow OpenTelemetry semantic-conventions v1.24.
+    Span names (`"publish my-queue"`, `"receive my-queue"`) and
+    attribute keys (`messaging.operation`, `messaging.system`,
+    `messaging.destination.name`) have changed; dashboards and alerts
+    keyed on the old names need updating.
+  - `Pgmq.Effectful.Traced.sendMessageTraced` now takes a
+    `TracerProvider` instead of a `Tracer`. Use
+    `OpenTelemetry.Trace.Core.getTracerTracerProvider` to derive one
+    from an existing `Tracer`.
+
+### Other Changes
+
+- `shibuya-core` and `shibuya-metrics` are re-released at 0.3.0.0 to
+  track the shared version; neither has user-visible changes of its
+  own.
+- Documentation: README updated for the 0.2.0.0 release.
+
 ## 0.2.0.0 — 2026-04-22
 
 ### Breaking Changes
