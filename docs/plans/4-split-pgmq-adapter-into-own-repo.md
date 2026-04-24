@@ -63,30 +63,44 @@ registry` reflects the new topology.
       PostgreSQL. Required bumping `shinzui/hasql-migration` pin to
       `4aaff6c0919d1fe8e1c248c3ce4ce05775c59c8c` and deleting the
       frozen resolver — see Surprises. (2026-04-24)
-- [ ] **Milestone 3 — Remove the extracted packages from `shibuya`.**
-  - [ ] Edit `shibuya/cabal.project` to drop the three packages and the
-        hasql 1.10 `source-repository-package` entries.
-  - [ ] Edit `shibuya/mori.dhall` to drop the three packages, the
-        `shinzui/pgmq-hs` and `hasql/hasql` top-level dependencies, and the
-        `adapter-dev` agent hint; shrink `shibuya-full` bundle to
-        `shibuya-core` + `shibuya-metrics`.
-  - [ ] `rm -rf` the three package directories in `shibuya`.
-  - [ ] `cabal build all && cabal test` in `shibuya` must pass.
-  - [ ] `mori validate` in `shibuya` must succeed.
-- [ ] **Milestone 4 — Relocate PGMQ-specific documentation.**
-  - [ ] Move `shibuya/docs/user/pgmq-*.md` and `shibuya/docs/pgmq-adapter/*`
-        into the new repo under `docs/`.
-  - [ ] Update `shibuya/README.md` Documentation section: delete PGMQ doc
-        links that no longer exist; add an "Adapters" section linking to
-        `shinzui/shibuya-kafka-adapter` and `shinzui/shibuya-pgmq-adapter`.
-  - [ ] Append a `0.3.1.0` (or next) entry to `shibuya/CHANGELOG.md`
-        documenting the repo split.
-- [ ] **Milestone 5 — Final verification and commit discipline.**
-  - [ ] `nix fmt` clean in both repos.
-  - [ ] Pre-commit hooks pass in both repos.
-  - [ ] `mori registry show shinzui/shibuya --full` and
-        `mori registry show shinzui/shibuya-pgmq-adapter --full` both
-        render the expected topology.
+- [x] **Milestone 3 — Remove the extracted packages from `shibuya`.**
+      (2026-04-24)
+  - [x] Edit `shibuya/cabal.project` to drop the three packages and the
+        hasql 1.10 `source-repository-package` entries. Also removed
+        `cabal.project.freeze` (see Surprises — hasql-migration bump).
+  - [x] Edit `shibuya/mori.dhall` to drop the three packages, the
+        `shinzui/pgmq-hs` and `hasql/hasql` top-level dependencies, the
+        `adapter-dev` agent hint, and shrink the `shibuya-full` bundle
+        to `shibuya-core` + `shibuya-metrics`.
+  - [x] `rm -rf` the three package directories in `shibuya`.
+  - [x] `cabal build all && cabal test shibuya-core-test` in `shibuya`
+        pass (92 examples, 0 failures).
+  - [x] `mori validate` clean; `mori register --local` refreshed the
+        registry entry (now 4 packages).
+- [x] **Milestone 4 — Relocate PGMQ-specific documentation.**
+      (2026-04-24)
+  - [x] Moved `shibuya/docs/user/pgmq-*.md` (4 files) and
+        `shibuya/docs/pgmq-adapter/*` (5 files) into the new repo
+        under `docs/user/` and `docs/pgmq-adapter/` respectively.
+  - [x] Updated `shibuya/README.md`: dropped PGMQ doc bullets from the
+        Documentation section, retargeted the Optional Packages
+        `shibuya-pgmq-adapter` bullet to the new repo, added a Kafka
+        adapter bullet for symmetry, added an "Adapters" section, and
+        amended the 0.3.0.0 What's New bullet to flag the split.
+  - [x] Updated `docs/USAGE_GUIDE.md` and `docs/user/README.md` to
+        replace the removed PGMQ links with pointers to the new repo.
+  - [x] Prepended an `Unreleased / Repo Layout` section to
+        `shibuya/CHANGELOG.md` documenting the split and the
+        `cabal.project.freeze` deletion.
+- [x] **Milestone 5 — Final verification and commit discipline.**
+      (2026-04-24)
+  - [x] `nix fmt` in both repos reports 0 files changed.
+  - [x] Pre-commit hook (`treefmt`) bundled into the flake passed on
+        commit in both repos.
+  - [x] `mori registry show shinzui/shibuya --full` shows 4 packages
+        (core / core-bench / example / metrics); `mori registry show
+        shinzui/shibuya-pgmq-adapter --full` shows 3 packages
+        (adapter / adapter-bench / example).
 
 
 ## Surprises & Discoveries
@@ -187,10 +201,69 @@ registry` reflects the new topology.
 
 ## Outcomes & Retrospective
 
-(To be filled as milestones complete and at final close-out. Capture
-whether the new repo builds green on first try, any dependency drift
-discovered while extracting, and whether the documentation split feels
-well-placed after a week of use.)
+**Close-out — 2026-04-24**
+
+The split landed in four commits:
+
+- `shibuya-pgmq-adapter@4f92e55` — initial import from
+  `shinzui/shibuya@e426e00`.
+- `shibuya-pgmq-adapter@d0ffb0d` — `build: bump hasql-migration to
+  4aaff6c (crypton 1.x)`.
+- `shibuya-pgmq-adapter@49e9476` — `docs: import PGMQ user guides from
+  shinzui/shibuya`.
+- `shibuya@5a66aa1` — `chore(pgmq-adapter)!: split into
+  shinzui/shibuya-pgmq-adapter`.
+
+Observable outcomes versus the plan's purpose statement:
+
+1. **New repo builds and tests green.** `cabal build all` succeeds,
+   `cabal test shibuya-pgmq-adapter-test --enable-tests` returns
+   `112 examples, 0 failures`.
+2. **Shrunk `shibuya` still builds and tests green.**
+   `cabal test shibuya-core-test` returns `92 examples, 0 failures`.
+3. **`mori registry list` shows both `own` entries.** Both `--full`
+   listings render the expected topology (4 vs 3 packages).
+4. **`shibuya/README.md` has a clear Adapters section** linking both
+   adapter repos.
+
+Things we got right:
+
+- Copying the package directories verbatim (vs. `git filter-repo`)
+  kept the split fast and low-risk; the kafka-adapter precedent was
+  the right model.
+- Validating the new repo in isolation (Milestone 2) **before**
+  deleting anything from `shibuya` was load-bearing. Without that
+  sequence the hasql-migration/crypton failure would have surfaced
+  after the rollback path was already gone.
+
+Things the plan did not anticipate (recorded in Surprises &
+Discoveries):
+
+- `mori register --local` does not mint `mori/repo-id`. The new repo
+  is usable locally without one; we can add it later if we ever run
+  non-local `mori register`.
+- `fourmolu.yaml` is not picked up by `treefmt.nix` and has to be
+  copied in alongside it. Added to the scaffold step.
+- The old `shinzui/hasql-migration` pin (`ab66f6a`) only built
+  because `shibuya/cabal.project.freeze` was pinning `crypton 1.0.6`.
+  Upgrading the pin to `4aaff6c` (post-crypton-1.x-migration) and
+  dropping the freeze file in both repos was necessary for a clean
+  unfrozen build going forward.
+- `cabal test` in a fresh `dist-newstyle` requires `--enable-tests`
+  the first time through.
+
+Lessons for the next adapter split (if there is one):
+
+- **Pre-flight the resolver unfrozen.** Before copying packages,
+  temporarily rename `cabal.project.freeze` in the source repo and
+  run `cabal build all` to surface pin rot early. The hasql-migration
+  incident could have been caught in planning.
+- **Keep `fourmolu.yaml`/`.gitignore`/flake-lock checklist explicit.**
+  The plan named most top-level files but missed `fourmolu.yaml`.
+- **Record the doc targets that still reference moved files.**
+  `docs/USAGE_GUIDE.md` and `docs/user/README.md` were not in the
+  plan's move list but needed updating. A simple `grep -rl pgmq
+  docs/` before the split would have caught both.
 
 
 ## Context and Orientation
