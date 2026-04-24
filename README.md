@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.2.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.2.0.0))
+### Current Status (v0.3.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.3.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -37,13 +37,32 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | Graceful Shutdown (drain timeout) | ✅ Implemented |
 | Policy Validation | ✅ Implemented |
 
+### What's New in 0.3.0.0
+
+- **`shibuya-pgmq-adapter`** now tracks the `pgmq-hs` 0.2.0.0 series
+  (`pgmq-core`, `pgmq-hasql`, `pgmq-effectful`, `pgmq-migration`).
+- PGMQ traced spans now follow OpenTelemetry messaging semantic
+  conventions v1.24 — span names (`"publish my-queue"` /
+  `"receive my-queue"`) and attribute keys (`messaging.operation`,
+  `messaging.system`, `messaging.destination.name`) have changed.
+  Dashboards and alerts keyed on the old names need updating.
+- `Pgmq.Effectful.PgmqError` is renamed to `PgmqRuntimeError`; the old
+  name is re-exported as a deprecated alias for one release.
+- `Pgmq.Effectful.Traced.sendMessageTraced` now takes a `TracerProvider`
+  instead of a `Tracer` — use
+  `OpenTelemetry.Trace.Core.getTracerTracerProvider` to derive one.
+- `shibuya-core` and `shibuya-metrics` are re-released at 0.3.0.0 to
+  track the shared version; neither has user-visible changes of its own.
+
+See the [CHANGELOG](CHANGELOG.md) for full release history.
+
 ## Installation
 
 Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to your `cabal` file:
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.2.0.0
+    shibuya-core ^>=0.3.0.0
 ```
 
 Optional packages:
@@ -230,8 +249,12 @@ main = runEff . runConcurrent . runTracingNoop $ do
 ## Documentation
 
 - [Usage Guide](docs/USAGE_GUIDE.md) - Detailed usage examples
+- [Getting Started](docs/user/getting-started.md) - Framework walkthrough
+- [PGMQ Getting Started](docs/user/pgmq-getting-started.md) - Using the PGMQ adapter
+- [PGMQ Advanced](docs/user/pgmq-advanced.md) - Topic routing, dead-letter queues, FIFO
 - [Architecture](docs/UNIFIED_ARCHITECTURE.md) - System design and module structure
 - [Architecture Details](docs/architecture/) - Core types, message flow, metrics, concurrency
+- [CHANGELOG](CHANGELOG.md) - Release history
 
 ## Design Principles
 
