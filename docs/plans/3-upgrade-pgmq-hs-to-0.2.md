@@ -202,8 +202,22 @@ current state of the work.
 - [x] M4.3 — Run `nix fmt` and `nix flake check` and stage the final commit
   with `ExecPlan:` and `Intention:` trailers. `nix fmt` reported "0
   changed" (nothing to format); `nix flake check` reported
-  `pre-commit-check` and `formatting` both green. *(Done 2026-04-23 —
-  commit pending.)*
+  `pre-commit-check` and `formatting` both green. Committed as
+  `fd33704 chore(pgmq-adapter)!: upgrade to pgmq-hs 0.2.0.0`.
+  *(Done 2026-04-23.)*
+- [x] M5 — *(Follow-up after the main commit.)* Switch
+  `shibuya-pgmq-example/app/Simulator.hs` to use `runPgmqTraced` instead
+  of `runPgmq`, so the producer side actually emits the v1.24
+  `publish orders` / `publish payments` / `publish notifications` spans
+  (the earlier M3.3 verification only saw consumer-side `receive` spans
+  because the simulator was using the untraced interpreter). Confirmed
+  via Jaeger: a single trace now spans `pgmq.produce` (manual outer
+  producer span on the simulator) → `publish payments` (auto-traced,
+  v1.24 attributes) → `payments process` (Shibuya consumer-side span)
+  → `pgmq.delete payments` (auto-traced, kind=internal). The trace
+  context propagates correctly because the manual `pgmq.produce` span
+  provides the OTel context that `sendMessageTraced` reads and
+  injects into the message headers. *(Done 2026-04-24.)*
 
 
 ## Surprises & Discoveries
@@ -398,24 +412,25 @@ The plan's stated demonstrable outcomes were:
     `PgmqError` / `PgmqPoolError`. — **Met.**
 2.  `cabal test shibuya-pgmq-adapter-test` passes (plan said
     86 tests; actual 112; no test count *decreased*). — **Met.**
-3.  Jaeger traces show the new v1.24 names. — **Met for `receive`,
-    `pgmq.delete`, `pgmq.set_vt` spans (consumer side). The
-    aspirational `publish orders` span did not appear because the
-    simulator uses `runPgmq` rather than `runPgmqTraced` — see M3.3
-    note. The plan's pgmq-effectful span schema is verified for every
-    span the traced interpreter actually emits.**
+3.  Jaeger traces show the new v1.24 names. — **Met. After M5
+    follow-up, the simulator uses `runPgmqTraced` and emits
+    `publish orders` / `publish payments` spans with
+    `messaging.operation = "publish"`,
+    `messaging.destination.name = <queue>`, and
+    `db.operation = "pgmq.send"`. The consumer continues to emit
+    `receive orders` / `pgmq.delete orders` / `pgmq.set_vt orders` as
+    before. A single end-to-end trace now spans both services
+    (e.g. `shibuya-simulator: publish payments → shibuya-consumer:
+    payments process → pgmq.delete payments`).**
 4.  `cabal.project.freeze` pins each pgmq package at `0.2.0.0`. — **Met.**
 
 ### Gaps / follow-ups
 
-- The example simulator in `shibuya-pgmq-example/app/Simulator.hs`
-  still uses the untraced `runPgmq` interpreter alongside
-  `sendMessageTraced` (which only injects W3C trace headers). Switching
-  it to `runPgmqTraced` would surface `publish orders` /
-  `publish payments` / `publish notifications` spans on the simulator
-  side and complete the plan's narrative of "every messaging hop has a
-  v1.24-named span." This is a separate ergonomics-of-the-example
-  improvement, not a correctness gap in the adapter.
+- ~~The example simulator in `shibuya-pgmq-example/app/Simulator.hs`
+  still uses the untraced `runPgmq` interpreter…~~ **Resolved by M5.**
+  Simulator was switched to `runPgmqTraced`. `publish orders` /
+  `publish payments` spans now appear, and a single trace links
+  producer and consumer across services.
 - The `Example.Telemetry.withTracing` callback hands an `OTel.Tracer`
   to its action. The Simulator now has to thread
   `OTelCore.getTracerTracerProvider tracer` at every call site. A

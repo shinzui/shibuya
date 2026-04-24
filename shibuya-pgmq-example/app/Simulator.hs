@@ -42,7 +42,7 @@ import Example.Telemetry (withTracing)
 import Hasql.Pool qualified as Pool
 import OpenTelemetry.Trace qualified as OTel
 import OpenTelemetry.Trace.Core qualified as OTelCore
-import Pgmq.Effectful (PgmqRuntimeError, runPgmq)
+import Pgmq.Effectful (PgmqRuntimeError, runPgmqTraced)
 import Pgmq.Effectful.Traced (sendMessageTraced)
 import Pgmq.Types
   ( MessageBody (..),
@@ -227,7 +227,7 @@ sendBatchedTraced pool tracer queueName count batchSize delayMicros generator = 
       let payload = MessageBody (decodePayload body)
       -- Create producer span and send with trace context
       OTel.inSpan tracer "pgmq.produce" producerSpanArgs $ do
-        result :: Either PgmqRuntimeError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmq pool $ do
+        result :: Either PgmqRuntimeError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmqTraced pool tracer $ do
           _ <- sendMessageTraced (OTelCore.getTracerTracerProvider tracer) queueName payload Nothing
           pure ()
         case result of
@@ -260,7 +260,7 @@ sendPaymentsFifoTraced pool tracer queueName count delayMicros = do
 
     -- Create producer span and send with trace context + FIFO headers
     OTel.inSpan tracer "pgmq.produce" producerSpanArgs $ do
-      result :: Either PgmqRuntimeError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmq pool $ do
+      result :: Either PgmqRuntimeError () <- Effectful.runEff $ runErrorNoCallStack $ runPgmqTraced pool tracer $ do
         _ <- sendMessageTraced (OTelCore.getTracerTracerProvider tracer) queueName payload fifoHeaders
         pure ()
       case result of
