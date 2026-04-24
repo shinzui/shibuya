@@ -16,7 +16,7 @@ import Data.Vector qualified as V
 import Effectful (Eff, IOE, runEff)
 import Effectful.Error.Static (Error, runErrorNoCallStack)
 import Hasql.Pool qualified as Pool
-import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)
+import Pgmq.Effectful (Pgmq, PgmqRuntimeError, runPgmq)
 import Pgmq.Effectful qualified as Eff
 import Pgmq.Hasql.Sessions qualified as Pgmq
 import Pgmq.Hasql.Statements.Types qualified as Q
@@ -121,9 +121,9 @@ rawDelete pool queue = do
 
 -- Effectful layer operations
 
-runEffectful :: Pool.Pool -> Eff '[Pgmq, Error PgmqError, IOE] a -> IO ()
+runEffectful :: Pool.Pool -> Eff '[Pgmq, Error PgmqRuntimeError, IOE] a -> IO ()
 runEffectful pool action = do
-  result <- runEff . runErrorNoCallStack @PgmqError . runPgmq pool $ action
+  result <- runEff . runErrorNoCallStack @PgmqRuntimeError . runPgmq pool $ action
   case result of
     Left _ -> pure ()
     Right _ -> pure ()
@@ -142,7 +142,7 @@ effSendBatch pool queue n = runEffectful pool $ do
 
 effReadBatch :: Pool.Pool -> QueueName -> Int -> IO ()
 effReadBatch pool queue n = do
-  result <- runEff . runErrorNoCallStack @PgmqError . runPgmq pool $ do
+  result <- runEff . runErrorNoCallStack @PgmqRuntimeError . runPgmq pool $ do
     let req = Q.ReadMessage {queueName = queue, delay = 30, batchSize = Just (fromIntegral n), conditional = Nothing}
     Eff.readMessage req
   case result of

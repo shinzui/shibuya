@@ -20,7 +20,7 @@ import Data.Int (Int64)
 import Effectful (Eff, IOE, runEff)
 import Effectful.Error.Static (Error, runErrorNoCallStack)
 import Hasql.Pool qualified as Pool
-import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)
+import Pgmq.Effectful (Pgmq, PgmqRuntimeError, runPgmq)
 import Pgmq.Effectful qualified as Pgmq
 import Pgmq.Hasql.Sessions qualified as Sessions
 import Pgmq.Hasql.Statements.Types (SendMessage (..), SendMessageWithHeaders (..))
@@ -29,8 +29,8 @@ import Test.Hspec (Expectation, expectationFailure)
 import TmpPostgres (runPgmqSession)
 
 -- | Run an Eff action with Pgmq effect against a pool.
--- This handles the Error PgmqError effect and throws on errors.
-runWithPool :: Pool.Pool -> Eff '[Pgmq, Error PgmqError, IOE] a -> IO a
+-- This handles the Error PgmqRuntimeError effect and throws on errors.
+runWithPool :: Pool.Pool -> Eff '[Pgmq, Error PgmqRuntimeError, IOE] a -> IO a
 runWithPool pool action = do
   result <- runEff $ runErrorNoCallStack $ runPgmq pool action
   case result of

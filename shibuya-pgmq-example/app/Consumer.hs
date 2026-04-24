@@ -38,7 +38,7 @@ import Example.Telemetry (withTracing)
 import Hasql.Pool qualified as Pool
 import OpenTelemetry.Trace.Core qualified as OTel
 import Pgmq.Effectful (runPgmqTraced)
-import Pgmq.Effectful.Interpreter (PgmqError)
+import Pgmq.Effectful.Interpreter (PgmqRuntimeError)
 import Shibuya.Adapter.Pgmq
   ( FifoConfig (..),
     FifoReadStrategy (..),
@@ -246,7 +246,7 @@ runConsumer ::
   MVar () ->
   IO ()
 runConsumer pool tracer metricsPort shutdownVar = do
-  eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmqTraced pool tracer $ runTracing tracer $ do
+  eResult <- runEff $ runErrorNoCallStack @PgmqRuntimeError $ runPgmqTraced pool tracer $ runTracing tracer $ do
     -- Create adapters
     ordersAdapter <- pgmqAdapter ordersAdapterConfig
     paymentsAdapter <- pgmqAdapter paymentsAdapterConfig

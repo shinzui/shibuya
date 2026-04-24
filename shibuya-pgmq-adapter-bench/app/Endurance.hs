@@ -37,7 +37,7 @@ import Hasql.Connection.Settings qualified as Settings
 import Hasql.Pool qualified as Pool
 import Hasql.Pool.Config qualified as PoolConfig
 import Pgmq.Effectful (runPgmq)
-import Pgmq.Effectful.Interpreter (PgmqError)
+import Pgmq.Effectful.Interpreter (PgmqRuntimeError)
 import Pgmq.Hasql.Sessions qualified as Pgmq
 import Pgmq.Hasql.Statements.Types qualified as Q
 import Pgmq.Migration qualified as Migration
@@ -323,7 +323,7 @@ runEnduranceTest config pool queueName = do
     samplerAsync <- async $ runSampler config startTime producedVar processedRef failedRef csvHandle
 
     let adapterConfig = defaultConfig queueName
-    eResult <- runEff $ runErrorNoCallStack @PgmqError $ runPgmq pool $ runTracingNoop $ do
+    eResult <- runEff $ runErrorNoCallStack @PgmqRuntimeError $ runPgmq pool $ runTracingNoop $ do
       adapter <- pgmqAdapter adapterConfig
       let handler = makeHandler processedRef failedRef
           processor = mkProcessor adapter handler

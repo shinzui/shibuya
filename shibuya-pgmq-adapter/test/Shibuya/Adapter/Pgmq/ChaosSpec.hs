@@ -20,7 +20,7 @@ import Data.Vector qualified as Vector
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.Error.Static (Error, runErrorNoCallStack)
 import Hasql.Pool qualified as Pool
-import Pgmq.Effectful (Pgmq, PgmqError, runPgmq)
+import Pgmq.Effectful (Pgmq, PgmqRuntimeError, runPgmq)
 import Pgmq.Effectful qualified as PgmqEff
 import Pgmq.Hasql.Sessions qualified as Sessions
 import Pgmq.Hasql.Statements.Types (ReadMessage (..), SendMessage (..), SendMessageWithHeaders (..))
@@ -69,7 +69,7 @@ withTempDbFixture action = do
         Right () -> pure ()
 
 -- | Run an Eff action with Pgmq effect against a pool, throwing on error.
-runAdapterIO :: Pool.Pool -> Eff '[Pgmq, Error PgmqError, IOE] a -> IO a
+runAdapterIO :: Pool.Pool -> Eff '[Pgmq, Error PgmqRuntimeError, IOE] a -> IO a
 runAdapterIO pool action = do
   result <- runEff $ runErrorNoCallStack $ runPgmq pool action
   case result of
