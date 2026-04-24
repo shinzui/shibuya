@@ -37,10 +37,24 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | Graceful Shutdown (drain timeout) | ✅ Implemented |
 | Policy Validation | ✅ Implemented |
 
+## Adapters
+
+Queue backends live in sibling repositories so they can release on
+their own cadence:
+
+- [`shibuya-kafka-adapter`](https://github.com/shinzui/shibuya-kafka-adapter)
+  — Apache Kafka via `hw-kafka-client` and `kafka-effectful`.
+- [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
+  — PostgreSQL message queue (pgmq) via `pgmq-hs`.
+
 ### What's New in 0.3.0.0
 
-- **`shibuya-pgmq-adapter`** now tracks the `pgmq-hs` 0.2.0.0 series
-  (`pgmq-core`, `pgmq-hasql`, `pgmq-effectful`, `pgmq-migration`).
+- `shibuya-pgmq-adapter`, `shibuya-pgmq-adapter-bench`, and
+  `shibuya-pgmq-example` have moved to their own repository at
+  [`shinzui/shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter).
+  Release cadence for the adapter is now independent of `shibuya-core`.
+  The 0.3.0.0 tag already published from this repo remains valid for
+  the adapter; future releases will be cut from the new repo.
 - PGMQ traced spans now follow OpenTelemetry messaging semantic
   conventions v1.24 — span names (`"publish my-queue"` /
   `"receive my-queue"`) and attribute keys (`messaging.operation`,
@@ -67,7 +81,8 @@ build-depends:
 
 Optional packages:
 - [`shibuya-metrics`](https://hackage.haskell.org/package/shibuya-metrics) — HTTP/JSON, Prometheus, and WebSocket metrics endpoints
-- [`shibuya-pgmq-adapter`](https://hackage.haskell.org/package/shibuya-pgmq-adapter) — PostgreSQL message queue adapter
+- [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter) — PostgreSQL message queue adapter (standalone repo)
+- [`shibuya-kafka-adapter`](https://github.com/shinzui/shibuya-kafka-adapter) — Apache Kafka adapter (standalone repo)
 
 ## Quick Start
 
@@ -250,11 +265,12 @@ main = runEff . runConcurrent . runTracingNoop $ do
 
 - [Usage Guide](docs/USAGE_GUIDE.md) - Detailed usage examples
 - [Getting Started](docs/user/getting-started.md) - Framework walkthrough
-- [PGMQ Getting Started](docs/user/pgmq-getting-started.md) - Using the PGMQ adapter
-- [PGMQ Advanced](docs/user/pgmq-advanced.md) - Topic routing, dead-letter queues, FIFO
 - [Architecture](docs/UNIFIED_ARCHITECTURE.md) - System design and module structure
 - [Architecture Details](docs/architecture/) - Core types, message flow, metrics, concurrency
 - [CHANGELOG](CHANGELOG.md) - Release history
+
+Adapter-specific docs (PGMQ, Kafka, ...) live with their respective
+adapters — see the [Adapters](#adapters) section above.
 
 ## Design Principles
 

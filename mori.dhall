@@ -54,21 +54,6 @@ in  Schema.Project::{ project =
         , docs = emptyDocs
         , config = emptyConfig
         }
-      , Schema.Package::{ name = "shibuya-pgmq-adapter"
-        , type = Schema.PackageType.Library
-        , language = Schema.Language.Haskell
-        , path = Some "shibuya-pgmq-adapter"
-        , description = Some
-            "PGMQ adapter with visibility timeout leasing, retry handling, and DLQ support"
-        , runtime = emptyRuntime
-        , dependencies =
-          [ Schema.Dependency.ByName "effectful/effectful"
-          , Schema.Dependency.ByName "shinzui/pgmq-hs"
-          , Schema.Dependency.ByName "hasql/hasql"
-          ]
-        , docs = emptyDocs
-        , config = emptyConfig
-        }
       , Schema.Package::{ name = "shibuya-example"
         , type = Schema.PackageType.Application
         , language = Schema.Language.Haskell
@@ -77,18 +62,6 @@ in  Schema.Project::{ project =
             "Example demonstrating multi-processor setup with mock adapter"
         , visibility = Schema.Visibility.Internal
         , runtime = { deployable = True, exposesApi = False }
-        , dependencies = emptyDeps
-        , docs = emptyDocs
-        , config = emptyConfig
-        }
-      , Schema.Package::{ name = "shibuya-pgmq-example"
-        , type = Schema.PackageType.Application
-        , language = Schema.Language.Haskell
-        , path = Some "shibuya-pgmq-example"
-        , description = Some
-            "Real-world example with PGMQ, OpenTelemetry tracing, and Prometheus metrics"
-        , visibility = Schema.Visibility.Internal
-        , runtime = { deployable = True, exposesApi = True }
         , dependencies = emptyDeps
         , docs = emptyDocs
         , config = emptyConfig
@@ -105,27 +78,14 @@ in  Schema.Project::{ project =
         , docs = emptyDocs
         , config = emptyConfig
         }
-      , Schema.Package::{ name = "shibuya-pgmq-adapter-bench"
-        , type = Schema.PackageType.Other "Benchmark"
-        , language = Schema.Language.Haskell
-        , path = Some "shibuya-pgmq-adapter-bench"
-        , description = Some
-            "Throughput and concurrency benchmarks for the PGMQ adapter"
-        , visibility = Schema.Visibility.Internal
-        , runtime = emptyRuntime
-        , dependencies = emptyDeps
-        , docs = emptyDocs
-        , config = emptyConfig
-        }
       ]
     , bundles =
       [ Schema.PackageBundle::{ name = "shibuya-full"
         , description = Some
-            "Complete Shibuya stack with PGMQ adapter and metrics"
+            "Complete Shibuya stack with metrics"
         , packages =
           [ "shibuya-core"
           , "shibuya-metrics"
-          , "shibuya-pgmq-adapter"
           ]
         , primary = "shibuya-core"
         }
@@ -133,8 +93,6 @@ in  Schema.Project::{ project =
     , dependencies =
       [ "effectful/effectful"
       , "composewell/streamly"
-      , "shinzui/pgmq-hs"
-      , "hasql/hasql"
       ]
     , agents =
       [ Schema.AgentHint::{ role = "framework-dev"
@@ -149,21 +107,6 @@ in  Schema.Project::{ project =
           ]
         , relatedPackages =
           [ "shibuya-core"
-          ]
-        }
-      , Schema.AgentHint::{ role = "adapter-dev"
-        , description = Some
-            "Queue adapter development: PGMQ integration and benchmarks"
-        , includePaths =
-          [ "shibuya-pgmq-adapter/src/**"
-          , "shibuya-pgmq-adapter-bench/**"
-          ]
-        , excludePaths =
-          [ "dist-newstyle/**"
-          ]
-        , relatedPackages =
-          [ "shibuya-pgmq-adapter"
-          , "shibuya-pgmq-adapter-bench"
           ]
         }
       ]

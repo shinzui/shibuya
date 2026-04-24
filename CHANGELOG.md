@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Repo Layout
+
+- `shibuya-pgmq-adapter`, `shibuya-pgmq-adapter-bench`, and
+  `shibuya-pgmq-example` now live in their own repository at
+  [`shinzui/shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter).
+  They will release on their own cadence from this point forward.
+  The adapter's own changelog continues in that repository.
+- `shibuya-pgmq-adapter/CHANGELOG.md` (per-package history prior to
+  the split) was moved with the adapter; this repo's CHANGELOG keeps
+  only `shibuya-core` / `shibuya-metrics` history.
+- The hasql 1.10 `source-repository-package` pins (`hasql`,
+  `hasql-pool`, `hasql-transaction`, `hasql-migration`) were dropped
+  from `cabal.project` since no remaining package depends on them.
+  The top-level `cabal.project.freeze` was removed so the resolver
+  tracks the current dependency graph going forward.
+
 ## 0.3.0.0 — 2026-04-24
 
 ### Breaking Changes
