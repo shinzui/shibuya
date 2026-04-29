@@ -11,13 +11,22 @@ module Shibuya.Core.Retry
 
     -- * Pure evaluator
     exponentialBackoffPure,
+
+    -- * Effectful evaluator
+    exponentialBackoff,
+
+    -- * Handler convenience
+    retryWithBackoff,
   )
 where
 
+import Data.Maybe (fromMaybe)
 import Data.Time (NominalDiffTime, nominalDiffTimeToSeconds, secondsToNominalDiffTime)
+import Effectful (Eff, IOE, liftIO, (:>))
 import GHC.Generics (Generic)
-import Shibuya.Core.Ack (RetryDelay (..))
-import Shibuya.Core.Types (Attempt (..))
+import Shibuya.Core.Ack (AckDecision (..), RetryDelay (..))
+import Shibuya.Core.Types (Attempt (..), Envelope (..))
+import System.Random qualified as Random
 
 -- | Strategy for adding randomness to backoff delays.
 -- Jitter prevents thundering herds when many messages fail simultaneously.
@@ -96,3 +105,32 @@ exponentialBackoffPure policy (Attempt n) sample =
       NoJitter -> baseExp
       FullJitter -> baseExp * clampedSample
       EqualJitter -> baseExp / 2 + (baseExp / 2) * clampedSample
+
+-- | Compute a retry delay by sampling jitter from 'IO'.
+--
+-- Equivalent to 'exponentialBackoffPure' with a fresh sample drawn via
+-- 'System.Random.randomRIO' on each call.
+exponentialBackoff ::
+  (IOE :> es) =>
+  BackoffPolicy ->
+  Attempt ->
+  Eff es RetryDelay
+exponentialBackoff policy attempt = do
+  sample <- liftIO (Random.randomRIO (0.0 :: Double, 1.0))
+  pure (exponentialBackoffPure policy attempt sample)
+
+-- | One-line helper for the common case: read 'envelope.attempt', compute a
+-- backoff delay, and return 'AckRetry'.
+--
+-- Treats 'Nothing' attempt as @'Attempt' 0@ (first delivery), so handlers
+-- consuming envelopes from adapters that do not track redeliveries still
+-- get a sensible base-delay retry.
+retryWithBackoff ::
+  (IOE :> es) =>
+  BackoffPolicy ->
+  Envelope msg ->
+  Eff es AckDecision
+retryWithBackoff policy envelope = do
+  let attempt = fromMaybe (Attempt 0) envelope.attempt
+  delay <- exponentialBackoff policy attempt
+  pure (AckRetry delay)

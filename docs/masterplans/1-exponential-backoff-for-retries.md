@@ -213,8 +213,8 @@ something that explodes.
 - [x] EP-2: M1 — Add `Shibuya.Core.Retry` module with `BackoffPolicy`, `Jitter`,
       `defaultBackoffPolicy`, and the pure evaluator `exponentialBackoffPure`.
       *(2026-04-29)*
-- [ ] EP-2: M2 — Add the effectful evaluator `exponentialBackoff` (uses `IOE` to
-      sample randomness) and the convenience `retryWithBackoff`.
+- [x] EP-2: M2 — Add the effectful evaluator `exponentialBackoff` (uses `IOE` to
+      sample randomness) and the convenience `retryWithBackoff`. *(2026-04-29)*
 - [ ] EP-2: M3 — Add property and unit tests covering monotonicity, max-delay
       clamping, and the boundary cases for each `Jitter` variant.
 - [ ] EP-3: M1 — Populate `attempt` from `readCount` in `pgmqMessageToEnvelope`

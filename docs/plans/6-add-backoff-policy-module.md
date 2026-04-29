@@ -68,9 +68,9 @@ and `docs/plans/8-demonstrate-backoff-end-to-end.md`. It hard-depends on
       with `BackoffPolicy`, `Jitter`, `defaultBackoffPolicy`, and the pure
       evaluator `exponentialBackoffPure`. List the module in
       `shibuya-core/shibuya-core.cabal` `exposed-modules`. *(2026-04-29)*
-- [ ] Milestone 2 — Add the effectful `exponentialBackoff` (uses `IOE` to draw a
+- [x] Milestone 2 — Add the effectful `exponentialBackoff` (uses `IOE` to draw a
       sample from `System.Random`), and the convenience `retryWithBackoff`.
-      Add `random` to the build-depends if not already present.
+      Add `random` to the build-depends if not already present. *(2026-04-29)*
 - [ ] Milestone 3 — Add `shibuya-core/test/Shibuya/Core/RetrySpec.hs` with
       property and unit tests. Wire it into `Main.hs` and the test cabal stanza.
       Update the CHANGELOG `Unreleased` section to mention the new module.
