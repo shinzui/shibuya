@@ -91,7 +91,7 @@ Why this split and not others:
 | #     | Title                                                | Path                                                    | Hard Deps   | Soft Deps | Status      |
 |-------|------------------------------------------------------|---------------------------------------------------------|-------------|-----------|-------------|
 | EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
-| EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Not Started |
+| EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | In Progress |
 | EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Not Started |
 | EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Not Started |
 
@@ -210,8 +210,9 @@ something that explodes.
       every in-tree construction site so the build stays green. *(2026-04-29)*
 - [x] EP-1: M3 — Re-export `Attempt` from `Shibuya.Core` and update `CHANGELOG.md`
       with the breaking change. *(2026-04-29)*
-- [ ] EP-2: M1 — Add `Shibuya.Core.Retry` module with `BackoffPolicy`, `Jitter`,
+- [x] EP-2: M1 — Add `Shibuya.Core.Retry` module with `BackoffPolicy`, `Jitter`,
       `defaultBackoffPolicy`, and the pure evaluator `exponentialBackoffPure`.
+      *(2026-04-29)*
 - [ ] EP-2: M2 — Add the effectful evaluator `exponentialBackoff` (uses `IOE` to
       sample randomness) and the convenience `retryWithBackoff`.
 - [ ] EP-2: M3 — Add property and unit tests covering monotonicity, max-delay

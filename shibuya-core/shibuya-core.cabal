@@ -29,6 +29,7 @@ library
     Shibuya.Core.Error
     Shibuya.Core.Ingested
     Shibuya.Core.Lease
+    Shibuya.Core.Retry
     Shibuya.Core.Types
     Shibuya.Handler
     Shibuya.Policy
