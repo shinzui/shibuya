@@ -53,12 +53,15 @@ adapter must populate `attempt`).
       `Example.Database` so `createQueues` provisions it. Added
       `containers ^>=0.7` to the `shibuya-pgmq-consumer` executable's
       build-depends. *(2026-04-29)*
-- [ ] Milestone 2 — Add a tiny "send one message, then exit" mode to the
-      `Simulator.hs` companion in the same example, so an operator can run
-      `cabal run shibuya-pgmq-example-simulator -- one-shot` to enqueue
-      exactly one message and then run the consumer in `backoff-demo`
-      mode against it. Capture a sample transcript with timestamps; record
-      it in this plan's `Outcomes & Retrospective` section.
+- [x] Milestone 2 — Added `one-shot [queue]` mode to `Simulator.hs` (defaults
+      to `backoff_demo`) using `Pgmq.Effectful.sendMessage`. Captured a
+      live transcript against a local Postgres with the `pgmq-migration`
+      schema installed; recorded in `Outcomes & Retrospective`. As a
+      side-fix, both `Consumer.hs` and `Simulator.hs` now set
+      `LineBuffering` on stdout/stderr at startup so the demo's
+      timestamped output streams to non-tty file descriptors (e.g. `tee`,
+      log files) without the default block-buffer hiding everything until
+      shutdown. *(2026-04-29)*
 - [ ] Milestone 3 — Update the top-level `README.md` in the main `shibuya`
       repository with a "Exponential Backoff" subsection containing the
       worked snippet. Cross-reference the demo from
@@ -68,7 +71,32 @@ adapter must populate `attempt`).
 
 ## Surprises & Discoveries
 
-(None yet.)
+- The default GHC stdout buffering policy (block-buffered when stdout is
+  not a tty) hid the consumer's timestamped per-delivery log lines until
+  shutdown when the demo was piped to a file. Added an explicit
+  `hSetBuffering stdout LineBuffering` (and the same for stderr) at the
+  top of both `main`s. Future executable additions in
+  `shibuya-pgmq-example` should do the same if they expect to be
+  observed via `tee` or process-compose. Date: 2026-04-29.
+
+- With full jitter, the per-attempt wallclock gaps were noticeably
+  larger than the printed `retry in Ts` value when the chosen delay was
+  sub-second. Inspecting the adapter, the cause is that pgmq's
+  `read`/`set_vt` API takes integer seconds, so a `RetryDelay` of e.g.
+  0.22 s becomes effectively zero-then-poll: the message is immediately
+  re-visible and the next handler call lands on the next poll tick
+  (0.25 s in the demo's `backoffDemoAdapterConfig`) plus pgmq's own
+  visibility floor. The effect is invisible with `nojitter` (delays are
+  whole seconds) and only matters for the smallest jitter samples. Did
+  not change anything; documented for future investigators. Date:
+  2026-04-29.
+
+- The local Postgres started by `pg_ctl start` from outside the adapter
+  repo's nix devShell does not include the `pgmq` C extension, but
+  `Example.Database.installSchema` (via `pgmq-migration`) installs the
+  pgmq schema as PL/pgSQL into any plain Postgres. So the demo runs
+  against the main `shibuya` repo's existing PG socket without needing
+  the adapter repo's `process-compose` stack. Date: 2026-04-29.
 
 
 ## Decision Log
@@ -102,8 +130,57 @@ adapter must populate `attempt`).
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation. Include the captured
-transcript from M2 here.)
+### Captured live transcripts (2026-04-29)
+
+Both transcripts come from a real run against a local Postgres
+(socket `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/db`,
+database `shibuya`) with the pgmq schema installed by the consumer's
+own `installSchema`. The simulator was invoked with
+`shibuya-pgmq-simulator one-shot backoff_demo` after the consumer
+had started.
+
+NoJitter policy (`shibuya-pgmq-consumer backoff-demo nojitter`):
+
+    === Shibuya PGMQ Backoff Demo ===
+    Policy: BackoffPolicy {base = 1s, factor = 2.0, maxDelay = 300s, jitter = NoJitter}
+    ...
+    [2026-04-29 14:30:20.935306 UTC] msg=1 attempt=0
+      -> retry in 1s
+    [2026-04-29 14:30:21.943698 UTC] msg=1 attempt=1
+      -> retry in 2s
+    [2026-04-29 14:30:23.963085 UTC] msg=1 attempt=2
+      -> retry in 4s
+    [2026-04-29 14:30:27.997482 UTC] msg=1 attempt=3
+      -> success
+
+Wallclock gaps between successive handler calls: 1.008 s, 2.020 s,
+4.034 s — matching the requested 1, 2, 4 within ~30 ms of polling +
+processing overhead. The doubling is plainly visible.
+
+Default policy (`shibuya-pgmq-consumer backoff-demo`, full jitter):
+
+    === Shibuya PGMQ Backoff Demo ===
+    Policy: BackoffPolicy {base = 1s, factor = 2.0, maxDelay = 300s, jitter = FullJitter}
+    ...
+    [2026-04-29 14:31:47.442928 UTC] msg=1 attempt=0
+      -> retry in 0.216611697498s
+    [2026-04-29 14:31:48.450669 UTC] msg=1 attempt=1
+      -> retry in 0.782196539854s
+    [2026-04-29 14:31:49.461495 UTC] msg=1 attempt=2
+      -> retry in 2.164947981963s
+    [2026-04-29 14:31:52.487499 UTC] msg=1 attempt=3
+      -> success
+
+Each chosen delay falls within its expected full-jitter envelope
+(`[0, 1)`, `[0, 2)`, `[0, 4)` seconds for attempts 0–2). Wallclock
+gaps were 1.008 s, 1.011 s, 3.026 s — see the second
+"Surprises & Discoveries" entry for why the smaller delays land at
+the polling-interval floor.
+
+Both transcripts demonstrate that `Envelope.attempt` is being driven
+by the framework (the values 0/1/2/3 are pgmq's `read_count - 1`,
+populated by the EP-3 adapter change), and that `retryWithBackoff`
+consumes that field to produce a sensible exponentially-spaced retry.
 
 
 ## Context and Orientation

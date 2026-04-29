@@ -229,9 +229,11 @@ something that explodes.
       `Consumer.hs` that fails the first three deliveries and uses
       `retryWithBackoff`. Wired into a `backoff-demo` subcommand with
       optional `nojitter`/`equaljitter` flag. *(2026-04-29)*
-- [ ] EP-4: M2 — Run the example against a local PGMQ-capable Postgres; capture
-      timestamps that show the exponential spacing; record the transcript in the
-      plan.
+- [x] EP-4: M2 — Added `one-shot` mode to `Simulator.hs`; ran the demo
+      against the project's local Postgres; captured both `nojitter`
+      (1.008 s / 2.020 s / 4.034 s wallclock gaps) and full-jitter
+      transcripts. Recorded in EP-4's Outcomes & Retrospective.
+      *(2026-04-29)*
 - [ ] EP-4: M3 — Update top-level `README.md` and the cross-cutting CHANGELOG
       entries with a worked snippet.
 
@@ -262,6 +264,20 @@ something that explodes.
   `shibuya-pgmq-adapter` repo to point at the local checkouts of
   `shibuya-core` and `shibuya-metrics` until those packages are
   published to Hackage at `0.4.0.0`. Date: 2026-04-29.
+
+- EP-4 needed `hSetBuffering stdout LineBuffering` in both
+  `Consumer.hs` and `Simulator.hs` `main`s. Without it, GHC's default
+  block-buffering when stdout is not a tty hides the consumer's
+  per-delivery log lines (the entire point of the demo) until
+  shutdown. Future executable additions in `shibuya-pgmq-example`
+  should set line buffering at startup if they expect to be observed
+  via `tee`, redirection, or `process-compose`. Date: 2026-04-29.
+
+- EP-4 confirmed that the demo runs against any plain Postgres
+  reachable via `DATABASE_URL`; pgmq is installed as PL/pgSQL by
+  `Example.Database.installSchema` (via `pgmq-migration`), not as a
+  C extension. A Postgres without the pgmq C extension is fine for
+  this codebase's runtime needs. Date: 2026-04-29.
 
 
 ## Decision Log
