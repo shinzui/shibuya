@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.3.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.3.0.0))
+### Current Status (v0.4.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.4.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -47,26 +47,21 @@ their own cadence:
 - [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
   — PostgreSQL message queue (pgmq) via `pgmq-hs`.
 
-### What's New in 0.3.0.0
+### What's New in 0.4.0.0
 
-- `shibuya-pgmq-adapter`, `shibuya-pgmq-adapter-bench`, and
-  `shibuya-pgmq-example` have moved to their own repository at
-  [`shinzui/shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter).
-  Release cadence for the adapter is now independent of `shibuya-core`.
-  The 0.3.0.0 tag already published from this repo remains valid for
-  the adapter; future releases will be cut from the new repo.
-- PGMQ traced spans now follow OpenTelemetry messaging semantic
-  conventions v1.24 — span names (`"publish my-queue"` /
-  `"receive my-queue"`) and attribute keys (`messaging.operation`,
-  `messaging.system`, `messaging.destination.name`) have changed.
-  Dashboards and alerts keyed on the old names need updating.
-- `Pgmq.Effectful.PgmqError` is renamed to `PgmqRuntimeError`; the old
-  name is re-exported as a deprecated alias for one release.
-- `Pgmq.Effectful.Traced.sendMessageTraced` now takes a `TracerProvider`
-  instead of a `Tracer` — use
-  `OpenTelemetry.Trace.Core.getTracerTracerProvider` to derive one.
-- `shibuya-core` and `shibuya-metrics` are re-released at 0.3.0.0 to
-  track the shared version; neither has user-visible changes of its own.
+- **Exponential backoff for retries** — new `Shibuya.Core.Retry`
+  module providing `BackoffPolicy`, `Jitter` (`NoJitter`,
+  `FullJitter`, `EqualJitter`), `defaultBackoffPolicy`,
+  `exponentialBackoffPure`, `exponentialBackoff`, and the handler
+  convenience `retryWithBackoff`. See the
+  [Exponential Backoff](#exponential-backoff) section below.
+- **Breaking** — `Envelope` gained an `attempt :: !(Maybe Attempt)`
+  field carrying the adapter's delivery counter (zero-indexed;
+  `Nothing` if the adapter does not track redeliveries). Direct
+  constructions of `Envelope` must add the field. The new `Attempt`
+  newtype is exported from `Shibuya.Core` and `Shibuya.Core.Types`.
+- `shibuya-metrics` is re-released at 0.4.0.0 to track the shared
+  version; it has no user-visible changes of its own.
 
 See the [CHANGELOG](CHANGELOG.md) for full release history.
 
@@ -76,7 +71,7 @@ Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.3.0.0
+    shibuya-core ^>=0.4.0.0
 ```
 
 Optional packages:
