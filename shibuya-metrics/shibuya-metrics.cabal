@@ -48,7 +48,7 @@ library
     containers ^>=0.7,
     http-types ^>=0.12,
     prometheus-client ^>=1.1,
-    shibuya-core ^>=0.3.0.0,
+    shibuya-core ^>=0.4.0.0,
     stm ^>=2.5,
     text ^>=2.1,
     time ^>=1.14,
