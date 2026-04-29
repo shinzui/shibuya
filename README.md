@@ -165,6 +165,53 @@ result <- runApp
 --   concurrency - Serial | Ahead Natural | Async Natural
 ```
 
+## Exponential Backoff
+
+Shibuya 0.4 ships a built-in exponential-backoff helper for handlers
+that want exponentially-growing, jittered retry intervals without
+having to compute the math themselves:
+
+```haskell
+import Shibuya.Core.Retry (defaultBackoffPolicy, retryWithBackoff)
+
+myHandler ingested = do
+  result <- tryProcess ingested.envelope.payload
+  case result of
+    Right ()  -> pure AckOk
+    Left _err -> retryWithBackoff defaultBackoffPolicy ingested.envelope
+```
+
+`defaultBackoffPolicy` is AWS's published "exponential backoff with
+full jitter" recommendation: 1 s base, factor 2, capped at 5 minutes.
+The available `Jitter` strategies are `NoJitter`, `FullJitter`
+(default), and `EqualJitter`; switch by record-updating the policy
+(`defaultBackoffPolicy { jitter = NoJitter }`).
+
+Adapters that track per-message redelivery counts populate
+`ingested.envelope.attempt :: Maybe Attempt`; the helper reads it and
+grows the delay each time the same message returns. The PGMQ adapter
+sources the counter from pgmq's `read_count` column. Adapters that do
+not track redeliveries leave `attempt = Nothing`, in which case
+`retryWithBackoff` treats the delivery as `Attempt 0` (base delay).
+
+A runnable end-to-end demonstration lives in the
+[`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
+repo's `shibuya-pgmq-example/` package. With a local Postgres
+reachable via `DATABASE_URL`, run:
+
+```sh
+# Terminal 1 — consumer
+cabal run shibuya-pgmq-consumer -- backoff-demo nojitter
+
+# Terminal 2 — enqueue one message
+cabal run shibuya-pgmq-simulator -- one-shot backoff_demo
+```
+
+The consumer's stdout shows the message being delivered four times,
+with the wallclock gaps growing 1 s, 2 s, 4 s, then succeeding on the
+fourth delivery. Drop the `nojitter` flag for the default
+full-jittered policy.
+
 ## Distributed Tracing
 
 Shibuya includes built-in OpenTelemetry tracing support for distributed observability.

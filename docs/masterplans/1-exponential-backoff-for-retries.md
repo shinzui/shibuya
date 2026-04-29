@@ -93,7 +93,7 @@ Why this split and not others:
 | EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
 | EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Complete    |
 | EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Complete    |
-| EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | In Progress |
+| EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Complete    |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 
@@ -234,8 +234,13 @@ something that explodes.
       (1.008 s / 2.020 s / 4.034 s wallclock gaps) and full-jitter
       transcripts. Recorded in EP-4's Outcomes & Retrospective.
       *(2026-04-29)*
-- [ ] EP-4: M3 — Update top-level `README.md` and the cross-cutting CHANGELOG
-      entries with a worked snippet.
+- [x] EP-4: M3 — Added an "Exponential Backoff" section to the main
+      repo's `README.md` with a handler snippet and the two-terminal
+      demo invocation. Cross-referenced the demo from
+      `shibuya-core/CHANGELOG.md` (Unreleased) and added a new
+      `Unreleased` section to `shibuya-pgmq-adapter/CHANGELOG.md`
+      describing the EP-3 + EP-4 changes the adapter now ships.
+      *(2026-04-29)*
 
 
 ## Surprises & Discoveries
@@ -343,7 +348,68 @@ something that explodes.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+### Result vs. vision (2026-04-29)
+
+The initiative shipped exactly the surface described in
+"Vision & Scope":
+
+- `shibuya-core` 0.4.0.0 (in-tree, not yet on Hackage) exposes the
+  `Attempt` newtype, `Envelope.attempt :: Maybe Attempt`, and the
+  `Shibuya.Core.Retry` module with `BackoffPolicy`, three jitter
+  strategies (`NoJitter`, `FullJitter`, `EqualJitter`), the pure
+  `exponentialBackoffPure`, the effectful `exponentialBackoff`, and
+  the handler convenience `retryWithBackoff`.
+- `shibuya-pgmq-adapter` populates `Envelope.attempt` from pgmq's
+  `read_count` field and clamps the visibility-timeout extension at
+  `Int32` bounds.
+- A runnable end-to-end demonstration ships in
+  `shibuya-pgmq-adapter/shibuya-pgmq-example/` under the consumer's
+  `backoff-demo` subcommand and the simulator's `one-shot` mode.
+  The captured nojitter transcript (in EP-4's Outcomes section)
+  shows wallclock gaps of 1.008 s, 2.020 s, 4.034 s — matching the
+  requested 1, 2, 4-second exponential spacing within ~30 ms of
+  polling overhead.
+
+### Lessons learned
+
+- The early decision to put `attempt` on `Envelope` (rather than on a
+  new `DeliveryContext` carried by `Ingested`) paid off in EP-4: the
+  demo handler reads `ingested.envelope.attempt` exactly the way the
+  rest of the codebase already reads `ingested.envelope.payload`, so
+  there was no new ergonomic shape to learn or document.
+
+- Splitting EP-2 (policy module) and EP-3 (adapter integration)
+  turned out to be a cheap split that paid off independently. Both
+  could have run in parallel had two contributors been on the
+  initiative; in a single-contributor sequential session the
+  separation cost almost nothing.
+
+- The end-of-initiative discoveries that mattered most were
+  cross-cutting ergonomics (line buffering, the sub-second
+  visibility-floor, "any plain Postgres works") rather than algorithm
+  bugs. Future MasterPlans should deliberately reserve a
+  demonstration ExecPlan at the end for the same reason: the
+  observation step surfaces problems no amount of pure-and-property
+  testing can.
+
+- The pre-existing version-bump miss caught by EP-3 (CHANGELOG said
+  0.4.0.0, cabal still said 0.3.0.0) is a process gap. The
+  Surprises log notes that future plans modifying public types
+  should bump cabal versions in the same commit as the type change,
+  not as a follow-up.
+
+### Open follow-ups (non-blocking)
+
+- `shibuya-core` 0.4.0.0 and `shibuya-pgmq-adapter` 0.4.0.0 still need
+  to be cut and published to Hackage. The CHANGELOG `Unreleased`
+  sections in both repos are ready; the cabal version on the adapter
+  is still 0.3.0.0 awaiting the release.
+- The README's installation snippet still references
+  `shibuya-core ^>=0.3.0.0`; bump to `^>=0.4.0.0` at release time.
+- A future Kafka adapter could synthesize `Envelope.attempt` per
+  `(partition, offset)` if desired; this is not in scope and the
+  `Maybe Attempt` shape already accommodates "this adapter doesn't
+  track redeliveries".
 
 
 ## Reference

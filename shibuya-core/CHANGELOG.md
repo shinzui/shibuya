@@ -20,6 +20,12 @@
   ingested.envelope`. Pulls in `random ^>=1.2` as a new build-depends
   (already a transitive dep — ships with GHC). See the module haddock and
   the new `RetrySpec` test for usage patterns.
+- A runnable end-to-end demonstration of the new API lives in the
+  sibling [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
+  repo at `shibuya-pgmq-example/`, exposed via the `backoff-demo`
+  subcommand of `shibuya-pgmq-consumer`. The plan
+  `docs/plans/8-demonstrate-backoff-end-to-end.md` records setup
+  instructions and captured transcripts.
 
 Planned next release: 0.4.0.0 (major — breaks direct `Envelope` construction).
 

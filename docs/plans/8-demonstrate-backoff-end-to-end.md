@@ -62,11 +62,13 @@ adapter must populate `attempt`).
       timestamped output streams to non-tty file descriptors (e.g. `tee`,
       log files) without the default block-buffer hiding everything until
       shutdown. *(2026-04-29)*
-- [ ] Milestone 3 — Update the top-level `README.md` in the main `shibuya`
-      repository with a "Exponential Backoff" subsection containing the
-      worked snippet. Cross-reference the demo from
-      `shibuya-core/CHANGELOG.md` and `shibuya-pgmq-adapter/CHANGELOG.md`
-      `Unreleased` sections.
+- [x] Milestone 3 — Added an "Exponential Backoff" section to the main
+      repo's `README.md` with a handler snippet and the two-terminal demo
+      invocation. Linked the demo from `shibuya-core/CHANGELOG.md`
+      (Unreleased) and added a new `Unreleased` section to
+      `shibuya-pgmq-adapter/CHANGELOG.md` documenting the
+      `Envelope.attempt` integration, the `Int32` clamp, and the
+      `backoff-demo` / `one-shot` example modes. *(2026-04-29)*
 
 
 ## Surprises & Discoveries
@@ -181,6 +183,31 @@ Both transcripts demonstrate that `Envelope.attempt` is being driven
 by the framework (the values 0/1/2/3 are pgmq's `read_count - 1`,
 populated by the EP-3 adapter change), and that `retryWithBackoff`
 consumes that field to produce a sensible exponentially-spaced retry.
+
+### Final summary (2026-04-29)
+
+The plan delivered everything in the original `Purpose / Big Picture`:
+
+- A handler, `backoffDemoHandler`, in
+  `shibuya-pgmq-example/app/Consumer.hs` that fails the first three
+  deliveries and succeeds on the fourth, using
+  `retryWithBackoff defaultBackoffPolicy ingested.envelope`.
+- Two ergonomic CLI surfaces: the consumer's `backoff-demo
+  [nojitter|equaljitter]` subcommand, and the simulator's
+  `one-shot [queue]` companion (defaulting to `backoff_demo`).
+- Above-the-fold documentation: a new "Exponential Backoff" section in
+  the main repo's `README.md` with the handler snippet and the
+  two-terminal invocation. CHANGELOG cross-references in both
+  `shibuya-core/CHANGELOG.md` and (a newly created `Unreleased`
+  block in) `shibuya-pgmq-adapter/CHANGELOG.md`.
+
+Three small cross-cutting observations are recorded in
+`Surprises & Discoveries` and propagated up to the master plan: the
+need for `LineBuffering` on stdout in observable example executables;
+the sub-second-jitter floor caused by pgmq's integer-second
+visibility-timeout API; and the discovery that any plain Postgres
+suffices (pgmq is installed via `pgmq-migration`'s PL/pgSQL, not via
+a C extension).
 
 
 ## Context and Orientation
