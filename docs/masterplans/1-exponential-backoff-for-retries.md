@@ -90,7 +90,7 @@ Why this split and not others:
 
 | #     | Title                                                | Path                                                    | Hard Deps   | Soft Deps | Status      |
 |-------|------------------------------------------------------|---------------------------------------------------------|-------------|-----------|-------------|
-| EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | In Progress |
+| EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
 | EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Not Started |
 | EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Not Started |
 | EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Not Started |
@@ -205,11 +205,11 @@ something that explodes.
 
 ## Progress
 
-- [ ] EP-1: M1 — Add `Attempt` newtype to `Shibuya.Core.Types`.
-- [ ] EP-1: M2 — Add `attempt :: !(Maybe Attempt)` field to `Envelope` and update
-      every in-tree construction site so the build stays green.
-- [ ] EP-1: M3 — Re-export `Attempt` from `Shibuya.Core` and update `CHANGELOG.md`
-      with the breaking change.
+- [x] EP-1: M1 — Add `Attempt` newtype to `Shibuya.Core.Types`. *(2026-04-29)*
+- [x] EP-1: M2 — Add `attempt :: !(Maybe Attempt)` field to `Envelope` and update
+      every in-tree construction site so the build stays green. *(2026-04-29)*
+- [x] EP-1: M3 — Re-export `Attempt` from `Shibuya.Core` and update `CHANGELOG.md`
+      with the breaking change. *(2026-04-29)*
 - [ ] EP-2: M1 — Add `Shibuya.Core.Retry` module with `BackoffPolicy`, `Jitter`,
       `defaultBackoffPolicy`, and the pure evaluator `exponentialBackoffPure`.
 - [ ] EP-2: M2 — Add the effectful evaluator `exponentialBackoff` (uses `IOE` to
@@ -234,7 +234,18 @@ something that explodes.
 
 ## Surprises & Discoveries
 
-(None yet.)
+- EP-1's enumeration of `Envelope` construction sites missed the
+  `shibuya-core-bench/` package (four additional sites in
+  `bench/Bench/{Framework,Handler,Concurrency}.hs` and
+  `bench/Test/StandaloneTest.hs`). They were updated to pass
+  `attempt = Nothing`. Future ExecPlans that touch `Envelope` should
+  grep with `'Envelope$\|Envelope {'` across all packages, not just
+  `shibuya-core/` and `shibuya-example/`. Date: 2026-04-29.
+- EP-1 M1's test snippet used `unAttempt (minBound :: Attempt)` as a
+  function call. `shibuya-core` enables `NoFieldSelectors`, so field
+  accessors are not in scope as functions. Fixed via record-dot
+  syntax. EP-2 and EP-4 should be careful with field-selector idioms
+  in any new test snippets they introduce. Date: 2026-04-29.
 
 
 ## Decision Log

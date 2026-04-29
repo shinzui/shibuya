@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- `Envelope` gained an `attempt :: !(Maybe Attempt)` field carrying the
+  adapter's delivery counter (zero-indexed; `Nothing` if unknown). Direct
+  constructions of `Envelope` must add the field. The new `Attempt`
+  newtype is exported from `Shibuya.Core` and `Shibuya.Core.Types`.
+
+Planned next release: 0.4.0.0 (major — breaks direct `Envelope` construction).
+
 ## 0.3.0.0 — 2026-04-24
 
 Version bumped to track the shared release version. No user-visible

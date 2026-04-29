@@ -19,6 +19,7 @@ module Shibuya.Core
   ( -- * Message Types
     MessageId (..),
     Cursor (..),
+    Attempt (..),
     Envelope (..),
 
     -- * Ack Semantics
@@ -86,7 +87,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Attempt (..), Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Runner.Halt (ProcessorHalt (..))

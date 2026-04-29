@@ -59,11 +59,11 @@ unblocks both.
       and `shibuya-core-bench/bench/Test/StandaloneTest.hs`). Each of those
       sites passes `attempt = Nothing` because they construct mock messages
       with no delivery history. *(2026-04-29)*
-- [ ] Milestone 3 — Re-export `Attempt (..)` from `shibuya-core/src/Shibuya/Core.hs`.
+- [x] Milestone 3 — Re-export `Attempt (..)` from `shibuya-core/src/Shibuya/Core.hs`.
       Add an entry to `shibuya-core/CHANGELOG.md` under a fresh `Unreleased` section
       noting the breaking change to `Envelope`'s shape and bumping the planned
       version to `0.4.0.0` (a major bump because adding a record field breaks all
-      direct constructions).
+      direct constructions). *(2026-04-29)*
 
 
 ## Surprises & Discoveries
@@ -112,7 +112,29 @@ unblocks both.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Completed 2026-04-29.
+
+- `Attempt` newtype landed in `Shibuya.Core.Types` and is re-exported
+  from `Shibuya.Core`. Numeric-class derivations let callers do
+  arithmetic on the wrapped `Word` without unwrapping; tests in
+  `Shibuya.Core.TypesSpec` cover Eq, Ord, Num, and Bounded.
+- `Envelope` now carries `attempt :: !(Maybe Attempt)` between
+  `traceContext` and `payload`. Nine in-tree construction sites were
+  updated (5 listed in M2 + 4 surfaced in `shibuya-core-bench/`).
+  `cabal build all` and `cabal test shibuya-core-test` (97 examples)
+  pass.
+- `CHANGELOG.md` has a new `Unreleased` section documenting the
+  breaking change and the planned `0.4.0.0` major bump. The cabal
+  `version:` field stays at `0.3.0.0`; the bump itself is deferred
+  to release time per Decision Log.
+- Two corrections to the original plan are recorded in Surprises &
+  Discoveries: the bench-package construction sites and the
+  `NoFieldSelectors`-incompatible `unAttempt` call in M1's test
+  snippet.
+
+EP-2 (`docs/plans/6-add-backoff-policy-module.md`) and EP-3
+(`docs/plans/7-populate-attempt-from-pgmq-readcount.md`) are now
+unblocked and may proceed in parallel.
 
 
 ## Context and Orientation
