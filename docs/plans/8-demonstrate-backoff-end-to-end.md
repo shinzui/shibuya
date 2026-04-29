@@ -44,12 +44,15 @@ adapter must populate `attempt`).
 
 ## Progress
 
-- [ ] Milestone 1 — Add a new handler `backoffDemoHandler` to the existing
-      `shibuya-pgmq-example` (in
-      `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/shibuya-pgmq-example/app/Consumer.hs`,
-      or a new `BackoffDemo.hs` file) that fails messages until they reach
-      `Attempt 3` and then succeeds. Wire it into the `Consumer.hs` main
-      dispatcher under a new subcommand.
+- [x] Milestone 1 — Added `backoffDemoHandler` and `backoffDemoAdapterConfig`
+      to
+      `shibuya-pgmq-adapter/shibuya-pgmq-example/app/Consumer.hs`. Wired a
+      `backoff-demo` subcommand (with optional `nojitter` /
+      `equaljitter` flag) via a new `runBackoffDemoMain` /
+      `runBackoffDemoConsumer` pair. Added `backoff_demo` queue to
+      `Example.Database` so `createQueues` provisions it. Added
+      `containers ^>=0.7` to the `shibuya-pgmq-consumer` executable's
+      build-depends. *(2026-04-29)*
 - [ ] Milestone 2 — Add a tiny "send one message, then exit" mode to the
       `Simulator.hs` companion in the same example, so an operator can run
       `cabal run shibuya-pgmq-example-simulator -- one-shot` to enqueue

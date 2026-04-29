@@ -93,7 +93,7 @@ Why this split and not others:
 | EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
 | EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Complete    |
 | EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Complete    |
-| EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Not Started |
+| EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | In Progress |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 
@@ -225,8 +225,10 @@ something that explodes.
       adapter clamps to `Int32` max seconds without throwing. *(2026-04-29)*
 - [x] EP-3: M3 — Update `Shibuya.Adapter.Pgmq` haddock and `CHANGELOG.md` to
       mention the new field. *(2026-04-29)*
-- [ ] EP-4: M1 — Write a handler in `shibuya-pgmq-example` that fails the first N
-      deliveries and uses `retryWithBackoff`. Wire it into a runnable example.
+- [x] EP-4: M1 — Wrote `backoffDemoHandler` in `shibuya-pgmq-example`'s
+      `Consumer.hs` that fails the first three deliveries and uses
+      `retryWithBackoff`. Wired into a `backoff-demo` subcommand with
+      optional `nojitter`/`equaljitter` flag. *(2026-04-29)*
 - [ ] EP-4: M2 — Run the example against a local PGMQ-capable Postgres; capture
       timestamps that show the exponential spacing; record the transcript in the
       plan.
