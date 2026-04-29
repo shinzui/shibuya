@@ -91,7 +91,7 @@ Why this split and not others:
 | #     | Title                                                | Path                                                    | Hard Deps   | Soft Deps | Status      |
 |-------|------------------------------------------------------|---------------------------------------------------------|-------------|-----------|-------------|
 | EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
-| EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | In Progress |
+| EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Complete    |
 | EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Not Started |
 | EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Not Started |
 
@@ -215,8 +215,8 @@ something that explodes.
       *(2026-04-29)*
 - [x] EP-2: M2 — Add the effectful evaluator `exponentialBackoff` (uses `IOE` to
       sample randomness) and the convenience `retryWithBackoff`. *(2026-04-29)*
-- [ ] EP-2: M3 — Add property and unit tests covering monotonicity, max-delay
-      clamping, and the boundary cases for each `Jitter` variant.
+- [x] EP-2: M3 — Add property and unit tests covering monotonicity, max-delay
+      clamping, and the boundary cases for each `Jitter` variant. *(2026-04-29)*
 - [ ] EP-3: M1 — Populate `attempt` from `readCount` in `pgmqMessageToEnvelope`
       and add a unit test in `ConvertSpec` covering `readCount = 1, 2, 5`.
 - [ ] EP-3: M2 — Add the defensive `Int32` clamp on visibility-timeout extension

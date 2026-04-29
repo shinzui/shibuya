@@ -9,6 +9,18 @@
   constructions of `Envelope` must add the field. The new `Attempt`
   newtype is exported from `Shibuya.Core` and `Shibuya.Core.Types`.
 
+### Additions
+
+- New module `Shibuya.Core.Retry` providing `BackoffPolicy`, `Jitter`
+  (`NoJitter`, `FullJitter`, `EqualJitter`), `defaultBackoffPolicy`, the
+  pure evaluator `exponentialBackoffPure`, the effectful
+  `exponentialBackoff`, and the handler convenience `retryWithBackoff`.
+  Handlers can now compute exponentially-growing, jittered retry delays
+  with a single call: `retryWithBackoff defaultBackoffPolicy
+  ingested.envelope`. Pulls in `random ^>=1.2` as a new build-depends
+  (already a transitive dep — ships with GHC). See the module haddock and
+  the new `RetrySpec` test for usage patterns.
+
 Planned next release: 0.4.0.0 (major — breaks direct `Envelope` construction).
 
 ## 0.3.0.0 — 2026-04-24

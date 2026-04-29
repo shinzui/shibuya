@@ -71,9 +71,10 @@ and `docs/plans/8-demonstrate-backoff-end-to-end.md`. It hard-depends on
 - [x] Milestone 2 — Add the effectful `exponentialBackoff` (uses `IOE` to draw a
       sample from `System.Random`), and the convenience `retryWithBackoff`.
       Add `random` to the build-depends if not already present. *(2026-04-29)*
-- [ ] Milestone 3 — Add `shibuya-core/test/Shibuya/Core/RetrySpec.hs` with
+- [x] Milestone 3 — Add `shibuya-core/test/Shibuya/Core/RetrySpec.hs` with
       property and unit tests. Wire it into `Main.hs` and the test cabal stanza.
       Update the CHANGELOG `Unreleased` section to mention the new module.
+      *(2026-04-29)*
 
 
 ## Surprises & Discoveries
@@ -117,7 +118,29 @@ and `docs/plans/8-demonstrate-backoff-end-to-end.md`. It hard-depends on
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Implemented across three commits on 2026-04-29:
+
+- M1 added `Shibuya.Core.Retry` with `BackoffPolicy`, `Jitter`,
+  `defaultBackoffPolicy`, and `exponentialBackoffPure`, plus the cabal
+  `exposed-modules` entry.
+- M2 added `exponentialBackoff` (effectful) and `retryWithBackoff`,
+  with `random ^>=1.2` added to the library `build-depends`.
+- M3 added `Shibuya.Core.RetrySpec` covering all three jitter strategies
+  (deterministic boundary cases plus randomized property bounds) and the
+  effectful entry points; wired the spec into `test/Main.hs` and the
+  cabal test stanza; recorded the new module under `Unreleased > Additions`
+  in the changelog.
+
+The full test suite ran clean: 112 examples, 0 failures, in ~12 s.
+The plan's M3 sketch contained an illegal nested `import` inside an
+`it` block — it was hoisted to the module's top-level imports during
+implementation, as the plan itself flagged.
+
+`Shibuya.Core.Retry` is intentionally not re-exported from
+`Shibuya.Core`; handlers wanting backoff import the module directly.
+
+Next initiative steps: EP-3 (populate `attempt` from pgmq `readCount`
+in `shibuya-pgmq-adapter`) and EP-4 (end-to-end demonstration) remain.
 
 
 ## Context and Orientation
