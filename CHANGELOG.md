@@ -1,6 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.4.0.0 — 2026-04-29
+
+### Breaking Changes
+
+- `shibuya-core`: `Envelope` gained an `attempt :: !(Maybe Attempt)`
+  field carrying the adapter's delivery counter (zero-indexed; `Nothing`
+  if unknown). Direct constructions of `Envelope` must add the field.
+  The new `Attempt` newtype is exported from `Shibuya.Core` and
+  `Shibuya.Core.Types`.
+
+### New Features
+
+- `shibuya-core`: new module `Shibuya.Core.Retry` providing
+  `BackoffPolicy`, `Jitter` (`NoJitter`, `FullJitter`, `EqualJitter`),
+  `defaultBackoffPolicy`, the pure evaluator `exponentialBackoffPure`,
+  the effectful `exponentialBackoff`, and the handler convenience
+  `retryWithBackoff`. Handlers can now compute exponentially-growing,
+  jittered retry delays with a single call. Adds `random ^>=1.2` as a
+  new build-depends. A runnable end-to-end demo lives in the sibling
+  [`shinzui/shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
+  repo (`shibuya-pgmq-example`, `backoff-demo` subcommand).
+
+### Other Changes
+
+- `shibuya-metrics` is re-released at 0.4.0.0 to track the shared
+  version; it has no user-visible changes of its own.
 
 ### Repo Layout
 

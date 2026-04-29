@@ -1,6 +1,6 @@
 cabal-version: 3.14
 name: shibuya-metrics
-version: 0.3.0.0
+version: 0.4.0.0
 synopsis: Metrics web server for Shibuya queue processing framework
 description:
   Provides HTTP/JSON, Prometheus, and WebSocket endpoints for
