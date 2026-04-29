@@ -51,31 +51,53 @@ recommended handler-side helper.
 
 ## Progress
 
-- [ ] Milestone 1 — Update `pgmqMessageToEnvelope` in
+- [x] Milestone 1 — Update `pgmqMessageToEnvelope` in
       `shibuya-pgmq-adapter/shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs`
       to populate `attempt` from `msg.readCount`. Add unit tests in
       `shibuya-pgmq-adapter/shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ConvertSpec.hs`
       covering `readCount = 1` (first delivery, Attempt 0), `readCount = 2`
       (first retry, Attempt 1), `readCount = 5` (fourth retry, Attempt 4),
       and the boundary `readCount = 0` (which pgmq doesn't actually emit, but
-      the conversion must not panic — clamp to `Attempt 0`).
-- [ ] Milestone 2 — Replace the unsafe `nominalToSeconds` use in
+      the conversion must not panic — clamp to `Attempt 0`). *(2026-04-29)*
+- [x] Milestone 2 — Replace the unsafe `nominalToSeconds` use in
       `shibuya-pgmq-adapter/shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs`
-      with a clamping variant `nominalToSecondsClamped` that saturates at
-      `maxBound :: Int32`. Add a unit test that constructs a 100-year
-      `RetryDelay` and asserts the clamp produces `maxBound` seconds.
-- [ ] Milestone 3 — Update the haddock at the top of
+      with a clamping variant that saturates at `maxBound :: Int32` (kept
+      the same name and signature so call sites need no change). Added
+      four new test cases under `nominalToSeconds clamping` covering
+      30 seconds, subsecond rounding, the 100-year clamp, and the
+      negative-direction clamp. *(2026-04-29)*
+- [x] Milestone 3 — Updated the "Retry Handling" haddock section in
       `shibuya-pgmq-adapter/shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq.hs`
-      ("Retry Handling" section) to document the `attempt` field and point at
-      `Shibuya.Core.Retry.retryWithBackoff`. Update
-      `shibuya-pgmq-adapter/shibuya-pgmq-adapter/CHANGELOG.md` `Unreleased`
-      section. Bump the planned `shibuya-core` lower bound in the cabal file
-      to track `0.4.0.0`.
+      with a snippet pointing at `Shibuya.Core.Retry.retryWithBackoff` and
+      mentioning the `Int32` clamp. Added an `Unreleased` section to
+      `shibuya-pgmq-adapter/shibuya-pgmq-adapter/CHANGELOG.md` covering
+      the field, the clamp, and the new `shibuya-core ^>=0.4.0.0`
+      requirement. The cabal lower-bound bump itself was made earlier
+      (with M1's commit) so the build could resolve against the local
+      `shibuya-core 0.4.0.0`. *(2026-04-29)*
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+- The plan assumed the adapter could simply bump its `shibuya-core` lower
+  bound to `^>=0.4.0.0` and develop against a local checkout, but the main
+  repo's `shibuya-core/shibuya-core.cabal` was still at `version: 0.3.0.0`
+  even though EP-1's CHANGELOG declared the next release as `0.4.0.0`.
+  Cabal's resolver enforces the version literally, so without bumping the
+  main repo too, no version of `shibuya-core` could satisfy `^>=0.4.0.0`.
+  Resolved by:
+  1. Bumping `shibuya-core` to `0.4.0.0` in
+     `shibuya/shibuya-core/shibuya-core.cabal`.
+  2. Bumping the corresponding lower bound in
+     `shibuya/shibuya-metrics/shibuya-metrics.cabal` from `^>=0.3.0.0` to
+     `^>=0.4.0.0` so the in-repo build still resolves cleanly.
+  3. Adding a (gitignored) `cabal.project.local` to the adapter repo with
+     `packages: ../shibuya/shibuya-core ../shibuya/shibuya-metrics` so the
+     adapter builds against the local checkouts during development. The
+     `shibuya-metrics` override is needed because `shibuya-pgmq-example`
+     transitively pulls it and the published `shibuya-metrics-0.3.0.0`
+     still pins `shibuya-core ^>=0.3.0.0`.
+  Date: 2026-04-29.
 
 
 ## Decision Log
@@ -115,7 +137,33 @@ recommended handler-side helper.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Completed on 2026-04-29. The PGMQ adapter now populates
+`Envelope.attempt` from pgmq's `readCount` (0-indexed), and the
+visibility-timeout extension is defensively clamped to the `Int32`
+range so misconfigured `BackoffPolicy.maxDelay` values cannot cause
+undefined behavior. The adapter's `Shibuya.Adapter.Pgmq` haddock now
+points handler authors at `Shibuya.Core.Retry.retryWithBackoff`.
+
+Achieved:
+
+- 99 unit-test assertions pass (4 new for the `attempt` field and 4
+  new for `nominalToSeconds` clamping).
+- `shibuya-core ^>=0.4.0.0` lower bound is in place across the adapter
+  library and test suite.
+
+Discovered en route (recorded in Surprises): the main repo's
+`shibuya-core/shibuya-core.cabal` was still at `version: 0.3.0.0`
+even though EP-1 had already declared the next release as `0.4.0.0`,
+so the version bump and a sibling lower-bound bump in
+`shibuya-metrics` had to happen alongside this plan. A gitignored
+`cabal.project.local` was added in the adapter repo to point at the
+sibling shibuya-core/shibuya-metrics checkouts; once `shibuya-core
+0.4.0.0` is published this local override can be deleted.
+
+Not exercised by this plan: the live-PGMQ integration tests
+(`IntegrationSpec`, `ChaosSpec`) — they require a running Postgres
+with the pgmq extension. They will be exercised by EP-4's end-to-end
+demo run.
 
 
 ## Context and Orientation

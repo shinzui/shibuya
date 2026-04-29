@@ -92,7 +92,7 @@ Why this split and not others:
 |-------|------------------------------------------------------|---------------------------------------------------------|-------------|-----------|-------------|
 | EP-1  | Add Attempt newtype and attempt field on Envelope    | docs/plans/5-add-attempt-to-envelope.md                 | None        | None      | Complete    |
 | EP-2  | Add Shibuya.Core.Retry with BackoffPolicy            | docs/plans/6-add-backoff-policy-module.md               | EP-1        | None      | Complete    |
-| EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Not Started |
+| EP-3  | Populate attempt from pgmq readCount + Int32 clamp   | docs/plans/7-populate-attempt-from-pgmq-readcount.md    | EP-1        | EP-2      | Complete    |
 | EP-4  | Demonstrate exponential backoff end-to-end           | docs/plans/8-demonstrate-backoff-end-to-end.md          | EP-2, EP-3  | None      | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -217,13 +217,14 @@ something that explodes.
       sample randomness) and the convenience `retryWithBackoff`. *(2026-04-29)*
 - [x] EP-2: M3 — Add property and unit tests covering monotonicity, max-delay
       clamping, and the boundary cases for each `Jitter` variant. *(2026-04-29)*
-- [ ] EP-3: M1 — Populate `attempt` from `readCount` in `pgmqMessageToEnvelope`
+- [x] EP-3: M1 — Populate `attempt` from `readCount` in `pgmqMessageToEnvelope`
       and add a unit test in `ConvertSpec` covering `readCount = 1, 2, 5`.
-- [ ] EP-3: M2 — Add the defensive `Int32` clamp on visibility-timeout extension
+      *(2026-04-29)*
+- [x] EP-3: M2 — Add the defensive `Int32` clamp on visibility-timeout extension
       and a unit test that constructs a 100-year `RetryDelay` and asserts the
-      adapter clamps to `Int32` max seconds without throwing.
-- [ ] EP-3: M3 — Update `Shibuya.Adapter.Pgmq` haddock and `CHANGELOG.md` to
-      mention the new field.
+      adapter clamps to `Int32` max seconds without throwing. *(2026-04-29)*
+- [x] EP-3: M3 — Update `Shibuya.Adapter.Pgmq` haddock and `CHANGELOG.md` to
+      mention the new field. *(2026-04-29)*
 - [ ] EP-4: M1 — Write a handler in `shibuya-pgmq-example` that fails the first N
       deliveries and uses `retryWithBackoff`. Wire it into a runnable example.
 - [ ] EP-4: M2 — Run the example against a local PGMQ-capable Postgres; capture
@@ -247,6 +248,18 @@ something that explodes.
   accessors are not in scope as functions. Fixed via record-dot
   syntax. EP-2 and EP-4 should be careful with field-selector idioms
   in any new test snippets they introduce. Date: 2026-04-29.
+- EP-3 discovered that EP-1 had not bumped `shibuya-core` to
+  `0.4.0.0` in `shibuya-core/shibuya-core.cabal` despite EP-1's
+  CHANGELOG entry already declaring `0.4.0.0` as the next release.
+  EP-3 cannot honestly declare its `^>=0.4.0.0` lower bound while
+  the local cabal still says `0.3.0.0`, so the version bump (plus a
+  matching lower-bound bump in `shibuya-metrics`) was done as a
+  prerequisite commit for EP-3. EP-4 should assume `shibuya-core`
+  `0.4.0.0` is the in-tree version and rely on the (gitignored)
+  `cabal.project.local` already established in the
+  `shibuya-pgmq-adapter` repo to point at the local checkouts of
+  `shibuya-core` and `shibuya-metrics` until those packages are
+  published to Hackage at `0.4.0.0`. Date: 2026-04-29.
 
 
 ## Decision Log
