@@ -48,14 +48,17 @@ unblocks both.
       instances needed for arithmetic on the inner `Word`. Update the export list
       and add the type's own unit-test coverage in
       `shibuya-core/test/Shibuya/Core/TypesSpec.hs`. *(2026-04-29)*
-- [ ] Milestone 2 — Add the `attempt :: !(Maybe Attempt)` field to the `Envelope`
+- [x] Milestone 2 — Add the `attempt :: !(Maybe Attempt)` field to the `Envelope`
       record (also in `Types.hs`). Update every Envelope construction site in this
       repository so the build stays green: `shibuya-core/test/Shibuya/Core/TypesSpec.hs`,
       `shibuya-core/test/Shibuya/RunnerSpec.hs`,
       `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs`,
       `shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs`,
-      `shibuya-example/app/Main.hs`. Each of those sites passes `attempt = Nothing`
-      because they construct mock messages with no delivery history.
+      `shibuya-example/app/Main.hs`, plus the four bench sites surfaced in
+      Surprises & Discoveries (`shibuya-core-bench/bench/Bench/{Framework,Handler,Concurrency}.hs`
+      and `shibuya-core-bench/bench/Test/StandaloneTest.hs`). Each of those
+      sites passes `attempt = Nothing` because they construct mock messages
+      with no delivery history. *(2026-04-29)*
 - [ ] Milestone 3 — Re-export `Attempt (..)` from `shibuya-core/src/Shibuya/Core.hs`.
       Add an entry to `shibuya-core/CHANGELOG.md` under a fresh `Unreleased` section
       noting the breaking change to `Envelope`'s shape and bumping the planned

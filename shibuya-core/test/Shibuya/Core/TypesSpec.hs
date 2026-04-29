@@ -73,6 +73,11 @@ spec = do
       mapped.traceContext `shouldBe` env.traceContext
       mapped.payload `shouldBe` 5
 
+    it "preserves attempt through fmap" $ do
+      let env = (testEnvelope (1 :: Int)) {attempt = Just (Attempt 3)}
+          mapped = fmap show env
+      mapped.attempt `shouldBe` Just (Attempt 3)
+
 -- Test helper
 testEnvelope :: msg -> Envelope msg
 testEnvelope msg =
@@ -82,6 +87,7 @@ testEnvelope msg =
       partition = Just "partition-0",
       enqueuedAt = Just testTime,
       traceContext = Nothing,
+      attempt = Nothing,
       payload = msg
     }
 

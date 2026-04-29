@@ -130,6 +130,7 @@ createIngestedMessages n = do
                 partition = Nothing,
                 enqueuedAt = Just now,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
        in Ingested

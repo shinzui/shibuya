@@ -69,6 +69,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
                 partition = Nothing,
                 enqueuedAt = Nothing,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = ("hello" :: Text)
               }
           ingested =

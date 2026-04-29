@@ -64,6 +64,10 @@ data Envelope msg = Envelope
     enqueuedAt :: !(Maybe UTCTime),
     -- | W3C trace context headers for distributed tracing
     traceContext :: !(Maybe TraceHeaders),
+    -- | Optional zero-indexed delivery counter.
+    -- 'Just (Attempt 0)' on first delivery; 'Nothing' if the adapter
+    -- does not track redeliveries (e.g., Kafka).
+    attempt :: !(Maybe Attempt),
     -- | The actual message payload
     payload :: !msg
   }

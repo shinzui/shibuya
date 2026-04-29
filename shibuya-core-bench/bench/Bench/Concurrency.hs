@@ -226,6 +226,7 @@ createIngestedMessages n = mapM createMessage [1 .. n]
                 partition = Nothing,
                 enqueuedAt = Just benchTime,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack

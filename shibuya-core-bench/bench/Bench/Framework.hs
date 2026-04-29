@@ -153,6 +153,7 @@ wrapAsIngested payloads = do
                 partition = Nothing,
                 enqueuedAt = Just now,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = payload
               }
        in Ingested

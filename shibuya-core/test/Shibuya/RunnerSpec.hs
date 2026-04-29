@@ -205,6 +205,7 @@ createTestMessages n = mapM createMessage [1 .. n]
                 partition = Nothing,
                 enqueuedAt = Just testTime,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = "message-" <> show i
               }
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack
@@ -228,6 +229,7 @@ createTrackedMessages tracking n = mapM createMessage [1 .. n]
                 partition = Nothing,
                 enqueuedAt = Just testTime,
                 traceContext = Nothing,
+                attempt = Nothing,
                 payload = "message-" <> show i
               }
           ackHandle = trackingAckHandle tracking msgId
