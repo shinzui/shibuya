@@ -22,6 +22,23 @@ spec = do
       let msgId :: MessageId = "test-message"
       msgId.unMessageId `shouldBe` "test-message"
 
+  describe "Attempt" $ do
+    it "supports Eq" $ do
+      Attempt 0 `shouldBe` Attempt 0
+      Attempt 0 `shouldNotBe` Attempt 1
+
+    it "supports Ord for sequencing retries" $ do
+      Attempt 0 `compare` Attempt 1 `shouldBe` LT
+      Attempt 5 `compare` Attempt 5 `shouldBe` EQ
+      Attempt 9 `compare` Attempt 1 `shouldBe` GT
+
+    it "supports Num so retries can be incremented" $ do
+      Attempt 0 + 1 `shouldBe` Attempt 1
+      Attempt 4 + 1 `shouldBe` Attempt 5
+
+    it "Bounded reflects the underlying Word" $ do
+      (minBound :: Attempt).unAttempt `shouldBe` 0
+
   describe "Cursor" $ do
     it "CursorInt compares numerically" $ do
       CursorInt 1 `compare` CursorInt 2 `shouldBe` LT

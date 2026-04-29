@@ -8,6 +8,9 @@ module Shibuya.Core.Types
     -- * Cursor / Offset
     Cursor (..),
 
+    -- * Delivery Attempt
+    Attempt (..),
+
     -- * Message Envelope
     Envelope (..),
 
@@ -34,6 +37,14 @@ data Cursor
   = CursorInt !Int
   | CursorText !Text
   deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | Zero-indexed delivery attempt count.
+-- 0 means first delivery; 1 means first retry; and so on.
+-- Adapters that cannot track redeliveries report 'Nothing' on the envelope.
+newtype Attempt = Attempt {unAttempt :: Word}
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Num, Real, Enum, Integral, Bounded)
   deriving anyclass (NFData)
 
 -- | W3C Trace Context headers for distributed tracing.
