@@ -162,12 +162,14 @@ actual current state of the work.
         shibuya-core 0.5.0.0 publication.
 -   [ ] M3 — Implement the P1 fix(es) named by the audit, with tests
     and a Jaeger demo. Same trailer hygiene as M2.
--   [ ] M4 — Update `docs/plans/OPENTELEMETRY_INTEGRATION.md` to
-    reflect the audited and updated state of the API. Mark the legacy
-    plan as superseded for any sections that no longer match the
-    code. Run `nix fmt`, `nix flake check`, and the full
-    `cabal test` matrix one last time. Fill in Outcomes &
-    Retrospective.
+-   [x] M4 — Refresh `docs/plans/OPENTELEMETRY_INTEGRATION.md` to
+    reflect the audited and updated state of the API (added a
+    "Current State (2026-05-05)" section and inline `[SUPERSEDED]`
+    banners; populated the Phase 1/2/3 deliverable checklists with
+    shipped vs. open status). Ran `nix fmt`, `nix flake check`,
+    and the unit-tagged `cabal test` matrix in all three repos —
+    all green (see "Acceptance gates" in Outcomes). Outcomes &
+    Retrospective filled. Done 2026-05-05.
 
 
 ## Surprises & Discoveries
@@ -490,7 +492,133 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at
 completion. Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+### Outcomes (2026-05-05)
+
+The plan set out to (a) audit Shibuya's OpenTelemetry API surface,
+(b) name the worst frictions for adapter authors, and (c) implement
+the highest-priority fixes. After the work landed:
+
+-   **Audit deliverable** — `docs/plans/9-otel-audit-findings.md`
+    enumerates eight findings with file:line evidence and severity
+    triage. Pre-implementation Surprises S1..S7 are mapped onto
+    Findings F1..F8 (S4 refuted as a distinct finding; absorbed by
+    F1's fix). The status column on the triage table tracks what
+    landed.
+-   **F1 (P0) — duplicate Consumer span** — fixed by adding
+    `Envelope.attributes :: HashMap Text Attribute` to
+    `Shibuya.Core.Types` (shibuya-core 0.5.0.0, commit `7c6586b`).
+    `processOne` now merges adapter-supplied attributes over its
+    framework defaults (left-biased union) and flushes via a single
+    `addAttributes` call. The Kafka adapter populates the typed
+    `messaging.kafka.*` attributes plus
+    `messaging.system="kafka"`; `Shibuya.Adapter.Kafka.Tracing` and
+    its test are deleted (kafka-adapter 0.5.0.0, commit `0440544`).
+    The pgmq adapter populates `HashMap.empty` (no spec-defined
+    typed conventions today; pgmq-adapter 0.5.0.0, commit `274c0eb`).
+-   **F2 (P1)** — subsumed by F1's fix (typed Kafka attributes now
+    land on the framework span).
+-   **F3 (P1) — DLQ writes carry the original producer's
+    traceparent** — fixed by adding
+    `Shibuya.Telemetry.Propagation.currentTraceHeaders` to
+    shibuya-core (commit `193de1d`) and consuming it in pgmq's
+    `mkAckHandle (AckDeadLetter _)` branch. The consumer's
+    traceparent now becomes the active value on the DLQ message;
+    the producer's is preserved under
+    `x-shibuya-upstream-traceparent`. Five new
+    `Shibuya.Adapter.Pgmq.InternalSpec` cases assert the merge
+    contract directly. Kafka has no DLQ today (deferred).
+-   **F4 / F6 / F7 / F8 (P1/P2)** — open. The audit's "what's
+    next" recommendation: F4 (`runAppTraced` bracket) is the
+    highest-impact remaining fix for new-adapter authors; F8
+    (ingester-loop visibility) is the next highest-impact.
+-   **F5 (P2)** — resolved as documentation: `injectTraceContext`
+    stays exported as the lower-level primitive;
+    `currentTraceHeaders` is the recommended higher-level entry.
+-   **Cross-repo discipline** — the plan's original rule "do not
+    introduce path-based pins to test the integration before
+    publishing" was relaxed mid-work to "do not commit path-based
+    pins; gitignored `cabal.project.local` is fine for development."
+    The pgmq adapter already followed that pattern; the kafka
+    adapter adopted it for this work.
+    `cabal.project.local` is gitignored in both adapters; committed
+    `cabal.project` continues to point at Hackage.
+
+### Acceptance gates (2026-05-05)
+
+Run from the project root of each repo:
+
+| Gate | shibuya | shibuya-pgmq-adapter | shibuya-kafka-adapter |
+|------|---------|----------------------|-----------------------|
+| `cabal build all` | ✅ | ✅ | ✅ |
+| `cabal test` (unit-tagged subset) | ✅ 116/116 | ✅ 125/125 (12 DB pending) | ✅ 19/19 |
+| `nix flake check` | ✅ | ✅ | ✅ |
+| Hackage publication | _pending_ | _pending_ | _pending_ |
+| Live Jaeger smoke | _pending_ | _pending_ | _pending_ |
+
+Hackage publication and the live-Jaeger smokes are operator
+actions outside this plan's automation scope. All in-tree
+verification is green.
+
+### Findings landed by commit
+
+| Repo | Commit | Findings |
+|------|--------|----------|
+| shibuya | `8234f1a` | M1 — audit deliverable filed |
+| shibuya | `7c6586b` | M2.1 — F1 (P0), F2 (P1) |
+| shibuya | `193de1d` | M3.1 — F5 (P2) infrastructure for F3 |
+| shibuya | `d5024b1` | M4 — refresh `OPENTELEMETRY_INTEGRATION.md` |
+| shibuya-kafka-adapter | `0440544` | F1 (P0) adapter half — typed attrs in `Convert.hs`; `Tracing` module deleted |
+| shibuya-pgmq-adapter | `274c0eb` | F3 (P1) — DLQ trace propagation in `mkAckHandle` |
+
+### Gaps (open work)
+
+-   **F4 (P1) — `runApp` does not bracket tracing init.**
+    Recommended follow-up: add a `runAppTraced :: TracingConfig ->
+    SupervisionStrategy -> Int -> [(ProcessorId, QueueProcessor
+    (Tracing : es))] -> Eff es (Either AppError (AppHandle (Tracing
+    : es)))` bracket helper in `Shibuya.App` that owns
+    `initializeGlobalTracerProvider` /
+    `shutdownTracerProvider` and dispatches to `runTracing`
+    (when `cfg.enabled`) or `runTracingNoop`. Shibuya-core local;
+    no cross-repo coordination.
+-   **F6 (P2)** — `runTracingNoop` allocates a `TracerProvider`
+    per call. Cosmetic; works correctly today.
+-   **F7 (P2)** — `withSpan'`'s all-zero dummy `FrozenSpan`.
+    Cosmetic. Fix is a breaking type change
+    (`Span -> Eff es a` → `Maybe Span -> Eff es a`).
+-   **F8 (P2)** — Ingester poll-loop and adapter-shutdown spans.
+    Useful when source-stream errors are the symptom but rare
+    enough that priority is low.
+-   **Kafka DLQ propagation** — kafka-adapter does not implement
+    DLQ today; the analogous F3 work for kafka is its own future
+    plan when DLQ lands.
+-   **Postgres-backed integration test for F3** — the runtime
+    "consumer-traceparent wins under `runTracing`" assertion in
+    `ChaosSpec` is deferred. The unit-level `mergeDlqHeaders` spec
+    covers the merge contract directly.
+-   **Live Jaeger smoke** — operator action, recipes documented in
+    each adapter's README and in plan 1 / plan 12 Concrete Steps.
+
+### Lessons
+
+-   The original strict reading of "no path-based pins" was
+    operationally too conservative. The pgmq adapter's existing
+    `cabal.project.local` pattern (committed comment naming the
+    unreleased version) is the established practice and works well.
+    The Decision Log entries in the per-repo plans capture the
+    revised interpretation.
+-   `hs-opentelemetry-api`'s `Attribute` lacking `NFData` is the
+    kind of upstream gap that surfaces only when downstream code
+    derives `NFData` via `Generic`. The fix (manual instance) is
+    cheap; the discovery is worth recording so future contributors
+    do not delete the manual instance assuming derivation works.
+-   The upstream `addAttributes`'s left-biased union is correct in
+    isolation but produced surprising results when interleaved
+    with prior `addAttribute` calls on the same Span. Building
+    the framework defaults into a HashMap and unioning the
+    adapter's HashMap over them at the call site makes the
+    precedence rule easier to read and reason about. Plan 9 M2.1
+    Surprise records the attempt-and-correction cycle.
 
 
 ## Context and Orientation
