@@ -27,6 +27,16 @@
   previously bolted these on can now be removed; see the audit
   document `docs/plans/9-otel-audit-findings.md` (Finding F1, P0)
   for the full motivation.
+- `Shibuya.Telemetry.Propagation.currentTraceHeaders ::
+  (Tracing :> es, IOE :> es) => Eff es (Maybe TraceHeaders)` looks
+  up the currently-active OTel span (via thread-local context) and
+  encodes its trace context as W3C headers, ready for an adapter
+  to attach to an outgoing message. Returns `Nothing` when tracing
+  is disabled or there is no active span. The intended call sites
+  are adapter-side DLQ writes (so the failing-consumer's trace
+  links to the resulting DLQ message) and ad-hoc producer paths.
+  See the audit document `docs/plans/9-otel-audit-findings.md`
+  (Findings F3 and F5).
 
 ## 0.4.0.0 — 2026-04-29
 

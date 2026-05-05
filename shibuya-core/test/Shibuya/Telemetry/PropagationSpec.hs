@@ -5,9 +5,21 @@ module Shibuya.Telemetry.PropagationSpec (spec) where
 
 import Data.ByteArray.Encoding (Base (..))
 import Data.ByteString (ByteString)
+import Effectful (runEff)
+import OpenTelemetry.Attributes (emptyAttributes)
+import OpenTelemetry.Trace.Core
+  ( InstrumentationLibrary (..),
+    createTracerProvider,
+    defaultSpanArguments,
+    emptyTracerProviderOptions,
+    makeTracer,
+    shutdownTracerProvider,
+    tracerOptions,
+  )
 import OpenTelemetry.Trace.Core qualified as OTel
 import OpenTelemetry.Trace.Id qualified as OTel.Id
-import Shibuya.Telemetry.Propagation (extractTraceContext)
+import Shibuya.Telemetry.Effect (runTracing, runTracingNoop, withSpan)
+import Shibuya.Telemetry.Propagation (currentTraceHeaders, extractTraceContext)
 import Test.Hspec
 
 spec :: Spec
@@ -119,3 +131,46 @@ spec = describe "Shibuya.Telemetry.Propagation" $ do
         Nothing -> expectationFailure "Expected to extract trace context despite malformed tracestate"
         Just ctx -> do
           OTel.Id.traceIdBaseEncodedText Base16 (OTel.traceId ctx) `shouldBe` "0af7651916cd43dd8448eb211c80319c"
+
+  describe "currentTraceHeaders" $ do
+    it "returns Nothing when tracing is disabled" $ do
+      result <- runEff $ runTracingNoop currentTraceHeaders
+      result `shouldBe` Nothing
+
+    it "returns Nothing outside any active span" $ do
+      provider <- createTracerProvider [] emptyTracerProviderOptions
+      let tracer =
+            makeTracer
+              provider
+              ( InstrumentationLibrary
+                  { libraryName = "shibuya-test",
+                    libraryVersion = "",
+                    librarySchemaUrl = "",
+                    libraryAttributes = emptyAttributes
+                  }
+              )
+              tracerOptions
+      result <- runEff $ runTracing tracer currentTraceHeaders
+      _ <- shutdownTracerProvider provider
+      result `shouldBe` Nothing
+
+    it "returns headers carrying the active span's traceparent" $ do
+      provider <- createTracerProvider [] emptyTracerProviderOptions
+      let tracer =
+            makeTracer
+              provider
+              ( InstrumentationLibrary
+                  { libraryName = "shibuya-test",
+                    libraryVersion = "",
+                    librarySchemaUrl = "",
+                    libraryAttributes = emptyAttributes
+                  }
+              )
+              tracerOptions
+      result <- runEff $ runTracing tracer $ withSpan "outer" defaultSpanArguments currentTraceHeaders
+      _ <- shutdownTracerProvider provider
+      case result of
+        Nothing -> expectationFailure "expected currentTraceHeaders to return Just"
+        Just hs -> case lookup "traceparent" hs of
+          Nothing -> expectationFailure "expected traceparent header to be present"
+          Just _ -> pure ()

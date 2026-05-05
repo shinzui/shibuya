@@ -6,15 +6,20 @@ module Shibuya.Telemetry.Propagation
 
     -- * Injection
     injectTraceContext,
+    currentTraceHeaders,
 
     -- * Re-export
     TraceHeaders,
   )
 where
 
+import Effectful (Eff, IOE, liftIO, (:>))
+import OpenTelemetry.Context qualified as Ctx
+import OpenTelemetry.Context.ThreadLocal qualified as Ctx
 import OpenTelemetry.Propagator.W3CTraceContext qualified as W3C
 import OpenTelemetry.Trace.Core (Span, SpanContext)
 import Shibuya.Core.Types (TraceHeaders)
+import Shibuya.Telemetry.Effect (Tracing, isTracingEnabled)
 
 -- | Extract SpanContext from W3C trace headers.
 -- Returns Nothing if headers are missing or malformed.
@@ -49,3 +54,37 @@ injectTraceContext otelSpan = do
     [ ("traceparent", traceparent),
       ("tracestate", tracestate)
     ]
+
+-- | Look up the currently-active OTel span and encode its context as
+-- W3C trace headers, ready to attach to an outgoing message.
+--
+-- Returns 'Nothing' when tracing is disabled or when there is no
+-- active span at the call site (e.g. a producer running outside any
+-- 'Shibuya.Telemetry.Effect.withSpan'/@withSpan'@ scope).
+--
+-- This is the higher-level helper most call sites want — adapter
+-- code that forwards a message (a DLQ write from @AckDeadLetter@,
+-- a producer publishing a follow-on event) can do:
+--
+-- @
+-- consumerHeaders <- currentTraceHeaders
+-- let outgoingHeaders =
+--       maybe originalHeaders (\\h -> h <> originalHeaders) consumerHeaders
+-- @
+--
+-- and the failing-consumer's trace shows up linked to the resulting
+-- message in the downstream trace store. The lower-level
+-- 'injectTraceContext' is still exported for callers that already
+-- hold a 'Span' handle from inside a 'withSpan''.
+currentTraceHeaders ::
+  (Tracing :> es, IOE :> es) =>
+  Eff es (Maybe TraceHeaders)
+currentTraceHeaders = do
+  enabled <- isTracingEnabled
+  if not enabled
+    then pure Nothing
+    else liftIO $ do
+      ctx <- Ctx.getContext
+      case Ctx.lookupSpan ctx of
+        Nothing -> pure Nothing
+        Just sp -> Just <$> injectTraceContext sp
