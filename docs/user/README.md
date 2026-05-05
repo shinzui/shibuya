@@ -5,6 +5,7 @@ Guides for using the Shibuya queue processing framework.
 ## Core Shibuya
 
 - **[Getting Started](./getting-started.md)** - Handlers, ack decisions, runApp, supervision, metrics, graceful shutdown
+- **[OpenTelemetry Tracing](./opentelemetry.md)** - Enabling tracing, the `Envelope.traceContext` vs. `Envelope.attributes` distinction, custom spans inside handlers, DLQ trace propagation, local Jaeger setup
 
 ## Adapters
 
