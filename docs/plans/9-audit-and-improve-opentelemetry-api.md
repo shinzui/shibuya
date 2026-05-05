@@ -146,22 +146,28 @@ actual current state of the work.
         framework span (P0 fix, plan 9 F1/F2)" passes; the original
         case "emits a process span with conventions-aligned
         attributes and events" still passes.
-    -   [ ] M2.2 — `shibuya-pgmq-adapter`: bump bound to
-        `shibuya-core ^>=0.5`, populate `Envelope.attributes` from
-        the pgmq message at envelope-construction time (empty for
-        pgmq today; the field is a future hook), update tests, bump
-        version. Pending shibuya-core 0.5.0.0 publication to
-        Hackage — the plan forbids path-based pins for cross-repo
-        integration testing.
-    -   [ ] M2.3 — `shibuya-kafka-adapter`: bump bound to
+    -   [x] M2.2 — `shibuya-pgmq-adapter`: bumped to
+        `shibuya-core ^>=0.5`, populate `Envelope.attributes`
+        (empty HashMap for pgmq today; future hook), tests +
+        version bumped. Landed in shibuya-pgmq-adapter commit
+        `274c0eb`. Decision Log entry on 2026-05-05 relaxed the
+        "no path-based pins" rule to allow gitignored
+        `cabal.project.local` for development.
+    -   [x] M2.3 — `shibuya-kafka-adapter`: bumped to
         `shibuya-core ^>=0.5`, populate `Envelope.attributes` from
         the Kafka `ConsumerRecord` (system + typed
-        `messaging.kafka.*`), shrink or delete
-        `Shibuya.Adapter.Kafka.Tracing.traced` (no longer needed),
-        update tests + the `OtelDemo`, bump version. Pending
-        shibuya-core 0.5.0.0 publication.
--   [ ] M3 — Implement the P1 fix(es) named by the audit, with tests
-    and a Jaeger demo. Same trailer hygiene as M2.
+        `messaging.kafka.*`), `Shibuya.Adapter.Kafka.Tracing`
+        deleted, OtelDemo migrated to `runWithMetrics`, version
+        bumped. Landed in shibuya-kafka-adapter commit `0440544`.
+-   [x] M3.1 — F3 (P1) DLQ trace propagation: added
+    `currentTraceHeaders` in shibuya-core (commit `193de1d`) and
+    consumed it in pgmq's `mkAckHandle (AckDeadLetter _)` branch
+    (shibuya-pgmq-adapter commit `274c0eb`). Five new
+    `mergeDlqHeaders` spec cases pass.
+-   [ ] M3.2..M3.4 — F4 (`runAppTraced` bracket), F6
+    (`runTracingNoop` allocation), F7 (`withSpan'` dummy span), F8
+    (ingester poll-loop visibility) deferred to a follow-up plan.
+    See "Gaps" in Outcomes for rationale.
 -   [x] M4 — Refresh `docs/plans/OPENTELEMETRY_INTEGRATION.md` to
     reflect the audited and updated state of the API (added a
     "Current State (2026-05-05)" section and inline `[SUPERSEDED]`
@@ -550,14 +556,43 @@ Run from the project root of each repo:
 | Gate | shibuya | shibuya-pgmq-adapter | shibuya-kafka-adapter |
 |------|---------|----------------------|-----------------------|
 | `cabal build all` | ✅ | ✅ | ✅ |
-| `cabal test` (unit-tagged subset) | ✅ 116/116 | ✅ 125/125 (12 DB pending) | ✅ 19/19 |
+| `cabal test` (full suite) | ✅ 116/116 | ✅ 125/125 (incl. DB integration + chaos, against existing local Postgres) | ✅ 26/26 (incl. Redpanda integration) |
 | `nix flake check` | ✅ | ✅ | ✅ |
+| Live Jaeger smoke | ✅ (covered transitively via the two adapter demos) | ✅ (`shibuya-pgmq-simulator` + `shibuya-pgmq-consumer`) | ✅ (`otel-producer-demo` + `otel-demo`) |
 | Hackage publication | _pending_ | _pending_ | _pending_ |
-| Live Jaeger smoke | _pending_ | _pending_ | _pending_ |
 
-Hackage publication and the live-Jaeger smokes are operator
-actions outside this plan's automation scope. All in-tree
-verification is green.
+All in-tree verification is green. Hackage publication is the
+remaining operator action.
+
+Live Jaeger smoke transcript (run 2026-05-05; `~/.local/bin/jaeger`
++ Redpanda via `just process-up`):
+
+-   **Kafka producer→consumer round trip.** `otel-producer-demo`
+    emitted two records (`upstream-key`, `diy-key`) with
+    `traceparent` headers. `otel-demo` consumed both. Inspecting
+    the Jaeger trace `8754d1c69c6577bbe7a6595293c77dde` (the
+    DIY-branch trace) showed exactly two spans: a producer span
+    `shibuya.send.message` (kind=producer) and a single consumer
+    span `orders process` (kind=consumer) parented as `CHILD_OF`
+    the producer's `5e9480617881e53d` span. The `orders process`
+    span carried both the spec-aligned messaging.* attributes
+    AND the typed `messaging.kafka.destination.partition=0`,
+    `messaging.kafka.message.offset=3`, `messaging.system=kafka`
+    contributed by the adapter via `Envelope.attributes` —
+    confirming F1 (no duplicate sibling Consumer span) and F2
+    (typed Kafka attrs land on the framework span, not on a
+    separate one).
+-   **pgmq end-to-end.** `shibuya-pgmq-simulator` enqueued 5
+    orders messages with W3C traceparent headers via
+    `sendMessageTraced`. `shibuya-pgmq-consumer` processed all
+    five. A representative trace's spans:
+    `pgmq.produce` (producer) → `publish orders` (producer,
+    pgmq-effectful) → `orders process` (consumer, framework
+    processOne, single span) → `pgmq.delete orders` (internal,
+    ack/delete). The `orders process` span was correctly
+    `CHILD_OF` the producer side, confirming
+    `Envelope.traceContext` round-trip via
+    `Convert.extractTraceHeaders` works under `runApp`.
 
 ### Findings landed by commit
 
@@ -596,8 +631,12 @@ verification is green.
     "consumer-traceparent wins under `runTracing`" assertion in
     `ChaosSpec` is deferred. The unit-level `mergeDlqHeaders` spec
     covers the merge contract directly.
--   **Live Jaeger smoke** — operator action, recipes documented in
-    each adapter's README and in plan 1 / plan 12 Concrete Steps.
+-   **Live Jaeger smoke (cleared 2026-05-05)** — both adapters'
+    demos were exercised end-to-end against a live Jaeger v2 +
+    Redpanda + Postgres stack. Trace shapes match the audit's
+    "Proposed fix" predictions for F1 and F2. Recipes remain
+    documented in each adapter's README and in plan 1 / plan 12
+    Concrete Steps for future verification.
 
 ### Lessons
 
