@@ -33,10 +33,16 @@ handleMessage ingested = do
   let maybeCursor = cursor (envelope ingested)
   let maybePartition = partition (envelope ingested)
   let maybeEnqueuedAt = enqueuedAt (envelope ingested)
+  let maybeAttempt = attempt (envelope ingested)  -- Just (Attempt 0) on first delivery
 
   -- Process...
   pure AckOk
 ```
+
+The envelope also carries `traceContext` (incoming W3C trace headers)
+and `attributes` (adapter-supplied OTel span labels) — see
+[OpenTelemetry Tracing](./opentelemetry.md) for how those fields drive
+the per-message Consumer span.
 
 ### Ack Decisions
 
@@ -236,7 +242,7 @@ data AppError
   | AppRuntimeError !RuntimeError    -- Supervisor failure or inbox overflow
 ```
 
-## Current Limitations (v0.1.0-alpha)
+## Current Limitations
 
 ### Restart Semantics
 
