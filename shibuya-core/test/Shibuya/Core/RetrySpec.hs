@@ -2,6 +2,7 @@
 
 module Shibuya.Core.RetrySpec (spec) where
 
+import Data.HashMap.Strict qualified as HashMap
 import Data.Time (nominalDiffTimeToSeconds)
 import Effectful (runEff)
 import Shibuya.Core.Ack (AckDecision (..), RetryDelay (..))
@@ -22,6 +23,7 @@ testEnvelope a =
       enqueuedAt = Nothing,
       traceContext = Nothing,
       attempt = a,
+      attributes = HashMap.empty,
       payload = ()
     }
 

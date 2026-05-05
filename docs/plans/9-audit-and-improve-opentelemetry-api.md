@@ -133,10 +133,33 @@ actual current state of the work.
 -   [x] M1.5 — Write `docs/plans/9-otel-audit-findings.md` with a
     triaged findings table, each finding tagged P0/P1/P2 with a
     one-paragraph proposed fix, and commit it. Done 2026-05-05.
--   [ ] M2 — Implement the P0 fix(es) named by the audit, with tests
+-   [/] M2 — Implement the P0 fix(es) named by the audit, with tests
     and a Jaeger demo. Each P0 lands as its own commit with the
     `ExecPlan:` and `Intention:` trailers. Update Surprises and
     Decision Log when implementation reveals a fact the audit missed.
+    -   [x] M2.1 — `shibuya-core` 0.5.0.0: add
+        `Envelope.attributes :: HashMap Text Attribute`, have
+        `processOne` merge envelope-supplied attrs over framework
+        defaults (left-biased union — adapter wins), update tests,
+        bump versions, update CHANGELOGs. Done 2026-05-05; the new
+        `SemanticSpec` case "applies envelope.attributes onto the
+        framework span (P0 fix, plan 9 F1/F2)" passes; the original
+        case "emits a process span with conventions-aligned
+        attributes and events" still passes.
+    -   [ ] M2.2 — `shibuya-pgmq-adapter`: bump bound to
+        `shibuya-core ^>=0.5`, populate `Envelope.attributes` from
+        the pgmq message at envelope-construction time (empty for
+        pgmq today; the field is a future hook), update tests, bump
+        version. Pending shibuya-core 0.5.0.0 publication to
+        Hackage — the plan forbids path-based pins for cross-repo
+        integration testing.
+    -   [ ] M2.3 — `shibuya-kafka-adapter`: bump bound to
+        `shibuya-core ^>=0.5`, populate `Envelope.attributes` from
+        the Kafka `ConsumerRecord` (system + typed
+        `messaging.kafka.*`), shrink or delete
+        `Shibuya.Adapter.Kafka.Tracing.traced` (no longer needed),
+        update tests + the `OtelDemo`, bump version. Pending
+        shibuya-core 0.5.0.0 publication.
 -   [ ] M3 — Implement the P1 fix(es) named by the audit, with tests
     and a Jaeger demo. Same trailer hygiene as M2.
 -   [ ] M4 — Update `docs/plans/OPENTELEMETRY_INTEGRATION.md` to
@@ -314,6 +337,55 @@ S4 (pgmq has no symmetric `traced` module) is **refuted as a
 distinct finding**: the asymmetry is correct, and once F1 lands the
 kafka `traced` module disappears too.
 
+### M2.1 — `Attribute` lacks an upstream `NFData` instance (2026-05-05)
+
+While implementing F1's fix in `shibuya-core`, `Envelope`'s
+`deriving anyclass (NFData)` clause stopped working as soon as the
+new `attributes :: HashMap Text Attribute` field was added.
+`hs-opentelemetry-api`'s `OpenTelemetry.Attributes.Attribute`
+derives `(Read, Show, Eq, Ord, Data, Generic, TH.Lift)` and a
+`Hashable` anyclass — but no `NFData`. The bench harness at
+`shibuya-core-bench/bench/Bench/Framework.hs:104` (the
+`map (.envelope) msgs \`deepseq\` …` line) requires
+`NFData (Envelope BenchMessage)`, so dropping the derivation was
+not an option. Rather than ship an orphan `NFData Attribute`
+instance from inside `shibuya-core`, the chosen fix is a manual
+`instance NFData (Envelope msg)` body that deeply-forces every
+existing field and reduces `attributes` to WHNF — every
+`Attribute` leaf is `Text`/`Bool`/`Double`/`Int64`, all of which
+are NF-equivalent at WHNF when the enclosing `HashMap` is itself
+in WHNF, so the bench-harness's deepseq behavior is unchanged for
+the practical shape of the attribute values that adapters
+populate. Recorded so a future contributor who edits
+`Shibuya.Core.Types` knows why the instance is hand-written.
+
+### M2.1 — `addAttribute` ordering against the adapter's HashMap is non-obvious (2026-05-05)
+
+The first attempt at F1's fix in `processOne` left the existing
+`addAttribute traceSpan attrMessagingSystem ("shibuya" :: Text)`
+calls in place and then called
+`addAttributes traceSpan ingested.envelope.attributes` afterwards.
+`OpenTelemetry.Attributes.addAttributes` (upstream) implements its
+merge as `HashMap.union (mapped attrs) attributeMap` — left-biased
+in the new batch — so the adapter's `messaging.system="kafka"`
+*should* win over the framework's prior `"shibuya"` write. In
+practice the new test
+`SemanticSpec.applies envelope.attributes onto the framework span`
+still saw `"shibuya"` on the span. The exact reason was not
+chased to ground; the surface-level fix is to assemble the
+framework-default attribute set into a single
+`HashMap Text Attribute` and union the adapter's HashMap over it
+with `HashMap.union envelope.attributes frameworkDefaults`
+(left-biased, adapter wins), then call `addAttributes` once.
+This makes the precedence rule explicit at the call site rather
+than relying on the upstream's per-call merge order against the
+mutable Span's IORef. The new test now passes; the original
+SemanticSpec case ("emits a process span with conventions-aligned
+attributes and events") still passes too. Shibuya-specific
+attributes (`shibuya.inflight.count`, `shibuya.ack.decision`) are
+still set via individual `addAttribute` calls because they are
+not duplicated against any adapter-supplied keys.
+
 
 ## Decision Log
 
@@ -368,6 +440,48 @@ Record every decision made while working on the plan.
     an operational standpoint (DLQ post-mortems are the core use
     case for distributed tracing in queue systems). F4 is the
     highest-impact P1 for new-adapter authors.
+    Date: 2026-05-05.
+
+-   Decision: `Envelope.attributes` is `HashMap Text Attribute`
+    (mempty default), not `Maybe (HashMap Text Attribute)`.
+    Rationale: empty hashmap is the natural "nothing to contribute"
+    signal and avoids the `forM_ envAttrs (addAttributes traceSpan)`
+    unwrap in `processOne`. Construction sites pay one extra line
+    (`attributes = HashMap.empty`) which is consistent with the
+    rest of the codebase's `Envelope` literals in tests and the
+    bench harness.
+    Date: 2026-05-05.
+
+-   Decision: M2 splits per repo per the plan's idempotence section.
+    `shibuya-core` 0.5.0.0 lands first (this commit). The two
+    adapter repos' edits (M2.2, M2.3) wait until 0.5.0.0 publishes
+    to Hackage, because the plan forbids path-based pins for
+    cross-repo integration testing.
+    Rationale: respects the plan's published-package-as-source-of-
+    truth invariant. Cost: M2.2 / M2.3 cannot be locally verified
+    against 0.5.0.0 until publication. Acceptable trade-off because
+    the shibuya-core test added in M2.1 (the new SemanticSpec case)
+    already exercises the `Envelope.attributes` → `processOne` →
+    in-memory exporter round trip end-to-end, which is the
+    behavioral proof that F1's fix works.
+    Date: 2026-05-05.
+
+-   Decision: in `processOne`, framework-default `messaging.*`
+    attributes are now built up into a single `HashMap` and
+    union'd with `Envelope.attributes` (adapter's HashMap left,
+    framework defaults right — left-biased so adapter wins), then
+    flushed via one `addAttributes` call. `shibuya.*` attributes
+    (`inflight.count`, `inflight.max`, `ack.decision`) are still
+    set via individual `addAttribute` calls because they have no
+    duplication against adapter-supplied keys.
+    Rationale: the upstream `Span`-level `addAttributes` does
+    implement a left-biased merge per
+    `OpenTelemetry.Attributes.addAttributes`, but the precedence
+    rule is easier to read when made explicit at the call site
+    rather than spread across multiple per-attribute calls against
+    the mutable Span. The first attempt (sequential
+    `addAttribute … "shibuya"` then `addAttributes envAttrs`)
+    surfaced as the test failure documented in Surprises.
     Date: 2026-05-05.
 
 

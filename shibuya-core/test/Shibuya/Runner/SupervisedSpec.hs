@@ -5,6 +5,7 @@ module Shibuya.Runner.SupervisedSpec (spec) where
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
 import Control.Monad (forM, replicateM)
+import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
@@ -854,6 +855,7 @@ createTestMessages n = mapM createMessage [1 .. n]
                 enqueuedAt = Just testTime,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = "message-" <> show i
               }
           ackHandle = AckHandle $ \_ -> pure ()
@@ -877,6 +879,7 @@ createSingleMessage i = do
             enqueuedAt = Just testTime,
             traceContext = Nothing,
             attempt = Nothing,
+            attributes = HashMap.empty,
             payload = "message-" <> show i
           }
       ackHandle = AckHandle $ \_ -> pure ()

@@ -57,6 +57,7 @@ benchmark shibuya-core-bench
     tasty-bench ^>=0.4,
     text ^>=2.1,
     time,
+    unordered-containers ^>=0.2,
 
 executable standalone-test
   import: warnings
@@ -90,3 +91,4 @@ executable standalone-test
     streamly-core ^>=0.3,
     text ^>=2.1,
     time,
+    unordered-containers ^>=0.2,

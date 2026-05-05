@@ -2,6 +2,7 @@
 
 module Shibuya.Core.TypesSpec (spec) where
 
+import Data.HashMap.Strict qualified as HashMap
 import Data.Time (UTCTime (..), fromGregorian)
 import Shibuya.Core.Types
 import Test.Hspec
@@ -88,6 +89,7 @@ testEnvelope msg =
       enqueuedAt = Just testTime,
       traceContext = Nothing,
       attempt = Nothing,
+      attributes = HashMap.empty,
       payload = msg
     }
 

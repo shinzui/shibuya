@@ -4,6 +4,7 @@ module Main where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.DeepSeq (NFData)
+import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -115,6 +116,7 @@ createIngestedMessages n = mapM createMessage [1 .. n]
                 enqueuedAt = Just benchTime,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
           ackHandle = AckHandle $ \_ -> pure ()

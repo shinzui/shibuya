@@ -14,6 +14,7 @@ import Data.Foldable (toList)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (readIORef)
+import Data.Int (Int64)
 import Data.Text (Text)
 import Effectful (runEff)
 import OpenTelemetry.Attributes
@@ -21,6 +22,7 @@ import OpenTelemetry.Attributes
     PrimitiveAttribute (..),
     emptyAttributes,
     getAttributeMap,
+    toAttribute,
   )
 import OpenTelemetry.Exporter.InMemory.Span (inMemoryListExporter)
 import OpenTelemetry.Trace.Core
@@ -49,17 +51,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
   it "emits a process span with conventions-aligned attributes and events" $ do
     (processor, spansRef) <- inMemoryListExporter
     provider <- createTracerProvider [processor] emptyTracerProviderOptions
-    let tracer =
-          makeTracer
-            provider
-            ( InstrumentationLibrary
-                { libraryName = "shibuya-test",
-                  libraryVersion = "",
-                  librarySchemaUrl = "",
-                  libraryAttributes = emptyAttributes
-                }
-            )
-            tracerOptions
+    let tracer = mkTestTracer provider
 
     runEff $ runTracing tracer $ do
       let envelope =
@@ -70,6 +62,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
                 enqueuedAt = Nothing,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = ("hello" :: Text)
               }
           ingested =
@@ -102,7 +95,79 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
         evNames `shouldContain` ["shibuya.handler.completed"]
       _ ->
         expectationFailure $ "expected exactly one span, got " <> show (length spans)
+
+  it "applies envelope.attributes onto the framework span (P0 fix, plan 9 F1/F2)" $ do
+    -- The adapter contributes broker-specific typed attributes via
+    -- 'Envelope.attributes'. The framework's processOne span must carry
+    -- them, and adapter-supplied keys must override framework defaults
+    -- of the same name (here: messaging.system flips from "shibuya" to
+    -- "kafka" because the adapter set it).
+    (processor, spansRef) <- inMemoryListExporter
+    provider <- createTracerProvider [processor] emptyTracerProviderOptions
+    let tracer = mkTestTracer provider
+
+    runEff $ runTracing tracer $ do
+      let envelope =
+            Envelope
+              { messageId = MessageId "orders-2-42",
+                cursor = Nothing,
+                partition = Nothing,
+                enqueuedAt = Nothing,
+                traceContext = Nothing,
+                attempt = Nothing,
+                attributes =
+                  HashMap.fromList
+                    [ ("messaging.system", toAttribute ("kafka" :: Text)),
+                      ( "messaging.kafka.destination.partition",
+                        toAttribute (2 :: Int64)
+                      ),
+                      ( "messaging.kafka.message.offset",
+                        toAttribute (42 :: Int64)
+                      )
+                    ],
+                payload = ("hello" :: Text)
+              }
+          ingested =
+            Ingested
+              { envelope = envelope,
+                ack = AckHandle (\_ -> pure ()),
+                lease = Nothing
+              }
+          adapter = listAdapter [ingested]
+          handler _ = pure AckOk
+          procId = ProcessorId "orders-consumer"
+      _ <- runWithMetrics 4 procId adapter handler
+      pure ()
+
+    _ <- shutdownTracerProvider provider
+    spans <- readIORef spansRef
+    case spans of
+      [s] -> do
+        let attrs = getAttributeMap (spanAttributes s)
+        -- Adapter override wins.
+        attrs `shouldHaveTextAttribute` ("messaging.system", "kafka")
+        -- Adapter-typed attributes appear on the framework span.
+        attrs `shouldHaveIntAttribute` ("messaging.kafka.destination.partition", 2)
+        attrs `shouldHaveIntAttribute` ("messaging.kafka.message.offset", 42)
+        -- Framework defaults still set where the adapter did not override.
+        attrs `shouldHaveTextAttribute` ("messaging.destination.name", "orders-consumer")
+        attrs `shouldHaveTextAttribute` ("messaging.operation", "process")
+        attrs `shouldHaveTextAttribute` ("messaging.message.id", "orders-2-42")
+      _ ->
+        expectationFailure $
+          "expected exactly one span, got " <> show (length spans)
   where
+    mkTestTracer p =
+      makeTracer
+        p
+        ( InstrumentationLibrary
+            { libraryName = "shibuya-test",
+              libraryVersion = "",
+              librarySchemaUrl = "",
+              libraryAttributes = emptyAttributes
+            }
+        )
+        tracerOptions
     shouldHaveTextAttribute :: HashMap Text Attribute -> (Text, Text) -> Expectation
     shouldHaveTextAttribute attrs (k, expected) =
       case HashMap.lookup k attrs of

@@ -36,11 +36,13 @@ import Control.Concurrent.STM
     writeTVar,
   )
 import Control.Monad (unless)
+import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
+import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..))
@@ -66,6 +68,7 @@ import Shibuya.Runner.Metrics
 import Shibuya.Telemetry.Effect
   ( Tracing,
     addAttribute,
+    addAttributes,
     addEvent,
     recordException,
     setStatus,
@@ -373,17 +376,26 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
 
   withExtractedContext parentCtx $
     withSpan' (processSpanName pidText) consumerSpanArgs $ \traceSpan -> do
-      -- Add messaging attributes
+      -- Build the messaging.* attribute set: framework defaults first,
+      -- then the adapter's HashMap layered on top so adapter keys with
+      -- the same name override the framework's default. The explicit
+      -- 'HashMap.union' here is left-biased (left wins), which keeps
+      -- the precedence rule local and obvious instead of relying on
+      -- the order of repeated 'addAttribute' / 'addAttributes' calls
+      -- against the underlying mutable Span.
       let MessageId msgIdText = ingested.envelope.messageId
-      addAttribute traceSpan attrMessagingSystem ("shibuya" :: Text)
-      addAttribute traceSpan attrMessagingDestinationName pidText
-      addAttribute traceSpan attrMessagingOperation ("process" :: Text)
-      addAttribute traceSpan attrMessagingMessageId msgIdText
-
-      -- Add partition if present
-      case ingested.envelope.partition of
-        Just p -> addAttribute traceSpan attrShibuyaPartition p
-        Nothing -> pure ()
+          frameworkAttrs =
+            HashMap.fromList $
+              [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
+                (attrMessagingDestinationName, toAttribute pidText),
+                (attrMessagingOperation, toAttribute ("process" :: Text)),
+                (attrMessagingMessageId, toAttribute msgIdText)
+              ]
+                <> case ingested.envelope.partition of
+                  Just p -> [(attrShibuyaPartition, toAttribute p)]
+                  Nothing -> []
+          mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
+      addAttributes traceSpan mergedAttrs
 
       -- Increment in-flight and add inflight attributes
       now <- liftIO getCurrentTime

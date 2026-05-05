@@ -36,3 +36,4 @@ executable shibuya-example
     shibuya-metrics,
     streamly-core ^>=0.3,
     text ^>=2.1.3,
+    unordered-containers ^>=0.2,

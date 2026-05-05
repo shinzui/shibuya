@@ -2,6 +2,7 @@
 
 module Shibuya.RunnerSpec (spec) where
 
+import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
@@ -206,6 +207,7 @@ createTestMessages n = mapM createMessage [1 .. n]
                 enqueuedAt = Just testTime,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = "message-" <> show i
               }
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack
@@ -230,6 +232,7 @@ createTrackedMessages tracking n = mapM createMessage [1 .. n]
                 enqueuedAt = Just testTime,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = "message-" <> show i
               }
           ackHandle = trackingAckHandle tracking msgId

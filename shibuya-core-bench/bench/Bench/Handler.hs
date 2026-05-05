@@ -3,6 +3,7 @@
 module Bench.Handler (benchmarks) where
 
 import Control.DeepSeq (NFData)
+import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -131,6 +132,7 @@ createIngestedMessages n = do
                 enqueuedAt = Just now,
                 traceContext = Nothing,
                 attempt = Nothing,
+                attributes = HashMap.empty,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)
               }
        in Ingested

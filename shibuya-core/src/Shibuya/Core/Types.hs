@@ -19,9 +19,11 @@ module Shibuya.Core.Types
   )
 where
 
-import Control.DeepSeq (NFData)
+import Control.DeepSeq (NFData (..))
 import Data.ByteString (ByteString)
+import Data.HashMap.Strict (HashMap)
 import Data.String (IsString)
+import OpenTelemetry.Attributes (Attribute (..), PrimitiveAttribute (..))
 import Shibuya.Prelude
 
 -- | Stable identity for idempotency & observability.
@@ -68,8 +70,41 @@ data Envelope msg = Envelope
     -- 'Just (Attempt 0)' on first delivery; 'Nothing' if the adapter
     -- does not track redeliveries (e.g., Kafka).
     attempt :: !(Maybe Attempt),
+    -- | Adapter-supplied OpenTelemetry attributes for the per-message
+    -- processing span.
+    --
+    -- The framework's @processOne@ adds these to its Consumer-kind
+    -- span after setting the spec-aligned @messaging.*@ defaults, so
+    -- adapter-supplied keys override framework defaults of the same
+    -- name. Use 'Data.HashMap.Strict.empty' when the adapter has
+    -- nothing to contribute (the common case).
+    --
+    -- Adapters that emit broker-specific typed attributes
+    -- (e.g. Kafka's @messaging.kafka.destination.partition@) should
+    -- populate this field at envelope-construction time. The
+    -- previous opt-in @Shibuya.Adapter.Kafka.Tracing.traced@
+    -- transformer existed only to bolt these on; this field replaces
+    -- that mechanism without the duplicate-span hazard.
+    attributes :: !(HashMap Text Attribute),
     -- | The actual message payload
     payload :: !msg
   }
   deriving stock (Eq, Show, Functor, Generic)
-  deriving anyclass (NFData)
+
+-- | Manual 'NFData' so the @attributes@ field's 'Attribute' values do
+-- not require an upstream NFData instance (which
+-- @hs-opentelemetry-api@ does not currently ship). Forces every other
+-- field deeply and reduces 'attributes' to WHNF — every 'Attribute'
+-- leaf is a small primitive ('Text', 'Bool', 'Double', 'Int64'), so
+-- WHNF is enough to evaluate the contained values when the HashMap
+-- is itself in WHNF.
+instance (NFData msg) => NFData (Envelope msg) where
+  rnf e =
+    rnf e.messageId `seq`
+      rnf e.cursor `seq`
+        rnf e.partition `seq`
+          rnf e.enqueuedAt `seq`
+            rnf e.traceContext `seq`
+              rnf e.attempt `seq`
+                e.attributes `seq`
+                  rnf e.payload

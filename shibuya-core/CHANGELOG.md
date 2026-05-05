@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.0.0 — 2026-05-05
+
+### Breaking Changes
+
+- `Envelope` gained an `attributes :: !(HashMap Text Attribute)` field
+  carrying adapter-supplied OpenTelemetry attributes for the per-message
+  processing span. Direct constructions of `Envelope` must add the
+  field; pass `Data.HashMap.Strict.empty` when the adapter has nothing
+  to contribute (the common case). `Envelope`'s `NFData` instance is
+  now hand-written rather than derived (because `Attribute` from
+  `hs-opentelemetry-api` does not ship `NFData`); the strictness shape
+  is unchanged for every other field.
+
+### New Features
+
+- `Shibuya.Runner.Supervised`'s `processOne` now applies
+  `envelope.attributes` to its Consumer-kind span after setting the
+  framework-default `messaging.*` attributes, so adapter-supplied
+  keys override framework defaults of the same name. This lets
+  broker-aware adapters (Kafka in particular) emit typed attributes
+  (`messaging.kafka.destination.partition`,
+  `messaging.kafka.message.offset`) and override the
+  `messaging.system` default — without opening a second span. The
+  per-record `Shibuya.Adapter.Kafka.Tracing.traced` wrapper that
+  previously bolted these on can now be removed; see the audit
+  document `docs/plans/9-otel-audit-findings.md` (Finding F1, P0)
+  for the full motivation.
+
 ## 0.4.0.0 — 2026-04-29
 
 ### Breaking Changes

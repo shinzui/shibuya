@@ -8,6 +8,7 @@ module Main (main) where
 import Control.Concurrent (threadDelay)
 import Control.Monad (replicateM_)
 import Data.Function ((&))
+import Data.HashMap.Strict qualified as HashMap
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -76,6 +77,7 @@ mkIngested tracking sourceName n = do
               enqueuedAt = Nothing,
               traceContext = Nothing,
               attempt = Nothing,
+              attributes = HashMap.empty,
               payload = n
             },
         ack = trackingAckHandle tracking msgId,
