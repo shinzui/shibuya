@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.4.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.4.0.0))
+### Current Status (v0.5.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.5.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -47,20 +47,35 @@ their own cadence:
 - [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
   — PostgreSQL message queue (pgmq) via `pgmq-hs`.
 
-### What's New in 0.4.0.0
+### What's New in 0.5.0.0
 
-- **Exponential backoff for retries** — new `Shibuya.Core.Retry`
-  module providing `BackoffPolicy`, `Jitter` (`NoJitter`,
-  `FullJitter`, `EqualJitter`), `defaultBackoffPolicy`,
-  `exponentialBackoffPure`, `exponentialBackoff`, and the handler
-  convenience `retryWithBackoff`. See the
-  [Exponential Backoff](#exponential-backoff) section below.
-- **Breaking** — `Envelope` gained an `attempt :: !(Maybe Attempt)`
-  field carrying the adapter's delivery counter (zero-indexed;
-  `Nothing` if the adapter does not track redeliveries). Direct
-  constructions of `Envelope` must add the field. The new `Attempt`
-  newtype is exported from `Shibuya.Core` and `Shibuya.Core.Types`.
-- `shibuya-metrics` is re-released at 0.4.0.0 to track the shared
+- **Adapter-supplied span attributes** — `Envelope` gained an
+  `attributes :: !(HashMap Text Attribute)` field carrying
+  OpenTelemetry attributes for the per-message processing span.
+  `Shibuya.Runner.Supervised` applies them to its Consumer-kind
+  span after the framework-default `messaging.*` keys, so
+  broker-aware adapters (Kafka in particular) can emit typed
+  attributes (`messaging.kafka.destination.partition`,
+  `messaging.kafka.message.offset`) and override the
+  `messaging.system` default — without opening a second span.
+- **Producer-side trace propagation** — new
+  `Shibuya.Telemetry.Propagation.currentTraceHeaders :: (Tracing
+  :> es, IOE :> es) => Eff es (Maybe TraceHeaders)` looks up the
+  currently-active OTel span and encodes its trace context as W3C
+  headers, ready for an adapter to attach to an outgoing message.
+  Returns `Nothing` when tracing is disabled or there is no active
+  span. Intended for adapter-side DLQ writes and ad-hoc producer
+  paths.
+- **Breaking** — direct constructions of `Envelope` must add the
+  new `attributes` field; pass `Data.HashMap.Strict.empty` when the
+  adapter has nothing to contribute (the common case). `Envelope`'s
+  `NFData` instance is now hand-written rather than derived (because
+  `Attribute` from `hs-opentelemetry-api` does not ship `NFData`);
+  the strictness shape is unchanged.
+- New [OpenTelemetry user guide](docs/user/opentelemetry.md)
+  walking through tracer setup, what the framework spans contain,
+  and how to wire propagation end-to-end.
+- `shibuya-metrics` is re-released at 0.5.0.0 to track the shared
   version; it has no user-visible changes of its own.
 
 See the [CHANGELOG](CHANGELOG.md) for full release history.
@@ -71,7 +86,7 @@ Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.4.0.0
+    shibuya-core ^>=0.5.0.0
 ```
 
 Optional packages:
