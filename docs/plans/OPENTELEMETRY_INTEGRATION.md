@@ -1,20 +1,205 @@
 # OpenTelemetry Integration Plan for Shibuya
 
+> **Status (2026-05-05): partially superseded — design archive.**
+> The bulk of this plan landed across `shibuya-core` 0.1.x – 0.5.0.0
+> and the two real adapters. Sections that no longer match the
+> shipped code carry a **[SUPERSEDED]** banner pointing at the
+> follow-up plan or the actual code path. Read the
+> [Current State](#current-state-2026-05-05) section first; then use
+> the rest of this document as the original design archive.
+
 This document outlines the plan for integrating OpenTelemetry (OTel) into shibuya-core using the [hs-opentelemetry](https://github.com/iand675/hs-opentelemetry) library.
 
 ## Table of Contents
 
-1. [Goals & Non-Goals](#goals--non-goals)
-2. [hs-opentelemetry Overview](#hs-opentelemetry-overview)
-3. [Architecture](#architecture)
-4. [Effect Integration](#effect-integration)
-5. [Tracing Instrumentation](#tracing-instrumentation)
-6. [Context Propagation](#context-propagation)
-7. [Configuration](#configuration)
-8. [Implementation Phases](#implementation-phases)
-9. [Testing Strategy](#testing-strategy)
-10. [Performance Considerations](#performance-considerations)
-11. [Future Work: Metrics Integration](#future-work-metrics-integration)
+1. [Current State (2026-05-05)](#current-state-2026-05-05)
+2. [Goals & Non-Goals](#goals--non-goals)
+3. [hs-opentelemetry Overview](#hs-opentelemetry-overview)
+4. [Architecture](#architecture)
+5. [Effect Integration](#effect-integration)
+6. [Tracing Instrumentation](#tracing-instrumentation)
+7. [Context Propagation](#context-propagation)
+8. [Configuration](#configuration)
+9. [Implementation Phases](#implementation-phases)
+10. [Testing Strategy](#testing-strategy)
+11. [Performance Considerations](#performance-considerations)
+12. [Future Work: Metrics Integration](#future-work-metrics-integration)
+
+---
+
+## Current State (2026-05-05)
+
+This section is the load-bearing summary of what the OpenTelemetry
+integration looks like today. The rest of the document is the
+historical design archive.
+
+### Shipped in `shibuya-core 0.5.0.0`
+
+-   `Shibuya.Telemetry.Effect` — the `Tracing` static effect, runners
+    `runTracing :: Tracer -> Eff (Tracing : es) a -> Eff es a` and
+    `runTracingNoop`, plus the span-operation API
+    (`withSpan`/`withSpan'`, `addAttribute`/`addAttributes`,
+    `addEvent`, `recordException`, `setStatus`, `withExtractedContext`,
+    `getTracer`, `isTracingEnabled`).
+-   `Shibuya.Telemetry.Config` — `TracingConfig { enabled,
+    serviceName, serviceVersion }` and `defaultTracingConfig`. The
+    type is exported but not yet consumed by `runApp` (see
+    [Open Items](#open-items-from-the-otel-api-audit-2026-05-05)
+    below — Finding F4).
+-   `Shibuya.Telemetry.Propagation` —
+    `extractTraceContext :: TraceHeaders -> Maybe SpanContext`,
+    `injectTraceContext :: Span -> IO TraceHeaders`, and (new in
+    0.5) `currentTraceHeaders :: (Tracing :> es, IOE :> es) => Eff
+    es (Maybe TraceHeaders)`. The latter looks up the active OTel
+    span and encodes its W3C headers — the primitive adapters use to
+    propagate the failing-consumer's trace onto a DLQ write.
+-   `Shibuya.Telemetry.Semantic` — typed-attribute-key constants
+    derived from `OpenTelemetry.SemanticConventions` via `unkey`
+    (`attrMessagingSystem`, `attrMessagingMessageId`,
+    `attrMessagingDestinationName`, `attrMessagingOperation`); the
+    shibuya-namespaced fallbacks (`attrShibuyaProcessorId`,
+    `attrShibuyaInflightCount`, `attrShibuyaInflightMax`,
+    `attrShibuyaAckDecision`, `attrShibuyaPartition`); event names
+    (`eventHandlerStarted`, `eventHandlerCompleted`,
+    `eventAckDecision`); span-name helpers (`processSpanName`,
+    `ingestSpanName`); and `SpanArguments` builders
+    (`consumerSpanArgs`, `internalSpanArgs`).
+-   `Envelope.traceContext :: !(Maybe TraceHeaders)` — populated by
+    every adapter from queue-native headers; decoded by the
+    framework's `processOne` and passed to `withExtractedContext` so
+    the per-message span is parented on the producer's
+    `traceparent`.
+-   **(0.5.0.0, breaking)** `Envelope.attributes :: !(HashMap Text
+    Attribute)` — adapter-supplied attributes for the per-message
+    processing span. Populated at envelope-construction time inside
+    each adapter's `Convert.hs`. Empty for pgmq (no spec-defined
+    typed conventions today); kafka populates `messaging.system =
+    "kafka"`, the typed `messaging.kafka.destination.partition`
+    (Int64), and the typed `messaging.kafka.message.offset` (Int64).
+-   `Envelope`'s `NFData` instance is hand-written (because
+    `OpenTelemetry.Attribute` from `hs-opentelemetry-api` does not
+    derive `NFData`); the strictness shape is unchanged for every
+    other field.
+
+### Span shape (per-message)
+
+`Shibuya.Runner.Supervised.processOne` opens **exactly one**
+Consumer-kind span per message named `"<processor-id> process"` per
+the OTel messaging-spans spec, parented on the envelope's
+`traceContext` when present. The span body assembles a single
+attribute `HashMap`:
+
+-   Framework defaults: `messaging.system = "shibuya"`,
+    `messaging.destination.name = <pidText>`,
+    `messaging.operation = "process"`,
+    `messaging.message.id = <envelope.messageId>`, plus
+    `shibuya.partition` when the envelope carries a partition.
+-   Adapter overrides: `Envelope.attributes` is `HashMap.union`'d
+    over the framework defaults (left-biased, adapter wins). The
+    Kafka adapter therefore overrides `messaging.system` to
+    `"kafka"` and adds the typed `messaging.kafka.*` keys; the pgmq
+    adapter contributes nothing today.
+
+The merged HashMap is flushed via a single
+`addAttributes traceSpan` call. Subsequent
+`addAttribute traceSpan attrShibuyaInflightCount`,
+`attrShibuyaInflightMax`, and `attrShibuyaAckDecision` cover the
+in-flight / ack-decision attributes that have no adapter-side
+input.
+
+This is the post-fix shape from Finding F1 (P0) of the OTel API
+audit; before 0.5.0.0 the kafka adapter's
+`Shibuya.Adapter.Kafka.Tracing.traced` opened a *second*
+Consumer-kind span as a sibling, with the typed Kafka attributes
+split between the two spans. The `traced` module has been deleted.
+See `docs/plans/9-otel-audit-findings.md` for the full motivation.
+
+### Adapter integration today
+
+Both adapters share the same shape:
+
+-   **`Convert.hs`** turns the broker-native message into an
+    `Envelope`. Both populate `Envelope.traceContext` from
+    queue-native headers via a local `extractTraceHeaders`. The
+    Kafka adapter additionally populates `Envelope.attributes` (see
+    above); the pgmq adapter sets it to `HashMap.empty`.
+-   **`Internal.hs`** wires the polling loop and the `AckHandle`
+    finalize logic. Neither opens spans; both rely on `processOne`.
+-   **DLQ trace propagation (pgmq only).** The pgmq adapter's
+    `mkAckHandle (AckDeadLetter _)` branch calls
+    `currentTraceHeaders` to look up the failing consumer's active
+    span and merges its W3C headers onto the DLQ message. The
+    consumer's `traceparent` becomes the active value; the original
+    producer's `traceparent`/`tracestate` are preserved under the
+    `x-shibuya-upstream-traceparent` /
+    `x-shibuya-upstream-tracestate` keys. When tracing is disabled
+    (or no active span at the call site), the original headers
+    forward verbatim — the pre-0.5.0.0 behavior.
+-   **No public `Tracing` module per adapter.** The kafka adapter
+    used to ship `Shibuya.Adapter.Kafka.Tracing.traced` (a
+    stream transformer that opened a per-message span); deleted in
+    `shibuya-kafka-adapter 0.5.0.0`. The pgmq adapter never had
+    one. Span ownership lives in the framework's `processOne`.
+
+### Wiring
+
+A typical caller (see e.g. `shibuya-pgmq-example/app/Consumer.hs`,
+`shibuya-kafka-adapter-jitsurei/app/OtelDemo.hs`) wires tracing by
+hand:
+
+```haskell
+bracket initializeGlobalTracerProvider shutdownTracerProvider $ \provider -> do
+    let tracer = makeTracer provider "<service-name>" tracerOptions
+    runEff . runTracing tracer $ do
+        adapter <- pgmqAdapter config        -- or kafkaAdapter config
+        result  <- runApp IgnoreFailures 100 [(ProcessorId "...", processor)]
+        ...
+```
+
+`runApp` requires `(IOE :> es, Tracing :> es)`; the caller is
+responsible for calling `runTracing` (or `runTracingNoop`) before
+`runApp`. The proposed `withTracing` bracket and `runApp`-internal
+initialization in this document's [Effect Integration](#effect-integration)
+section are **not implemented** — see Finding F4 below.
+
+### Open items from the OTel API audit (2026-05-05)
+
+`docs/plans/9-otel-audit-findings.md` enumerates eight findings.
+After plan 9's work landed, the open ones are:
+
+-   **F3 (P1)** — *Done* in `shibuya-pgmq-adapter 0.5.0.0`. Kafka
+    adapter has no DLQ today (deferred per
+    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs:63-65`).
+-   **F4 (P1)** — `runApp` does not bracket tracing init;
+    `TracingConfig.enabled` is dead code in shibuya-core. **Open.**
+    The proposed shape is a `runAppTraced :: TracingConfig -> ...`
+    bracket helper alongside the existing `runApp`.
+-   **F5 (P2)** — `injectTraceContext` is exported but used by no
+    in-tree adapter. **Resolved as documentation:** the higher-level
+    `currentTraceHeaders` is now the recommended entry point;
+    `injectTraceContext` remains for callers that already hold a
+    `Span` handle.
+-   **F6 (P2)** — `runTracingNoop` allocates a `TracerProvider`
+    per call. **Open.** Cosmetic; works correctly today.
+-   **F7 (P2)** — `withSpan'` synthesises an all-zero `FrozenSpan`
+    when disabled. **Open.** Cosmetic.
+-   **F8 (P2)** — Ingester poll-loop and adapter shutdown are
+    invisible in traces. **Open.** The `Shibuya.Telemetry.Semantic.ingestSpanName`
+    constant is in place but unused.
+
+### What landed across the three repos
+
+| Repository | Version | Key changes for OTel |
+|------------|---------|----------------------|
+| `shibuya/shibuya-core` | 0.5.0.0 | `Envelope.attributes` field; `processOne` merges adapter attrs over framework defaults; `currentTraceHeaders` helper; manual `NFData (Envelope msg)`. |
+| `shibuya/shibuya-metrics` | 0.5.0.0 | Tracking version bump, no behavioral change. |
+| `shibuya-pgmq-adapter` | 0.5.0.0 | `pgmqMessageToEnvelope` populates `attributes = HashMap.empty`; `mkAckHandle` `AckDeadLetter` branch injects consumer's trace context onto DLQ writes; `mergeDlqHeaders` helper exposed for unit testing; `Tracing :> es` constraint added to `pgmqAdapter`/`mkAckHandle`/`mkIngested`/`pgmqSource`/`pgmqSourceWithPrefetch`. |
+| `shibuya-kafka-adapter` | 0.5.0.0 | `consumerRecordToEnvelope` populates `attributes` with `messaging.system="kafka"` plus typed `messaging.kafka.*` keys; `Shibuya.Adapter.Kafka.Tracing` deleted (and its `TracingTest`); `OtelDemo` refactored to drive through `runWithMetrics`. |
+
+Plan 9 (`docs/plans/9-audit-and-improve-opentelemetry-api.md`) is
+the index for the audit and follow-on work; the per-repo execplans
+are `docs/plans/12-migrate-to-shibuya-core-0.5.md` (kafka) and
+`docs/plans/1-migrate-to-shibuya-core-0.5-and-dlq-trace.md` (pgmq).
 
 ---
 
@@ -297,6 +482,14 @@ mkEvent name attrs = OTel.NewEvent
 
 ### Initialization
 
+> **[SUPERSEDED] Not implemented.** No `Shibuya.Telemetry.Init`
+> module exists; `withTracing` and `initTracing` were never added.
+> Callers wire `bracket initializeGlobalTracerProvider
+> shutdownTracerProvider` + `runTracing tracer` by hand (see
+> [Current State / Wiring](#wiring)). Re-introducing this bracket
+> as `runAppTraced` is Finding F4 (P1, open) of the OTel API
+> audit — `docs/plans/9-otel-audit-findings.md`.
+
 ```haskell
 -- Shibuya/Telemetry/Init.hs
 module Shibuya.Telemetry.Init
@@ -334,6 +527,12 @@ withTracing cfg action = bracket
 ```
 
 ### Integration with Shibuya App
+
+> **[SUPERSEDED] Not implemented.** `runApp` requires
+> `(IOE :> es, Tracing :> es)` and the caller wraps with
+> `runTracing` or `runTracingNoop`; it does not read
+> `TracingConfig`. See Finding F4 of plan 9 for the proposed
+> follow-up (`runAppTraced` bracket helper).
 
 ```haskell
 -- Updated Shibuya/App.hs
@@ -382,6 +581,28 @@ runApp config processors = do
 
 #### 1. Process Message Span (Primary)
 
+> **[SUPERSEDED]** Several details in this block are stale — see the
+> [Current State / Span shape (per-message)](#span-shape-per-message)
+> section above for the actual contract. Specifically:
+>
+> -   Span name is `"<destination> process"` (the `ProcessorId`
+>     followed by `" process"`), not the constant
+>     `"shibuya.process.message"`. Aligned in plan 2
+>     (`docs/plans/2-align-opentelemetry-semantic-conventions.md`).
+> -   `messaging.operation = "process"` is now always set on the
+>     span (was missing from this block). Same plan.
+> -   `messaging.destination.partition.id` was removed (no upstream
+>     spec key in v1.24/v1.27); replaced by `shibuya.partition` for
+>     a generic partition string. Adapters that know their broker
+>     can override via `Envelope.attributes` — Kafka emits the
+>     typed `messaging.kafka.destination.partition` (Int64) and
+>     `messaging.kafka.message.offset` (Int64).
+> -   The `handler.exception` event was dropped — `recordException`
+>     already emits the standard `exception` event. Plan 2.
+> -   The handler events are namespaced as `shibuya.handler.started`
+>     / `shibuya.handler.completed` (not bare `handler.started`).
+>     Plan 2.
+
 **Location**: `Shibuya.Runner.Supervised.processOne`
 
 This is the main span we create per message. Using OTel semantic conventions for messaging:
@@ -414,6 +635,14 @@ Error    -- AckDeadLetter, AckHalt, exceptions
 
 #### 2. Ingest Span (Optional, Low-Overhead)
 
+> **[SUPERSEDED] Not implemented.** The
+> `Shibuya.Telemetry.Semantic.ingestSpanName` constant is in place,
+> but `runIngesterWithMetrics` does not open a span. Errors from
+> the source stream (a Postgres disconnect inside `pgmqSource`, a
+> fatal Kafka error inside `kafkaSource`) currently leave no
+> breadcrumb in the trace store. Tracked as Finding F8 (P2) of
+> plan 9.
+
 **Location**: `Shibuya.Runner.Ingester.runIngesterWithMetrics`
 
 We create one span for the entire ingester lifecycle, not per-message (too expensive):
@@ -432,6 +661,12 @@ messaging.system             :: "shibuya"
 ```
 
 #### 3. Handler Span (User-Provided)
+
+> **[SUPERSEDED] Not implemented.** `instrumentHandler` was never
+> added. Users who want a handler-internal span call `withSpan` /
+> `withSpan'` directly inside their handler body — the framework's
+> `processOne` span supplies the parent. The `internalSpanArgs`
+> helper is shipped (in `Shibuya.Telemetry.Semantic`).
 
 Users can optionally wrap their handlers:
 
@@ -541,7 +776,23 @@ withExtractedContext (Just parentCtx) action = do
   pure result
 ```
 
+> **[SUPERSEDED]** The shipped `withExtractedContext` lives in
+> `Shibuya.Telemetry.Effect` (not `Propagation`), takes a
+> `(Tracing :> es, IOE :> es)` constraint, and uses
+> `bracket_ (Ctx.attachContext newContext) Ctx.detachContext`
+> rather than `Context.adjustContext`. `currentTraceHeaders` (added
+> in 0.5.0.0) is the new helper for the *producer* side — see
+> [Current State](#current-state-2026-05-05).
+
 ### Updated Envelope
+
+> **[SUPERSEDED]** `Envelope` lives in `Shibuya.Core.Types` (not
+> `Shibuya.Core.Ingested`) and now carries two more fields than this
+> block shows: `attempt :: !(Maybe Attempt)` (added in 0.4.0.0) and
+> `attributes :: !(HashMap Text Attribute)` (added in 0.5.0.0).
+> The `NFData` instance is hand-written. See the
+> [Current State](#current-state-2026-05-05) section for the actual
+> shape.
 
 ```haskell
 -- Shibuya/Core/Ingested.hs
@@ -697,11 +948,25 @@ export OTEL_BSP_SCHEDULE_DELAY="2000"
 
 ## Implementation Phases
 
+> **[SUPERSEDED] All three phases are complete.** Phase 1 and the
+> instrumented/non-instrumented portions of Phase 2 shipped in
+> `shibuya-core 0.1.0.0` – `0.5.0.0`. Phase 3's testing matrix is
+> in place
+> (`shibuya-core/test/Shibuya/Telemetry/{EffectSpec,PropagationSpec,SemanticSpec}.hs`).
+> The deliverable checklists below have been updated with shipped /
+> not-shipped status.
+
 ### Phase 1: Foundation
 
 **Goal**: Core infrastructure without changing existing behavior
 
 #### 1.1 Add dependencies
+
+> **[SUPERSEDED]** Pins are now `hs-opentelemetry-api ^>=0.3` and
+> `hs-opentelemetry-semantic-conventions ^>=0.1`. The SDK and OTLP
+> exporter are not direct dependencies of `shibuya-core`; consumers
+> (`shibuya-pgmq-example`, `shibuya-kafka-adapter-jitsurei`) pull
+> them in.
 
 ```cabal
 -- shibuya-core.cabal
@@ -758,11 +1023,17 @@ data Envelope msg = Envelope
 ```
 
 **Deliverables**:
-- [ ] Dependencies added to cabal
-- [ ] `Shibuya.Telemetry.Effect` module
-- [ ] `Shibuya.Telemetry.Config` module
-- [ ] `Shibuya.Telemetry.Propagation` module
-- [ ] `traceContext` field in Envelope
+- [x] Dependencies added to cabal (final pins:
+  `hs-opentelemetry-api ^>=0.3`,
+  `hs-opentelemetry-propagator-w3c ^>=0.1`,
+  `hs-opentelemetry-semantic-conventions ^>=0.1`).
+- [x] `Shibuya.Telemetry.Effect` module.
+- [x] `Shibuya.Telemetry.Config` module (type only;
+  `runApp`-internal use is Finding F4 of plan 9, open).
+- [x] `Shibuya.Telemetry.Propagation` module (gained
+  `currentTraceHeaders` in 0.5.0.0).
+- [x] `traceContext` field in Envelope (now in
+  `Shibuya.Core.Types`, not `Shibuya.Core.Ingested`).
 
 ---
 
@@ -899,11 +1170,17 @@ runApp config processors = do
 ```
 
 **Deliverables**:
-- [ ] `Shibuya.Telemetry.Semantic` module
-- [ ] `processOne` instrumented with spans
-- [ ] `runIngesterWithMetrics` instrumented
-- [ ] `runApp` initializes tracing
-- [ ] Context propagation from message headers
+- [x] `Shibuya.Telemetry.Semantic` module (typed-key derivation
+  added in plan 2).
+- [x] `processOne` instrumented with spans (single Consumer span
+  per message; merges `Envelope.attributes` over framework
+  defaults — see [Span shape](#span-shape-per-message)).
+- [ ] `runIngesterWithMetrics` instrumented — **not done**;
+  Finding F8 (P2) of plan 9.
+- [ ] `runApp` initializes tracing — **not done**; caller wraps
+  with `runTracing`/`runTracingNoop`. Finding F4 (P1) of plan 9.
+- [x] Context propagation from message headers
+  (`extractTraceContext` + `withExtractedContext` in `processOne`).
 
 ---
 
@@ -977,11 +1254,24 @@ services:
 ```
 
 **Deliverables**:
-- [ ] Unit tests for Tracing effect
-- [ ] Integration tests with in-memory exporter
-- [ ] Updated shibuya-example with tracing
-- [ ] Docker Compose for local Jaeger testing
-- [ ] README section on tracing configuration
+- [x] Unit tests for Tracing effect
+  (`shibuya-core/test/Shibuya/Telemetry/EffectSpec.hs`).
+- [x] Integration tests with in-memory exporter
+  (`SemanticSpec.hs` drives `processOne` against
+  `OpenTelemetry.Exporter.InMemory.Span.inMemoryListExporter` and
+  asserts the wire format; `PropagationSpec.hs` covers
+  `currentTraceHeaders`).
+- [x] Updated `shibuya-example` and example demos with tracing
+  (the in-tree examples wire `runTracing` by hand around `runApp`;
+  the kafka jitsurei `OtelDemo` and pgmq-example
+  `shibuya-pgmq-consumer` are the canonical references).
+- [x] Local Jaeger testing via `process-compose` rather than Docker
+  Compose (see `shibuya-kafka-adapter/process-compose.yaml` and
+  the `just process-up` recipe).
+- [x] README section on tracing configuration (see each repo's
+  README; the parent `shibuya/CLAUDE.md` documents the
+  `OTEL_TRACING_ENABLED` / `OTEL_EXPORTER_OTLP_ENDPOINT` /
+  `OTEL_SERVICE_NAME` envvars and the local Jaeger setup).
 
 ---
 
@@ -1258,21 +1548,29 @@ docs/
 
 ## Dependencies Summary
 
-```cabal
--- shibuya-core.cabal additions
-build-depends:
-    -- OpenTelemetry
-  , hs-opentelemetry-api ^>=0.2
-  , hs-opentelemetry-sdk ^>=0.1
-  , hs-opentelemetry-exporter-otlp ^>=0.1
-  , hs-opentelemetry-propagator-w3c ^>=0.1
+> **[SUPERSEDED]** Final pins as shipped in `shibuya-core 0.5.0.0`:
 
--- For testing only
+```cabal
+-- shibuya-core.cabal (library) — what actually ships
 build-depends:
-  , hs-opentelemetry-exporter-in-memory ^>=0.1
+  , hs-opentelemetry-api                   ^>=0.3
+  , hs-opentelemetry-propagator-w3c        ^>=0.1
+  , hs-opentelemetry-semantic-conventions  ^>=0.1
+
+-- shibuya-core.cabal (test stanza)
+build-depends:
+  , hs-opentelemetry-api
+  , hs-opentelemetry-exporter-in-memory    ^>=0.0
 ```
 
-Note: All hs-opentelemetry packages should use compatible versions. Check Hackage for latest versions.
+`hs-opentelemetry-sdk` and `hs-opentelemetry-exporter-otlp` are
+**not** direct dependencies of `shibuya-core` — consumers
+(`shibuya-pgmq-example`, `shibuya-kafka-adapter-jitsurei`) pull
+them in to build their own `TracerProvider`.
+
+`hs-opentelemetry-semantic-conventions` is added in plan 2 so
+attribute keys derive from typed `AttributeKey` values via `unkey`
+and an upstream rename surfaces as a Haskell compile error.
 
 ---
 
