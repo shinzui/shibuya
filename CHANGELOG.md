@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.5.0.0 — 2026-05-05
+
+### Breaking Changes
+
+- `shibuya-core`: `Envelope` gained an `attributes :: !(HashMap Text
+  Attribute)` field carrying adapter-supplied OpenTelemetry attributes
+  for the per-message processing span. Direct constructions of
+  `Envelope` must add the field; pass `Data.HashMap.Strict.empty` when
+  the adapter has nothing to contribute (the common case). `Envelope`'s
+  `NFData` instance is now hand-written rather than derived (because
+  `Attribute` from `hs-opentelemetry-api` does not ship `NFData`); the
+  strictness shape is unchanged.
+
+### New Features
+
+- `shibuya-core`: `Shibuya.Runner.Supervised`'s `processOne` now applies
+  `envelope.attributes` to its Consumer-kind span after setting the
+  framework-default `messaging.*` attributes, so adapter-supplied keys
+  override framework defaults of the same name. This lets broker-aware
+  adapters (Kafka in particular) emit typed attributes
+  (`messaging.kafka.destination.partition`,
+  `messaging.kafka.message.offset`) and override the `messaging.system`
+  default — without opening a second span.
+- `shibuya-core`: new `Shibuya.Telemetry.Propagation.currentTraceHeaders
+  :: (Tracing :> es, IOE :> es) => Eff es (Maybe TraceHeaders)` looks up
+  the currently-active OTel span and encodes its trace context as W3C
+  headers, ready for an adapter to attach to an outgoing message.
+  Returns `Nothing` when tracing is disabled or there is no active span.
+  Intended for adapter-side DLQ writes and ad-hoc producer paths.
+
+### Other Changes
+
+- `shibuya-metrics` is re-released at 0.5.0.0 to track the shared
+  version; it has no user-visible changes of its own.
+- Documentation: new OpenTelemetry user guide
+  (`docs/user/opentelemetry.md`), getting-started refreshed for the
+  current `Envelope` shape, plan 9 (OTel audit) closed out with audit
+  findings and live Jaeger smoke transcript captured.
+
 ## 0.4.0.0 — 2026-04-29
 
 ### Breaking Changes
