@@ -28,16 +28,16 @@ attributes to it.
 
 ## Triage table
 
-| ID | Title | Bucket | Severity |
-|----|-------|--------|----------|
-| F1 | `traced` + `runApp` emits two duplicate Consumer spans per message | B | **P0** |
-| F2 | Kafka-typed attributes only land on the adapter span, not the framework's | B | **P1** |
-| F3 | pgmq DLQ writes carry the original producer's `traceparent`, not the failing consumer's | D | **P1** |
-| F4 | `runApp` does not bracket tracing initialization; `TracingConfig` is dead code | A | **P1** |
-| F5 | `injectTraceContext` is exported but used by no in-tree adapter | D | **P2** |
-| F6 | `runTracingNoop` allocates a `TracerProvider` and `Tracer` per call | A | **P2** |
-| F7 | `withSpan'` synthesises a misleading all-zero `FrozenSpan` when disabled | A | **P2** |
-| F8 | Ingester poll-loop and adapter shutdown are invisible in traces | B | **P2** |
+| ID | Title | Bucket | Severity | Status |
+|----|-------|--------|----------|--------|
+| F1 | `traced` + `runApp` emits two duplicate Consumer spans per message | B | **P0** | shibuya-core 0.5.0.0 fix landed (2026-05-05). Adapter-side migration pending Hackage publication. |
+| F2 | Kafka-typed attributes only land on the adapter span, not the framework's | B | **P1** | Subsumed by F1's fix. |
+| F3 | pgmq DLQ writes carry the original producer's `traceparent`, not the failing consumer's | D | **P1** | Open. |
+| F4 | `runApp` does not bracket tracing initialization; `TracingConfig` is dead code | A | **P1** | Open. |
+| F5 | `injectTraceContext` is exported but used by no in-tree adapter | D | **P2** | Open. Will land alongside F3's `currentTraceHeaders`. |
+| F6 | `runTracingNoop` allocates a `TracerProvider` and `Tracer` per call | A | **P2** | Open. |
+| F7 | `withSpan'` synthesises a misleading all-zero `FrozenSpan` when disabled | A | **P2** | Open. |
+| F8 | Ingester poll-loop and adapter shutdown are invisible in traces | B | **P2** | Open. |
 
 S4 (the suspicion that pgmq lacks a `traced` module) is **refuted as a
 distinct finding**: the absence is intentional (pgmq has no broker-
