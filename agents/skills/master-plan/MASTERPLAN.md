@@ -18,7 +18,7 @@ Every MasterPlan must be fully self-contained. In its current form it contains a
 
 Every MasterPlan is a living document. Contributors must revise it as child plans progress, as discoveries occur across plans, and as the decomposition changes.
 
-Every MasterPlan must produce child ExecPlans that each conform to the ExecPlan specification in `claude/skills/{{exec-plan.skill.name}}/PLANS.md`. The MasterPlan governs coordination; each child plan governs its own implementation.
+Every MasterPlan must produce child ExecPlans that each conform to the ExecPlan specification in `agents/skills/exec-plan/PLANS.md`. The MasterPlan governs coordination; each child plan governs its own implementation.
 
 Every child ExecPlan must be independently implementable. A contributor should be able to pick up any child plan whose dependencies are satisfied and implement it without reading the other child plans. The MasterPlan itself provides the coordination context, but a child plan must stand alone for implementation purposes.
 
@@ -57,4 +57,4 @@ When a child plan's implementation reveals that the decomposition was wrong (a p
 
 ## Writing Style and Formatting
 
-Follow the same writing style and formatting rules as ExecPlans (see `claude/skills/{{exec-plan.skill.name}}/PLANS.md`). Write in plain prose. Use indented blocks (four-space indent) for commands and transcripts rather than fenced code blocks. The Exec-Plan Registry is the one exception where a table is preferred for scanability.
+Follow the same writing style and formatting rules as ExecPlans (see `agents/skills/exec-plan/PLANS.md`). Write in plain prose. Use fenced code blocks (triple backticks) with an explicit language tag — for example `bash`, `typescript`, `haskell`, `diff`, or `text` — for every command, transcript, diff, or code snippet. Bare fences without a language tag are not permitted. The Exec-Plan Registry is the one exception where a table is preferred for scanability.

@@ -13,39 +13,42 @@ user-invocable: true
 You are managing master plans (MasterPlans) — coordination documents that decompose large initiatives into multiple ExecPlans with defined dependencies and integration points. Before doing anything, read the full specifications:
 
 - [MASTERPLAN.md](MASTERPLAN.md) — requirements for MasterPlan documents
-- [ExecPlan specification](../{{exec-plan.skill.name}}/PLANS.md) — requirements for child ExecPlan documents
-- [ExecPlan skill](../{{exec-plan.skill.name}}/SKILL.md) — the ExecPlan skeleton and implementation protocol
+- [ExecPlan specification](../exec-plan/PLANS.md) — requirements for child ExecPlan documents
+- [ExecPlan skill](../exec-plan/SKILL.md) — the ExecPlan skeleton and implementation protocol
 
 Follow all three to the letter.
 
-MasterPlans live in the `docs/masterplans/` directory at the repository root. Each master plan is a single Markdown file named with a sequential number prefix followed by a slug derived from its title (e.g., `docs/masterplans/1-kafka-consumer-pipeline.md`).
+MasterPlans live in the `docs/masterplans/` directory at the repository root. Each master plan is a single Markdown file named with a sequential number prefix followed by a slug derived from its title (e.g., `docs/masterplans/1-kafka-consumer-pipeline.md`). Each plan begins with a YAML frontmatter block — `id`, `slug`, `title`, `kind: master-plan`, `created_at`, optional `intention` — so tooling can identify it without parsing prose.
 
-To determine the next number, scan `docs/masterplans/` for existing `.md` files, extract the leading integer from each filename, and use one greater than the highest found. If the directory is empty or does not exist, start at 1.
+Create new MasterPlans with the bundled `init-masterplan.ts` script (see Mode: create). The script picks the next sequential number, derives the slug from the title, writes the frontmatter and skeleton, and refuses to overwrite an existing file. Do not pick numbers, write skeletons, or hand-author frontmatter by hand.
 
-Child ExecPlans created by a MasterPlan live in `docs/plans/` following the standard ExecPlan naming convention (sequential numbering, slug from title). Each child ExecPlan must include a `MasterPlan:` reference line immediately after its title heading, linking back to the parent:
+Child ExecPlans created by a MasterPlan live in `docs/plans/` following the standard ExecPlan naming convention. Create them with the exec-plan skill's `init-plan.ts` script, passing `--master-plan <path-to-this-masterplan>`; the script records the parent in the child's `master_plan` frontmatter field. Do not add a body reference line by hand.
 
-    # Add Kafka Consumer Group Support
 
-    MasterPlan: docs/masterplans/1-kafka-consumer-pipeline.md
+## Formatting
 
-    This ExecPlan is a living document. ...
+When you write commands, transcripts, diffs, or code into a MasterPlan or any child ExecPlan, use fenced code blocks (triple backticks) and **always specify a language tag** on the opening fence — for example ` ```bash `, ` ```typescript `, ` ```haskell `, ` ```python `, ` ```diff `, or ` ```text ` for plain output and commit messages. Never emit a bare ` ``` ` fence without a language. This rule applies to every plan file you create or edit. See MASTERPLAN.md and the ExecPlan PLANS.md for the full formatting rules.
 
 
 ## Git Trailers
 
 Every commit made while working under a MasterPlan must include a `MasterPlan:` git trailer:
 
-    MasterPlan: docs/masterplans/<N>-<slug>.md
+```text
+MasterPlan: docs/masterplans/<N>-<slug>.md
+```
 
 When implementing a specific child ExecPlan, include both trailers:
 
-    Implement consumer group rebalance handling
+```text
+Implement consumer group rebalance handling
 
-    Add consumer group module with cooperative rebalance protocol.
-    Wire partition assignment into the existing consumer loop.
+Add consumer group module with cooperative rebalance protocol.
+Wire partition assignment into the existing consumer loop.
 
-    MasterPlan: docs/masterplans/1-kafka-consumer-pipeline.md
-    ExecPlan: docs/plans/3-add-consumer-group.md
+MasterPlan: docs/masterplans/1-kafka-consumer-pipeline.md
+ExecPlan: docs/plans/3-add-consumer-group.md
+```
 
 
 ## Modes of Operation
@@ -63,16 +66,27 @@ Create a new MasterPlan and all its child ExecPlans. The remaining arguments des
 
 3. For each work stream, determine its purpose and scope (what exists after it is complete that did not exist before), the key files and modules it touches, its dependencies on other work streams (hard, soft, or integration per MASTERPLAN.md), and integration points with other work streams (shared types, interfaces, files, or configurations).
 
-4. Write the MasterPlan document to `docs/masterplans/<N>-<slug>.md` using the skeleton below. The MasterPlan must be self-contained: someone reading only this document must understand the full decomposition, the rationale behind it, and how to proceed.
+4. Run the init script to create the MasterPlan file with frontmatter and skeleton:
 
-5. Create each child ExecPlan in `docs/plans/` following the ExecPlan specification and skeleton. Each child plan must:
+    ```bash
+    bun agents/skills/master-plan/init-masterplan.ts --title "<initiative title>" [--intention <id>]
+    ```
 
-   - Include `MasterPlan: <path>` immediately after its title heading.
-   - Be fully self-contained per `claude/skills/{{exec-plan.skill.name}}/PLANS.md` — a novice with only the child plan and the working tree must be able to implement it end-to-end.
-   - Reference other child plans only by file path when describing dependencies or integration points, never by assumed shared context.
-   - Include all relevant codebase context discovered during research, even if it overlaps with other child plans. Self-containment takes precedence over avoiding repetition.
+    The script prints the created file path to stdout. Read the file back and flesh out the prose sections (Vision & Scope, Decomposition Strategy, Dependency Graph, Integration Points). Leave the living-document sections empty for now, except the Decision Log which records the initial decomposition decisions.
 
-6. After creating all documents, verify the MasterPlan's Exec-Plan Registry contains the correct paths, dependencies, and initial statuses for every child plan.
+5. Create each child ExecPlan by running the exec-plan skill's init script, passing the parent path:
+
+    ```bash
+    bun agents/skills/exec-plan/init-plan.ts --title "<child title>" --master-plan <path-to-this-masterplan> [--intention <id>]
+    ```
+
+    Then read each child file back and flesh it out per `agents/skills/exec-plan/PLANS.md`. Each child plan must:
+
+    - Be fully self-contained: a novice with only the child plan and the working tree must be able to implement it end-to-end.
+    - Reference other child plans only by file path when describing dependencies or integration points, never by assumed shared context.
+    - Include all relevant codebase context discovered during research, even if it overlaps with other child plans. Self-containment takes precedence over avoiding repetition.
+
+6. After creating all documents, fill in the MasterPlan's Exec-Plan Registry with each child plan's number, title, path, dependencies, and initial status (Not Started).
 
 7. Present a summary to the user: the initiative's purpose, the number of child plans created, a one-line description of each with its dependencies, and all file paths.
 
@@ -93,7 +107,7 @@ Implement child ExecPlans under an existing MasterPlan. The first argument is th
 
 3. Update the child plan's status to In Progress in the MasterPlan's Exec-Plan Registry.
 
-4. Read the child ExecPlan file. Follow the implementation protocol described in `claude/skills/{{exec-plan.skill.name}}/SKILL.md` (Mode: implement) to carry out the work. This means: identify the current state from the Progress section, proceed step by step through milestones, update the child plan's living sections at every stopping point, resolve ambiguities autonomously, and commit frequently. Every commit must include both `MasterPlan:` and `ExecPlan:` git trailers.
+4. Read the child ExecPlan file. Follow the implementation protocol described in `agents/skills/exec-plan/SKILL.md` (Mode: implement) to carry out the work. This means: identify the current state from the Progress section, proceed step by step through milestones, update the child plan's living sections at every stopping point, resolve ambiguities autonomously, and commit frequently. Every commit must include both `MasterPlan:` and `ExecPlan:` git trailers.
 
 5. After completing the child plan:
 
@@ -162,93 +176,7 @@ Discuss or review an existing MasterPlan. The argument is the master plan file p
 
 ## MasterPlan Skeleton
 
-When creating a new master plan, use this structure. Every section is mandatory.
-
-    # <Initiative Title>
-
-    This MasterPlan is a living document. The sections Progress, Surprises & Discoveries,
-    Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
-
-    This document is maintained in accordance with `claude/skills/{{mp.skill.name}}/MASTERPLAN.md`.
-
-
-    ## Vision & Scope
-
-    Explain in a few sentences what the system looks like after the entire initiative is
-    complete. State the user-visible behaviors that will be enabled. Describe the scope
-    boundary: what is included and what is explicitly excluded.
-
-
-    ## Decomposition Strategy
-
-    Explain how and why the initiative was decomposed into these specific work streams.
-    Describe the principles that guided the decomposition (functional concerns, dependency
-    minimization, independent verifiability). State alternatives considered and why they
-    were rejected.
-
-
-    ## Exec-Plan Registry
-
-    | # | Title | Path | Hard Deps | Soft Deps | Status |
-    |---|-------|------|-----------|-----------|--------|
-    | 1 | ... | docs/plans/... | None | None | Not Started |
-    | 2 | ... | docs/plans/... | EP-1 | None | Not Started |
-
-    Status values: Not Started, In Progress, Complete, Cancelled.
-    Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).
-
-
-    ## Dependency Graph
-
-    Describe the ordering constraints between child plans in prose. Explain why each hard
-    dependency exists — what artifact or behavior from the earlier plan does the later plan
-    require? Identify which plans can proceed in parallel and under what conditions.
-
-
-    ## Integration Points
-
-    For each shared artifact (type, module, configuration, database table) that multiple
-    child plans touch, document: which plans are involved, what the shared artifact is,
-    which plan is responsible for defining it, and how later plans should consume or extend
-    it.
-
-    (None identified, or list each integration point.)
-
-
-    ## Progress
-
-    Track milestone-level progress across all child plans. Each entry names the child plan
-    and the milestone. This section provides an at-a-glance view of the entire initiative.
-
-    - [ ] EP-1: <first milestone description>
-    - [ ] EP-1: <second milestone description>
-    - [ ] EP-2: <first milestone description>
-
-
-    ## Surprises & Discoveries
-
-    Document cross-plan insights, dependency changes, scope adjustments, or unexpected
-    interactions between child plans. Provide concise evidence.
-
-    (None yet.)
-
-
-    ## Decision Log
-
-    Record every decomposition or coordination decision made while working on the master
-    plan.
-
-    - Decision: ...
-      Rationale: ...
-      Date: ...
-
-
-    ## Outcomes & Retrospective
-
-    Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
-    Compare the result against the original vision.
-
-    (To be filled during and after implementation.)
+The skeleton is owned by `init-masterplan.ts`; the script writes it into every new MasterPlan. Section names and the order they appear in are: Vision & Scope, Decomposition Strategy, Exec-Plan Registry, Dependency Graph, Integration Points, Progress, Surprises & Discoveries, Decision Log, Outcomes & Retrospective. Each generated section carries inline guidance describing what belongs there — read the file after creation and follow the guidance verbatim. The Exec-Plan Registry is a table; populate it once all child ExecPlans have been created so the paths are real.
 # --- seihou:master-plan ---
 
 
@@ -262,27 +190,19 @@ When starting work in **create** or **implement** mode, use the `AskUserQuestion
 
 If the user provides an Intention ID, store it for the duration of the session and:
 
-1. **Add it to the top of the MasterPlan.** When creating a new MasterPlan, include the Intention ID immediately after the title heading:
+1. **Pass it to the init scripts.** When creating a new MasterPlan, pass `--intention <IntentionId>` to `init-masterplan.ts`; when creating each child ExecPlan in the same session, pass the same `--intention <IntentionId>` to `init-plan.ts`. Both scripts write it into the plan's YAML frontmatter (`intention: <IntentionId>`); do not add a body line for it. When working with an existing plan whose frontmatter does not yet have an `intention` field, add it directly to the frontmatter block.
 
-        # <Initiative Title>
+2. **Include an `Intention:` git trailer on every commit** alongside the other trailers:
 
-        Intention: <IntentionId>
+    ```text
+    Implement consumer group rebalance handling
 
-        This MasterPlan is a living document. ...
+    Add consumer group module with cooperative rebalance protocol.
 
-    When working with an existing MasterPlan that does not yet have an `Intention:` line, insert it in the same position (after the title, before the living-document preamble).
-
-2. **Propagate it to every child ExecPlan** created during this session. Each child plan gets the same `Intention:` line after its title heading.
-
-3. **Include an `Intention:` git trailer on every commit** alongside the other trailers:
-
-        Implement consumer group rebalance handling
-
-        Add consumer group module with cooperative rebalance protocol.
-
-        MasterPlan: docs/masterplans/1-kafka-consumer-pipeline.md
-        ExecPlan: docs/plans/3-add-consumer-group.md
-        Intention: INTENT-42
+    MasterPlan: docs/masterplans/1-kafka-consumer-pipeline.md
+    ExecPlan: docs/plans/3-add-consumer-group.md
+    Intention: INTENT-42
+    ```
 
 Ask once at the start of a session. Do not ask again on subsequent operations within the same session. If the user skips or declines, proceed without the trailer.
 # --- /seihou:master-plan ---

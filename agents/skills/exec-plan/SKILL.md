@@ -13,25 +13,34 @@ user-invocable: true
 
 You are managing execution plans (ExecPlans) — self-contained living documents that guide implementation of features and system changes. Before doing anything, read the full specification at [PLANS.md](PLANS.md) and follow it to the letter.
 
-ExecPlans live in the `docs/plans/` directory at the repository root. Each plan is a single Markdown file named with a sequential number prefix followed by a slug derived from its title (e.g., `docs/plans/1-add-template-engine.md`).
+ExecPlans live in the `docs/plans/` directory at the repository root. Each plan is a single Markdown file named with a sequential number prefix followed by a slug derived from its title (e.g., `docs/plans/1-add-template-engine.md`). Each plan begins with a YAML frontmatter block — `id`, `slug`, `title`, `kind: exec-plan`, `created_at`, optional `intention`, optional `master_plan` — so tooling can identify it without parsing prose.
 
-To determine the next number, scan `docs/plans/` for existing `.md` files, extract the leading integer from each filename, and use one greater than the highest found. If the directory is empty or does not exist, start at 1.
+Create new plans with the bundled `init-plan.ts` script (see Mode: create). The script picks the next sequential number, derives the slug from the title, writes the frontmatter and skeleton, and refuses to overwrite an existing file. Do not pick numbers, write skeletons, or hand-author frontmatter by hand.
+
+
+## Formatting
+
+When you write commands, transcripts, diffs, or code into a plan, use fenced code blocks (triple backticks) and **always specify a language tag** on the opening fence — for example ` ```bash `, ` ```typescript `, ` ```haskell `, ` ```python `, ` ```diff `, or ` ```text ` for plain output and commit messages. Never emit a bare ` ``` ` fence without a language. This rule applies to every plan file you create or edit. See PLANS.md for the full formatting rules.
 
 
 ## Git Trailers
 
 Every commit made while working on an ExecPlan **must** include a git trailer linking back to the plan:
 
-    ExecPlan: docs/plans/<N>-<slug>.md
+```text
+ExecPlan: docs/plans/<N>-<slug>.md
+```
 
 Add the trailer to the end of the commit message body, separated by a blank line:
 
-    Implement health-check endpoint
+```text
+Implement health-check endpoint
 
-    Add GET /health route that returns 200 OK with uptime info.
-    Wire into the existing router module.
+Add GET /health route that returns 200 OK with uptime info.
+Wire into the existing router module.
 
-    ExecPlan: docs/plans/3-add-health-check.md
+ExecPlan: docs/plans/3-add-health-check.md
+```
 
 If a single commit spans multiple plans (rare — prefer not to), include one trailer per plan.
 
@@ -47,17 +56,21 @@ Create a new ExecPlan. The remaining arguments describe the feature or change.
 
 1. Research the codebase thoroughly before writing anything. Use Glob, Grep, and Read to understand the current state of the repository — file structure, key modules, build system, test infrastructure, and any existing patterns relevant to the planned work.
 
-2. Start from the skeleton below and flesh it out section by section as you research. Do not write the plan from memory or assumptions; ground every claim in what you find in the codebase.
+2. Run the init script to create the file with frontmatter and skeleton:
 
-3. Write the ExecPlan to `docs/plans/<N>-<slug>.md`, where `<N>` is the next sequential number (see naming convention above). The plan must be fully self-contained per PLANS.md: a novice with only the plan file and the working tree must be able to implement the feature end-to-end.
+    ```bash
+    bun agents/skills/exec-plan/init-plan.ts --title "<short, action-oriented title>" [--intention <id>] [--master-plan <path>]
+    ```
 
-4. Define every term of art in plain language. Name files by full repository-relative path. Show exact commands with working directories and expected output.
+    The script prints the created file path to stdout (e.g., `docs/plans/4-add-template-engine.md`). Pass `--intention` only when an Intention ID is active for this session; pass `--master-plan` only when this plan is a child of an existing MasterPlan, naming the parent's file path.
+
+3. Read the file back and flesh out each prose section in order, grounding every claim in what you found during research. The Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective sections start empty by design — only the Decision Log should be seeded now, with any initial scoping decisions you made.
+
+4. The plan must be fully self-contained per PLANS.md: a novice with only the plan file and the working tree must be able to implement the feature end-to-end. Define every term of art in plain language. Name files by full repository-relative path. Show exact commands with working directories and expected output.
 
 5. Anchor the plan with observable outcomes — what the user can do after implementation, commands to run, behavior to verify.
 
-6. Initialize all living sections: Progress (empty checklist), Surprises & Discoveries (empty), Decision Log (record initial scoping decisions), Outcomes & Retrospective (empty, to be filled during implementation).
-
-7. After writing, present a summary to the user: the plan's purpose, milestone count, and the file path.
+6. After writing, present a summary to the user: the plan's purpose, milestone count, and the file path.
 
 
 ### Mode: implement
@@ -125,104 +138,8 @@ If no path is given, scan `docs/plans/` for all `.md` files and show a summary t
 
 ## ExecPlan Skeleton
 
-When creating a new plan, use this structure. Every section is mandatory.
-
-    # <Short, action-oriented title>
-
-    This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
-    Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
-
-    This document is maintained in accordance with `.claude/skills/exec-plan/PLANS.md`.
-
-
-    ## Purpose / Big Picture
-
-    Explain in a few sentences what someone gains after this change and how they can see it
-    working. State the user-visible behavior you will enable.
-
-
-    ## Progress
-
-    Use a checklist to summarize granular steps. Every stopping point must be documented here,
-    even if it requires splitting a partially completed task into two ("done" vs. "remaining").
-    This section must always reflect the actual current state of the work.
-
-    - [ ] Example incomplete step.
-
-
-    ## Surprises & Discoveries
-
-    Document unexpected behaviors, bugs, optimizations, or insights discovered during
-    implementation. Provide concise evidence.
-
-    (None yet.)
-
-
-    ## Decision Log
-
-    Record every decision made while working on the plan.
-
-    - Decision: ...
-      Rationale: ...
-      Date: ...
-
-
-    ## Outcomes & Retrospective
-
-    Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
-    Compare the result against the original purpose.
-
-    (To be filled during and after implementation.)
-
-
-    ## Context and Orientation
-
-    Describe the current state relevant to this task as if the reader knows nothing. Name the
-    key files and modules by full path. Define any non-obvious term you will use. Do not refer
-    to prior plans unless they are checked into the repository, in which case reference them by
-    path.
-
-
-    ## Plan of Work
-
-    Describe, in prose, the sequence of edits and additions. For each edit, name the file and
-    location (function, module) and what to insert or change. Keep it concrete and minimal.
-
-    Break into milestones if the work spans multiple independent phases. Each milestone must be
-    independently verifiable. Introduce each milestone with a brief paragraph: scope, what will
-    exist at the end, commands to run, acceptance criteria.
-
-
-    ## Concrete Steps
-
-    State the exact commands to run and where to run them (working directory). When a command
-    generates output, show a short expected transcript so the reader can compare. This section
-    must be updated as work proceeds.
-
-
-    ## Validation and Acceptance
-
-    Describe how to exercise the system and what to observe. Phrase acceptance as behavior with
-    specific inputs and outputs. If tests are involved, name the exact test commands and expected
-    results. Show that the change is effective beyond compilation.
-
-
-    ## Idempotence and Recovery
-
-    If steps can be repeated safely, say so. If a step is risky, provide a safe retry or
-    rollback path.
-
-
-    ## Interfaces and Dependencies
-
-    Name the libraries, modules, and services to use and why. Specify the types, interfaces, and
-    function signatures that must exist at the end of each milestone. Use full module paths. For
-    example:
-
-        In src/Seihou/Core/Template.hs, define:
-
-            renderTemplate :: TemplatePath -> Variables -> IO Text
-# --- seihou:exec-plan ---
+The skeleton is owned by `init-plan.ts`; the script writes it into every new plan. Section names and the order they appear in are: Purpose / Big Picture, Progress, Surprises & Discoveries, Decision Log, Outcomes & Retrospective, Context and Orientation, Plan of Work, Concrete Steps, Validation and Acceptance, Idempotence and Recovery, Interfaces and Dependencies. Each generated section carries inline guidance describing what belongs there — read the file after creation and follow the guidance verbatim.
+# --- seihou:exec-plan#bfa0a336 ---
 
 
 ## Intention Tracking
@@ -236,28 +153,24 @@ If the user selects "Yes", they will provide the Intention ID via the "Other" fr
 
 If the user provides an Intention ID, store it for the duration of the session and:
 
-1. **Add it to the top of the plan.** When creating a new ExecPlan, include the Intention ID immediately after the title heading:
-
-        # <Short, action-oriented title>
-
-        Intention: <IntentionId>
-
-        This ExecPlan is a living document. ...
-
-    When implementing an existing plan that does not yet have an `Intention:` line, insert it in the same position (after the title, before the living-document preamble).
+1. **Pass it to the init script.** When creating a new ExecPlan, pass `--intention <IntentionId>` to `init-plan.ts`. The script writes it into the plan's YAML frontmatter (`intention: <IntentionId>`); do not add a body line for it. When implementing an existing plan whose frontmatter does not yet have an `intention` field, add it directly to the frontmatter block (do not introduce a body line).
 
 2. **Include an `Intention:` git trailer on every commit:**
 
-        Intention: <IntentionId>
+    ```text
+    Intention: <IntentionId>
+    ```
 
 When both an ExecPlan and an Intention are active, commits must include both trailers:
 
-    Implement health-check endpoint
+```text
+Implement health-check endpoint
 
-    Add GET /health route that returns 200 OK with uptime info.
+Add GET /health route that returns 200 OK with uptime info.
 
-    ExecPlan: docs/plans/add-health-check.md
-    Intention: INTENT-42
+ExecPlan: docs/plans/3-add-health-check.md
+Intention: INTENT-42
+```
 
 Ask once at the start of a session. Do not ask again on subsequent commits within the same session. If the user skips or declines, proceed without the trailer.
-# --- /seihou:exec-plan ---
+# --- /seihou:exec-plan#bfa0a336 ---
