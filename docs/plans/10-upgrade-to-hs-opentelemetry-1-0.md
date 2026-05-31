@@ -77,11 +77,14 @@ two items.
   the live docs additionally require `messaging.operation.name`, which remains
   intentionally omitted at the generic framework layer until adapters can supply
   a system-specific value.
-- [ ] M5. Run `cabal build all`, `cabal test shibuya-core-test`, `nix fmt`, and
-  `nix flake check`; fix any fallout.
-- [ ] M6. Re-run the live Jaeger smoke test and capture one span proving
-  `messaging.operation.type=process`.
-- [ ] M7. Update `shibuya-core/CHANGELOG.md` and decide the Shibuya version bump.
+- [x] 2026-05-31: M5. Ran `cabal build all`, `cabal test shibuya-core-test`,
+  `nix fmt`, and `nix flake check`; all exited 0.
+- [x] 2026-05-31: M6. Re-ran the live Jaeger smoke test with the example app and
+  captured a `shibuya-consumer` span carrying `messaging.operation.type=process`.
+- [x] 2026-05-31: M7. Updated `shibuya-core/CHANGELOG.md` and bumped
+  `shibuya-core` to `0.6.0.0` because the telemetry wire-key rename is an
+  observable downstream dashboard/query change. Bumped `shibuya-metrics` to
+  `0.6.0.0` as the sibling package that tracks the core version.
 
 
 ## Surprises & Discoveries
@@ -175,6 +178,39 @@ implementation. Provide concise evidence.
   OpenTelemetry semantic conventions 1.41.0 docs: messaging.operation.name is Required; messaging.operation.type is Conditionally Required if applicable; messaging.message.id is Recommended for single-message spans.
   ```
 
+- Observation: The default Jaeger query port `16686` was already occupied locally,
+  so the smoke test used an equivalent Jaeger all-in-one configuration with query
+  HTTP on `127.0.0.1:16687` and OTLP HTTP on `127.0.0.1:4318`.
+  Evidence:
+  ```json
+  {"data":["shibuya-consumer"],"total":1,"limit":0,"offset":0,"errors":null}
+  ```
+
+- Observation: The example app needed explicit tracer-provider initialization to
+  exercise real OTLP export in the smoke test. `OTEL_TRACING_ENABLED=true` now runs
+  the demo under a real `Tracer`; the default remains the no-op tracer used by
+  previous local demo runs.
+  Evidence:
+  ```text
+  cabal build shibuya-example
+  ```
+
+- Observation: The Jaeger smoke trace shows Shibuya's processing span under service
+  `shibuya-consumer` with the upgraded semantic key.
+  Evidence:
+  ```json
+  {"key":"messaging.operation.type","type":"string","value":"process"}
+  ```
+
+- Observation: Bumping `shibuya-core` to `0.6.0.0` required the sibling
+  `shibuya-metrics` package to track the same version and depend on
+  `shibuya-core ^>=0.6.0.0`; otherwise `cabal build all` could not resolve the
+  local package set.
+  Evidence:
+  ```text
+  shibuya-metrics-0.5.0.0 (conflict: shibuya-core==0.6.0.0, shibuya-metrics => shibuya-core^>=0.5.0.0)
+  ```
+
 
 ## Decision Log
 
@@ -245,13 +281,55 @@ Record every decision made while working on the plan.
   preserve existing behavior.
   Date: 2026-05-31
 
+- Decision: Keep the upstream source-repository-package pin on the release tag
+  `hs-opentelemetry-api-types-1.0.0.0` rather than the earlier local commit.
+  Rationale: The earlier pin did not contain the new `api-types` subdirectory needed
+  by the 1.0 dependency graph. The release tag resolves all five required packages
+  as a consistent 1.0 ecosystem snapshot.
+  Date: 2026-05-31
+
+- Decision: Add opt-in tracing to `shibuya-example` with `OTEL_TRACING_ENABLED=true`
+  and direct `initializeTracerProvider` / `shutdownTracerProvider` bracketing.
+  Rationale: The smoke-test acceptance requires the existing example app to export
+  spans to Jaeger, while default demo behavior should stay no-op unless the user
+  opts into OpenTelemetry export with standard OTEL environment variables.
+  Date: 2026-05-31
+
+- Decision: Bump `shibuya-core` to `0.6.0.0`.
+  Rationale: The exported Haskell symbol `attrMessagingOperation` remains source
+  compatible, but the emitted wire key changes from deprecated
+  `messaging.operation` to `messaging.operation.type`. Existing release history
+  treats telemetry shape changes that affect downstream consumers as release-level
+  changes, and dashboard or alert queries must be migrated.
+  Date: 2026-05-31
+
+- Decision: Bump `shibuya-metrics` to `0.6.0.0` with a matching
+  `shibuya-core ^>=0.6.0.0` dependency.
+  Rationale: Existing metrics releases track the core package version even when
+  there is no metrics-specific user-visible change, and `cabal build all` requires
+  the sibling package bounds to accept the new core version.
+  Date: 2026-05-31
+
 
 ## Outcomes & Retrospective
 
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed on 2026-05-31. Shibuya now builds and tests against the
+hs-opentelemetry 1.0 package family and the Haskell semantic-conventions 1.40
+package. The core tracing API remains source-compatible for Shibuya callers, while
+the emitted processing-span wire key moves from deprecated `messaging.operation` to
+current `messaging.operation.type`.
+
+The full validation set passed: `cabal build all`, `cabal test shibuya-core-test`,
+`nix fmt`, and `nix flake check`. The live Jaeger smoke test captured a
+`shibuya-consumer` processing span with `messaging.operation.type=process`.
+
+The only intentional gap is `messaging.operation.name`: the current OpenTelemetry
+docs define it as a system-specific operation name, and generic `shibuya-core` does
+not know that adapter-level verb. Adapters can add it later when they know the
+broker-specific operation.
 
 
 ## Context and Orientation

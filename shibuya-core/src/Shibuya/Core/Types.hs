@@ -23,7 +23,7 @@ import Control.DeepSeq (NFData (..))
 import Data.ByteString (ByteString)
 import Data.HashMap.Strict (HashMap)
 import Data.String (IsString)
-import OpenTelemetry.Attributes (Attribute (..), PrimitiveAttribute (..))
+import OpenTelemetry.Attributes (Attribute (..))
 import Shibuya.Prelude
 
 -- | Stable identity for idempotency & observability.

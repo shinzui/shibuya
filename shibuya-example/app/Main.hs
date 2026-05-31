@@ -6,6 +6,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
+import Control.Exception (bracket)
 import Control.Monad (replicateM_)
 import Data.Function ((&))
 import Data.HashMap.Strict qualified as HashMap
@@ -14,6 +15,9 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import OpenTelemetry.Attributes (emptyAttributes)
+import OpenTelemetry.Trace qualified as OTelSdk
+import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
 import Shibuya.App
@@ -33,9 +37,10 @@ import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Metrics (defaultConfig, withMetricsServer)
 import Shibuya.Runner.Metrics (ProcessorState (..), StreamStats (..))
-import Shibuya.Telemetry.Effect (runTracingNoop)
+import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
+import System.Environment (lookupEnv)
 
 -- | Create an adapter that produces an infinite stream of counter messages.
 -- Each message contains an incrementing integer starting from the given value.
@@ -119,7 +124,29 @@ printMetrics appHandle = do
     formatState Stopped = "Stopped"
 
 main :: IO ()
-main = runEff $ runTracingNoop $ do
+main = do
+  tracingEnabled <- lookupEnv "OTEL_TRACING_ENABLED"
+  if tracingEnabled == Just "true"
+    then bracket
+      OTelSdk.initializeTracerProvider
+      (\provider -> OTel.shutdownTracerProvider provider (Just 5_000_000))
+      $ \provider -> do
+        let tracer =
+              OTel.makeTracer
+                provider
+                ( OTel.InstrumentationLibrary
+                    { OTel.libraryName = "shibuya-example",
+                      OTel.libraryVersion = "",
+                      OTel.librarySchemaUrl = "",
+                      OTel.libraryAttributes = emptyAttributes
+                    }
+                )
+                OTel.tracerOptions
+        runEff $ runTracing tracer app
+    else runEff $ runTracingNoop app
+
+app :: Eff '[Tracing, IOE] ()
+app = do
   liftIO $ Text.putStrLn "Starting Shibuya example with multiple independent queues..."
   liftIO $ Text.putStrLn "Each queue runs as a separate supervised processor."
   liftIO $ Text.putStrLn "Will show metrics every second for 5 iterations.\n"

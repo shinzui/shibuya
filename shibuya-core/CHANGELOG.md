@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0.0 — 2026-05-31
+
+### Breaking Changes
+
+- OpenTelemetry messaging spans now emit `messaging.operation.type =
+  "process"` instead of the deprecated `messaging.operation = "process"`
+  wire key. The Haskell constant `attrMessagingOperation` keeps the same
+  name and now resolves to the current semantic-conventions key, so source
+  imports continue to compile. Dashboards, alerts, and trace queries that
+  filter on `messaging.operation` must be updated to
+  `messaging.operation.type`.
+
+### Other Changes
+
+- Upgrade OpenTelemetry dependencies to the 1.0 ecosystem:
+  `hs-opentelemetry-api ^>= 1.0`,
+  `hs-opentelemetry-propagator-w3c ^>= 1.0`, and test-only
+  `hs-opentelemetry-exporter-in-memory ^>= 1.0`.
+- Move `hs-opentelemetry-semantic-conventions` to the latest Haskell
+  generated package available with the 1.0 release, `^>= 1.40`, and source
+  Shibuya's generic messaging keys from its typed exports.
+
 ## 0.5.0.0 — 2026-05-05
 
 ### Breaking Changes

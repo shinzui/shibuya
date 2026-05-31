@@ -32,6 +32,8 @@ executable shibuya-example
     base ^>=4.21.0.0,
     containers,
     effectful ^>=2.6.1.0,
+    hs-opentelemetry-api ^>=1.0,
+    hs-opentelemetry-sdk ^>=1.0,
     shibuya-core,
     shibuya-metrics,
     streamly-core ^>=0.3,
