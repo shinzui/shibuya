@@ -3,10 +3,10 @@
 -- | Tests for W3C Trace Context propagation.
 module Shibuya.Telemetry.PropagationSpec (spec) where
 
-import Data.ByteArray.Encoding (Base (..))
 import Data.ByteString (ByteString)
 import Effectful (runEff)
 import OpenTelemetry.Attributes (emptyAttributes)
+import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Trace.Core
   ( InstrumentationLibrary (..),
     createTracerProvider,
@@ -17,6 +17,7 @@ import OpenTelemetry.Trace.Core
     tracerOptions,
   )
 import OpenTelemetry.Trace.Core qualified as OTel
+import OpenTelemetry.Trace.Id (Base (..))
 import OpenTelemetry.Trace.Id qualified as OTel.Id
 import Shibuya.Telemetry.Effect (runTracing, runTracingNoop, withSpan)
 import Shibuya.Telemetry.Propagation (currentTraceHeaders, extractTraceContext)
@@ -60,38 +61,29 @@ spec = describe "Shibuya.Telemetry.Propagation" $ do
           headers = [("traceparent", "invalid-format")]
       extractTraceContext headers `shouldBe` Nothing
 
-    it "parses traceparent with non-standard version (permissive)" $ do
-      -- Note: hs-opentelemetry propagator is permissive and accepts non-00 versions
+    it "rejects traceparent with non-standard version" $ do
+      -- hs-opentelemetry 1.0 validates the traceparent version strictly.
       let headers :: [(ByteString, ByteString)]
           headers =
             [ ("traceparent", "ff-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
             ]
-      -- Library accepts this - validation is left to the application
-      case extractTraceContext headers of
-        Nothing -> expectationFailure "Library should parse non-standard version"
-        Just _ctx -> pure ()
+      extractTraceContext headers `shouldBe` Nothing
 
-    it "parses traceparent with all-zero trace ID (permissive)" $ do
-      -- Note: hs-opentelemetry propagator doesn't reject all-zero trace IDs
+    it "rejects traceparent with all-zero trace ID" $ do
+      -- hs-opentelemetry 1.0 rejects all-zero trace IDs.
       let headers :: [(ByteString, ByteString)]
           headers =
             [ ("traceparent", "00-00000000000000000000000000000000-b7ad6b7169203331-01")
             ]
-      -- Library accepts this - validation is left to the application
-      case extractTraceContext headers of
-        Nothing -> expectationFailure "Library should parse all-zero trace ID"
-        Just ctx -> OTel.Id.traceIdBaseEncodedText Base16 (OTel.traceId ctx) `shouldBe` "00000000000000000000000000000000"
+      extractTraceContext headers `shouldBe` Nothing
 
-    it "parses traceparent with all-zero span ID (permissive)" $ do
-      -- Note: hs-opentelemetry propagator doesn't reject all-zero span IDs
+    it "rejects traceparent with all-zero span ID" $ do
+      -- hs-opentelemetry 1.0 rejects all-zero span IDs.
       let headers :: [(ByteString, ByteString)]
           headers =
             [ ("traceparent", "00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01")
             ]
-      -- Library accepts this - validation is left to the application
-      case extractTraceContext headers of
-        Nothing -> expectationFailure "Library should parse all-zero span ID"
-        Just ctx -> OTel.Id.spanIdBaseEncodedText Base16 (OTel.spanId ctx) `shouldBe` "0000000000000000"
+      extractTraceContext headers `shouldBe` Nothing
 
     it "handles unsampled trace flag (00)" $ do
       let headers :: [(ByteString, ByteString)]
@@ -151,11 +143,12 @@ spec = describe "Shibuya.Telemetry.Propagation" $ do
               )
               tracerOptions
       result <- runEff $ runTracing tracer currentTraceHeaders
-      _ <- shutdownTracerProvider provider
+      _ <- shutdownTracerProvider provider (Just 5_000_000)
       result `shouldBe` Nothing
 
     it "returns headers carrying the active span's traceparent" $ do
-      provider <- createTracerProvider [] emptyTracerProviderOptions
+      (processor, _spansRef) <- inMemoryListExporter
+      provider <- createTracerProvider [processor] emptyTracerProviderOptions
       let tracer =
             makeTracer
               provider
@@ -168,7 +161,7 @@ spec = describe "Shibuya.Telemetry.Propagation" $ do
               )
               tracerOptions
       result <- runEff $ runTracing tracer $ withSpan "outer" defaultSpanArguments currentTraceHeaders
-      _ <- shutdownTracerProvider provider
+      _ <- shutdownTracerProvider provider (Just 5_000_000)
       case result of
         Nothing -> expectationFailure "expected currentTraceHeaders to return Just"
         Just hs -> case lookup "traceparent" hs of

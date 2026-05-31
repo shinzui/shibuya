@@ -91,12 +91,12 @@ attrMessagingMessageId = unkey Sem.messaging_message_id
 attrMessagingDestinationName :: Text
 attrMessagingDestinationName = unkey Sem.messaging_destination_name
 
--- | The messaging operation (@messaging.operation@).
+-- | The messaging operation type (@messaging.operation.type@).
 --
--- One of the spec-defined enum values: @publish@, @receive@, @process@,
--- @settle@, @create@. Shibuya's per-message span uses @"process"@.
+-- One of the spec-defined enum values: @create@, @send@, @receive@,
+-- @process@, @settle@. Shibuya's per-message span uses @"process"@.
 attrMessagingOperation :: Text
-attrMessagingOperation = unkey Sem.messaging_operation
+attrMessagingOperation = unkey Sem.messaging_operation_type
 
 --------------------------------------------------------------------------------
 -- Attribute Keys (Shibuya-specific)
@@ -129,7 +129,7 @@ attrShibuyaAckDecision = "shibuya.ack.decision"
 
 -- | A generic partition identifier (@shibuya.partition@).
 --
--- Shibuya-specific: in semantic-conventions v1.24 there is no portable
+-- Shibuya-specific: there is no portable
 -- @messaging.destination.partition.id@ key — only system-specific ones
 -- (@messaging.kafka.destination.partition@,
 -- @messaging.eventhubs.destination.partition.id@). System-specific

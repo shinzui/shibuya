@@ -24,13 +24,16 @@ import OpenTelemetry.Attributes
     getAttributeMap,
     toAttribute,
   )
-import OpenTelemetry.Exporter.InMemory.Span (inMemoryListExporter)
+import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Trace.Core
   ( Event (..),
     ImmutableSpan (..),
     InstrumentationLibrary (..),
     createTracerProvider,
     emptyTracerProviderOptions,
+    hotAttributes,
+    hotEvents,
+    hotName,
     makeTracer,
     shutdownTracerProvider,
     tracerOptions,
@@ -77,20 +80,21 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       _ <- runWithMetrics 4 procId adapter handler
       pure ()
 
-    _ <- shutdownTracerProvider provider
+    _ <- shutdownTracerProvider provider (Just 5_000_000)
     spans <- readIORef spansRef
     case spans of
       [s] -> do
-        spanName s `shouldBe` "test-proc process"
-        let attrs = getAttributeMap (spanAttributes s)
+        hot <- readIORef (spanHot s)
+        hotName hot `shouldBe` "test-proc process"
+        let attrs = getAttributeMap (hotAttributes hot)
         attrs `shouldHaveTextAttribute` ("messaging.system", "shibuya")
         attrs `shouldHaveTextAttribute` ("messaging.message.id", "m-1")
         attrs `shouldHaveTextAttribute` ("messaging.destination.name", "test-proc")
-        attrs `shouldHaveTextAttribute` ("messaging.operation", "process")
+        attrs `shouldHaveTextAttribute` ("messaging.operation.type", "process")
         attrs `shouldHaveTextAttribute` ("shibuya.ack.decision", "ack_ok")
         attrs `shouldHaveIntAttribute` ("shibuya.inflight.count", 1)
         attrs `shouldHaveIntAttribute` ("shibuya.inflight.max", 1)
-        let evNames = map eventName (toList (appendOnlyBoundedCollectionValues (spanEvents s)))
+        let evNames = map eventName (toList (appendOnlyBoundedCollectionValues (hotEvents hot)))
         evNames `shouldContain` ["shibuya.handler.started"]
         evNames `shouldContain` ["shibuya.handler.completed"]
       _ ->
@@ -139,11 +143,12 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       _ <- runWithMetrics 4 procId adapter handler
       pure ()
 
-    _ <- shutdownTracerProvider provider
+    _ <- shutdownTracerProvider provider (Just 5_000_000)
     spans <- readIORef spansRef
     case spans of
       [s] -> do
-        let attrs = getAttributeMap (spanAttributes s)
+        hot <- readIORef (spanHot s)
+        let attrs = getAttributeMap (hotAttributes hot)
         -- Adapter override wins.
         attrs `shouldHaveTextAttribute` ("messaging.system", "kafka")
         -- Adapter-typed attributes appear on the framework span.
@@ -151,7 +156,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
         attrs `shouldHaveIntAttribute` ("messaging.kafka.message.offset", 42)
         -- Framework defaults still set where the adapter did not override.
         attrs `shouldHaveTextAttribute` ("messaging.destination.name", "orders-consumer")
-        attrs `shouldHaveTextAttribute` ("messaging.operation", "process")
+        attrs `shouldHaveTextAttribute` ("messaging.operation.type", "process")
         attrs `shouldHaveTextAttribute` ("messaging.message.id", "orders-2-42")
       _ ->
         expectationFailure $

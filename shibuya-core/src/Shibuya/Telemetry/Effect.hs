@@ -38,7 +38,7 @@ module Shibuya.Telemetry.Effect
   )
 where
 
-import Control.Exception (Exception, bracket_)
+import Control.Exception (Exception, bracket)
 import Data.ByteString qualified as BS
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -280,10 +280,10 @@ withExtractedContext (Just parentCtx) action = do
       let parentSpan = OTel.wrapSpanContext parentCtx
           newContext = Ctx.insertSpan parentSpan Ctx.empty
       withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-        bracket_
+        bracket
           (Ctx.attachContext newContext)
           Ctx.detachContext
-          (runInIO action)
+          (\_token -> runInIO action)
 
 --------------------------------------------------------------------------------
 -- Internal Helpers
