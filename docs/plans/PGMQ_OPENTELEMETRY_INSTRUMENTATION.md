@@ -1,3 +1,11 @@
+---
+slug: PGMQ_OPENTELEMETRY_INSTRUMENTATION
+title: "pgmq-hs OpenTelemetry Instrumentation Plan"
+kind: exec-plan
+created_at: 2026-02-09T01:05:26Z
+---
+
+
 # pgmq-hs OpenTelemetry Instrumentation Plan
 
 This document outlines the plan for adding OpenTelemetry instrumentation to pgmq-hs and integrating it with shibuya-pgmq-adapter for end-to-end distributed tracing.

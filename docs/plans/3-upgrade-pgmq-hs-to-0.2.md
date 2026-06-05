@@ -1,6 +1,14 @@
-# Upgrade shibuya-pgmq-adapter to pgmq-hs 0.2.0.0
+---
+id: 3
+slug: upgrade-pgmq-hs-to-0.2
+title: "Upgrade shibuya-pgmq-adapter to pgmq-hs 0.2.0.0"
+kind: exec-plan
+created_at: 2026-04-24T04:10:00Z
+intention: "intention_01kg953t69enps79pj77taz6nw"
+---
 
-Intention: intention_01kg953t69enps79pj77taz6nw
+
+# Upgrade shibuya-pgmq-adapter to pgmq-hs 0.2.0.0
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

@@ -1,7 +1,15 @@
-# Demonstrate exponential backoff end-to-end with a runnable example
+---
+id: 8
+slug: demonstrate-backoff-end-to-end
+title: "Demonstrate exponential backoff end-to-end with a runnable example"
+kind: exec-plan
+created_at: 2026-04-29T14:38:07Z
+intention: "intention_01kqbspdwse4tv03dbkbyt1cmg"
+master_plan: "docs/masterplans/1-exponential-backoff-for-retries.md"
+---
 
-MasterPlan: docs/masterplans/1-exponential-backoff-for-retries.md
-Intention: intention_01kqbspdwse4tv03dbkbyt1cmg
+
+# Demonstrate exponential backoff end-to-end with a runnable example
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

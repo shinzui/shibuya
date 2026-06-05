@@ -1,7 +1,15 @@
-# Populate Envelope.attempt from pgmq readCount + defensive Int32 clamp
+---
+id: 7
+slug: populate-attempt-from-pgmq-readcount
+title: "Populate Envelope.attempt from pgmq readCount + defensive Int32 clamp"
+kind: exec-plan
+created_at: 2026-04-29T13:51:55Z
+intention: "intention_01kqbspdwse4tv03dbkbyt1cmg"
+master_plan: "docs/masterplans/1-exponential-backoff-for-retries.md"
+---
 
-MasterPlan: docs/masterplans/1-exponential-backoff-for-retries.md
-Intention: intention_01kqbspdwse4tv03dbkbyt1cmg
+
+# Populate Envelope.attempt from pgmq readCount + defensive Int32 clamp
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

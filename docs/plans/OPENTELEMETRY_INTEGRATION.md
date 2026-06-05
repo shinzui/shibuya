@@ -1,3 +1,11 @@
+---
+slug: OPENTELEMETRY_INTEGRATION
+title: "OpenTelemetry Integration Plan for Shibuya"
+kind: exec-plan
+created_at: 2026-05-05T21:02:35Z
+---
+
+
 # OpenTelemetry Integration Plan for Shibuya
 
 > **Status (2026-05-05): partially superseded — design archive.**

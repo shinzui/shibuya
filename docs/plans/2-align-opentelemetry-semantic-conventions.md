@@ -1,6 +1,14 @@
-# Align Shibuya's OpenTelemetry attribute keys with the official semantic conventions
+---
+id: 2
+slug: align-opentelemetry-semantic-conventions
+title: "Align Shibuya's OpenTelemetry attribute keys with the official semantic conventions"
+kind: exec-plan
+created_at: 2026-04-22T02:46:23Z
+intention: "intention_01kpgjfhrfe499b5vtpa043pyx"
+---
 
-Intention: intention_01kpgjfhrfe499b5vtpa043pyx
+
+# Align Shibuya's OpenTelemetry attribute keys with the official semantic conventions
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

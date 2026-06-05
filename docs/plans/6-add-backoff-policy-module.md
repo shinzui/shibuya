@@ -1,7 +1,15 @@
-# Add Shibuya.Core.Retry with BackoffPolicy and exponentialBackoff helpers
+---
+id: 6
+slug: add-backoff-policy-module
+title: "Add Shibuya.Core.Retry with BackoffPolicy and exponentialBackoff helpers"
+kind: exec-plan
+created_at: 2026-04-29T13:10:37Z
+intention: "intention_01kqbspdwse4tv03dbkbyt1cmg"
+master_plan: "docs/masterplans/1-exponential-backoff-for-retries.md"
+---
 
-MasterPlan: docs/masterplans/1-exponential-backoff-for-retries.md
-Intention: intention_01kqbspdwse4tv03dbkbyt1cmg
+
+# Add Shibuya.Core.Retry with BackoffPolicy and exponentialBackoff helpers
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

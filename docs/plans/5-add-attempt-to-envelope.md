@@ -1,7 +1,15 @@
-# Add Attempt newtype and `attempt` field on Envelope
+---
+id: 5
+slug: add-attempt-to-envelope
+title: "Add Attempt newtype and attempt field on Envelope"
+kind: exec-plan
+created_at: 2026-04-29T12:55:23Z
+intention: "intention_01kqbspdwse4tv03dbkbyt1cmg"
+master_plan: "docs/masterplans/1-exponential-backoff-for-retries.md"
+---
 
-MasterPlan: docs/masterplans/1-exponential-backoff-for-retries.md
-Intention: intention_01kqbspdwse4tv03dbkbyt1cmg
+
+# Add Attempt newtype and `attempt` field on Envelope
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

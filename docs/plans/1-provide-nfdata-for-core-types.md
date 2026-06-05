@@ -1,3 +1,12 @@
+---
+id: 1
+slug: provide-nfdata-for-core-types
+title: "Provide NFData instances for core message types"
+kind: exec-plan
+created_at: 2026-04-18T14:02:26Z
+---
+
+
 # Provide NFData instances for core message types
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,

@@ -1,3 +1,11 @@
+---
+slug: METRICS_WEB_UI
+title: "Metrics Web UI Design Options"
+kind: exec-plan
+created_at: 2026-01-23T23:06:22Z
+---
+
+
 # Metrics Web UI Design Options
 
 This document evaluates different approaches for exposing Shibuya metrics through a web UI without affecting processing performance.

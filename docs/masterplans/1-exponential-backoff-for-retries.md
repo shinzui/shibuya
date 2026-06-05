@@ -1,6 +1,14 @@
-# Exponential Backoff for Retries
+---
+id: 1
+slug: exponential-backoff-for-retries
+title: "Exponential Backoff for Retries"
+kind: master-plan
+created_at: 2026-04-29T14:37:57Z
+intention: "intention_01kqbspdwse4tv03dbkbyt1cmg"
+---
 
-Intention: intention_01kqbspdwse4tv03dbkbyt1cmg
+
+# Exponential Backoff for Retries
 
 This MasterPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

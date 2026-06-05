@@ -1,3 +1,12 @@
+---
+id: 9
+slug: otel-audit-findings
+title: "OpenTelemetry API audit — findings (plan 9, M1)"
+kind: exec-plan
+created_at: 2026-05-05T14:24:37Z
+---
+
+
 # OpenTelemetry API audit — findings (plan 9, M1)
 
 This document is the read-only deliverable of Milestone 1 of

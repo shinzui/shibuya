@@ -1,6 +1,14 @@
-# Split shibuya-pgmq-adapter into its own repository
+---
+id: 4
+slug: split-pgmq-adapter-into-own-repo
+title: "Split shibuya-pgmq-adapter into its own repository"
+kind: exec-plan
+created_at: 2026-04-24T14:08:32Z
+intention: "intention_01kg953t69enps79pj77taz6nw"
+---
 
-Intention: intention_01kg953t69enps79pj77taz6nw
+
+# Split shibuya-pgmq-adapter into its own repository
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.

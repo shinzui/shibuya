@@ -1,3 +1,11 @@
+---
+slug: EXPONENTIAL_BACKOFF_DESIGN
+title: "Exponential Backoff for Retries — Design Findings"
+kind: exec-plan
+created_at: 2026-04-29T04:56:37Z
+---
+
+
 # Exponential Backoff for Retries — Design Findings
 
 Status: design notes, not yet scheduled.

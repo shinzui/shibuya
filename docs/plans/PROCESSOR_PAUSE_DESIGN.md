@@ -1,3 +1,11 @@
+---
+slug: PROCESSOR_PAUSE_DESIGN
+title: "Processor Pause/Resume Design"
+kind: exec-plan
+created_at: 2026-02-19T23:25:28Z
+---
+
+
 # Processor Pause/Resume Design
 
 ## Overview

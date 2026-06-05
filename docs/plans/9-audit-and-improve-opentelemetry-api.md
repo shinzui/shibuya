@@ -1,6 +1,14 @@
-# Audit and improve Shibuya's OpenTelemetry API for adapters
+---
+id: 9
+slug: audit-and-improve-opentelemetry-api
+title: "Audit and improve Shibuya's OpenTelemetry API for adapters"
+kind: exec-plan
+created_at: 2026-05-05T22:19:16Z
+intention: "intention_01kh0akd82ekat0be54p2f72kv"
+---
 
-Intention: intention_01kh0akd82ekat0be54p2f72kv
+
+# Audit and improve Shibuya's OpenTelemetry API for adapters
 
 This ExecPlan is a living document. The sections Progress, Surprises &
 Discoveries, Decision Log, and Outcomes & Retrospective must be kept up to
