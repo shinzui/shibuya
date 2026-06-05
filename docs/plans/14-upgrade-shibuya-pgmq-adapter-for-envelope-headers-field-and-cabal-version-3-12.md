@@ -63,14 +63,15 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] M1: Lower `cabal-version: 3.14` → `3.12` in all three `.cabal` files.
-- [ ] M1: Confirm `shibuya-core 0.7.0.0` is available (Hackage, or git-pin).
-- [ ] M1: Bump `shibuya-core ^>=0.6.0.0` → `^>=0.7.0.0` in all three `.cabal` files.
-- [ ] M1: Add `headers = Nothing` to `pgmqMessageToEnvelope`.
-- [ ] M1: `cabal build` succeeds against `shibuya-core 0.7.0.0`.
-- [ ] M2: Add/extend a test asserting `headers == Nothing`; `cabal test` is green.
-- [ ] M3: Bump `version:` fields; add CHANGELOG entry; `nix fmt`.
-- [ ] M3: Commit, tag `v0.7.0.0`, and (privileged) publish `shibuya-pgmq-adapter`.
+- [x] M1: Lowered `cabal-version: 3.14` → `3.12` in all three `.cabal` files. (2026-06-05)
+- [x] M1: Verified `shibuya-core 0.7.0.0` via temporary local-source pin (core + metrics; removed before commit). (2026-06-05)
+- [x] M1: Bumped `shibuya-core ^>=0.6.0.0` → `^>=0.7.0.0` (all four occurrences) and the example's `shibuya-metrics ^>=0.7.0.0`. (2026-06-05)
+- [x] M1: Added `headers = Nothing` to `pgmqMessageToEnvelope` (+ haddock incl. a Future note). (2026-06-05)
+- [x] M1: `cabal build all` succeeds against local `shibuya-core 0.7.0.0` (inside `nix develop`). (2026-06-05)
+- [x] M2: Added unit tests asserting `headers == Nothing` (no-headers and non-empty-JSONB cases); Convert spec green — 22 examples. (2026-06-05)
+- [x] M3: Bumped `shibuya-pgmq-adapter` `version:` to `0.7.0.0`; added CHANGELOG entry; removed temp pin; `nix fmt` clean. (2026-06-05)
+- [x] M3: Committed `48c27ba` and tagged `v0.7.0.0` in the pgmq repo. (2026-06-05)
+- [ ] M3 (privileged, owned by user): publish `shibuya-pgmq-adapter 0.7.0.0` to Hackage (after `shibuya-core 0.7.0.0`).
 
 
 ## Surprises & Discoveries
@@ -99,6 +100,17 @@ Record every decision made while working on the plan.
   masquerading as broker headers.
   Date: 2026-06-05
 
+- Decision (confirmed with user, 2026-06-05): keep `headers = Nothing` for the pgmq
+  adapter; do not flatten the JSONB `headers` object into the field at this time.
+  Rationale: The user asked whether the pgmq adapter should leverage the field and chose
+  `Nothing`. A future use case does exist — surfacing arbitrary producer-supplied pgmq
+  headers (beyond the `x-pgmq-group`/`traceparent`/`tracestate` keys already special-cased)
+  so handlers can read them — but it requires a lossy JSON-object → ordered-list mapping
+  and was deferred until a concrete need appears. A "Future:" note documenting this option
+  was added to the haddock above `pgmqMessageToEnvelope` in
+  `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs` so the next maintainer sees it.
+  Date: 2026-06-05
+
 - Decision: Lower `cabal-version` from `3.14` to `3.12` in all three `.cabal` files as part
   of this plan.
   Rationale: This repository's files declare `3.14`, which blocks Nix users with an older
@@ -121,7 +133,22 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+As of 2026-06-05 the adapter is upgraded and released locally (commit `48c27ba`, tag
+`v0.7.0.0`). `pgmqMessageToEnvelope` sets `headers = Nothing`; the Convert spec reports 22
+examples passing, including two new cases proving the field is `Nothing` even when the
+pgmq JSONB `headers` object is non-empty. All three `.cabal` files are now `cabal-version:
+3.12`.
+
+Two things surfaced beyond the original plan. First, the local-source pin needed to include
+`shibuya-metrics` as well as `shibuya-core`, because `shibuya-pgmq-example` depends on
+`shibuya-metrics` (Hackage 0.6.0.0) and that transitively pinned `shibuya-core` back to
+0.6.0.0; the example's `shibuya-metrics` constraint also had to move to `^>=0.7.0.0`.
+Second, the user confirmed the `headers = Nothing` choice and asked for a forward-looking
+note, so a `Future:` comment documenting the option to surface producer-supplied pgmq
+headers was added to `Shibuya.Adapter.Pgmq.Convert` and to this plan's Decision Log.
+
+The remaining step is the privileged Hackage upload of the adapter, owned by the user and
+gated behind the `shibuya-core 0.7.0.0` publish.
 
 
 ## Context and Orientation

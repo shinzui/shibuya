@@ -80,8 +80,8 @@ cross-cutting nature is instead recorded in Integration Points below.
 |---|-------|------|-----------|-----------|--------|
 | 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | Complete (local); Hackage publish owned by user |
 | 2 | Upgrade shibuya-kafka-adapter for Envelope headers field | docs/plans/13-upgrade-shibuya-kafka-adapter-for-envelope-headers-field.md | EP-1 | None | Complete (local); Hackage publish owned by user |
-| 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | In Progress |
-| 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | Not Started |
+| 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | Complete (local); Hackage publish owned by user |
+| 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | In Progress |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).
@@ -166,9 +166,9 @@ Phase 2 — adapter upgrades (parallel, each hard-depends on EP-1):
 - [x] EP-2 M1: Kafka — bumped constraint to ^>=0.7.0.0 and populated `headers = Just (headersToList cr.crHeaders)`; build green. (2026-06-05)
 - [x] EP-2 M2: Kafka — tests prove headers round-trip verbatim (order + duplicates) and empty→`Just []`; 28 tests green. (2026-06-05)
 - [~] EP-2 M3: Kafka — version 0.7.0.0, changelog, committed `424a4c2`, tagged `v0.7.0.0`. Hackage publish owned by user.
-- [ ] EP-3 M1: PGMQ — cabal-version 3.12, bump constraint to ^>=0.7.0.0, `headers = Nothing`; build green.
-- [ ] EP-3 M2: PGMQ — test that `headers == Nothing`; `cabal test` green.
-- [ ] EP-3 M3: PGMQ — version 0.7.0.0, changelog, tag, publish.
+- [x] EP-3 M1: PGMQ — cabal-version 3.12, bumped constraints to ^>=0.7.0.0, `headers = Nothing`; build green. (2026-06-05)
+- [x] EP-3 M2: PGMQ — tests prove `headers == Nothing` (incl. non-empty JSONB); Convert spec 22 green. (2026-06-05)
+- [~] EP-3 M3: PGMQ — version 0.7.0.0, changelog, committed `48c27ba`, tagged `v0.7.0.0`. Hackage publish owned by user.
 - [ ] EP-4 M1: Kiroku — bound to >=0.7 && <0.8, `headers = Nothing`; build green.
 - [ ] EP-4 M2: Kiroku — test that `headers == Nothing`; `cabal test` green.
 - [ ] EP-4 M3: Kiroku — version 0.3.0.0, changelog, commit/tag.
@@ -187,6 +187,17 @@ interactions between child plans. Provide concise evidence.
   (`cr.crHeaders`, already converted via `headersToList` for trace extraction), so it is the
   only adapter that populates the field with data; PGMQ and Kiroku back onto PostgreSQL
   stores with JSONB metadata objects, not ordered header streams, hence `Nothing`.
+- Local pre-Hackage verification (IP-3) needs the local `shibuya-metrics` pinned alongside
+  `shibuya-core` whenever the adapter repo builds a package that depends on
+  `shibuya-metrics`. In `shibuya-pgmq-adapter`, `shibuya-pgmq-example` depends on
+  `shibuya-metrics`, so pinning only `shibuya-core` left `shibuya-metrics 0.6.0.0` (Hackage)
+  dragging `shibuya-core` back to `0.6.0.0` and the solver failed; pinning both local
+  sources and bumping the example's `shibuya-metrics` constraint to `^>=0.7.0.0` resolved
+  it. The kafka repo did not hit this (it has no `shibuya-metrics` dependency). Watch for
+  the same in any adapter that uses `shibuya-metrics`.
+- pgmq `headers` decision confirmed with the user as `Nothing`; a forward-looking note about
+  optionally surfacing producer-supplied pgmq headers was added to the adapter code and
+  EP-3's Decision Log so the option is not lost.
 
 
 ## Decision Log
