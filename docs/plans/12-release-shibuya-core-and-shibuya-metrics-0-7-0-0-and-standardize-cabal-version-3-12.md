@@ -68,9 +68,9 @@ This section must always reflect the actual current state of the work.
 - [x] M2: Add a `## 0.7.0.0` entry to `shibuya-metrics/CHANGELOG.md`. (2026-06-05)
 - [x] M2: Add a `## 0.7.0.0` entry to the root `CHANGELOG.md`. (2026-06-05)
 - [x] M2: `cabal build all` and `cabal test shibuya-core-test` pass (118 examples, 0 failures); `nix fmt`/`nix flake check` clean. (2026-06-05)
-- [ ] M3: `cabal sdist shibuya-core shibuya-metrics` produces tarballs; inspect their `.cabal` reports `version: 0.7.0.0`, `cabal-version: 3.12`.
-- [ ] M3: Commit the release, then create annotated git tag `v0.7.0.0`.
-- [ ] M3 (privileged): Publish `shibuya-core` and `shibuya-metrics` `0.7.0.0` to Hackage.
+- [x] M3: `cabal sdist shibuya-core shibuya-metrics` produced tarballs; both `.cabal` report `version: 0.7.0.0`, `cabal-version: 3.12`. (2026-06-05)
+- [x] M3: Committed the release (`8ed1257`) and created annotated git tag `v0.7.0.0`. (2026-06-05)
+- [ ] M3 (privileged, BLOCKED on user authorization): Publish `shibuya-core` and `shibuya-metrics` `0.7.0.0` to Hackage via `cabal upload --publish`.
 
 
 ## Surprises & Discoveries
@@ -123,7 +123,22 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+As of 2026-06-05, M1 and M2 are complete and the M3 local steps are done: all four
+`.cabal` files declare `cabal-version: 3.12`; `shibuya-core` and `shibuya-metrics` are
+`0.7.0.0`; the changelogs are finalized; `cabal build all` and `cabal test
+shibuya-core-test` (118 examples, 0 failures) pass; `nix fmt`/`nix flake check` are clean;
+the release is committed (`8ed1257`) and tagged `v0.7.0.0`; and the sdists build with the
+correct version/cabal-version.
+
+The only remaining work is the irreversible Hackage publish, which is intentionally gated
+on explicit user authorization and maintainer credentials. Until it runs, the three
+adapter plans (EP-2/3/4) can develop against the local `v0.7.0.0` git tag but cannot
+publish their own releases. Once the publish completes, EP-1 should be marked Complete in
+the master plan registry and the adapters unblocked.
+
+No surprises were encountered: the downgrade from `3.14` to `3.12` was purely mechanical
+(no `3.14`-only syntax was in use, as predicted), and the `headers` field code was already
+in the tree so no source edits were needed.
 
 
 ## Context and Orientation

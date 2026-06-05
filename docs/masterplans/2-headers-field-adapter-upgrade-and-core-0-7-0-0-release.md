@@ -157,9 +157,9 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 
 Phase 1 — core release (must complete before Phase 2):
 
-- [ ] EP-1 M1: `cabal-version` 3.14 → 3.12 across the `shibuya` repo; build still green.
-- [ ] EP-1 M2: bump shibuya-core/shibuya-metrics to 0.7.0.0, finalize changelogs, tests green.
-- [ ] EP-1 M3: sdists built, `v0.7.0.0` tagged, and (privileged) published to Hackage.
+- [x] EP-1 M1: `cabal-version` 3.14 → 3.12 across the `shibuya` repo; build still green. (2026-06-05)
+- [x] EP-1 M2: bumped shibuya-core/shibuya-metrics to 0.7.0.0, finalized changelogs; 118 tests green. (2026-06-05)
+- [~] EP-1 M3: sdists built, committed `8ed1257`, `v0.7.0.0` tagged. Hackage publish BLOCKED on user authorization.
 
 Phase 2 — adapter upgrades (parallel, each hard-depends on EP-1):
 
