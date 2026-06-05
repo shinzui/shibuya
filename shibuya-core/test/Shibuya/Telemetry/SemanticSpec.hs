@@ -64,6 +64,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
                 partition = Nothing,
                 enqueuedAt = Nothing,
                 traceContext = Nothing,
+                headers = Nothing,
                 attempt = Nothing,
                 attributes = HashMap.empty,
                 payload = ("hello" :: Text)
@@ -118,6 +119,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
                 partition = Nothing,
                 enqueuedAt = Nothing,
                 traceContext = Nothing,
+                headers = Nothing,
                 attempt = Nothing,
                 attributes =
                   HashMap.fromList

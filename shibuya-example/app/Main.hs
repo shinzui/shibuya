@@ -81,6 +81,7 @@ mkIngested tracking sourceName n = do
               partition = Nothing,
               enqueuedAt = Nothing,
               traceContext = Nothing,
+              headers = Nothing,
               attempt = Nothing,
               attributes = HashMap.empty,
               payload = n

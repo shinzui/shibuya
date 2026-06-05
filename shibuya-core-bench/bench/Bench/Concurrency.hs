@@ -227,6 +227,7 @@ createIngestedMessages n = mapM createMessage [1 .. n]
                 partition = Nothing,
                 enqueuedAt = Just benchTime,
                 traceContext = Nothing,
+                headers = Nothing,
                 attempt = Nothing,
                 attributes = HashMap.empty,
                 payload = BenchMessage i (Text.pack $ "payload-" <> show i)

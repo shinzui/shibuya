@@ -14,6 +14,9 @@ module Shibuya.Core.Types
     -- * Message Envelope
     Envelope (..),
 
+    -- * Message Headers
+    Headers,
+
     -- * Trace Context
     TraceHeaders,
   )
@@ -49,6 +52,16 @@ newtype Attempt = Attempt {unAttempt :: Word}
   deriving newtype (Num, Real, Enum, Integral, Bounded)
   deriving anyclass (NFData)
 
+-- | Raw message headers as delivered by the source broker.
+--
+-- An ordered list of @(key, value)@ byte-string pairs. Order is
+-- preserved and duplicate keys are allowed, because brokers such as
+-- Kafka permit multiple headers with the same key and define header
+-- order. Keys and values are raw 'ByteString' because header values
+-- are not guaranteed to be UTF-8 text (for example a binary schema
+-- id); decoding is left to the handler.
+type Headers = [(ByteString, ByteString)]
+
 -- | W3C Trace Context headers for distributed tracing.
 -- Contains traceparent and optionally tracestate headers.
 type TraceHeaders = [(ByteString, ByteString)]
@@ -66,6 +79,17 @@ data Envelope msg = Envelope
     enqueuedAt :: !(Maybe UTCTime),
     -- | W3C trace context headers for distributed tracing
     traceContext :: !(Maybe TraceHeaders),
+    -- | All message headers as delivered by the source broker, in
+    -- order and including duplicates.
+    --
+    -- 'Nothing' means the adapter does not surface headers at all;
+    -- 'Just []' means the adapter surfaces headers and this message
+    -- carried none. The W3C trace headers ('traceparent' /
+    -- 'tracestate') appear here verbatim /in addition to/ their
+    -- parsed form in 'traceContext'; this field is the faithful,
+    -- non-lossy view and 'traceContext' is the narrow projection the
+    -- framework uses to re-establish a parent span.
+    headers :: !(Maybe Headers),
     -- | Optional zero-indexed delivery counter.
     -- 'Just (Attempt 0)' on first delivery; 'Nothing' if the adapter
     -- does not track redeliveries (e.g., Kafka).
@@ -105,6 +129,7 @@ instance (NFData msg) => NFData (Envelope msg) where
         rnf e.partition `seq`
           rnf e.enqueuedAt `seq`
             rnf e.traceContext `seq`
-              rnf e.attempt `seq`
-                e.attributes `seq`
-                  rnf e.payload
+              rnf e.headers `seq`
+                rnf e.attempt `seq`
+                  e.attributes `seq`
+                    rnf e.payload

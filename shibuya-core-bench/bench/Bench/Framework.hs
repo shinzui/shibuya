@@ -154,6 +154,7 @@ wrapAsIngested payloads = do
                 partition = Nothing,
                 enqueuedAt = Just now,
                 traceContext = Nothing,
+                headers = Nothing,
                 attempt = Nothing,
                 attributes = HashMap.empty,
                 payload = payload

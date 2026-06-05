@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `Envelope` gained a `headers :: !(Maybe Headers)` field carrying every
+  message header the source broker delivered, in order and including
+  duplicates. Direct constructions of `Envelope` must add the field.
+  `Nothing` means the adapter does not surface headers; `Just []` means
+  it does and the message had none. The new `Headers` type alias
+  (`[(ByteString, ByteString)]`) is exported from `Shibuya.Core` and
+  `Shibuya.Core.Types`. The W3C trace headers continue to appear in
+  `traceContext` as before; they now also appear verbatim in `headers`.
+
+Planned next release: 0.7.0.0 (major — breaks direct `Envelope` construction).
+
 ## 0.6.0.0 — 2026-05-31
 
 ### Breaking Changes

@@ -79,6 +79,14 @@ spec = do
           mapped = fmap show env
       mapped.attempt `shouldBe` Just (Attempt 3)
 
+    it "preserves headers through fmap" $ do
+      let env = (testEnvelope (1 :: Int)) {headers = Just [("content-type", "application/json")]}
+          mapped = fmap show env
+      mapped.headers `shouldBe` Just [("content-type", "application/json")]
+
+    it "defaults headers to Nothing in the test helper" $ do
+      (testEnvelope (1 :: Int)).headers `shouldBe` Nothing
+
 -- Test helper
 testEnvelope :: msg -> Envelope msg
 testEnvelope msg =
@@ -88,6 +96,7 @@ testEnvelope msg =
       partition = Just "partition-0",
       enqueuedAt = Just testTime,
       traceContext = Nothing,
+      headers = Nothing,
       attempt = Nothing,
       attributes = HashMap.empty,
       payload = msg

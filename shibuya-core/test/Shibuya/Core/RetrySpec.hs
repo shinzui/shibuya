@@ -22,6 +22,7 @@ testEnvelope a =
       partition = Nothing,
       enqueuedAt = Nothing,
       traceContext = Nothing,
+      headers = Nothing,
       attempt = a,
       attributes = HashMap.empty,
       payload = ()
