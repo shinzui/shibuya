@@ -23,7 +23,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.5.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.5.0.0))
+### Current Status (v0.7.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.7.0.0))
 
 | Feature | Status |
 |---------|--------|
@@ -47,36 +47,37 @@ their own cadence:
 - [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
   — PostgreSQL message queue (pgmq) via `pgmq-hs`.
 
-### What's New in 0.5.0.0
+### What's New in 0.7.0.0
 
-- **Adapter-supplied span attributes** — `Envelope` gained an
-  `attributes :: !(HashMap Text Attribute)` field carrying
-  OpenTelemetry attributes for the per-message processing span.
-  `Shibuya.Runner.Supervised` applies them to its Consumer-kind
-  span after the framework-default `messaging.*` keys, so
-  broker-aware adapters (Kafka in particular) can emit typed
-  attributes (`messaging.kafka.destination.partition`,
-  `messaging.kafka.message.offset`) and override the
-  `messaging.system` default — without opening a second span.
-- **Producer-side trace propagation** — new
-  `Shibuya.Telemetry.Propagation.currentTraceHeaders :: (Tracing
-  :> es, IOE :> es) => Eff es (Maybe TraceHeaders)` looks up the
-  currently-active OTel span and encodes its trace context as W3C
-  headers, ready for an adapter to attach to an outgoing message.
-  Returns `Nothing` when tracing is disabled or there is no active
-  span. Intended for adapter-side DLQ writes and ad-hoc producer
-  paths.
+- **Adapter-supplied message headers** — `Envelope` gained a
+  `headers :: !(Maybe Headers)` field carrying every message header
+  the source broker delivered, in order and including duplicates.
+  `Nothing` means the adapter does not surface headers; `Just []`
+  means it does and the message had none. The new `Headers` type
+  alias (`[(ByteString, ByteString)]`) is exported from
+  `Shibuya.Core` and `Shibuya.Core.Types`.
 - **Breaking** — direct constructions of `Envelope` must add the
-  new `attributes` field; pass `Data.HashMap.Strict.empty` when the
-  adapter has nothing to contribute (the common case). `Envelope`'s
-  `NFData` instance is now hand-written rather than derived (because
-  `Attribute` from `hs-opentelemetry-api` does not ship `NFData`);
-  the strictness shape is unchanged.
-- New [OpenTelemetry user guide](docs/user/opentelemetry.md)
-  walking through tracer setup, what the framework spans contain,
-  and how to wire propagation end-to-end.
-- `shibuya-metrics` is re-released at 0.5.0.0 to track the shared
+  new `headers` field.
+- All `.cabal` files now declare `cabal-version: 3.12` instead of
+  `3.14`, so Nix toolchains whose bundled Cabal predates 3.14 can
+  build the packages. No package-description syntax that required
+  3.14 was in use, so this is behavior-preserving.
+- `shibuya-metrics` is re-released at 0.7.0.0 to track the shared
   version; it has no user-visible changes of its own.
+
+### What's New in 0.6.0.0
+
+- **Breaking** — OpenTelemetry messaging spans now emit
+  `messaging.operation.type = "process"` instead of the deprecated
+  `messaging.operation = "process"` wire key. The Haskell constant
+  `attrMessagingOperation` keeps its name and resolves to the current
+  semantic-conventions key, so source imports keep compiling, but
+  dashboards, alerts, and trace queries filtering on
+  `messaging.operation` must move to `messaging.operation.type`.
+- Upgraded the OpenTelemetry dependencies to the 1.0 ecosystem
+  (`hs-opentelemetry-api ^>= 1.0`, propagator and exporters to
+  match) and sourced Shibuya's generic messaging keys from
+  `hs-opentelemetry-semantic-conventions ^>= 1.40`.
 
 See the [CHANGELOG](CHANGELOG.md) for full release history.
 
@@ -86,7 +87,7 @@ Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.5.0.0
+    shibuya-core ^>=0.7.0.0
 ```
 
 Optional packages:
@@ -256,7 +257,7 @@ Each message creates a span with:
 - **Span kind**: `Consumer`
 - **Attributes**:
   - `messaging.system`: "shibuya"
-  - `messaging.operation`: "process"
+  - `messaging.operation.type`: "process"
   - `messaging.destination.name`: The processor id
   - `messaging.message.id`: The message ID
   - `shibuya.partition`: Partition (if present)
