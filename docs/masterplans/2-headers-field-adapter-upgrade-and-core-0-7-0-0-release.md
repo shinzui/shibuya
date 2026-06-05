@@ -78,9 +78,9 @@ cross-cutting nature is instead recorded in Integration Points below.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | In Progress |
-| 2 | Upgrade shibuya-kafka-adapter for Envelope headers field | docs/plans/13-upgrade-shibuya-kafka-adapter-for-envelope-headers-field.md | EP-1 | None | Not Started |
-| 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | Not Started |
+| 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | Complete (local); Hackage publish owned by user |
+| 2 | Upgrade shibuya-kafka-adapter for Envelope headers field | docs/plans/13-upgrade-shibuya-kafka-adapter-for-envelope-headers-field.md | EP-1 | None | Complete (local); Hackage publish owned by user |
+| 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | In Progress |
 | 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -163,9 +163,9 @@ Phase 1 — core release (must complete before Phase 2):
 
 Phase 2 — adapter upgrades (parallel, each hard-depends on EP-1):
 
-- [ ] EP-2 M1: Kafka — bump constraint to ^>=0.7.0.0 and populate `headers = Just (headersToList cr.crHeaders)`; build green.
-- [ ] EP-2 M2: Kafka — test that headers round-trip verbatim; `cabal test` green.
-- [ ] EP-2 M3: Kafka — version 0.7.0.0, changelog, tag, publish.
+- [x] EP-2 M1: Kafka — bumped constraint to ^>=0.7.0.0 and populated `headers = Just (headersToList cr.crHeaders)`; build green. (2026-06-05)
+- [x] EP-2 M2: Kafka — tests prove headers round-trip verbatim (order + duplicates) and empty→`Just []`; 28 tests green. (2026-06-05)
+- [~] EP-2 M3: Kafka — version 0.7.0.0, changelog, committed `424a4c2`, tagged `v0.7.0.0`. Hackage publish owned by user.
 - [ ] EP-3 M1: PGMQ — cabal-version 3.12, bump constraint to ^>=0.7.0.0, `headers = Nothing`; build green.
 - [ ] EP-3 M2: PGMQ — test that `headers == Nothing`; `cabal test` green.
 - [ ] EP-3 M3: PGMQ — version 0.7.0.0, changelog, tag, publish.

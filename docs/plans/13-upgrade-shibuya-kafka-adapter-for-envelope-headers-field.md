@@ -57,14 +57,15 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] M1: Confirm `shibuya-core 0.7.0.0` is available to the adapter (Hackage, or git-pin).
-- [ ] M1: Bump `shibuya-core ^>=0.6.0.0` → `^>=0.7.0.0` in all three `.cabal` files.
-- [ ] M1: Add `headers = Just (headersToList cr.crHeaders)` to `consumerRecordToEnvelope`.
-- [ ] M1: `cabal build all` succeeds against `shibuya-core 0.7.0.0`.
-- [ ] M2: Add a unit test asserting `headers` round-trips Kafka headers verbatim.
-- [ ] M2: `cabal test shibuya-kafka-adapter` is green (unit tests; integration needs Redpanda).
-- [ ] M3: Bump the three packages' `version:` to `0.7.0.0`; add CHANGELOG entry; `nix fmt`.
-- [ ] M3: Commit, tag `v0.7.0.0`, and (privileged) publish `shibuya-kafka-adapter` to Hackage.
+- [x] M1: Verified `shibuya-core 0.7.0.0` via a temporary local-source pin in `cabal.project` (removed before commit). (2026-06-05)
+- [x] M1: Bumped `shibuya-core ^>=0.6.0.0` → `^>=0.7.0.0` in all four occurrences (3 cabal files, incl. test suite). (2026-06-05)
+- [x] M1: Added `headers = Just (headersToList cr.crHeaders)` to `consumerRecordToEnvelope` (+ haddock). (2026-06-05)
+- [x] M1: `cabal build shibuya-kafka-adapter` succeeds against local `shibuya-core 0.7.0.0` (inside `nix develop`). (2026-06-05)
+- [x] M2: Added unit tests asserting verbatim/duplicate-preserving headers and the `Just []` empty case. (2026-06-05)
+- [x] M2: `cabal test shibuya-kafka-adapter` green — 28 tests passed (was 26). (2026-06-05)
+- [x] M3: Bumped the three packages' `version:` to `0.7.0.0`; added CHANGELOG entry; removed the temp pin; `nix fmt` clean. (2026-06-05)
+- [x] M3: Committed `424a4c2` and tagged `v0.7.0.0` in the kafka repo. (2026-06-05)
+- [ ] M3 (privileged, owned by user): publish `shibuya-kafka-adapter 0.7.0.0` to Hackage (after `shibuya-core 0.7.0.0` is published).
 
 
 ## Surprises & Discoveries
@@ -108,7 +109,20 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+As of 2026-06-05 the adapter is upgraded and released locally (commit `424a4c2`, tag
+`v0.7.0.0`). `consumerRecordToEnvelope` now surfaces every Kafka header verbatim;
+`cabal test shibuya-kafka-adapter` reports 28 tests passing, including the new cases that
+prove order and duplicate keys round-trip into `env.headers` and that an empty record
+yields `Just []`. `hw-kafka-client`'s `Headers` turned out to be a plain newtype over
+`[(ByteString, ByteString)]` (`headersFromList = Headers`, `headersToList = unHeaders`), so
+order/duplicate preservation is exact and the assertions are unambiguous.
+
+Build verification used a temporary local-source pin (`packages: ../shibuya/shibuya-core`)
+in `cabal.project` because `shibuya-core 0.7.0.0` was not yet on Hackage and the
+`v0.7.0.0` tag was unpushed; the pin was removed before committing, so the released adapter
+depends solely on Hackage `shibuya-core ^>=0.7.0.0`. The only remaining step is the
+privileged Hackage upload of the adapter, which must follow the `shibuya-core 0.7.0.0`
+publish and is owned by the user.
 
 
 ## Context and Orientation
