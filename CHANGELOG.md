@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.0.0 — 2026-06-05
+
+### Breaking Changes
+
+- `shibuya-core`: `Envelope` gained a `headers :: !(Maybe Headers)` field
+  carrying every message header the source broker delivered, in order and
+  including duplicates. Direct constructions of `Envelope` must add the
+  field. `Nothing` means the adapter does not surface headers; `Just []`
+  means it does and the message had none. The new `Headers` type alias
+  (`[(ByteString, ByteString)]`) is exported from `Shibuya.Core` and
+  `Shibuya.Core.Types`.
+
+### Other Changes
+
+- All `.cabal` files in this repository now declare `cabal-version: 3.12`
+  instead of `3.14`, so Nix toolchains whose bundled Cabal predates 3.14
+  can build the packages. No package-description syntax that requires 3.14
+  was in use, so this is behavior-preserving.
+- `shibuya-metrics` is re-released at 0.7.0.0 to track the shared version;
+  it has no user-visible changes of its own.
+
 ## 0.6.0.0 — 2026-05-31
 
 ### Breaking Changes

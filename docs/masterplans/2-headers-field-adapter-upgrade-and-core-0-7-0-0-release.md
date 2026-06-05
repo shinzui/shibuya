@@ -78,7 +78,7 @@ cross-cutting nature is instead recorded in Integration Points below.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | Not Started |
+| 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | In Progress |
 | 2 | Upgrade shibuya-kafka-adapter for Envelope headers field | docs/plans/13-upgrade-shibuya-kafka-adapter-for-envelope-headers-field.md | EP-1 | None | Not Started |
 | 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | Not Started |
 | 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | Not Started |

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0.0 — 2026-06-05
 
 ### Breaking Changes
 
@@ -12,8 +12,6 @@
   (`[(ByteString, ByteString)]`) is exported from `Shibuya.Core` and
   `Shibuya.Core.Types`. The W3C trace headers continue to appear in
   `traceContext` as before; they now also appear verbatim in `headers`.
-
-Planned next release: 0.7.0.0 (major — breaks direct `Envelope` construction).
 
 ## 0.6.0.0 — 2026-05-31
 

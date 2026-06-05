@@ -60,14 +60,14 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] M1: Downgrade `cabal-version: 3.14` → `3.12` in all four `.cabal` files in this repo.
-- [ ] M1: `nix flake check` (or `cabal build all`) still succeeds with the downgraded files.
-- [ ] M2: Bump `shibuya-core` and `shibuya-metrics` `version:` fields to `0.7.0.0`.
-- [ ] M2: Bump the `shibuya-core ^>=0.6.0.0` constraint in `shibuya-metrics.cabal` to `^>=0.7.0.0`.
-- [ ] M2: Move `shibuya-core/CHANGELOG.md` `## Unreleased` content under `## 0.7.0.0 — 2026-06-05`.
-- [ ] M2: Add a `## 0.7.0.0` entry to `shibuya-metrics/CHANGELOG.md`.
-- [ ] M2: Add a `## 0.7.0.0` entry to the root `CHANGELOG.md`.
-- [ ] M2: `cabal build all` and `cabal test shibuya-core-test` pass; `nix fmt` applied.
+- [x] M1: Downgrade `cabal-version: 3.14` → `3.12` in all four `.cabal` files in this repo. (2026-06-05)
+- [x] M1: `nix flake check` (and `cabal build all`) succeed with the downgraded files. (2026-06-05)
+- [x] M2: Bump `shibuya-core` and `shibuya-metrics` `version:` fields to `0.7.0.0`. (2026-06-05)
+- [x] M2: Bump the `shibuya-core ^>=0.6.0.0` constraint in `shibuya-metrics.cabal` to `^>=0.7.0.0`. (2026-06-05)
+- [x] M2: Move `shibuya-core/CHANGELOG.md` `## Unreleased` content under `## 0.7.0.0 — 2026-06-05`. (2026-06-05)
+- [x] M2: Add a `## 0.7.0.0` entry to `shibuya-metrics/CHANGELOG.md`. (2026-06-05)
+- [x] M2: Add a `## 0.7.0.0` entry to the root `CHANGELOG.md`. (2026-06-05)
+- [x] M2: `cabal build all` and `cabal test shibuya-core-test` pass (118 examples, 0 failures); `nix fmt`/`nix flake check` clean. (2026-06-05)
 - [ ] M3: `cabal sdist shibuya-core shibuya-metrics` produces tarballs; inspect their `.cabal` reports `version: 0.7.0.0`, `cabal-version: 3.12`.
 - [ ] M3: Commit the release, then create annotated git tag `v0.7.0.0`.
 - [ ] M3 (privileged): Publish `shibuya-core` and `shibuya-metrics` `0.7.0.0` to Hackage.
