@@ -81,7 +81,7 @@ cross-cutting nature is instead recorded in Integration Points below.
 | 1 | Release shibuya-core and shibuya-metrics 0.7.0.0 and standardize cabal-version 3.12 | docs/plans/12-release-shibuya-core-and-shibuya-metrics-0-7-0-0-and-standardize-cabal-version-3-12.md | None | None | Complete (local); Hackage publish owned by user |
 | 2 | Upgrade shibuya-kafka-adapter for Envelope headers field | docs/plans/13-upgrade-shibuya-kafka-adapter-for-envelope-headers-field.md | EP-1 | None | Complete (local); Hackage publish owned by user |
 | 3 | Upgrade shibuya-pgmq-adapter for Envelope headers field and cabal-version 3.12 | docs/plans/14-upgrade-shibuya-pgmq-adapter-for-envelope-headers-field-and-cabal-version-3-12.md | EP-1 | None | Complete (local); Hackage publish owned by user |
-| 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | In Progress |
+| 4 | Upgrade shibuya-kiroku-adapter for Envelope headers field | docs/plans/15-upgrade-shibuya-kiroku-adapter-for-envelope-headers-field.md | EP-1 | None | Complete (local); Hackage publish owned by user |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).
@@ -169,9 +169,9 @@ Phase 2 — adapter upgrades (parallel, each hard-depends on EP-1):
 - [x] EP-3 M1: PGMQ — cabal-version 3.12, bumped constraints to ^>=0.7.0.0, `headers = Nothing`; build green. (2026-06-05)
 - [x] EP-3 M2: PGMQ — tests prove `headers == Nothing` (incl. non-empty JSONB); Convert spec 22 green. (2026-06-05)
 - [~] EP-3 M3: PGMQ — version 0.7.0.0, changelog, committed `48c27ba`, tagged `v0.7.0.0`. Hackage publish owned by user.
-- [ ] EP-4 M1: Kiroku — bound to >=0.7 && <0.8, `headers = Nothing`; build green.
-- [ ] EP-4 M2: Kiroku — test that `headers == Nothing`; `cabal test` green.
-- [ ] EP-4 M3: Kiroku — version 0.3.0.0, changelog, commit/tag.
+- [x] EP-4 M1: Kiroku — bound to >=0.7 && <0.8 (adapter + kiroku-store bench), `headers = Nothing`; build green. (2026-06-05)
+- [x] EP-4 M2: Kiroku — test proves `headers == Nothing` (incl. with trace metadata); toEnvelope suite 5 green. (2026-06-05)
+- [x] EP-4 M3: Kiroku — version 0.3.0.0, changelog, committed `90bd3bc`, tagged `shibuya-kiroku-adapter-v0.3.0.0`.
 
 
 ## Surprises & Discoveries
@@ -198,6 +198,13 @@ interactions between child plans. Provide concise evidence.
 - pgmq `headers` decision confirmed with the user as `Nothing`; a forward-looking note about
   optionally surfacing producer-supplied pgmq headers was added to the adapter code and
   EP-3's Decision Log so the option is not lost.
+- The "one Envelope construction site per repo" assumption held for kafka and pgmq but
+  **not** for kiroku: `kiroku-store`'s `kiroku-shibuya-overhead` benchmark also constructs
+  an `Envelope` and depends on `shibuya-core`. With `benchmarks: True` in the repo's
+  `cabal.project`, that second site had to be updated (field + `>=0.7 && <0.8` bound) before
+  the adapter would resolve. Lesson for any future `Envelope`-field rollout: grep the entire
+  adapter repo (all packages, including benchmarks) for `shibuya-core` and `Envelope`, not
+  just the adapter package.
 
 
 ## Decision Log
@@ -243,4 +250,29 @@ plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original vision.
 
-(To be filled during and after implementation.)
+As of 2026-06-05 all four child plans are implemented and locally verified:
+
+- EP-1: `shibuya-core`/`shibuya-metrics` `0.7.0.0` — built, 118 tests green, changelogs
+  finalized, `cabal-version` 3.12 across the repo, committed `8ed1257`, tagged `v0.7.0.0`,
+  sdists built.
+- EP-2: `shibuya-kafka-adapter` `0.7.0.0` — `headers` populated verbatim from Kafka, 28
+  tests green, committed `424a4c2`, tagged `v0.7.0.0`.
+- EP-3: `shibuya-pgmq-adapter` `0.7.0.0` — `headers = Nothing`, `cabal-version` 3.12, Convert
+  spec 22 green, committed `48c27ba`, tagged `v0.7.0.0`.
+- EP-4: `shibuya-kiroku-adapter` `0.3.0.0` — `headers = Nothing` (adapter + kiroku-store
+  benchmark), `toEnvelope` suite 5 green, committed `90bd3bc`, tagged
+  `shibuya-kiroku-adapter-v0.3.0.0`.
+
+The vision is met against the original scope, with one outstanding gate: the **Hackage
+publishes are owned by the user** and not yet performed. The release order is `shibuya-core`
++ `shibuya-metrics` `0.7.0.0` first, then the three adapters (which depend on the core being
+on Hackage). Each adapter was verified locally against a temporary `shibuya-core` source pin
+that was removed before its release commit, so every released `.cabal` depends solely on
+Hackage. The `shibuya-message-db-adapter` remains out of scope per the user's instruction
+and can reuse EP-3/EP-4 as templates (almost certainly `headers = Nothing`).
+
+Lessons: (1) when rolling out a new `Envelope` field, grep every package in each adapter
+repo — benchmarks included — for `shibuya-core`/`Envelope`, since the "one construction
+site" assumption broke for kiroku. (2) Local pre-Hackage verification must pin every local
+Shibuya package that participates in the solve (e.g. `shibuya-metrics` for pgmq), not just
+`shibuya-core`.

@@ -59,13 +59,14 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] M1: Confirm `shibuya-core 0.7.0.0` is available (Hackage, or git-pin).
-- [ ] M1: Bump the `shibuya-core >=0.6 && <0.7` constraint to `>=0.7 && <0.8` (library + test).
-- [ ] M1: Add `headers = Nothing` to `toEnvelope` in `Convert.hs`.
-- [ ] M1: `cabal build shibuya-kiroku-adapter` succeeds against `shibuya-core 0.7.0.0`.
-- [ ] M2: Add/extend a test asserting `headers == Nothing`; `cabal test` is green.
-- [ ] M3: Bump `shibuya-kiroku-adapter` `version:` to `0.3.0.0`; add CHANGELOG entry; `nix fmt`.
-- [ ] M3: Commit, tag, and (if this adapter is published) publish.
+- [x] M1: Verified `shibuya-core 0.7.0.0` via a temporary local-source pin (removed before commit). (2026-06-05)
+- [x] M1: Bumped `shibuya-core >=0.6 && <0.7` → `>=0.7 && <0.8` in the adapter (library + test) AND in `kiroku-store`'s `ShibuyaOverhead` benchmark. (2026-06-05)
+- [x] M1: Added `headers = Nothing` to `toEnvelope` (and to the `kiroku-store` benchmark's `Envelope`). (2026-06-05)
+- [x] M1: `cabal build shibuya-kiroku-adapter` succeeds against local `shibuya-core 0.7.0.0` (inside `nix develop`). (2026-06-05)
+- [x] M2: Added a unit test asserting `headers == Nothing` (incl. with trace metadata); `toEnvelope` suite green — 5 examples. (2026-06-05)
+- [x] M3: Bumped `shibuya-kiroku-adapter` `version:` to `0.3.0.0`; added CHANGELOG entry; removed temp pin; `nix fmt` clean. (2026-06-05)
+- [x] M3: Committed `90bd3bc` and tagged `shibuya-kiroku-adapter-v0.3.0.0` (repo uses per-package tags). (2026-06-05)
+- [ ] M3 (optional, owned by user): publish `shibuya-kiroku-adapter 0.3.0.0` to Hackage if it is a published package.
 
 
 ## Surprises & Discoveries
@@ -73,7 +74,20 @@ This section must always reflect the actual current state of the work.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- The research said only `shibuya-kiroku-adapter` depends on `shibuya-core`, but the
+  `kiroku-store` package's `kiroku-shibuya-overhead` benchmark *also* depends on
+  `shibuya-core` (`kiroku-store/kiroku-store.cabal:179`) and constructs an `Envelope`
+  directly (`kiroku-store/bench/ShibuyaOverhead.hs:225`). Because the repo's `cabal.project`
+  sets `benchmarks: True`, the solver evaluated that component and rejected `shibuya-core
+  0.7.0.0` until its bound was moved to `>=0.7 && <0.8` and `headers = Nothing` was added to
+  that benchmark's `Envelope`. Evidence — solver error before the fix:
+
+  ```text
+  [__2] rejecting: shibuya-core-0.7.0.0 (conflict: kiroku-store *bench => shibuya-core>=0.6 && <0.7)
+  ```
+
+  `kiroku-store`'s own version was left at `0.2.0.0`: the change is confined to a benchmark
+  (not part of the published library API), so no library version bump is warranted.
 
 
 ## Decision Log
@@ -110,7 +124,18 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+As of 2026-06-05 the adapter is upgraded and released locally (commit `90bd3bc`, tag
+`shibuya-kiroku-adapter-v0.3.0.0`). `toEnvelope` sets `headers = Nothing`; the `toEnvelope`
+suite reports 5 examples passing, including the new case proving the field is `Nothing`
+even when event metadata carries `traceparent`. No `cabal-version` change was needed (the
+repo is `3.0`).
+
+The one surprise was the second `Envelope` construction site in `kiroku-store`'s benchmark
+(see Surprises & Discoveries), which had to be updated alongside the adapter. The
+per-package tag convention (`shibuya-kiroku-adapter-v0.2.0.0` already existed) was followed
+for the new tag. Two unrelated untracked plan files in the kiroku repo (`docs/plans/53-*`,
+`docs/plans/54-*`) were deliberately left unstaged. Hackage publication, if applicable, is
+the user's privileged step.
 
 
 ## Context and Orientation
