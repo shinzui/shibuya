@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.1.0 — 2026-06-15
+
+### Bug Fixes
+
+- `shibuya-core`: supervised processors now observe their ingester async after
+  draining already-ingested messages. If the source dies with an exception, the
+  processor is marked `Failed`, its `done` flag is set, and the exception is
+  rethrown to the supervisor instead of being reported as a clean stream
+  completion.
+
 ## 0.7.0.0 — 2026-06-05
 
 ### Breaking Changes

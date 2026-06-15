@@ -95,7 +95,7 @@ import Shibuya.Telemetry.Semantic
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Stream.Prelude qualified as StreamP
-import UnliftIO (Async, catch, catchAny, finally, throwIO)
+import UnliftIO (Async, catch, catchAny, displayException, finally, throwIO)
 import UnliftIO qualified as UIO
 
 -- | Handle for a supervised processor.
@@ -250,9 +250,18 @@ runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter 
           runInIO (runIngesterWithMetrics metricsVar adapter.source inbox)
             `finally` atomically (writeTVar streamDoneVar True)
 
-    UIO.withAsync ingesterWithSignal $ \_ ->
+    UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       -- Processor: process messages, exit when stream done and inbox empty
       runInIO $ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar
+      UIO.poll ingesterAsync >>= \case
+        Just (Left ingesterErr) -> do
+          now <- getCurrentTime
+          atomically $
+            modifyTVar' metricsVar $ \m ->
+              m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
+          atomically $ writeTVar doneVar True
+          UIO.throwIO ingesterErr
+        _ -> pure ()
 
   -- Mark done when processor exits
   liftIO $ atomically $ writeTVar doneVar True

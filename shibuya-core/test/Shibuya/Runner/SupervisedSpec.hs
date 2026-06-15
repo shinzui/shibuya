@@ -6,7 +6,7 @@ import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
 import Control.Monad (forM, replicateM)
 import Data.HashMap.Strict qualified as HashMap
-import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
@@ -47,7 +47,8 @@ import Shibuya.Runner.Supervised
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
-import UnliftIO (SomeException, try)
+import UnliftIO (try)
+import UnliftIO qualified as UIO
 import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
@@ -516,43 +517,64 @@ spec = do
 
     describe "Robustness" $ do
       describe "Adapter source exceptions" $ do
-        it "handles adapter source throwing mid-stream" $ do
+        it "drains already-ingested messages, marks Failed, and propagates the ingester exception" $ do
           processedRef <- newIORef (0 :: Int)
+          spRef <- newIORef (Nothing :: Maybe SupervisedProcessor)
 
-          _ <- runEff $ runTracingNoop $ do
-            -- Create an adapter where source throws after 3 messages
-            _goodMessages <- createTestMessages 3
-            -- Use fromEffect to throw after yielding good messages
-            let failingSource = Stream.unfoldrM step (0 :: Int)
-                  where
-                    step n
-                      | n < 3 = do
-                          msg <- liftIO $ createSingleMessage (n + 1)
-                          pure $ Just (msg, n + 1)
-                      | n == 3 = error "Network failure mid-stream"
-                      | otherwise = pure Nothing
+          result <-
+            UIO.withAsync
+              ( runEff $ runTracingNoop $ do
+                  -- Create an adapter where source throws after 3 messages
+                  let failingSource = Stream.unfoldrM step (0 :: Int)
+                        where
+                          step n
+                            | n < 3 = do
+                                msg <- liftIO $ createSingleMessage (n + 1)
+                                pure $ Just (msg, n + 1)
+                            | n == 3 = error "Network failure mid-stream"
+                            | otherwise = pure Nothing
 
-            let adapter =
-                  Adapter
-                    { adapterName = "test:failing-source",
-                      source = failingSource,
-                      shutdown = pure ()
-                    }
+                  let adapter =
+                        Adapter
+                          { adapterName = "test:failing-source",
+                            source = failingSource,
+                            shutdown = pure ()
+                          }
 
-            let handler _ = do
-                  liftIO $ modifyIORef' processedRef (+ 1)
-                  pure AckOk
+                  let handler _ = do
+                        liftIO $ modifyIORef' processedRef (+ 1)
+                        pure AckOk
 
-            master <- startMaster IgnoreAll
-            _ <- runSupervised master 10 (ProcessorId "failing-adapter") Serial adapter handler
+                  master <- startMaster IgnoreAll
+                  sp <- runSupervised master 10 (ProcessorId "failing-adapter") Serial adapter handler
+                  liftIO $ atomicWriteIORef spRef (Just sp)
 
-            -- Wait for processing
-            liftIO $ threadDelay 200000 -- 200ms
-            stopMaster master
+                  -- Wait for the linked ingester failure to reach this thread.
+                  liftIO $ threadDelay 200000 -- 200ms
+                  stopMaster master
+              )
+              UIO.waitCatch
+
+          case result of
+            Left err ->
+              Text.pack (show err) `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
+            Right () ->
+              expectationFailure "Expected the ingester exception to propagate"
 
           -- Should have processed the 3 good messages before the error
           processed <- readIORef processedRef
           processed `shouldBe` 3
+
+          mSp <- readIORef spRef
+          case mSp of
+            Nothing -> expectationFailure "Expected supervised processor handle"
+            Just sp -> do
+              done <- readTVarIO sp.done
+              done `shouldBe` True
+              metrics <- readTVarIO sp.metrics
+              case metrics.state of
+                Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
+                other -> expectationFailure $ "Expected Failed state, got: " ++ show other
 
       describe "Rapid start/stop cycles" $ do
         it "handles rapid start/stop without resource leaks" $ do
@@ -606,48 +628,58 @@ spec = do
           countARef <- newIORef (0 :: Int)
           countBRef <- newIORef (0 :: Int)
 
-          _ :: Either SomeException () <- try $ runEff $ runTracingNoop $ do
-            messagesB <- createTestMessages 20
+          result <-
+            UIO.withAsync
+              ( runEff $ runTracingNoop $ do
+                  messagesB <- createTestMessages 20
 
-            -- Adapter A throws after 3 messages (ingester crash, not handler)
-            let failingSourceA = Stream.unfoldrM step (0 :: Int)
-                  where
-                    step n
-                      | n < 3 = do
-                          msg <- liftIO $ createSingleMessage (n + 1)
-                          pure $ Just (msg, n + 1)
-                      | otherwise = error "Adapter A source failed!"
+                  -- Adapter A throws after 3 messages (ingester crash, not handler)
+                  let failingSourceA = Stream.unfoldrM step (0 :: Int)
+                        where
+                          step n
+                            | n < 3 = do
+                                msg <- liftIO $ createSingleMessage (n + 1)
+                                pure $ Just (msg, n + 1)
+                            | otherwise = error "Adapter A source failed!"
 
-            let adapterA =
-                  Adapter
-                    { adapterName = "test:failing-A",
-                      source = failingSourceA,
-                      shutdown = pure ()
-                    }
+                  let adapterA =
+                        Adapter
+                          { adapterName = "test:failing-A",
+                            source = failingSourceA,
+                            shutdown = pure ()
+                          }
 
-            -- Handler A counts messages
-            let handlerA _ = do
-                  liftIO $ modifyIORef' countARef (+ 1)
-                  liftIO $ threadDelay 10000 -- 10ms
-                  pure AckOk
+                  -- Handler A counts messages
+                  let handlerA _ = do
+                        liftIO $ modifyIORef' countARef (+ 1)
+                        liftIO $ threadDelay 10000 -- 10ms
+                        pure AckOk
 
-            -- Handler B processes slowly
-            let handlerB _ = do
-                  liftIO $ modifyIORef' countBRef (+ 1)
-                  liftIO $ threadDelay 30000 -- 30ms
-                  pure AckOk
+                  -- Handler B processes slowly
+                  let handlerB _ = do
+                        liftIO $ modifyIORef' countBRef (+ 1)
+                        liftIO $ threadDelay 30000 -- 30ms
+                        pure AckOk
 
-            let adapterB = testAdapter messagesB
+                  let adapterB = testAdapter messagesB
 
-            -- Use KillAll strategy
-            master <- startMaster KillAll
+                  -- Use KillAll strategy
+                  master <- startMaster KillAll
 
-            _spA <- runSupervised master 10 (ProcessorId "killall-A") Serial adapterA handlerA
-            _spB <- runSupervised master 10 (ProcessorId "killall-B") Serial adapterB handlerB
+                  _spA <- runSupervised master 10 (ProcessorId "killall-A") Serial adapterA handlerA
+                  _spB <- runSupervised master 10 (ProcessorId "killall-B") Serial adapterB handlerB
 
-            -- Wait for A to fail and trigger KillAll
-            liftIO $ threadDelay 500000 -- 500ms
-            stopMaster master
+                  -- Wait for A to fail and trigger KillAll
+                  liftIO $ threadDelay 500000 -- 500ms
+                  stopMaster master
+              )
+              UIO.waitCatch
+
+          case result of
+            Left err ->
+              Text.pack (show err) `shouldSatisfy` Text.isInfixOf "Adapter A source failed"
+            Right () ->
+              expectationFailure "Expected adapter A source failure to propagate"
 
           -- A should have processed messages before adapter failed
           countA <- readIORef countARef
