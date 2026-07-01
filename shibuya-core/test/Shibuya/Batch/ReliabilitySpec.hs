@@ -13,6 +13,7 @@ import Control.Concurrent.STM
 import Control.Monad (forM_)
 import Data.Foldable (toList)
 import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
+import Data.List (isInfixOf)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -234,6 +235,29 @@ spec = describe "Shibuya.Batch reliability" $ do
             )
           assert (metrics.stats.processed + metrics.stats.failed == s.msgCount)
           assert (metrics.batch.batchedMessages == s.msgCount)
+
+  -- Non-vacuity of the checker itself: feed it perturbed tracked lists and prove
+  -- it fires. Without these, a checker that always returns Right () would pass
+  -- the property above vacuously.
+  describe "finalizedExactlyOnce checker (non-vacuity)" $ do
+    let mid i = MessageId ("msg-" <> tshowT i)
+        okFor is = Map.fromList [(mid i, AckOk) | i <- is]
+        failsWith needle = either (needle `isInfixOf`) (const False)
+    it "accepts a complete, once-each tracked list regardless of order" $
+      finalizedExactlyOnce [(mid 2, AckOk), (mid 1, AckOk)] (okFor [1, 2])
+        `shouldBe` Right ()
+    it "rejects a double-finalized message" $
+      finalizedExactlyOnce [(mid 1, AckOk), (mid 2, AckOk), (mid 1, AckOk)] (okFor [1, 2])
+        `shouldSatisfy` failsWith "finalized more than once"
+    it "rejects a missing finalization" $
+      finalizedExactlyOnce [(mid 1, AckOk)] (okFor [1, 2])
+        `shouldSatisfy` failsWith "id set mismatch"
+    it "rejects an unexpected finalization" $
+      finalizedExactlyOnce [(mid 1, AckOk), (mid 2, AckOk)] (okFor [1])
+        `shouldSatisfy` failsWith "id set mismatch"
+    it "rejects a finalization with the wrong decision" $
+      finalizedExactlyOnce [(mid 1, AckRetry (RetryDelay 1))] (okFor [1])
+        `shouldSatisfy` failsWith "wrong decision"
 
   describe "scenarios" $ do
     -- #2 Timeout flush (via a gated adapter so the ticker, not EOF, flushes).

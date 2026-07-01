@@ -528,8 +528,10 @@ matching the Vision & Scope. What now exists that did not before:
   through the real `runApp` path plus ten scenario tests (timeout, partial failure, handler
   exception, transient-finalizer retry, permanent fail-loud, halt-with-isolation, drain flush,
   multi-key, per-key FIFO under `Async`, backpressure liveness) and the reusable
-  `mkTrackedIngested`/`trackedListAdapter`/`finalizedExactlyOnce` harness. Shown non-vacuous by
-  a double-finalize perturbation.
+  `mkTrackedIngested`/`trackedListAdapter`/`finalizedExactlyOnce` harness. Non-vacuity of the
+  `finalizedExactlyOnce` checker is guarded by five committed unit tests (duplicate, missing,
+  extra, wrong-decision, and accepting cases) in `ReliabilitySpec`, replacing the original
+  transient double-finalize perturbation check.
 - **EP-21** — a runnable `shibuya-batch-example` and updated architecture docs
   (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON) + README; Broadway's "single largest
   feature gap" is closed.
