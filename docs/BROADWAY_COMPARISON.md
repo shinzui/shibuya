@@ -8,11 +8,11 @@ A comprehensive comparison between **Shibuya** (Haskell) and **Broadway** (Elixi
 
 | Feature | Broadway (Elixir) | Shibuya (Haskell) | Gap |
 |---------|-------------------|-------------------|-----|
-| **Core Pipeline** | Producer → Processor → Batcher → BatchProcessor → Ack | Adapter → Ingester → Processor → Ack | Batching stage missing |
+| **Core Pipeline** | Producer → Processor → Batcher → BatchProcessor → Ack | Adapter → Ingester → Processor → Ack (optional Batcher stage) | Comparable (Shibuya's batcher is opt-in per processor) |
 | **Backpressure** | GenStage demand-driven (min/max demand per stage) | Bounded inbox (blocks when full) | Comparable (different mechanisms) |
 | **Concurrency** | Per-stage concurrency count | Serial / Ahead N / Async N | Comparable |
 | **Supervision** | Multi-level OTP supervision tree | NQE Master + Supervisor | Broadway more granular |
-| **Batching** | First-class: batch_size, batch_timeout, batch_key, dynamic sizing | Not built-in | **Major gap** |
+| **Batching** | First-class: batch_size, batch_timeout, batch_key, dynamic sizing | First-class: `batchSize`, `batchTimeout`, `batchKey`, `BatchAck` with resilient finalization | ✅ Closed (v1; no dynamic sizing) |
 | **Rate Limiting** | Built-in, runtime-adjustable | Not built-in | **Major gap** |
 | **Partitioning** | `partition_by` at every stage, hash-based dispatch | `PartitionedInOrder` policy (documented, not enforced) | **Major gap** |
 | **Telemetry** | `:telemetry` events at every pipeline stage | OpenTelemetry tracing + custom metrics | Different approach, both good |
@@ -69,7 +69,22 @@ The adapter produces a Streamly stream, the ingester buffers into a bounded inbo
 - `handle_batch/4` callback processes entire batch
 - `:flush` batch mode for immediate emission
 
-**Shibuya:** No batching stage. Handlers process one message at a time. Batching would need to be implemented in user-space (e.g., accumulating in handler state).
+**Shibuya:** First-class batching via `Shibuya.Batch` and `mkBatchProcessor`
+(or the `BatchingProcessor` constructor). Messages are accumulated by a pure
+`batchKey` (each key has its own size counter and timeout) and a batch is emitted
+on the first of `batchSize`, `batchTimeout`, or a shutdown flush. The
+`BatchHandler` runs once over the whole batch (a `NonEmpty (Ingested es msg)`
+plus `BatchInfo`) and returns a `BatchAck` — a per-`MessageId` decision map with
+a `fallback` for messages it did not name. The framework resolves exactly one
+decision for every retained message and applies it through the message's
+idempotent finalizer with bounded retries; a permanent finalizer failure halts
+the processor loudly with the affected `MessageId`. The `Concurrency` mode is
+reused to bound how many batches run at once while preserving per-`BatchKey` FIFO
+execution.
+
+**v1 scope boundary:** there is **no** Broadway-style pre-batch
+`handle_message` + `put_batcher` transform/routing stage — routing is purely by
+`batchKey` — and **no** dynamic runtime reconfiguration of batch size or timeout.
 
 ### 4. Rate Limiting
 
@@ -159,9 +174,26 @@ Prioritized by impact and feasibility.
 
 ### Priority 1: First-Class Batching (High Impact, Medium Effort)
 
+**Status:** ✅ Implemented.
+
+Shipped as the `Shibuya.Batch` module (re-exported from `Shibuya.App`) plus the
+`BatchingProcessor` constructor and `mkBatchProcessor` smart constructor.
+Messages accumulate by a pure `batchKey` and a batch is emitted on the first of
+`batchSize` (`TriggerSize`), `batchTimeout` (`TriggerTimeout`), or a
+shutdown/drain flush (`TriggerFlush`). The `BatchHandler` runs once per batch and
+returns a `BatchAck` (a per-`MessageId` decision map + `fallback`); the framework
+resolves one decision per retained message and applies it through idempotent
+finalizers with bounded retries, halting loudly on a permanent failure. The
+`Concurrency` mode is reused to bound concurrent batches with per-`BatchKey` FIFO
+execution.
+
 **What:** Add a batching stage between processor and ack.
 
-**Design sketch:**
+**Design sketch (superseded):** The positional `[AckDecision]` return below was
+superseded by `BatchAck`, which is keyed by `MessageId` rather than list
+position, so the handler never has to return decisions in a specific order or
+length. The sketch is kept for historical context only.
+
 ```haskell
 data BatchConfig msg = BatchConfig
   { batchSize    :: Int              -- max messages per batch
@@ -346,11 +378,10 @@ data QueueProcessor es msg = QueueProcessor
 
 ## Summary
 
-Shibuya has a solid foundation with genuine advantages (typed effects, AckHalt, leases, Streamly fusion). The most impactful improvements are:
+Shibuya has a solid foundation with genuine advantages (typed effects, AckHalt, leases, Streamly fusion). First-class **batching is now shipped** (`Shibuya.Batch` + `mkBatchProcessor`), closing what was previously the single largest feature gap. The remaining top gaps are:
 
-1. **Batching** — the single largest feature gap; unlocks most real-world use cases
-2. **Enforced partitioning** — moves ordering from documentation to runtime enforcement
-3. **Rate limiting** — small effort, big production value
-4. **Richer supervision** — essential for long-running production services
+1. **Enforced partitioning** — moves ordering from documentation to runtime enforcement
+2. **Rate limiting** — small effort, big production value
+3. **Richer supervision** — essential for long-running production services
 
-These four features would close ~80% of the gap with Broadway while preserving Shibuya's Haskell-native advantages.
+Closing these three (batching is already done) would close ~80% of the gap with Broadway while preserving Shibuya's Haskell-native advantages.

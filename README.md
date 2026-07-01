@@ -19,6 +19,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Supervised Processing** - Failure isolation via NQE supervision
 - **Backpressure** - Bounded inboxes prevent memory exhaustion
 - **Explicit Ack Semantics** - Handlers express intent (ack, retry, dead-letter, halt), framework handles mechanics
+- **First-Class Batching** - Accumulate by key with size/timeout/flush triggers, `BatchAck` decisions, and resilient finalization
 - **Metrics & Introspection** - Real-time visibility into processor state and statistics
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
@@ -33,6 +34,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 | Metrics & Introspection | ✅ Implemented |
 | NQE Supervision | ✅ Implemented |
 | Concurrent Processing (Ahead/Async) | ✅ Implemented |
+| First-Class Batching (size/timeout/key) | ✅ Implemented |
 | OpenTelemetry Tracing | ✅ Implemented |
 | Graceful Shutdown (drain timeout) | ✅ Implemented |
 | Policy Validation | ✅ Implemented |

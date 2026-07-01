@@ -61,16 +61,16 @@ Decision Log.
 
 ## Progress
 
-- [ ] Verify the shipped public API: read `shibuya-core/src/Shibuya/Batch.hs`, `shibuya-core/src/Shibuya/App.hs`, and `shibuya-core/src/Shibuya/Runner/Metrics.hs`, and record in the Decision Log any name/shape drift from the signatures quoted in this plan.
-- [ ] M1: Add the `shibuya-batch-example` executable stanza to `shibuya-example/shibuya-example.cabal`.
-- [ ] M1: Create `shibuya-example/app-batch/Main.hs` (the runnable batching example).
-- [ ] M1: `cabal run shibuya-batch-example` builds and prints the documented transcript; reconcile the transcript in this plan with any drift.
-- [ ] M2: Update `docs/architecture/MESSAGE_FLOW.md` (batching stage in the pipeline diagram; batch metrics/state transitions; size vs timeout vs flush triggers).
-- [ ] M2: Update `docs/architecture/CORE_TYPES.md` (the `Shibuya.Batch` public types, `BatchingProcessor`/`mkBatchProcessor`, acknowledgement decision/finalization contract).
-- [ ] M2: Update `docs/architecture/METRICS.md` (the `BatchStats` fields on `ProcessorMetrics`).
-- [ ] M2: Update `docs/BROADWAY_COMPARISON.md` (flip the Batching gap to done; update Feature Matrix and the "Priority 1: First-Class Batching" roadmap section).
-- [ ] M2: Optionally update `README.md` feature list / status table if it enumerates features.
-- [ ] `nix fmt` clean; `cabal build all` green.
+- [x] Verify the shipped public API: read `shibuya-core/src/Shibuya/Batch.hs`, `shibuya-core/src/Shibuya/App.hs`, and `shibuya-core/src/Shibuya/Runner/Metrics.hs`, and record in the Decision Log any name/shape drift from the signatures quoted in this plan. (2026-07-01)
+- [x] M1: Add the `shibuya-batch-example` executable stanza to `shibuya-example/shibuya-example.cabal`. (2026-07-01)
+- [x] M1: Create `shibuya-example/app-batch/Main.hs` (the runnable batching example). (2026-07-01)
+- [x] M1: `cabal run shibuya-batch-example` builds and prints the documented transcript (matches exactly). (2026-07-01)
+- [x] M2: Update `docs/architecture/MESSAGE_FLOW.md` (batching stage in the pipeline diagram; batch metrics/state transitions; size vs timeout vs flush triggers). (2026-07-01)
+- [x] M2: Update `docs/architecture/CORE_TYPES.md` (the `Shibuya.Batch` public types, `BatchingProcessor`/`mkBatchProcessor`, acknowledgement decision/finalization contract; also `AppBatchConfigError`). (2026-07-01)
+- [x] M2: Update `docs/architecture/METRICS.md` (the `BatchStats` fields on `ProcessorMetrics`). (2026-07-01)
+- [x] M2: Update `docs/BROADWAY_COMPARISON.md` (flip the Batching gap to done; update Feature Matrix and the "Priority 1: First-Class Batching" roadmap section). (2026-07-01)
+- [x] M2: Update `README.md` feature list + status table (it enumerates features). (2026-07-01)
+- [x] `nix fmt` clean; `cabal build all` green. (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -78,7 +78,32 @@ Decision Log.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- Step 0 API drift: the shipped `BatchStats` (EP-18) names its per-trigger counters
+  `sizeTriggered`, `timeoutTriggered`, `flushTriggered` — NOT the plan's placeholder
+  `triggeredBySize` / `triggeredByTimeout` / `triggeredByFlush`. The other names shipped as
+  targeted: `batchesEmitted`, `batchedMessages`, `partialFailures`; the `ProcessorMetrics`
+  field is `batch`; `mkBatchProcessor :: Adapter -> BatchHandler -> BatchConfig ->
+  QueueProcessor` shipped as-is. The example's `printMetrics` and the METRICS.md update use the
+  real names (`pm.batch.sizeTriggered`, etc.).
+
+- The plain streamly `Stream` type has no `Semigroup`, so the plan's
+  `Stream.append (... & Stream.mapM ...) (Stream.nilM ...)` blocking-tail idiom is fragile
+  (and `&`/`nilM`/`append` availability varies by streamly version). Rewrote `ordersAdapter`
+  as a single `Stream.unfoldrM` state machine that yields each ingested order and, once the
+  list is exhausted, blocks on `readMVar stopVar` before ending — the same shape used by the
+  EP-19/EP-20 gated adapters, and it needs only `Stream.unfoldrM`. `mkIngested` became a pure
+  builder (no `Eff`) since it only constructs a value.
+
+- The `:: Eff es BatchAck` annotation the plan put on the `failMessages` branch is unnecessary
+  and would fail (`es` is not in scope without an explicit `forall`); both `case` branches
+  already unify to `Eff es BatchAck`, so it was dropped.
+
+- Transcript reproduced exactly (2026-07-01): `cabal run shibuya-batch-example` prints the two
+  `TriggerSize` batches, the `dead-lettered order-21` line, the metrics block
+  `received=5 processed=3 failed=1` / `batches=2 batchedMessages=4 partialFailures=1 bySize=2
+  byTimeout=0 byFlush=0`, and the post-`Stopping...` `flushed batch of 1 messages (key=apac,
+  trigger=TriggerFlush)` line. The example reads metrics only BEFORE `stopApp` (while the
+  processor is still registered), sidestepping the unregister-on-completion issue EP-20 hit.
 
 
 ## Decision Log
@@ -155,7 +180,29 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed 2026-07-01. Batching is now discoverable and demonstrably runnable. M1 shipped a new
+`shibuya-batch-example` executable (`shibuya-example/app-batch/Main.hs` + a cabal stanza) that
+runs one batching processor over five region-keyed orders and prints the documented transcript
+exactly: two `TriggerSize` batches, a dead-lettered poison order (partial failure), a metrics
+block (`received=5 processed=3 failed=1`, `batches=2 batchedMessages=4 partialFailures=1
+bySize=2 byTimeout=0 byFlush=0`), and a `TriggerFlush` batch of the leftover on graceful
+shutdown. M2 updated all four architecture/comparison docs plus the README: MESSAGE_FLOW.md
+(batching pipeline stage + metric transitions), CORE_TYPES.md (the `Shibuya.Batch` vocabulary,
+the verbatim acknowledgement contract, `BatchingProcessor`/`mkBatchProcessor`,
+`AppBatchConfigError`), METRICS.md (the `BatchStats` record + `batch` field), and
+BROADWAY_COMPARISON.md (Batching flipped from "Major gap" to "✅ Closed (v1)", the detailed
+section rewritten, the Priority-1 roadmap marked Implemented with the positional-`[AckDecision]`
+sketch annotated as superseded by `BatchAck`, and the Summary reworded).
+
+Deviations from the plan, all recorded in Surprises/Decision Log: the shipped `BatchStats`
+per-trigger fields are `sizeTriggered`/`timeoutTriggered`/`flushTriggered` (not the plan's
+`triggeredBy*`), used everywhere; the gated adapter uses `Stream.unfoldrM` (the plain `Stream`
+has no `Semigroup`, so `append`/`nilM` was avoided); and the unnecessary `:: Eff es BatchAck`
+annotation was dropped. `cabal build all` is green, `nix fmt` is clean, and the full test suite
+remains at 161 examples / 0 failures. The one documented limitation carried forward: the
+example reads metrics only before `stopApp` (processors unregister their metrics on completion),
+so the post-flush counters are shown via the handler's own `TriggerFlush` line rather than a
+metrics read-back.
 
 
 ## Context and Orientation

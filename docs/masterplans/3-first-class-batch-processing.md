@@ -151,7 +151,7 @@ merely exposed in EP-19.
 | 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Complete |
 | 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Complete |
 | 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Complete |
-| 21 | Batch Documentation and Example | docs/plans/21-batch-documentation-and-example.md | EP-19 | EP-20 | Not Started |
+| 21 | Batch Documentation and Example | docs/plans/21-batch-documentation-and-example.md | EP-19 | EP-20 | Complete |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-16, EP-17).
@@ -280,8 +280,8 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 - [x] EP-19: Batch policy validation + graceful-shutdown flush of pending batches (2026-07-01)
 - [x] EP-20: End-to-end decision/finalization property test through `runApp` (randomized sizes/timeouts/failures) (2026-07-01)
 - [x] EP-20: Timeout, partial-failure, halt, and drain-flush scenario tests + mock batch harness (2026-07-01)
-- [ ] EP-21: Architecture docs updated (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON)
-- [ ] EP-21: Runnable batching example in `shibuya-example`
+- [x] EP-21: Architecture docs updated (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON) + README (2026-07-01)
+- [x] EP-21: Runnable batching example in `shibuya-example` (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -505,7 +505,63 @@ plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original vision.
 
-(To be filled during and after implementation.)
+All six exec-plans complete (2026-07-01). First-class batch processing shipped end to end,
+matching the Vision & Scope. What now exists that did not before:
+
+- **EP-16** — the public `Shibuya.Batch` API: `BatchKey`, `BatchTrigger`, `BatchInfo`,
+  `BatchConfig`, `BatchHandler`, `BatchAck` + smart constructors (`ackAllOk`, `ackAll`,
+  `ackExcept`, `withFallback`, `failMessages`), and `validateBatchConfig`. The
+  one-decision-per-retained-message contract is written down as the normative haddock spec.
+- **EP-17** — `Shibuya.Runner.Batcher`: a pure, deterministic accumulation core
+  (`stepArrival`/`stepTick`/`stepFlush`) plus the `runBatcher` IO engine (single timeout
+  ticker, `MVar`-serialized hand-off, bounded `TBQueue` for backpressure, EOF flush). Message
+  conservation is property-tested with no threads.
+- **EP-18** — `Shibuya.Runner.BatchProcessor`: runs the handler under exception isolation,
+  resolves exactly one `AckDecision` per retained message, drives idempotent finalization with
+  a bounded `[10ms,50ms,250ms]` retry schedule and fail-loud on exhaustion, a keyed STM
+  scheduler for per-key FIFO under `Ahead`/`Async`, halt-sets-flag semantics, and the
+  `BatchStats` metrics record + batch tracing attributes/events.
+- **EP-19** — the `BatchingProcessor` GADT constructor + `mkBatchProcessor`, threaded through
+  `runSupervisedBatch`/`runWithMetricsBatch`/`runIngesterAndProcessorBatch`, batch-config
+  validation (`AppBatchConfigError`), and graceful-shutdown flush of pending partial batches.
+- **EP-20** — the reliability suite: a 50-run QuickCheck exactly-once-finalization property
+  through the real `runApp` path plus ten scenario tests (timeout, partial failure, handler
+  exception, transient-finalizer retry, permanent fail-loud, halt-with-isolation, drain flush,
+  multi-key, per-key FIFO under `Async`, backpressure liveness) and the reusable
+  `mkTrackedIngested`/`trackedListAdapter`/`finalizedExactlyOnce` harness. Shown non-vacuous by
+  a double-finalize perturbation.
+- **EP-21** — a runnable `shibuya-batch-example` and updated architecture docs
+  (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON) + README; Broadway's "single largest
+  feature gap" is closed.
+
+Final verification: `cabal build all` green; `cabal test shibuya-core-test` = 161 examples, 0
+failures; no compiler warnings; `nix fmt` clean; `cabal run shibuya-batch-example` reproduces
+the documented transcript.
+
+The reliability contract in the Vision held under test: no message that enters a batch is lost,
+skipped, double-resolved, or silently abandoned — including on handler exceptions, timeout and
+shutdown flushes, and under concurrency across keys; adapter finalization failures are retried
+and, if permanent, surfaced loudly with the affected `MessageId`.
+
+Decomposition retrospective. The six-plan split held up: the accumulation invariant (EP-17) and
+the acknowledgement/finalization invariant (EP-18) were each property-tested in isolation, and
+the one genuinely shared artifact (`BatchAck`) was defined once (EP-16) and only consumed
+thereafter. The linear dependency chain matched reality — each stage physically consumed the
+previous stage's artifact — so no plan started before its inputs existed. The main
+cross-plan reconciliations discovered during implementation (all recorded in Surprises &
+Discoveries): the halt-throw seam moved from EP-18 (sets `haltRef`) to EP-19 (reads it and
+throws); `getAppMetrics` is empty for a completed/halted processor (processors unregister in
+their `finally`), so tests read the persistent `SupervisedProcessor` TVar; test specs building
+`Ingested` values must pin the empty effect stack's kind (`type E = ('[] :: [Effect])`); and
+EP-21's docs use the shipped `BatchStats` field names (`sizeTriggered`/`timeoutTriggered`/
+`flushTriggered`).
+
+Known gaps / deferred (as scoped): no pre-batch `handle_message` + `put_batcher` transform
+stage (routing is purely by `batchKey`); no dynamic runtime reconfiguration of batch
+size/timeout; no hash-based partition routing to multiple inboxes. One latent parity issue is
+carried, not fixed: on `ProcessorHalt` the batch runner (like the single-message runner) leaves
+`done` unset, so `waitApp`/`waitForDrainWithTimeout` block until the drain timeout after a halt
+— EP-20's halt/permanent-failure scenarios use a short `drainTimeout` to accommodate this.
 
 
 ## Revision Notes

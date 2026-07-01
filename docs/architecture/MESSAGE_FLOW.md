@@ -47,6 +47,82 @@ Each queue processor created via `runApp` gets its own instance of this pipeline
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+## Batching Stage (optional)
+
+A processor created with `mkBatchProcessor` (or the `BatchingProcessor`
+constructor) inserts a **Batcher** between the bounded inbox and the handler.
+Instead of running a `Handler` once per message, the framework accumulates
+messages into batches and runs a `BatchHandler` once per emitted batch.
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    runSupervisedBatch (per batching processor)           │
+│                                                                          │
+│  adapter.source ──► Ingester ──► ┌─────────────────┐                     │
+│   (stream)          incReceived  │  Bounded Inbox  │◄── inboxSize         │
+│                                  │  (backpressure) │    (blocks if full)  │
+│                                  └────────┬────────┘                      │
+│                                           │                              │
+│                                           ▼                              │
+│                    ┌──────────────────────────────────────────┐          │
+│                    │              Batcher                      │          │
+│                    │  accumulate by batchKey (per-key size &   │          │
+│                    │  timeout); emit a batch on the first of:  │          │
+│                    │    • reached batchSize   → TriggerSize    │          │
+│                    │    • batchTimeout elapsed → TriggerTimeout│          │
+│                    │    • drain / shutdown    → TriggerFlush   │          │
+│                    └────────────────────┬─────────────────────┘          │
+│                                         │ NonEmpty (Ingested es msg)      │
+│                                         ▼         + BatchInfo             │
+│                    ┌──────────────────────────────────────────┐          │
+│                    │           Batch handler                   │          │
+│                    │  runs once over the whole batch,          │          │
+│                    │  returns a single BatchAck                │          │
+│                    └────────────────────┬─────────────────────┘          │
+│                                         │ BatchAck (decisions + fallback) │
+│                                         ▼                                 │
+│                    ┌──────────────────────────────────────────┐          │
+│                    │        Batch finalization                 │          │
+│                    │  one decision per RETAINED message        │          │
+│                    │  (MessageId lookup in decisions, else     │          │
+│                    │  fallback); apply each via idempotent     │          │
+│                    │  finalizer with bounded retry; a          │          │
+│                    │  permanent finalizer failure fails loud   │          │
+│                    │  with the affected MessageId              │          │
+│                    └──────────────────────────────────────────┘          │
+│                                                                          │
+│  A single timeout ticker thread scans accumulators, so flush latency is  │
+│  bounded by tickInterval. Concurrency (Serial | Ahead n | Async n) is    │
+│  reused to bound how many BATCHES run at once while preserving FIFO       │
+│  execution within each BatchKey.                                         │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Batch key routing.** Each message's `batchKey` is computed from its envelope
+(a pure function in `BatchConfig`). Messages sharing a key accumulate into the
+same sub-batch, and every `BatchKey` has its own independent size counter and
+timeout. Use `const defaultBatchKey` for a single undivided batch.
+
+**Three triggers.** A batch is emitted on the first of: reaching `batchSize`
+(`TriggerSize`), `batchTimeout` elapsing since the batch's first message arrived
+(`TriggerTimeout`), or the processor draining on shutdown, which flushes any
+partial batch (`TriggerFlush`). The `BatchInfo` passed to the handler records
+which `trigger` fired.
+
+**Batch handler.** The `BatchHandler` receives the `BatchInfo` and the whole
+batch as a `NonEmpty (Ingested es msg)`, runs once, and returns a single
+`BatchAck`.
+
+**One decision per retained message + bounded retry / fail loud.** Given the
+emitted batch and the returned `BatchAck`, the framework resolves exactly one
+`AckDecision` for every message in its own retained batch list. For each
+retained message it looks the message's `MessageId` up in `decisions`; if the id
+is absent it uses `fallback`. The handler's return value only supplies decisions
+— it never drives which messages are acked. Each resolved decision is then
+applied through the message's idempotent finalizer with bounded retries. A
+permanently failing finalizer is surfaced as a loud processor failure with the
+affected `MessageId`; it is not swallowed.
+
 ## Multi-Queue Architecture
 
 Each queue processor runs in its own independent pipeline:
@@ -197,6 +273,16 @@ Fast Adapter                  Slow Handler
 | `AckDeadLetter` | `stats.failed++` | `Processing → Idle` |
 | `AckHalt` | - | `Processing → Failed` |
 | Handler throws | `stats.failed++` | `Processing → Failed` |
+| Batch emitted at `batchSize` | `batch.batchesEmitted++`, `batch.batchedMessages += N`, `batch.sizeTriggered++` | - |
+| Batch emitted at `batchTimeout` | `batch.batchesEmitted++`, `batch.batchedMessages += N`, `batch.timeoutTriggered++` | - |
+| Batch flushed on drain/shutdown | `batch.batchesEmitted++`, `batch.batchedMessages += N`, `batch.flushTriggered++` | - |
+| Batch partial failure (handler named ≥1 failing message) | `batch.partialFailures++` | - |
+| Per-message ack within a batch | `stats.processed++` or `stats.failed++` per message | - |
+
+A batching processor's per-message counters (`stats.received/processed/failed`)
+update exactly as for a single-message processor — each message in a batch is
+finalized individually — while the `batch.*` counters summarize batch-level
+activity.
 
 ## Finite vs Infinite Streams
 

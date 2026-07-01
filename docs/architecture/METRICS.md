@@ -60,12 +60,43 @@ Counters for message processing:
 | `processed` | Handler returns `AckOk` or `AckRetry` |
 | `failed` | Handler returns `AckDeadLetter` or throws |
 
+### BatchStats
+
+```haskell
+data BatchStats = BatchStats
+  { batchesEmitted  :: !Int  -- batches handed to the batch handler
+  , batchedMessages :: !Int  -- total messages across all emitted batches
+  , partialFailures :: !Int  -- batches where the handler named >=1 failing message
+  , sizeTriggered   :: !Int  -- batches emitted at batchSize
+  , timeoutTriggered :: !Int -- batches emitted at batchTimeout
+  , flushTriggered  :: !Int  -- batches emitted by a drain/shutdown flush
+  }
+```
+
+Batch-processing counters, tracked alongside per-message `StreamStats`:
+
+| Counter | Incremented When |
+|---------|-----------------|
+| `batchesEmitted` | A batch is emitted and handed to the batch handler |
+| `batchedMessages` | Add `N` for every emitted batch of `N` messages |
+| `partialFailures` | The handler returns normally and names ≥ 1 message with a failing decision (counted per batch, not per message) |
+| `sizeTriggered` | A batch is emitted because it reached `batchSize` (`TriggerSize`) |
+| `timeoutTriggered` | A batch is emitted because `batchTimeout` elapsed (`TriggerTimeout`) |
+| `flushTriggered` | A batch is emitted by a drain/shutdown flush (`TriggerFlush`) |
+
+For a non-batching processor these counters are all zero; for a batching
+processor they summarize batch-level activity while `stats` continues to count
+per-message outcomes (each message in a batch is finalized individually, so
+`stats.processed`/`stats.failed` update exactly as for single-message
+processing).
+
 ### ProcessorMetrics
 
 ```haskell
 data ProcessorMetrics = ProcessorMetrics
   { state     :: !ProcessorState
   , stats     :: !StreamStats
+  , batch     :: !BatchStats
   , startedAt :: !UTCTime
   }
 ```

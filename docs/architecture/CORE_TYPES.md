@@ -171,6 +171,158 @@ Adapters provide:
 - A stream of ingested messages
 - A shutdown action for cleanup
 
+## Batch Processing
+
+Types in `Shibuya.Batch` (re-exported from `Shibuya.App`) opt a processor into
+batching: messages are accumulated into batches and a `BatchHandler` runs once
+per emitted batch instead of a `Handler` running once per message.
+
+### BatchKey
+
+```haskell
+newtype BatchKey = BatchKey { unBatchKey :: Text }
+```
+
+Groups messages into independent sub-batches within one processor. Messages
+sharing a key accumulate together; each key has its own size counter and
+timeout. `defaultBatchKey = BatchKey "default"` is the key used when a
+configuration does not distinguish sub-batches.
+
+### BatchTrigger
+
+```haskell
+data BatchTrigger
+  = TriggerSize      -- reached the configured batchSize
+  | TriggerTimeout   -- batchTimeout elapsed since the batch's first message
+  | TriggerFlush     -- processor is draining/shutting down (partial flush)
+```
+
+Why the framework emitted a batch. A batch is emitted on the first of these to
+occur.
+
+### BatchInfo
+
+```haskell
+data BatchInfo = BatchInfo
+  { batchKey  :: !BatchKey
+  , size      :: !Int
+  , trigger   :: !BatchTrigger
+  , partition :: !(Maybe Text)
+  }
+```
+
+Metadata passed to the `BatchHandler` alongside the messages.
+
+| Field | Purpose |
+|-------|---------|
+| `batchKey` | The key all messages in this batch share |
+| `size` | How many messages are in this batch (always ≥ 1) |
+| `trigger` | Why this batch was emitted |
+| `partition` | Partition of the batch's first message, if the envelope had one |
+
+### BatchConfig
+
+```haskell
+data BatchConfig es msg = BatchConfig
+  { batchSize    :: !Int
+  , batchTimeout :: !NominalDiffTime
+  , batchKey     :: !(Envelope msg -> BatchKey)
+  , tickInterval :: !(Maybe NominalDiffTime)
+  }
+```
+
+| Field | Purpose |
+|-------|---------|
+| `batchSize` | Emit a batch once it holds this many messages (must be ≥ 1) |
+| `batchTimeout` | Emit this long after the batch's first message arrives, even if not full (must be > 0) |
+| `batchKey` | Compute a message's sub-batch key from its envelope; use `const defaultBatchKey` for a single undivided batch |
+| `tickInterval` | How often the timeout ticker scans for timed-out batches; `Nothing` means "use `batchTimeout`". Flush latency is bounded by this interval |
+
+`defaultBatchConfig` uses `batchSize = 100`, `batchTimeout = 1` second,
+`batchKey = const defaultBatchKey`, and `tickInterval = Nothing`, matching
+Broadway's defaults. `validateBatchConfig` rejects a non-positive
+`batchSize`/`batchTimeout`/`tickInterval` with a `BatchConfigError`
+(`BatchSizeNotPositive`, `BatchTimeoutNotPositive`, `TickIntervalNotPositive`);
+a bad config surfaces from `runApp` as `AppBatchConfigError`.
+
+### BatchHandler
+
+```haskell
+type BatchHandler es msg =
+  BatchInfo -> NonEmpty (Ingested es msg) -> Eff es BatchAck
+```
+
+Unlike `Handler` (one message → one decision), a batch handler receives every
+message in the batch plus its `BatchInfo`, runs once, and returns a single
+`BatchAck` describing per-message outcomes.
+
+### BatchAck
+
+```haskell
+data BatchAck = BatchAck
+  { decisions :: !(Map MessageId AckDecision)
+  , fallback  :: !AckDecision
+  }
+```
+
+How to acknowledge every message in a batch.
+
+| Field | Purpose |
+|-------|---------|
+| `decisions` | Per-message overrides, keyed by `MessageId` |
+| `fallback` | Decision for any message not present in `decisions` |
+
+**Acknowledgement decision contract:**
+
+> Given an emitted batch and the BatchAck a BatchHandler returns, the framework
+> resolves exactly one AckDecision for every message in its own retained batch
+> list. For each retained message it looks the message's MessageId up in
+> `decisions`; if the id is absent it uses `fallback`. The handler's return
+> value only supplies decisions — it never drives which messages are acked. The
+> execution stage then applies those decisions through each message's idempotent
+> finalizer with bounded retries. A permanently failing finalizer is surfaced as
+> a loud processor failure with the affected MessageId; it is not swallowed.
+> This requires MessageIds to be unique within a batch, which holds for every
+> real adapter and the mock adapter.
+
+Smart constructors build a `BatchAck` without touching the `Map` directly:
+
+| Constructor | Meaning |
+|-------------|---------|
+| `ackAllOk` | Acknowledge every message OK (the common case) |
+| `ackAll d` | Apply one decision `d` to every message |
+| `ackExcept overrides` | Ack everything OK except the listed messages |
+| `withFallback fb overrides` | Give the listed messages their decisions and everything else `fb` |
+| `failMessages fs` | Dead-letter the listed messages (with reasons) and ack the rest OK (the common failure case) |
+
+### BatchingProcessor
+
+```haskell
+data QueueProcessor es where
+  QueueProcessor    :: { adapter :: Adapter es msg, handler :: Handler es msg
+                       , ordering :: Ordering, concurrency :: Concurrency
+                       } -> QueueProcessor es
+  BatchingProcessor :: { adapter :: Adapter es msg, batchHandler :: BatchHandler es msg
+                       , batchConfig :: BatchConfig es msg
+                       , ordering :: Ordering, concurrency :: Concurrency
+                       } -> QueueProcessor es
+
+mkBatchProcessor ::
+  Adapter es msg -> BatchHandler es msg -> BatchConfig es msg -> QueueProcessor es
+```
+
+`BatchingProcessor` is the second `QueueProcessor` constructor; it pairs an
+adapter with a `BatchHandler` and a `BatchConfig`. `mkBatchProcessor` is the
+convenience constructor with safe default policies (`Unordered` ordering +
+`Serial` concurrency, i.e. one batch at a time). The `Concurrency` mode is
+reused to bound how many batches run concurrently while preserving FIFO
+execution within each `BatchKey`: `Serial` runs one batch at a time in emission
+order, `Ahead n` runs batches concurrently but finalizes in order, and `Async n`
+runs batches concurrently without ordering.
+
+A runnable example lives at `shibuya-example/app-batch/Main.hs`
+(`cabal run shibuya-batch-example`).
+
 ## In-Flight Tracking
 
 ### InFlightInfo
@@ -221,4 +373,5 @@ data AppError
   = AppPolicyError !PolicyError
   | AppHandlerError !HandlerError
   | AppRuntimeError !RuntimeError
+  | AppBatchConfigError !BatchConfigError
 ```

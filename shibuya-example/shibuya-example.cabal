@@ -39,3 +39,32 @@ executable shibuya-example
     streamly-core ^>=0.3,
     text ^>=2.1.3,
     unordered-containers ^>=0.2,
+
+executable shibuya-batch-example
+  import: warnings
+  ghc-options:
+    -threaded
+    -rtsopts
+
+  main-is: Main.hs
+  hs-source-dirs: app-batch
+  default-language: GHC2024
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  build-depends:
+    base ^>=4.21.0.0,
+    containers,
+    effectful ^>=2.6.1.0,
+    shibuya-core,
+    streamly-core ^>=0.3,
+    text ^>=2.1.3,
+    unordered-containers ^>=0.2,
