@@ -7,6 +7,7 @@ import Shibuya.Core.AckSpec qualified
 import Shibuya.Core.RetrySpec qualified
 import Shibuya.Core.TypesSpec qualified
 import Shibuya.PolicySpec qualified
+import Shibuya.Runner.BatchProcessorSpec qualified
 import Shibuya.Runner.BatcherSpec qualified
 import Shibuya.Runner.SupervisedSpec qualified
 import Shibuya.RunnerSpec qualified
@@ -24,6 +25,7 @@ main = hspec $ do
   describe "Shibuya.Policy" Shibuya.PolicySpec.spec
   describe "Shibuya.Runner" Shibuya.RunnerSpec.spec
   Shibuya.Runner.BatcherSpec.spec
+  Shibuya.Runner.BatchProcessorSpec.spec
   Shibuya.Runner.SupervisedSpec.spec
   Shibuya.Telemetry.EffectSpec.spec
   Shibuya.Telemetry.PropagationSpec.spec

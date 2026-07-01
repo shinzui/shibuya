@@ -68,15 +68,15 @@ that EP-19 will mount.
 
 ## Progress
 
-- [ ] Extend `shibuya-core/src/Shibuya/Runner/Metrics.hs`: add `BatchStats` record, `emptyBatchStats`, a `batch :: !BatchStats` field on `ProcessorMetrics`, initialize it in `emptyProcessorMetrics`, and add increment helpers (`incBatchesEmitted`, `addBatchedMessages`, `incPartialFailures`, `incSizeTriggered`, `incTimeoutTriggered`, `incFlushTriggered`). Export all of them.
-- [ ] Extend `shibuya-core/src/Shibuya/Telemetry/Semantic.hs`: add batch attribute keys (`attrShibuyaBatchKey`, `attrShibuyaBatchSize`, `attrShibuyaBatchTrigger`) and batch event names (`eventBatchStarted`, `eventBatchCompleted`). Export them.
-- [ ] Create `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` with `processOneBatch`, `finalizeWithRetry`, `processBatchesUntilDrained`, and the test driver `runBatchesWithMetrics`.
-- [ ] Implement keyed batch scheduling so `Ahead n`/`Async n` run different keys concurrently but never overlap two batches with the same `BatchKey`.
-- [ ] Add finalization-failure handling: transient finalizer exceptions are retried; exhausted retries mark the processor failed and surface a fatal halt after the batch's remaining messages are attempted.
-- [ ] Add `Shibuya.Runner.BatchProcessor` to the library `exposed-modules` in `shibuya-core/shibuya-core.cabal`.
-- [ ] Create `shibuya-core/test/Shibuya/Runner/BatchProcessorSpec.hs` with the M1 and M2 scenarios; register it in the test-suite `other-modules` and wire it into `shibuya-core/test/Main.hs`.
-- [ ] `cabal build shibuya-core` and `cabal test shibuya-core-test` both green.
-- [ ] `nix fmt` leaves the tree clean.
+- [x] Extend `shibuya-core/src/Shibuya/Runner/Metrics.hs`: add `BatchStats` record, `emptyBatchStats`, a `batch :: !BatchStats` field on `ProcessorMetrics`, initialize it in `emptyProcessorMetrics`, and add increment helpers (`incBatchesEmitted`, `addBatchedMessages`, `incPartialFailures`, `incSizeTriggered`, `incTimeoutTriggered`, `incFlushTriggered`). Export all of them. (2026-07-01)
+- [x] Extend `shibuya-core/src/Shibuya/Telemetry/Semantic.hs`: add batch attribute keys (`attrShibuyaBatchKey`, `attrShibuyaBatchSize`, `attrShibuyaBatchTrigger`) and batch event names (`eventBatchStarted`, `eventBatchCompleted`). Export them. (2026-07-01)
+- [x] Create `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` with `processOneBatch`, `finalizeWithRetry`, `processBatchesUntilDrained`, and the test driver `runBatchesWithMetrics`. (2026-07-01)
+- [x] Implement keyed batch scheduling so `Ahead n`/`Async n` run different keys concurrently but never overlap two batches with the same `BatchKey`. (2026-07-01)
+- [x] Add finalization-failure handling: transient finalizer exceptions are retried; exhausted retries mark the processor failed and surface a fatal halt after the batch's remaining messages are attempted. (2026-07-01)
+- [x] Add `Shibuya.Runner.BatchProcessor` to the library `exposed-modules` in `shibuya-core/shibuya-core.cabal`. (2026-07-01)
+- [x] Create `shibuya-core/test/Shibuya/Runner/BatchProcessorSpec.hs` with the M1 and M2 scenarios; register it in the test-suite `other-modules` and wire it into `shibuya-core/test/Main.hs`. (2026-07-01)
+- [x] `cabal build shibuya-core` and `cabal test shibuya-core-test` both green (147 examples, 0 failures; no warnings). (2026-07-01)
+- [x] `nix fmt` leaves the tree clean. (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -84,7 +84,26 @@ that EP-19 will mount.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- The module listing in Concrete Steps indented `haltReasonText` and `tshow` as if they were
+  inside a `where` block (lines ~984-989), but they are top-level helpers used by both
+  `processOneBatch` and `recordBatchOutcome`. Implemented them at top level; no behavioral
+  change.
+
+- Two imports the listing named were redundant under `-Wall` in this GHC (9.12.4 / base 4.21):
+  `Data.List (foldl')` — `foldl'` is re-exported by the implicit `Prelude` now — and
+  `MessageId` from `Shibuya.Core.Types`, which is only needed at type level via `Envelope`
+  and `Map` and so is imported without being named. Both were dropped to keep the build
+  warning-free, exactly as the plan's Idempotence/Recovery note anticipated.
+
+- `BatchKey` lives in `Shibuya.Batch`, not `Shibuya.Core.Types`; the test spec must import it
+  from `Shibuya.Batch (BatchKey (..))`. (An initial draft imported it from `Core.Types` and
+  failed to resolve.)
+
+- The test spec's local `AckHandle`-typed helpers (`flakyAckHandle`, `alwaysFailAckHandle`)
+  carry `(IOE :> es)` constraints, so the test module must add `(:>)` to its `Effectful`
+  import list (`import Effectful (..., (:>))`). The batch fixtures here are built inside a
+  concrete `runEff $ runTracingNoop $ do ...` block, so — unlike EP-17's `BatcherSpec` — no
+  `type E = ('[] :: [Effect])` kind alias is needed; `es` is inferred concretely.
 
 
 ## Decision Log
@@ -194,7 +213,33 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion. Compare
 the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed 2026-07-01. Both milestones landed as designed. `Shibuya.Runner.BatchProcessor`
+(exposed) provides `processOneBatch`, `processBatchesUntilDrained`, `runBatchesWithMetrics`,
+and the internal `finalizeWithRetry` plus the keyed STM scheduler
+(`runKeyedBatchScheduler`). `Shibuya.Runner.Metrics` gained the Generic-JSON `BatchStats`
+record, a `batch` field on `ProcessorMetrics`, and six increment helpers;
+`Shibuya.Telemetry.Semantic` gained three batch attribute keys and two batch event names.
+All exported signatures match the frozen ones in the MasterPlan Surprises & Discoveries, so
+EP-19 can mount `processBatchesUntilDrained` and expose `BatchStats` unchanged.
+
+The reliability contract is proven by six scenario tests (all green, 147 examples total, no
+warnings): (M1) a 5-message batch with two per-message dead-letters finalizes each id exactly
+once with the right decision and correct metrics (`batchesEmitted=1`, `batchedMessages=5`,
+`partialFailures=1`, `sizeTriggered=1`, `processed=3`, `failed=2`); (M1) a flaky finalizer
+that throws twice records exactly one successful finalization, proving retry does not
+recompute or duplicate the resolved decision; (M2) a throwing handler finalizes all five with
+`AckRetry (RetryDelay 0)` (`failed=5`, `partialFailures=0`); (M2) a per-message `AckHalt`
+finalizes the whole batch, sets the flag, and the driver raises
+`ProcessorHalt (HaltFatal ...)`; (M2) a permanently failing finalizer exhausts the
+`[10ms,50ms,250ms]` retry schedule, names the failed `MessageId` in the fatal halt, and still
+finalizes the batch's other message; (M2) under `Async 3` same-key batches never overlap
+while different keys may.
+
+No deviations from the plan's design or the emitted-batch type. The only surprises were
+mechanical (the mis-indented top-level helpers, two redundant imports, the `BatchKey` import
+origin, and the `(:>)` test import) recorded above. Deferred, as the plan states: EP-18 does
+not throw on halt or stop batch emission — the caller (EP-19) reads `haltRef` after draining
+and throws; halting *emission* is EP-17/EP-19 flow control.
 
 
 ## Context and Orientation

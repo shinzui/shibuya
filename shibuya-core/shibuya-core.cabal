@@ -35,6 +35,7 @@ library
     Shibuya.Handler
     Shibuya.Policy
     Shibuya.Prelude
+    Shibuya.Runner.BatchProcessor
     Shibuya.Runner.Batcher
     Shibuya.Runner.Master
     Shibuya.Runner.Metrics
@@ -120,6 +121,7 @@ test-suite shibuya-core-test
     Shibuya.Core.RetrySpec
     Shibuya.Core.TypesSpec
     Shibuya.PolicySpec
+    Shibuya.Runner.BatchProcessorSpec
     Shibuya.Runner.BatcherSpec
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec

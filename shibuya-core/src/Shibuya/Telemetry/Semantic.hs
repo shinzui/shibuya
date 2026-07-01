@@ -22,11 +22,16 @@ module Shibuya.Telemetry.Semantic
     attrShibuyaInflightMax,
     attrShibuyaAckDecision,
     attrShibuyaPartition,
+    attrShibuyaBatchKey,
+    attrShibuyaBatchSize,
+    attrShibuyaBatchTrigger,
 
     -- * Event Names
     eventHandlerStarted,
     eventHandlerCompleted,
     eventAckDecision,
+    eventBatchStarted,
+    eventBatchCompleted,
 
     -- * SpanArguments Helpers
     consumerSpanArgs,
@@ -139,6 +144,18 @@ attrShibuyaAckDecision = "shibuya.ack.decision"
 attrShibuyaPartition :: Text
 attrShibuyaPartition = "shibuya.partition"
 
+-- | The batch grouping key (@shibuya.batch.key@).
+attrShibuyaBatchKey :: Text
+attrShibuyaBatchKey = "shibuya.batch.key"
+
+-- | The number of messages in the batch (@shibuya.batch.size@).
+attrShibuyaBatchSize :: Text
+attrShibuyaBatchSize = "shibuya.batch.size"
+
+-- | Why the batch was emitted: size, timeout, or flush (@shibuya.batch.trigger@).
+attrShibuyaBatchTrigger :: Text
+attrShibuyaBatchTrigger = "shibuya.batch.trigger"
+
 --------------------------------------------------------------------------------
 -- Event Names
 --
@@ -160,6 +177,14 @@ eventHandlerCompleted = "shibuya.handler.completed"
 -- | Event recorded when ack decision is made (@shibuya.ack.decision@).
 eventAckDecision :: Text
 eventAckDecision = "shibuya.ack.decision"
+
+-- | Event recorded when batch-handler execution starts (@shibuya.batch.started@).
+eventBatchStarted :: Text
+eventBatchStarted = "shibuya.batch.started"
+
+-- | Event recorded when a batch has been fully finalized (@shibuya.batch.completed@).
+eventBatchCompleted :: Text
+eventBatchCompleted = "shibuya.batch.completed"
 
 --------------------------------------------------------------------------------
 -- SpanArguments Helpers

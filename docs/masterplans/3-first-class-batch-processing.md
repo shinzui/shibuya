@@ -148,7 +148,7 @@ merely exposed in EP-19.
 |----|-------|------|-----------|-----------|--------|
 | 16 | Batch API and Configuration Types | docs/plans/16-batch-api-and-configuration-types.md | None | None | Complete |
 | 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Complete |
-| 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Not Started |
+| 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Complete |
 | 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Not Started |
 | 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Not Started |
 | 21 | Batch Documentation and Example | docs/plans/21-batch-documentation-and-example.md | EP-19 | EP-20 | Not Started |
@@ -274,8 +274,8 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 - [x] EP-16: Smart constructors + `validateBatchConfig` with unit tests green (2026-07-01)
 - [x] EP-17: STM accumulator groups inbox stream by batch key with size trigger (2026-07-01)
 - [x] EP-17: Timeout ticker and shutdown flush triggers, with message-conservation property tests green (2026-07-01)
-- [ ] EP-18: Batch handler invocation with exception isolation, one decision per retained message, and resilient finalization
-- [ ] EP-18: Halt-in-batch handling + batch metrics/tracing spans
+- [x] EP-18: Batch handler invocation with exception isolation, one decision per retained message, and resilient finalization (2026-07-01)
+- [x] EP-18: Halt-in-batch handling + batch metrics/tracing spans (2026-07-01)
 - [ ] EP-19: `BatchingProcessor` constructor + `mkBatchProcessor`, threaded through `runSupervised`
 - [ ] EP-19: Batch policy validation + graceful-shutdown flush of pending batches
 - [ ] EP-20: End-to-end decision/finalization property test through `runApp` (randomized sizes/timeouts/failures)

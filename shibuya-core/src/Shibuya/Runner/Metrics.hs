@@ -13,6 +13,16 @@ module Shibuya.Runner.Metrics
     StreamStats (..),
     emptyStreamStats,
 
+    -- * Batch Statistics
+    BatchStats (..),
+    emptyBatchStats,
+    incBatchesEmitted,
+    addBatchedMessages,
+    incPartialFailures,
+    incSizeTriggered,
+    incTimeoutTriggered,
+    incFlushTriggered,
+
     -- * Combined Metrics
     ProcessorMetrics (..),
     emptyProcessorMetrics,
@@ -126,12 +136,40 @@ data StreamStats = StreamStats
 emptyStreamStats :: StreamStats
 emptyStreamStats = StreamStats 0 0 0 0
 
+-- | Batch-processing statistics, tracked alongside per-message 'StreamStats'.
+data BatchStats = BatchStats
+  { -- | Number of batches emitted and executed.
+    batchesEmitted :: !Int,
+    -- | Total messages across all emitted batches.
+    batchedMessages :: !Int,
+    -- | Batches with a genuine partial failure: the handler returned normally
+    -- and named at least one message in its decision map with a failing
+    -- decision (dead-letter or retry) while acking the rest. Counted per batch,
+    -- not per message, so it does not double-count the per-message 'failed'
+    -- counter.
+    partialFailures :: !Int,
+    -- | Batches emitted because they reached the configured size.
+    sizeTriggered :: !Int,
+    -- | Batches emitted because their timeout elapsed.
+    timeoutTriggered :: !Int,
+    -- | Batches emitted because the processor was draining (flush).
+    flushTriggered :: !Int
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Empty batch stats (all zero).
+emptyBatchStats :: BatchStats
+emptyBatchStats = BatchStats 0 0 0 0 0 0
+
 -- | Combined processor metrics.
 data ProcessorMetrics = ProcessorMetrics
   { -- | Current state
     state :: !ProcessorState,
-    -- | Statistics
+    -- | Per-message statistics
     stats :: !StreamStats,
+    -- | Batch statistics
+    batch :: !BatchStats,
     -- | When the processor started
     startedAt :: !UTCTime
   }
@@ -144,6 +182,7 @@ emptyProcessorMetrics now =
   ProcessorMetrics
     { state = Idle,
       stats = emptyStreamStats,
+      batch = emptyBatchStats,
       startedAt = now
     }
 
@@ -165,3 +204,27 @@ incProcessed = #processed %~ (+ 1)
 -- | Increment failed count.
 incFailed :: StreamStats -> StreamStats
 incFailed = #failed %~ (+ 1)
+
+-- | Increment the emitted-batch counter.
+incBatchesEmitted :: BatchStats -> BatchStats
+incBatchesEmitted = #batchesEmitted %~ (+ 1)
+
+-- | Add to the total batched-messages counter.
+addBatchedMessages :: Int -> BatchStats -> BatchStats
+addBatchedMessages n = #batchedMessages %~ (+ n)
+
+-- | Increment the partial-failure batch counter.
+incPartialFailures :: BatchStats -> BatchStats
+incPartialFailures = #partialFailures %~ (+ 1)
+
+-- | Increment the size-trigger counter.
+incSizeTriggered :: BatchStats -> BatchStats
+incSizeTriggered = #sizeTriggered %~ (+ 1)
+
+-- | Increment the timeout-trigger counter.
+incTimeoutTriggered :: BatchStats -> BatchStats
+incTimeoutTriggered = #timeoutTriggered %~ (+ 1)
+
+-- | Increment the flush-trigger counter.
+incFlushTriggered :: BatchStats -> BatchStats
+incFlushTriggered = #flushTriggered %~ (+ 1)
