@@ -147,7 +147,7 @@ merely exposed in EP-19.
 | #  | Title | Path | Hard Deps | Soft Deps | Status |
 |----|-------|------|-----------|-----------|--------|
 | 16 | Batch API and Configuration Types | docs/plans/16-batch-api-and-configuration-types.md | None | None | Complete |
-| 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Not Started |
+| 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Complete |
 | 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Not Started |
 | 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Not Started |
 | 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Not Started |
@@ -272,8 +272,8 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 
 - [x] EP-16: `Shibuya.Batch` types compile and are exported (BatchKey, BatchTrigger, BatchInfo, BatchConfig, BatchHandler, BatchAck) (2026-07-01)
 - [x] EP-16: Smart constructors + `validateBatchConfig` with unit tests green (2026-07-01)
-- [ ] EP-17: STM accumulator groups inbox stream by batch key with size trigger
-- [ ] EP-17: Timeout ticker and shutdown flush triggers, with message-conservation property tests green
+- [x] EP-17: STM accumulator groups inbox stream by batch key with size trigger (2026-07-01)
+- [x] EP-17: Timeout ticker and shutdown flush triggers, with message-conservation property tests green (2026-07-01)
 - [ ] EP-18: Batch handler invocation with exception isolation, one decision per retained message, and resilient finalization
 - [ ] EP-18: Halt-in-batch handling + batch metrics/tracing spans
 - [ ] EP-19: `BatchingProcessor` constructor + `mkBatchProcessor`, threaded through `runSupervised`
@@ -389,6 +389,18 @@ Both are now in place in `shibuya-core/shibuya-core.cabal`, so EP-17's and EP-20
 need not re-add them. Also note: `Shibuya.Prelude` does not re-export `IsString` (import it
 explicitly), and `AckDecision`/`BatchAck` fields are strict (test fixtures must use concrete
 `RetryDelay`/decision values, never `undefined`).
+
+Test specs that build `Ingested` values must pin the empty effect stack's kind (EP-17,
+2026-07-01, affects EP-18 and EP-20). A top-level signature written as
+`... :: BatchConfig '[] String -> ...` makes GHC kind-generalize `'[]` to a fresh kind
+variable, which then fails to unify with the `[Effect]`-kinded `'[]` that
+`Ingested '[] msg` forces through `AckHandle`'s `Eff es`. The fix used in
+`shibuya-core/test/Shibuya/Runner/BatcherSpec.hs` is to `import Effectful (Effect)` and
+define `type E = ('[] :: [Effect])`, then write `Ingested E String`, `BatchConfig E String`,
+etc. EP-16's `BatchSpec` avoided this only because its `cfg :: BatchConfig '[] Int` never
+meets an `Ingested`. EP-18's `BatchProcessorSpec` and EP-20's reliability specs, which build
+`Ingested` fixtures, must reuse this `type E = ('[] :: [Effect])` alias. (EP-17's
+`runBatcher` signature itself is unaffected — it is polymorphic in `es`.)
 
 `stopApp` unregisters processor metrics before the drain-flush completes (EP-21). The
 runnable example therefore cannot read back post-flush batch counters through

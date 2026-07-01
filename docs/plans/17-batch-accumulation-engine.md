@@ -68,20 +68,20 @@ out on the timeout trigger before the stream has even finished.
 
 Milestone 1 — pure accumulation core (no threads, no timing):
 
-- [ ] Create `shibuya-core/src/Shibuya/Runner/Batcher.hs` with the pure types `Accum`, `BatcherState`, `ReadyBatch`, and `emptyBatcherState`.
-- [ ] Implement the pure step functions `stepArrival`, `stepTick`, `stepFlush` and the helper `emitAccum`.
-- [ ] Add `Shibuya.Runner.Batcher` to the library `exposed-modules` in `shibuya-core/shibuya-core.cabal`.
-- [ ] `cabal build shibuya-core` compiles the new module with no warnings.
-- [ ] Create `shibuya-core/test/Shibuya/Runner/BatcherSpec.hs` with the pure-core unit tests and the message-conservation / FIFO / size-trigger QuickCheck properties.
-- [ ] Add `Shibuya.Runner.BatcherSpec` to the test suite `other-modules` in the cabal file (it imports `Shibuya.Runner.Batcher` like any exposed module); wire `Shibuya.Runner.BatcherSpec` into `shibuya-core/test/Main.hs`.
-- [ ] `cabal test shibuya-core-test` green: the `Shibuya.Runner.Batcher` describe block passes, including the property tests.
+- [x] Create `shibuya-core/src/Shibuya/Runner/Batcher.hs` with the pure types `Accum`, `BatcherState`, `ReadyBatch`, and `emptyBatcherState`. (2026-07-01)
+- [x] Implement the pure step functions `stepArrival`, `stepTick`, `stepFlush` and the helper `emitAccum`. (2026-07-01)
+- [x] Add `Shibuya.Runner.Batcher` to the library `exposed-modules` in `shibuya-core/shibuya-core.cabal`. (2026-07-01)
+- [x] `cabal build shibuya-core` compiles the new module with no warnings. (2026-07-01)
+- [x] Create `shibuya-core/test/Shibuya/Runner/BatcherSpec.hs` with the pure-core unit tests and the message-conservation / FIFO / size-trigger QuickCheck properties. (2026-07-01)
+- [x] Add `Shibuya.Runner.BatcherSpec` to the test suite `other-modules` in the cabal file (it imports `Shibuya.Runner.Batcher` like any exposed module); wire `Shibuya.Runner.BatcherSpec` into `shibuya-core/test/Main.hs`. (2026-07-01)
+- [x] `cabal test shibuya-core-test` green: the `Shibuya.Runner.Batcher` describe block passes, including the property tests. (2026-07-01)
 
 Milestone 2 — `IO` wrapper with ticker, bounded output, and EOF flush:
 
-- [ ] Implement `runBatcher` (background consumer + ticker threads, bounded `TBQueue` output, EOF flush, `Stream.bracketIO` lifetime management).
-- [ ] Add the `IO`-level tests: finite-stream conservation, size-trigger shape, and slow-stream timeout observation.
-- [ ] `cabal test shibuya-core-test` green including the new `IO`-level examples.
-- [ ] `nix fmt` clean (no formatting diff).
+- [x] Implement `runBatcher` (background consumer + ticker threads, bounded `TBQueue` output, EOF flush, `Stream.bracketIO` lifetime management). (2026-07-01)
+- [x] Add the `IO`-level tests: finite-stream conservation, size-trigger shape, and slow-stream timeout observation. (2026-07-01)
+- [x] `cabal test shibuya-core-test` green including the new `IO`-level examples (141 examples, 0 failures). (2026-07-01)
+- [x] `nix fmt` clean (no formatting diff). (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -89,7 +89,25 @@ Milestone 2 — `IO` wrapper with ticker, bounded output, and EOF flush:
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- The bracket callback name `use` shadows `Control.Lens.use`, which `Shibuya.Prelude`
+  re-exports (`module Control.Lens`). With `-Wall` this is a `-Wname-shadowing` warning that
+  fails the "no warnings" acceptance criterion. Renamed the `where`-bound helper from `use`
+  to `consume`. Evidence: `cabal build shibuya-core` initially reported
+  `[GHC-63397] [-Wname-shadowing] This binding for 'use' shadows ... Control.Lens.Getter`;
+  after the rename the library builds with `NO WARNINGS`.
+
+- The test needed the empty effect stack's kind pinned. Writing top-level signatures like
+  `runEvents :: BatchConfig '[] String -> ...` makes GHC kind-generalize the `'[]` to a fresh
+  kind variable `[a]`, which then fails to unify with the `[Effect]`-kinded `'[]` that
+  `mkIng :: Ingested '[] String` forces (via `AckHandle`'s `Eff es`). Fixed by importing
+  `Effectful (Effect)` and defining `type E = ('[] :: [Effect])`, used in every test
+  signature. EP-16's `BatchSpec` did not hit this because its `cfg :: BatchConfig '[] Int`
+  never meets an `Ingested`, so nothing constrains the kind. EP-18/EP-20 specs that build
+  `Ingested` values will need the same `type E = ('[] :: [Effect])` alias.
+
+- `Ev` (the synthetic event type driving the pure-core property tests) needs a `Show`
+  instance because `forAll genSchedule` returns it inside the generated tuple and QuickCheck
+  requires `Show` to print counterexamples. Added `deriving stock (Show)`.
 
 
 ## Decision Log
@@ -181,7 +199,32 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed 2026-07-01. Both milestones landed as designed. `Shibuya.Runner.Batcher` is an
+exposed library module providing the pure accumulation core (`Accum`, `BatcherState`,
+`emptyBatcherState`, `ReadyBatch`, `stepArrival`, `stepTick`, `stepFlush`) plus the `IO`
+engine `runBatcher` (background consumer + single timeout ticker, `MVar`-serialized
+state-transition-then-hand-off, bounded `TBQueue` output for backpressure, EOF flush,
+`Stream.bracketIO` lifetime management). The signatures match the frozen ones in the
+MasterPlan's Surprises & Discoveries verbatim, so EP-18 can consume
+`Stream IO (ReadyBatch es msg)` unchanged.
+
+The core reliability property — message conservation — is established by
+`prop_conservation` (emitted id-multiset equals arrival id-multiset over ~60 randomized
+arrivals with random keys, random `batchSize`, and randomly interleaved ticks), backed by
+`prop_fifo` (per-key cursor ordering) and `prop_sizeTrigger` (size batches are exactly
+`batchSize`). The `IO`-level examples confirm the concurrent wrapper faithfully drives the
+same core: finite-stream conservation across two keys, `[(TriggerSize,3),(TriggerSize,3),
+(TriggerFlush,1)]` shape for a single key, and an observed `TriggerTimeout` batch on a
+deliberately slow stream before it ends. Full suite: 141 examples, 0 failures; library
+builds with no warnings; `nix fmt` clean.
+
+No scope changes and no deviations from the plan's design. The only surprises were two
+mechanical compile fixes (the `use`/`Control.Lens.use` shadow and the `[Effect]` kind
+pinning) recorded above; neither affected the engine's semantics or the emitted-batch type.
+Gap deferred by design: `runBatcher` runs in plain `IO` and does not itself propagate a
+consumer-thread failure to its caller (it only sets `doneVar` in a `finally`); surfacing
+that failure is EP-19's integration concern, exactly as the per-message loop polls its
+ingester async.
 
 
 ## Context and Orientation
