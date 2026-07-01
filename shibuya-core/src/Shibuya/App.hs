@@ -4,6 +4,7 @@ module Shibuya.App
     runApp,
     QueueProcessor (..),
     mkProcessor,
+    mkBatchProcessor,
     AppHandle (..),
 
     -- * AppHandle Operations
@@ -23,6 +24,9 @@ module Shibuya.App
     -- * Errors
     AppError (..),
 
+    -- * Batch API (re-exported from "Shibuya.Batch")
+    module Shibuya.Batch,
+
     -- * Re-exports
     ProcessorId (..),
     ProcessorMetrics (..),
@@ -32,6 +36,7 @@ where
 import Control.Concurrent.NQE.Supervisor qualified as NQE
 import Control.Concurrent.STM (STM, atomically, check, orElse, readTVar, registerDelay)
 import Control.Monad (forM_, void)
+import Data.Bifunctor (first)
 import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -41,6 +46,7 @@ import Effectful (Eff, IOE, liftIO, (:>))
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.Batch
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
@@ -58,6 +64,7 @@ import Shibuya.Runner.Metrics
 import Shibuya.Runner.Supervised
   ( SupervisedProcessor (..),
     runSupervised,
+    runSupervisedBatch,
   )
 import Shibuya.Telemetry.Effect (Tracing)
 import UnliftIO (SomeException, catch, displayException)
@@ -116,14 +123,27 @@ data AppError
     AppHandlerError !HandlerError
   | -- | Runtime error
     AppRuntimeError !RuntimeError
+  | -- | Invalid batch configuration for a 'BatchingProcessor'
+    AppBatchConfigError !BatchConfigError
   deriving stock (Eq, Show)
 
--- | A queue processor pairs an adapter with its handler.
--- The message type is existentially hidden, allowing heterogeneous queues.
+-- | A queue processor pairs an adapter with a handler. The message type is
+-- existentially hidden, allowing heterogeneous queues in one 'runApp' call.
+--
+-- 'QueueProcessor' processes one message at a time; 'BatchingProcessor' groups
+-- messages into batches (see "Shibuya.Batch") and runs a 'BatchHandler' over each.
 data QueueProcessor es where
   QueueProcessor ::
     { adapter :: Adapter es msg,
       handler :: Handler es msg,
+      ordering :: Ordering,
+      concurrency :: Concurrency
+    } ->
+    QueueProcessor es
+  BatchingProcessor ::
+    { adapter :: Adapter es msg,
+      batchHandler :: BatchHandler es msg,
+      batchConfig :: BatchConfig es msg,
       ordering :: Ordering,
       concurrency :: Concurrency
     } ->
@@ -133,6 +153,13 @@ data QueueProcessor es where
 -- Provides backward compatibility with existing code.
 mkProcessor :: Adapter es msg -> Handler es msg -> QueueProcessor es
 mkProcessor adapter handler = QueueProcessor adapter handler Unordered Serial
+
+-- | Convenience constructor for a batching processor with safe default policies
+-- (Unordered ordering + Serial concurrency, i.e. one batch at a time).
+mkBatchProcessor ::
+  Adapter es msg -> BatchHandler es msg -> BatchConfig es msg -> QueueProcessor es
+mkBatchProcessor adapter batchHandler batchConfig =
+  BatchingProcessor adapter batchHandler batchConfig Unordered Serial
 
 -- | Handle for a running multi-queue application.
 -- Provides introspection and control over all processors.
@@ -166,9 +193,9 @@ runApp ::
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (Either AppError (AppHandle es))
 runApp strategy inboxSize namedProcessors =
-  -- Validate all policies first
+  -- Validate all policies (and batch configs) first
   case validateAllPolicies namedProcessors of
-    Left err -> pure $ Left $ AppPolicyError err
+    Left err -> pure $ Left err
     Right () -> do
       let nqeStrategy = toNQEStrategy strategy
       catch
@@ -190,11 +217,16 @@ runApp strategy inboxSize namedProcessors =
             pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
         )
 
--- | Validate all processor policies before starting.
-validateAllPolicies :: [(ProcessorId, QueueProcessor es)] -> Either PolicyError ()
+-- | Validate all processor policies (and batch configs) before starting.
+validateAllPolicies :: [(ProcessorId, QueueProcessor es)] -> Either AppError ()
 validateAllPolicies = traverse_ validateOne
   where
-    validateOne (_, QueueProcessor _ _ ord conc) = validatePolicy ord conc
+    validateOne (_, qp) = case qp of
+      QueueProcessor {ordering, concurrency} ->
+        first AppPolicyError (validatePolicy ordering concurrency)
+      BatchingProcessor {ordering, concurrency, batchConfig} -> do
+        first AppPolicyError (validatePolicy ordering concurrency)
+        first AppBatchConfigError (validateBatchConfig batchConfig)
 
 -- | Spawn all processors under supervision.
 spawnProcessors ::
@@ -205,9 +237,21 @@ spawnProcessors ::
   Eff es [(ProcessorId, (SupervisedProcessor, QueueProcessor es))]
 spawnProcessors master inboxSize = traverse spawnOne
   where
-    spawnOne (procId, qp@(QueueProcessor adapter handler _ordering concurrency)) = do
-      sp <- runSupervised master inboxSize procId concurrency adapter handler
-      pure (procId, (sp, qp))
+    spawnOne (procId, qp) = case qp of
+      QueueProcessor {adapter, handler, concurrency} -> do
+        sp <- runSupervised master inboxSize procId concurrency adapter handler
+        pure (procId, (sp, qp))
+      BatchingProcessor {adapter, batchHandler, batchConfig, concurrency} -> do
+        sp <-
+          runSupervisedBatch
+            master
+            inboxSize
+            procId
+            concurrency
+            batchConfig
+            adapter
+            batchHandler
+        pure (procId, (sp, qp))
 
 --------------------------------------------------------------------------------
 -- AppHandle Operations
@@ -254,7 +298,9 @@ stopAppGracefully config appHandle = do
 
   pure drained
   where
-    shutdownAdapter (_, QueueProcessor adapter _ _ _) = adapter.shutdown
+    shutdownAdapter (_, qp) = case qp of
+      QueueProcessor {adapter} -> adapter.shutdown
+      BatchingProcessor {adapter} -> adapter.shutdown
 
 -- | Wait for all processors to be done, with timeout.
 -- Returns True if all drained cleanly, False if timeout occurred.

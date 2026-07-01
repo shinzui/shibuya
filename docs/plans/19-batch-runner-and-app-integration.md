@@ -71,25 +71,25 @@ flushed and acknowledged when the processor is stopped.
 
 Milestone 1 — types + validation:
 
-- [ ] Add the `BatchingProcessor` constructor to `QueueProcessor es` in `shibuya-core/src/Shibuya/App.hs`.
-- [ ] Add the `mkBatchProcessor` smart constructor (defaults `Unordered` + `Serial`).
-- [ ] Add the `AppBatchConfigError !BatchConfigError` constructor to `AppError`.
-- [ ] Import `Shibuya.Batch` unqualified into `Shibuya.App` and re-export it (`module Shibuya.Batch` in the export list); export `mkBatchProcessor` (the `QueueProcessor (..)` export already covers `BatchingProcessor`).
-- [ ] Change `validateAllPolicies` to return `Either AppError ()` and validate both `validatePolicy` and `validateBatchConfig` for a `BatchingProcessor`; update `runApp` to propagate its `Left` unchanged.
-- [ ] Convert the positional pattern-matches in `validateOne`, `spawnOne`, and `shutdownAdapter` to two-branch `case` expressions using field puns.
-- [ ] `cabal build shibuya-core` green; add the M1 unit test (bad batch config rejected with `AppBatchConfigError`) and `cabal test shibuya-core-test` green.
+- [x] Add the `BatchingProcessor` constructor to `QueueProcessor es` in `shibuya-core/src/Shibuya/App.hs`. (2026-07-01)
+- [x] Add the `mkBatchProcessor` smart constructor (defaults `Unordered` + `Serial`). (2026-07-01)
+- [x] Add the `AppBatchConfigError !BatchConfigError` constructor to `AppError`. (2026-07-01)
+- [x] Import `Shibuya.Batch` unqualified into `Shibuya.App` and re-export it (`module Shibuya.Batch` in the export list); export `mkBatchProcessor` (the `QueueProcessor (..)` export already covers `BatchingProcessor`). (2026-07-01)
+- [x] Change `validateAllPolicies` to return `Either AppError ()` and validate both `validatePolicy` and `validateBatchConfig` for a `BatchingProcessor`; update `runApp` to propagate its `Left` unchanged. (2026-07-01)
+- [x] Convert the positional pattern-matches in `validateOne`, `spawnOne`, and `shutdownAdapter` to two-branch `case` expressions using field puns. (2026-07-01)
+- [x] `cabal build shibuya-core` green; add the M1 unit test (bad batch config rejected with `AppBatchConfigError`) and `cabal test shibuya-core-test` green. (2026-07-01)
 
 Milestone 2 — runner wired + dispatch:
 
-- [ ] Add `runIngesterAndProcessorBatch`, `runSupervisedBatch`, and `runWithMetricsBatch` to `shibuya-core/src/Shibuya/Runner/Supervised.hs`; export `runSupervisedBatch` and `runWithMetricsBatch`.
-- [ ] Update `spawnOne` in `App.hs` to dispatch `QueueProcessor{}` to `runSupervised` and `BatchingProcessor{}` to `runSupervisedBatch`.
-- [ ] Add the M2 end-to-end test (N messages through `runApp` with a `BatchingProcessor`, all acked exactly once, seen in batches) and confirm green.
+- [x] Add `runIngesterAndProcessorBatch`, `runSupervisedBatch`, and `runWithMetricsBatch` to `shibuya-core/src/Shibuya/Runner/Supervised.hs`; export `runSupervisedBatch` and `runWithMetricsBatch`. (2026-07-01)
+- [x] Update `spawnOne` in `App.hs` to dispatch `QueueProcessor{}` to `runSupervised` and `BatchingProcessor{}` to `runSupervisedBatch`. (2026-07-01)
+- [x] Add the M2 end-to-end test (N messages through `runApp` with a `BatchingProcessor`, all acked exactly once, seen in batches) and confirm green. (2026-07-01)
 
 Milestone 3 — graceful shutdown flush:
 
-- [ ] Add the M3 test: feed fewer than `batchSize` through a gated adapter, `stopApp`, assert the partial batch was flushed (`TriggerFlush`) and every message acked exactly once.
-- [ ] Confirm `SupervisedProcessor.done` is set only after the batch pipeline (including flush) completes, so `waitForDrainWithTimeout` waits for the flush.
-- [ ] `nix fmt` clean across all edited files.
+- [x] Add the M3 test: feed fewer than `batchSize` through a gated adapter, `stopApp`, assert the partial batch was flushed (`TriggerFlush`) and every message acked exactly once. (2026-07-01)
+- [x] Confirm `SupervisedProcessor.done` is set only after the batch pipeline (including flush) completes, so `waitForDrainWithTimeout` waits for the flush. (2026-07-01)
+- [x] `nix fmt` clean across all edited files. (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -97,7 +97,29 @@ Milestone 3 — graceful shutdown flush:
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- Confirmed the "DEPENDENCY TO CONFIRM" seam: EP-18's `processBatchesUntilDrained` only *sets*
+  `haltRef` and returns normally — it does **not** throw `ProcessorHalt` (only EP-18's
+  `runBatchesWithMetrics` throws). So `runIngesterAndProcessorBatch` reads `haltRef` right
+  after `processBatchesUntilDrained` returns and throws `ProcessorHalt` itself, inside the same
+  `runInIO` block and before the ingester `poll` — mirroring the single-message
+  `processUntilDrained` throw and preserving the parity that a halt leaves `doneVar` unset. This
+  is the second contingency the plan's Context/Idempotence sections anticipated.
+
+- Adding the `BatchingProcessor` constructor made two *pre-existing* `RunnerSpec` let-patterns
+  (`QueueProcessor _ _ ordering _ = mkProcessor ...` at lines ~181/188) non-exhaustive, which
+  `-Wincomplete-uni-patterns` flags under the `-Wall` test stanza. The plan predicted these
+  "still compile unchanged" (true — they compile) but did not anticipate the warning. Rewrote
+  both as total `case` expressions over both constructors (`QueueProcessor {ordering = o} -> o;
+  BatchingProcessor {ordering = o} -> o`). Also dropped a now-unused `ProcessorState` import
+  from `BatchProcessorSpec` (EP-18) that only surfaced once `Shibuya.Core` was recompiled.
+
+- The plain streamly `Stream` type has **no** `Semigroup` instance, so the plan's sketched
+  `Stream.fromList messages <> Stream.concatEffect (...)` for the M3 gated adapter does not
+  compile ("Could not deduce Semigroup (Stream (Eff es) ...)"). Rewrote the gated adapter as a
+  single `Stream.unfoldrM` state machine that yields each message and, once the list is
+  exhausted, blocks on the gate (`readTVar gate >>= check`) before ending — same behavior, no
+  stream append needed. `Adapter.source` is `Stream (Eff es) (Ingested es msg)`, so the gate
+  wait runs in `Eff es`.
 
 
 ## Decision Log
@@ -186,7 +208,29 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed 2026-07-01. Batching is now user-visible end to end through `runApp`. `Shibuya.App`
+gained the `BatchingProcessor` GADT constructor, the `mkBatchProcessor` smart constructor
+(defaulting `Unordered` + `Serial`), the `AppBatchConfigError` error constructor, and a whole-
+module re-export of `Shibuya.Batch`. `validateAllPolicies` now returns `Either AppError ()` and
+validates both policy and batch config; `spawnOne` and `shutdownAdapter` dispatch on the
+constructor via field puns. `Shibuya.Runner.Supervised` gained `runSupervisedBatch`,
+`runWithMetricsBatch`, and the shared `runIngesterAndProcessorBatch`, which wire EP-17's
+`runBatcher` between `inboxToStream` and EP-18's `processBatchesUntilDrained` and add the
+`haltRef` check-and-throw.
+
+All three milestones are proven by `Shibuya.App.Batch` (150 examples total, 0 failures, no
+warnings): M1 rejects `batchSize = 0` with `AppBatchConfigError`; M2 groups 10 messages into
+batches summing to 10 with each id acked exactly once; M3 holds 3 messages below `batchSize`
+behind a gated adapter and shows they are flushed (`TriggerFlush`) and acked exactly once only
+when `stopApp` ends the source — proving graceful-shutdown flush works through the reused
+`waitForDrainWithTimeout`/`done` machinery. The single-message path is untouched and all its
+existing tests still pass.
+
+No signature drift from the frozen MasterPlan interfaces. The three surprises above (the
+halt-throw seam, the pre-existing-spec warnings, and the missing `Stream` `Semigroup`) were all
+mechanical and are recorded. The public API (`BatchingProcessor`, `mkBatchProcessor`,
+`AppBatchConfigError`, the re-exported `Shibuya.Batch`) is now stable for EP-20 (tests) and
+EP-21 (docs + example) to build against.
 
 
 ## Context and Orientation

@@ -178,14 +178,18 @@ spec = do
       messages <- runEff $ createTestMessages 1
       let adapter = testAdapter messages
           handler = alwaysAckOk
-          QueueProcessor _ _ ordering _ = mkProcessor adapter handler
+          ordering = case mkProcessor adapter handler of
+            QueueProcessor {ordering = o} -> o
+            BatchingProcessor {ordering = o} -> o
       ordering `shouldBe` Unordered
 
     it "creates processor with Serial concurrency" $ do
       messages <- runEff $ createTestMessages 1
       let adapter = testAdapter messages
           handler = alwaysAckOk
-          QueueProcessor _ _ _ concurrency = mkProcessor adapter handler
+          concurrency = case mkProcessor adapter handler of
+            QueueProcessor {concurrency = c} -> c
+            BatchingProcessor {concurrency = c} -> c
       concurrency `shouldBe` Serial
 
 -- Test helpers

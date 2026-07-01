@@ -116,6 +116,7 @@ test-suite shibuya-core-test
     -with-rtsopts=-N
 
   other-modules:
+    Shibuya.App.BatchSpec
     Shibuya.BatchSpec
     Shibuya.Core.AckSpec
     Shibuya.Core.RetrySpec

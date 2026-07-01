@@ -49,7 +49,6 @@ import Shibuya.Runner.Metrics
   ( BatchStats (..),
     ProcessorId (..),
     ProcessorMetrics (..),
-    ProcessorState (..),
     StreamStats (..),
   )
 import Shibuya.Telemetry.Effect (runTracingNoop)

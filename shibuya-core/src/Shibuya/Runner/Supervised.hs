@@ -8,9 +8,11 @@
 module Shibuya.Runner.Supervised
   ( -- * Running with Supervision
     runSupervised,
+    runSupervisedBatch,
 
     -- * Standalone (without Master)
     runWithMetrics,
+    runWithMetricsBatch,
 
     -- * Processor Handle
     SupervisedProcessor (..),
@@ -45,6 +47,7 @@ import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (
 import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.Batch (BatchConfig, BatchHandler)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
@@ -53,6 +56,8 @@ import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
+import Shibuya.Runner.BatchProcessor (processBatchesUntilDrained)
+import Shibuya.Runner.Batcher (runBatcher)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
@@ -264,6 +269,162 @@ runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter 
         _ -> pure ()
 
   -- Mark done when processor exits
+  liftIO $ atomically $ writeTVar doneVar True
+
+-- | Run a batching processor under the Master's supervision with metrics.
+--
+-- Identical in shape to 'runSupervised' but the inner loop accumulates messages
+-- into batches (via the 'BatchConfig') and runs a 'BatchHandler' over each batch,
+-- finalizing every message exactly once. On a batch-handler halt the child exits
+-- gracefully (the 'ProcessorHalt' is caught here), matching 'runSupervised'.
+runSupervisedBatch ::
+  (IOE :> es, Tracing :> es) =>
+  Master ->
+  -- | Inbox size (for backpressure)
+  Natural ->
+  -- | Processor identifier
+  ProcessorId ->
+  -- | Concurrency mode (bounds how many BATCHES run at once)
+  Concurrency ->
+  -- | Batch configuration
+  BatchConfig es msg ->
+  -- | Queue adapter
+  Adapter es msg ->
+  -- | Batch handler
+  BatchHandler es msg ->
+  Eff es SupervisedProcessor
+runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = do
+  now <- liftIO getCurrentTime
+
+  let initialMetrics = emptyProcessorMetrics now
+  metricsVar <- liftIO $ newTVarIO initialMetrics
+  doneVar <- liftIO $ newTVarIO False
+
+  registerProcessor master procId metricsVar
+
+  supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
+    addChild master.state.supervisor $
+      runInIO $
+        ( runIngesterAndProcessorBatch
+            metricsVar
+            procId
+            doneVar
+            inboxSize
+            concurrency
+            batchConfig
+            adapter
+            batchHandler
+            `catch` \(ProcessorHalt _) -> pure ()
+        )
+          `finally` unregisterProcessor master procId
+
+  unsafeEff_ $ UIO.link supervisedChild
+
+  pure
+    SupervisedProcessor
+      { metrics = metricsVar,
+        processorId = procId,
+        done = doneVar,
+        child = Just supervisedChild
+      }
+
+-- | Run a batching processor with metrics but without Master supervision.
+-- Blocks until the adapter stream is exhausted and every accumulated batch has
+-- been processed (including the end-of-input flush). Useful for tests.
+runWithMetricsBatch ::
+  (IOE :> es, Tracing :> es) =>
+  Natural ->
+  ProcessorId ->
+  Concurrency ->
+  BatchConfig es msg ->
+  Adapter es msg ->
+  BatchHandler es msg ->
+  Eff es SupervisedProcessor
+runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandler = do
+  now <- liftIO getCurrentTime
+
+  let initialMetrics = emptyProcessorMetrics now
+  metricsVar <- liftIO $ newTVarIO initialMetrics
+  doneVar <- liftIO $ newTVarIO False
+
+  runIngesterAndProcessorBatch
+    metricsVar
+    procId
+    doneVar
+    inboxSize
+    concurrency
+    batchConfig
+    adapter
+    batchHandler
+
+  pure
+    SupervisedProcessor
+      { metrics = metricsVar,
+        processorId = procId,
+        done = doneVar,
+        child = Nothing
+      }
+
+-- | Run ingester and batch processor with a bounded inbox.
+-- The ingester reads from the adapter stream into the inbox exactly as in the
+-- single-message path; 'inboxToStream' turns the inbox into a halt-aware,
+-- stream-done-aware Stream; 'runBatcher' groups that into ready batches; and
+-- 'processBatchesUntilDrained' runs the batch handler and finalizes each message
+-- exactly once. When the adapter stream ends (including on graceful shutdown,
+-- when 'Adapter.shutdown' ends 'source'), the ingester completes, sets
+-- streamDoneVar, 'inboxToStream' terminates once the inbox is empty, the batcher
+-- reaches end-of-input and flushes all pending partial batches with TriggerFlush,
+-- and only then does 'processBatchesUntilDrained' return and 'doneVar' get set.
+--
+-- 'processBatchesUntilDrained' (EP-18) only /sets/ 'haltRef' on a batch-handler
+-- 'AckHalt' or exhausted finalization; it does not throw. So we read 'haltRef'
+-- after it returns and throw 'ProcessorHalt' here, mirroring the single-message
+-- 'processUntilDrained'. The throw (inside 'runInIO', before the ingester poll)
+-- leaves 'doneVar' unset on halt, matching the single-message parity.
+runIngesterAndProcessorBatch ::
+  (IOE :> es, Tracing :> es) =>
+  TVar ProcessorMetrics ->
+  ProcessorId ->
+  TVar Bool ->
+  Natural ->
+  Concurrency ->
+  BatchConfig es msg ->
+  Adapter es msg ->
+  BatchHandler es msg ->
+  Eff es ()
+runIngesterAndProcessorBatch metricsVar procId doneVar inboxSize concurrency batchConfig adapter batchHandler = do
+  inbox <- liftIO $ newBoundedInbox inboxSize
+  streamDoneVar <- liftIO $ newTVarIO False
+  haltRef <- liftIO $ newIORef Nothing
+
+  withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
+    let ingesterWithSignal =
+          runInIO (runIngesterWithMetrics metricsVar adapter.source inbox)
+            `finally` atomically (writeTVar streamDoneVar True)
+
+    UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
+      let inboxStream = inboxToStream inbox streamDoneVar haltRef
+          readyBatchStream = runBatcher inboxSize batchConfig inboxStream
+      runInIO $ do
+        processBatchesUntilDrained
+          metricsVar
+          procId
+          concurrency
+          batchHandler
+          readyBatchStream
+          haltRef
+        maybeHalt <- liftIO (readIORef haltRef)
+        maybe (pure ()) (throwIO . ProcessorHalt) maybeHalt
+      UIO.poll ingesterAsync >>= \case
+        Just (Left ingesterErr) -> do
+          now <- getCurrentTime
+          atomically $
+            modifyTVar' metricsVar $ \m ->
+              m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
+          atomically $ writeTVar doneVar True
+          UIO.throwIO ingesterErr
+        _ -> pure ()
+
   liftIO $ atomically $ writeTVar doneVar True
 
 -- | Convert inbox to a stream for use with streamly.

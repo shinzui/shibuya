@@ -149,7 +149,7 @@ merely exposed in EP-19.
 | 16 | Batch API and Configuration Types | docs/plans/16-batch-api-and-configuration-types.md | None | None | Complete |
 | 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Complete |
 | 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Complete |
-| 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Not Started |
+| 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Complete |
 | 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Not Started |
 | 21 | Batch Documentation and Example | docs/plans/21-batch-documentation-and-example.md | EP-19 | EP-20 | Not Started |
 
@@ -276,8 +276,8 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 - [x] EP-17: Timeout ticker and shutdown flush triggers, with message-conservation property tests green (2026-07-01)
 - [x] EP-18: Batch handler invocation with exception isolation, one decision per retained message, and resilient finalization (2026-07-01)
 - [x] EP-18: Halt-in-batch handling + batch metrics/tracing spans (2026-07-01)
-- [ ] EP-19: `BatchingProcessor` constructor + `mkBatchProcessor`, threaded through `runSupervised`
-- [ ] EP-19: Batch policy validation + graceful-shutdown flush of pending batches
+- [x] EP-19: `BatchingProcessor` constructor + `mkBatchProcessor`, threaded through `runSupervised` (2026-07-01)
+- [x] EP-19: Batch policy validation + graceful-shutdown flush of pending batches (2026-07-01)
 - [ ] EP-20: End-to-end decision/finalization property test through `runApp` (randomized sizes/timeouts/failures)
 - [ ] EP-20: Timeout, partial-failure, halt, and drain-flush scenario tests + mock batch harness
 - [ ] EP-21: Architecture docs updated (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON)
@@ -389,6 +389,19 @@ Both are now in place in `shibuya-core/shibuya-core.cabal`, so EP-17's and EP-20
 need not re-add them. Also note: `Shibuya.Prelude` does not re-export `IsString` (import it
 explicitly), and `AckDecision`/`BatchAck` fields are strict (test fixtures must use concrete
 `RetryDelay`/decision values, never `undefined`).
+
+Halt-throw seam resolved: EP-18 sets, EP-19 throws (2026-07-01, affects EP-20). As
+implemented, EP-18's `processBatchesUntilDrained` only *sets* the shared
+`IORef (Maybe HaltReason)` and returns normally — it does not throw `ProcessorHalt`. Only
+EP-18's standalone test driver `runBatchesWithMetrics` reads the ref and throws. EP-19's
+`runIngesterAndProcessorBatch` therefore performs the read-and-throw itself
+(`readIORef haltRef >>= maybe (pure ()) (throwIO . ProcessorHalt)`) right after
+`processBatchesUntilDrained` returns, inside `runInIO` and before the ingester poll, mirroring
+the single-message `processUntilDrained`. Consequence for EP-20: to observe a halt end-to-end,
+drive `runApp`/`runWithMetricsBatch` (which throw) — a bare `processBatchesUntilDrained` call
+will not throw, it only leaves the halt reason in the ref. The `runSupervisedBatch` child
+catches `ProcessorHalt` and exits gracefully (parity with the single-message runner, including
+leaving `done` unset on halt).
 
 Test specs that build `Ingested` values must pin the empty effect stack's kind (EP-17,
 2026-07-01, affects EP-18 and EP-20). A top-level signature written as
