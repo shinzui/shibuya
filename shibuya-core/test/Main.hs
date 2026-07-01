@@ -3,6 +3,7 @@
 module Main (main) where
 
 import Shibuya.App.BatchSpec qualified
+import Shibuya.Batch.ReliabilitySpec qualified
 import Shibuya.BatchSpec qualified
 import Shibuya.Core.AckSpec qualified
 import Shibuya.Core.RetrySpec qualified
@@ -20,6 +21,7 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   Shibuya.App.BatchSpec.spec
+  Shibuya.Batch.ReliabilitySpec.spec
   Shibuya.BatchSpec.spec
   describe "Shibuya.Core.Types" Shibuya.Core.TypesSpec.spec
   describe "Shibuya.Core.Ack" Shibuya.Core.AckSpec.spec

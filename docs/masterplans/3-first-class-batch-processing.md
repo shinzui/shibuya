@@ -150,7 +150,7 @@ merely exposed in EP-19.
 | 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Complete |
 | 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Complete |
 | 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Complete |
-| 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Not Started |
+| 20 | Batch Reliability Test Suite | docs/plans/20-batch-reliability-test-suite.md | EP-19 | None | Complete |
 | 21 | Batch Documentation and Example | docs/plans/21-batch-documentation-and-example.md | EP-19 | EP-20 | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -278,8 +278,8 @@ and the milestone. This section provides an at-a-glance view of the entire initi
 - [x] EP-18: Halt-in-batch handling + batch metrics/tracing spans (2026-07-01)
 - [x] EP-19: `BatchingProcessor` constructor + `mkBatchProcessor`, threaded through `runSupervised` (2026-07-01)
 - [x] EP-19: Batch policy validation + graceful-shutdown flush of pending batches (2026-07-01)
-- [ ] EP-20: End-to-end decision/finalization property test through `runApp` (randomized sizes/timeouts/failures)
-- [ ] EP-20: Timeout, partial-failure, halt, and drain-flush scenario tests + mock batch harness
+- [x] EP-20: End-to-end decision/finalization property test through `runApp` (randomized sizes/timeouts/failures) (2026-07-01)
+- [x] EP-20: Timeout, partial-failure, halt, and drain-flush scenario tests + mock batch harness (2026-07-01)
 - [ ] EP-21: Architecture docs updated (MESSAGE_FLOW, CORE_TYPES, METRICS, BROADWAY_COMPARISON)
 - [ ] EP-21: Runnable batching example in `shibuya-example`
 
@@ -415,11 +415,18 @@ meets an `Ingested`. EP-18's `BatchProcessorSpec` and EP-20's reliability specs,
 `Ingested` fixtures, must reuse this `type E = ('[] :: [Effect])` alias. (EP-17's
 `runBatcher` signature itself is unaffected — it is polymorphic in `es`.)
 
-`stopApp` unregisters processor metrics before the drain-flush completes (EP-21). The
-runnable example therefore cannot read back post-flush batch counters through
-`getAppMetrics` after `stopApp`. The example demonstrates flush via the handler's own
-console output instead. If a metrics-read-before-unregister path is later exposed, the
-example can be strengthened.
+`getAppMetrics` returns nothing for a finished/halted processor (EP-20/EP-21). The precise
+mechanism (confirmed while writing EP-20): every processor calls
+`unregisterProcessor master procId` in its `finally` when its runner returns — normally or via
+a caught `ProcessorHalt` — and `unregisterProcessor` does `Map.delete` on the Master's registry
+(`Shibuya.Runner.Master` ~line 157). Since `getAppMetrics` reads that registry, it yields an
+empty entry for any processor that has completed or halted. Two consequences: (a) EP-21's
+runnable example cannot read post-flush batch counters through `getAppMetrics` after `stopApp`
+(it demonstrates flush via the handler's own console output instead); (b) EP-20's tests read
+metrics directly from the persistent `SupervisedProcessor.metrics` TVar via the `AppHandle`
+(`app.processors`) — a `metricsFor app pid` helper — which survives unregistration and holds
+the final metrics. If a metrics-read-before-unregister path is later exposed, both can be
+strengthened.
 
 
 ## Decision Log

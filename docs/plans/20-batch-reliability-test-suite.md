@@ -68,26 +68,26 @@ describe blocks in the HSpec output (shown verbatim in Concrete Steps).
 
 Milestone 1 (mock harness + successful-finalization property):
 
-- [ ] Add `mkTrackedIngested` and `trackedListAdapter` to `shibuya-core/src/Shibuya/Adapter/Mock.hs` and export them.
-- [ ] Create the test helper module `shibuya-core/test/Shibuya/Batch/TestHarness.hs` (envelope builders, pure successful-finalization checker, `BatchScenario` type + generator).
-- [ ] Create `shibuya-core/test/Shibuya/Batch/ReliabilitySpec.hs` with the QuickCheck successful-finalization property (scenario #1).
-- [ ] Add `containers` to the test-suite `build-depends` and register both new test modules in `other-modules` in `shibuya-core/shibuya-core.cabal`.
-- [ ] Wire `Shibuya.Batch.ReliabilitySpec` into `shibuya-core/test/Main.hs`.
-- [ ] `cabal test shibuya-core-test` green with the successful-finalization property passing.
+- [x] Add `mkTrackedIngested` and `trackedListAdapter` to `shibuya-core/src/Shibuya/Adapter/Mock.hs` and export them. (2026-07-01)
+- [x] Create the test helper module `shibuya-core/test/Shibuya/Batch/TestHarness.hs` (envelope builders, pure successful-finalization checker, `BatchScenario` type + generator). (2026-07-01)
+- [x] Create `shibuya-core/test/Shibuya/Batch/ReliabilitySpec.hs` with the QuickCheck successful-finalization property (scenario #1). (2026-07-01)
+- [x] Register both new test modules in `other-modules` in `shibuya-core/shibuya-core.cabal` (`containers` was already a test dep from EP-16). (2026-07-01)
+- [x] Wire `Shibuya.Batch.ReliabilitySpec` into `shibuya-core/test/Main.hs`. (2026-07-01)
+- [x] `cabal test shibuya-core-test` green with the successful-finalization property passing (50 tests). (2026-07-01)
 
 Milestone 2 (scenario tests):
 
-- [ ] Timeout-flush scenario (#2) green.
-- [ ] Partial-failure scenario (#3) green.
-- [ ] Batch-handler exception scenario (#4) green.
-- [ ] Transient finalizer retry scenario (#5) green.
-- [ ] Permanent finalizer failure scenario (#6) green: retries exhaust, failed `MessageId` is reported, and the processor halts loudly.
-- [ ] Halt-in-batch scenario (#7) green, including halt isolation of a second processor.
-- [ ] Graceful drain flush scenario (#8) green.
-- [ ] Multiple batch keys scenario (#9) green.
-- [ ] Per-key FIFO under concurrency scenario (#10) green: same-key batches never overlap under `Async`; different keys can overlap.
-- [ ] Backpressure liveness scenario (#11) green (marked as a limited check — see Decision Log).
-- [ ] `nix fmt` clean; full `cabal test shibuya-core-test` green.
+- [x] Timeout-flush scenario (#2) green (gated adapter so the ticker, not EOF, flushes). (2026-07-01)
+- [x] Partial-failure scenario (#3) green. (2026-07-01)
+- [x] Batch-handler exception scenario (#4) green. (2026-07-01)
+- [x] Transient finalizer retry scenario (#5) green. (2026-07-01)
+- [x] Permanent finalizer failure scenario (#6) green: retries exhaust, failed `MessageId` is reported, and the processor halts loudly. (2026-07-01)
+- [x] Halt-in-batch scenario (#7) green, including halt isolation of a second processor. (2026-07-01)
+- [x] Graceful drain flush scenario (#8) green. (2026-07-01)
+- [x] Multiple batch keys scenario (#9) green. (2026-07-01)
+- [x] Per-key FIFO under concurrency scenario (#10) green: same-key batches never overlap under `Async`; different keys can overlap. (2026-07-01)
+- [x] Backpressure liveness scenario (#11) green (marked as a limited check — see Decision Log). (2026-07-01)
+- [x] `nix fmt` clean; full `cabal test shibuya-core-test` green (161 examples, 0 failures). (2026-07-01)
 
 
 ## Surprises & Discoveries
@@ -95,7 +95,45 @@ Milestone 2 (scenario tests):
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- `getAppMetrics` returns nothing for a finished or halted processor. Each processor calls
+  `unregisterProcessor master procId` in its `finally` when its runner returns (normally or via
+  a caught `ProcessorHalt`), and `unregisterProcessor` does `Map.delete` on the Master's
+  registry (`Shibuya.Runner.Master`). So reading `getAppMetrics app` *after* a run (as the plan
+  sketched for the property and scenarios #3/#6/#7) yields an empty map and the
+  `Map.lookup pid` errors. Fix: read the processor's live metrics directly from its
+  `SupervisedProcessor.metrics` TVar via the `AppHandle` (`app.processors`), which persists
+  independently of the registry. Added a `metricsFor app pid` helper doing exactly that and
+  used it everywhere metrics are read after the run. Evidence: `Master.hs` line ~157
+  `UnregisterProcessor pid -> modifyTVar' state.metrics (Map.delete pid)`.
+
+- Scenario #2 (timeout flush) cannot use a finite `listAdapter`. A finite stream reaches
+  end-of-input almost immediately, so the batcher's EOF flush emits the partial batch as
+  `TriggerFlush` long before the 100 ms timeout ticker fires — the assertion for
+  `TriggerTimeout` would never hold. Fixed by adding a `gatedTrackedAdapter` (like EP-19's
+  gated adapter) that yields the messages then blocks the stream open until `shutdown`, so the
+  ticker is what emits the accumulated batch (`TriggerTimeout`), and only then does shutdown
+  end the stream. Scenario #8 (drain flush) also uses the gated adapter so its flush genuinely
+  comes from graceful shutdown rather than EOF.
+
+- Avoided relying on `MonadFail (Eff es)`: the plan's `Right app <- runApp ...` binds assume a
+  `MonadFail` instance. Instead added a `runAppOrFail` helper that `case`-matches the `Either`
+  and calls `ioError` on `Left`, so the tests do not depend on whether `Eff` has `MonadFail`.
+
+- A `where` clause cannot attach to an `it "..." $ do ...` statement inside a spec `do` block
+  (parse error `parse error on input 'it'`). Scenario #9's `idBelongsToKey`/`msgNum` helpers
+  were lifted to top-level module bindings instead of a trailing `where`.
+
+- Non-vacuity check performed (2026-07-01), per Validation & Acceptance. Temporarily changed
+  EP-18's `finalizeWithRetry` to call `ingested.ack.finalize decision` twice on success; the
+  property immediately failed with a shrunk counterexample and
+  `successful-finalization violated: finalized more than once: [MessageId "msg-1", ...]`,
+  confirming the suite is not vacuous. Reverted; suite green again (161 examples, 0 failures).
+
+- Halt/permanent-failure scenarios (#6, #7) use a short `drainTimeout` (1s). On halt the batch
+  runner leaves `done` unset (the documented single-message parity), so
+  `stopAppGracefully`'s `waitForDrainWithTimeout` waits the full `drainTimeout` before forcing
+  the stop. A 1s timeout keeps those tests fast while still allowing processing to complete
+  (metrics are read from the persistent TVar, not gated on `done`).
 
 
 ## Decision Log
@@ -182,7 +220,29 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Completed 2026-07-01. The headline reliability invariant is proven end-to-end through the real
+`runApp` path. `Shibuya.Adapter.Mock` gained the shippable `mkTrackedIngested` and
+`trackedListAdapter` helpers (usable by downstream adapter reliability suites). The test tree
+gained `Shibuya.Batch.TestHarness` (the `BatchScenario` model + generator, envelope builders,
+and the pure `finalizedExactlyOnce` checker) and `Shibuya.Batch.ReliabilitySpec` (the
+`withMaxSuccess 50` QuickCheck successful-finalization property plus all ten named scenarios:
+timeout flush, partial failure, handler exception, transient-finalizer retry, permanent
+fail-loud, halt-with-isolation, drain flush, multi-key independence, per-key FIFO under
+`Async 2`, and backpressure liveness). Full suite: 161 examples, 0 failures; no warnings;
+`nix fmt` clean.
+
+The property was shown non-vacuous by a fails-before/passes-after perturbation (double-finalize
+→ red with a `finalized more than once` counterexample → revert → green), recorded in Surprises.
+
+Deviations from the plan, all recorded in the Decision Log / Surprises and none affecting the
+invariant proven: (1) metrics are read from the persistent `SupervisedProcessor` TVar via a
+`metricsFor` helper rather than `getAppMetrics`, because processors unregister their metrics on
+completion; (2) the timeout (#2) and drain (#8) scenarios use a gated adapter so the flush comes
+from the ticker / shutdown rather than an immediate EOF; (3) a `runAppOrFail` helper avoids
+depending on `MonadFail (Eff es)`; (4) scenario #9's helpers are top-level (a `where` cannot
+attach to a spec `do` statement). The one cross-plan coordination flagged for adapter packages:
+they can reuse `mkTrackedIngested`/`trackedListAdapter` + `finalizedExactlyOnce` to assert the
+same one-successful-finalization property against their own adapters.
 
 
 ## Context and Orientation

@@ -9,6 +9,8 @@ module Shibuya.Adapter.Mock
     newTrackingAck,
     trackingAckHandle,
     getTrackedDecisions,
+    mkTrackedIngested,
+    trackedListAdapter,
   )
 where
 
@@ -17,8 +19,8 @@ import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision)
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested)
-import Shibuya.Core.Types (MessageId (..))
+import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Streamly.Data.Stream qualified as Stream
 
 -- | Create an adapter from a list of ingested messages.
@@ -54,3 +56,23 @@ newTrackingAck = liftIO $ TrackingAck <$> newIORef []
 -- | Get all tracked decisions.
 getTrackedDecisions :: (IOE :> es) => TrackingAck -> Eff es [(MessageId, AckDecision)]
 getTrackedDecisions tracking = liftIO $ readIORef tracking.trackedDecisions
+
+-- | Wrap an envelope into an 'Ingested' whose acknowledgement is recorded by the
+-- given 'TrackingAck', keyed by the envelope's own 'MessageId'. The lease is
+-- 'Nothing'. Every call to the resulting handle's 'finalize' appends one
+-- @(messageId, decision)@ pair to the tracking list, so duplicate finalizes are
+-- observable.
+mkTrackedIngested :: (IOE :> es) => TrackingAck -> Envelope msg -> Ingested es msg
+mkTrackedIngested tracking env =
+  Ingested
+    { envelope = env,
+      ack = trackingAckHandle tracking env.messageId,
+      lease = Nothing
+    }
+
+-- | Build an adapter from a list of envelopes where every message's acknowledgement
+-- is recorded into one shared 'TrackingAck'. Combine with 'getTrackedDecisions' to
+-- assert one successful finalization per message across a normal run.
+trackedListAdapter :: (IOE :> es) => TrackingAck -> [Envelope msg] -> Adapter es msg
+trackedListAdapter tracking envs =
+  listAdapter (map (mkTrackedIngested tracking) envs)

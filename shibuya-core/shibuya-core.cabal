@@ -117,6 +117,8 @@ test-suite shibuya-core-test
 
   other-modules:
     Shibuya.App.BatchSpec
+    Shibuya.Batch.ReliabilitySpec
+    Shibuya.Batch.TestHarness
     Shibuya.BatchSpec
     Shibuya.Core.AckSpec
     Shibuya.Core.RetrySpec
