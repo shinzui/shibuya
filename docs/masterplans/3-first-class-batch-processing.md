@@ -146,7 +146,7 @@ merely exposed in EP-19.
 
 | #  | Title | Path | Hard Deps | Soft Deps | Status |
 |----|-------|------|-----------|-----------|--------|
-| 16 | Batch API and Configuration Types | docs/plans/16-batch-api-and-configuration-types.md | None | None | Not Started |
+| 16 | Batch API and Configuration Types | docs/plans/16-batch-api-and-configuration-types.md | None | None | Complete |
 | 17 | Batch Accumulation Engine | docs/plans/17-batch-accumulation-engine.md | EP-16 | None | Not Started |
 | 18 | Batch Execution and Exactly-Once Ack | docs/plans/18-batch-execution-and-exactly-once-ack.md | EP-16, EP-17 | None | Not Started |
 | 19 | Batch Runner and App Integration | docs/plans/19-batch-runner-and-app-integration.md | EP-18 | None | Not Started |
@@ -270,8 +270,8 @@ EP-18 and must match EP-19's validation.
 Track milestone-level progress across all child plans. Each entry names the child plan
 and the milestone. This section provides an at-a-glance view of the entire initiative.
 
-- [ ] EP-16: `Shibuya.Batch` types compile and are exported (BatchKey, BatchTrigger, BatchInfo, BatchConfig, BatchHandler, BatchAck)
-- [ ] EP-16: Smart constructors + `validateBatchConfig` with unit tests green
+- [x] EP-16: `Shibuya.Batch` types compile and are exported (BatchKey, BatchTrigger, BatchInfo, BatchConfig, BatchHandler, BatchAck) (2026-07-01)
+- [x] EP-16: Smart constructors + `validateBatchConfig` with unit tests green (2026-07-01)
 - [ ] EP-17: STM accumulator groups inbox stream by batch key with size trigger
 - [ ] EP-17: Timeout ticker and shutdown flush triggers, with message-conservation property tests green
 - [ ] EP-18: Batch handler invocation with exception isolation, one decision per retained message, and resilient finalization
@@ -378,6 +378,17 @@ single-message runner leaves the `done` TVar unset, so `waitApp` would block aft
 The batch runner deliberately mirrors this parity rather than silently diverging. EP-20's
 reliability suite may choose to address it; recorded here so it is not mistaken for a
 batch-specific regression.
+
+Test-suite gained `containers` + `DataKinds` while implementing EP-16 (2026-07-01). The
+`shibuya-core-test` suite did not previously depend on `containers` and did not enable
+`DataKinds`. Implementing EP-16's `BatchSpec` required both: `containers` for
+`Data.Map.Strict` in the spec, and `DataKinds` for the concrete `BatchConfig '[] Int`
+helper that pins the phantom `es` parameter so config fields can be read unambiguously.
+Both are now in place in `shibuya-core/shibuya-core.cabal`, so EP-17's and EP-20's specs
+(which also use `Data.Map`/`Data.List.NonEmpty` and concrete effect lists) inherit them and
+need not re-add them. Also note: `Shibuya.Prelude` does not re-export `IsString` (import it
+explicitly), and `AckDecision`/`BatchAck` fields are strict (test fixtures must use concrete
+`RetryDelay`/decision values, never `undefined`).
 
 `stopApp` unregisters processor metrics before the drain-flush completes (EP-21). The
 runnable example therefore cannot read back post-flush batch counters through

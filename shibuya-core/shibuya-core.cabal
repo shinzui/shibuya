@@ -23,6 +23,7 @@ library
     Shibuya.Adapter
     Shibuya.Adapter.Mock
     Shibuya.App
+    Shibuya.Batch
     Shibuya.Core
     Shibuya.Core.Ack
     Shibuya.Core.AckHandle
@@ -96,6 +97,7 @@ test-suite shibuya-core-test
   hs-source-dirs: test
   main-is: Main.hs
   default-extensions:
+    DataKinds
     DeriveAnyClass
     DerivingStrategies
     DuplicateRecordFields
@@ -112,6 +114,7 @@ test-suite shibuya-core-test
     -with-rtsopts=-N
 
   other-modules:
+    Shibuya.BatchSpec
     Shibuya.Core.AckSpec
     Shibuya.Core.RetrySpec
     Shibuya.Core.TypesSpec
@@ -126,6 +129,7 @@ test-suite shibuya-core-test
     QuickCheck ^>=2.15,
     base ^>=4.21.0.0,
     bytestring,
+    containers,
     effectful,
     hs-opentelemetry-api,
     hs-opentelemetry-exporter-in-memory ^>=1.0,

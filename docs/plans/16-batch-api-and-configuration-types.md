@@ -50,13 +50,13 @@ validator behave as specified.
 
 ## Progress
 
-- [ ] Create `shibuya-core/src/Shibuya/Batch.hs` with `BatchKey`, `BatchTrigger`, `BatchInfo`, `BatchConfig`, `BatchHandler`, `BatchAck`, `BatchConfigError`.
-- [ ] Add smart constructors: `defaultBatchKey`, `defaultBatchConfig`, `ackAllOk`, `ackAll`, `ackExcept`, `withFallback`, `failMessages`.
-- [ ] Add `validateBatchConfig`.
-- [ ] Add `Shibuya.Batch` to `exposed-modules` in `shibuya-core/shibuya-core.cabal`.
-- [ ] Create `shibuya-core/test/Shibuya/BatchSpec.hs` and register it in the cabal `other-modules` and in `test/Main.hs`.
-- [ ] `cabal build shibuya-core` and `cabal test shibuya-core-test` both green.
-- [ ] `nix fmt` clean.
+- [x] Create `shibuya-core/src/Shibuya/Batch.hs` with `BatchKey`, `BatchTrigger`, `BatchInfo`, `BatchConfig`, `BatchHandler`, `BatchAck`, `BatchConfigError`. (2026-07-01)
+- [x] Add smart constructors: `defaultBatchKey`, `defaultBatchConfig`, `ackAllOk`, `ackAll`, `ackExcept`, `withFallback`, `failMessages`. (2026-07-01)
+- [x] Add `validateBatchConfig`. (2026-07-01)
+- [x] Add `Shibuya.Batch` to `exposed-modules` in `shibuya-core/shibuya-core.cabal`. (2026-07-01)
+- [x] Create `shibuya-core/test/Shibuya/BatchSpec.hs` and register it in the cabal `other-modules` and in `test/Main.hs`. (2026-07-01)
+- [x] `cabal build shibuya-core` and `cabal test shibuya-core-test` both green. (2026-07-01; 129 examples, 0 failures — 12 new Batch examples)
+- [x] `nix fmt` clean. (2026-07-01; 0 files changed)
 
 
 ## Surprises & Discoveries
@@ -64,7 +64,24 @@ validator behave as specified.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- `IsString` is not re-exported by `Shibuya.Prelude`. The first build failed with
+  `Not in scope: type constructor or class 'IsString'` for the `deriving newtype
+  (IsString)` clause on `BatchKey`. Fixed by importing `Data.String (IsString)`
+  explicitly, mirroring `shibuya-core/src/Shibuya/Core/Types.hs:28`.
+- The test suite did not depend on `containers`. Building `BatchSpec` (which imports
+  `Data.Map.Strict`) failed with `Could not load module 'Data.Map.Strict' ... hidden
+  package 'containers-0.7'`. Fixed by adding `containers` to the test suite
+  `build-depends` in `shibuya-core/shibuya-core.cabal`.
+- The plan's draft test used `ackAll (AckRetry undefined)`, which throws at construction
+  time: `AckRetry` has a strict `RetryDelay` field and `BatchAck.fallback` is strict, so
+  building the value forces `undefined` to WHNF. Fixed by using a concrete
+  `AckRetry (RetryDelay 5)` and additionally asserting the fallback round-trips. This is
+  evidence the strictness annotations on `AckDecision`/`BatchAck` behave as intended.
+- The polymorphic `defaultBatchConfig :: BatchConfig es msg` cannot have its fields read
+  directly in a test (e.g. `defaultBatchConfig.batchSize`) because `es` is a phantom
+  parameter of `BatchConfig` and would be ambiguous. Resolved by a concrete top-level
+  helper `cfg :: BatchConfig '[] Int = defaultBatchConfig` (needs `DataKinds`); see the
+  Decision Log entry.
 
 
 ## Decision Log
@@ -107,13 +124,55 @@ Record every decision made while working on the plan.
   `BatchConfigError` into the top-level `AppError` when it validates processors.
   Date: 2026-07-01
 
+- Decision: The test module uses a concrete top-level helper
+  `cfg :: BatchConfig '[] Int; cfg = defaultBatchConfig` (with `DataKinds` added to the
+  test suite `default-extensions`) rather than sprinkling `@'[] @Int` `TypeApplications`
+  at each use site. The plan offered both approaches.
+  Rationale: `es` is a phantom parameter of `BatchConfig`, so reading a field off the
+  polymorphic `defaultBatchConfig` is ambiguous; one concrete binding fixes `es`/`msg`
+  once, keeps every call site readable, and confines the extra extension to a single
+  `DataKinds` for the `'[]` empty-effect-list literal. `GHC2024` does not enable
+  `DataKinds`, so it is added explicitly to the test suite only.
+  Date: 2026-07-01
+
+- Decision: Placed `Shibuya.Batch` in `exposed-modules` after `Shibuya.App` (i.e.
+  App < Batch < Core), not literally "between `Shibuya.Adapter.Mock` and `Shibuya.App`"
+  as the prose suggested.
+  Rationale: The list is kept alphabetical; `App` sorts before `Batch`. The prose's
+  ordinal hint was imprecise, but its intent (alphabetical placement) is honored.
+  Date: 2026-07-01
+
 
 ## Outcomes & Retrospective
 
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+Complete (2026-07-01). The single milestone landed exactly as scoped: the new pure module
+`shibuya-core/src/Shibuya/Batch.hs` defines and exports `BatchKey`, `BatchTrigger`,
+`BatchInfo`, `BatchConfig`, `BatchHandler`, `BatchAck`, and `BatchConfigError`, plus the
+smart constructors (`defaultBatchKey`, `defaultBatchConfig`, `ackAllOk`, `ackAll`,
+`ackExcept`, `withFallback`, `failMessages`) and `validateBatchConfig`. The module haddock
+records the one-decision-per-retained-message acknowledgement contract verbatim as the
+normative spec that EP-18/EP-20 must match.
+
+Every acceptance criterion holds: `cabal build shibuya-core` compiles the new module with
+no warnings under `-Wall`; `cabal test shibuya-core-test` is green (129 examples, 0
+failures, 12 of them the new `Shibuya.Batch` block); `nix fmt` leaves the tree clean (0
+files changed). No runtime behavior was added, as intended — the reliability-critical
+types are pinned down for the downstream plans.
+
+Signatures match the MasterPlan's frozen public/shared signatures section: `BatchHandler
+es msg = BatchInfo -> NonEmpty (Ingested es msg) -> Eff es BatchAck`, and `BatchAck`
+carries `decisions :: Map MessageId AckDecision` + `fallback :: AckDecision`, exactly as
+EP-17/EP-18/EP-19/EP-20 quote.
+
+Lessons for downstream plans: (1) `Shibuya.Prelude` does not re-export `IsString` — import
+it explicitly where deriving it. (2) The test suite needed `containers` added to its
+`build-depends`; later batch specs that touch `Data.Map`/`Data.List.NonEmpty` inherit that
+now. (3) `AckDecision` and `BatchAck` fields are strict, so test fixtures must use concrete
+`RetryDelay`/decision values rather than `undefined`. (4) `BatchConfig`'s `es` is a phantom
+parameter — code that reads its fields needs a concrete type binding to avoid ambiguity.
 
 
 ## Context and Orientation
