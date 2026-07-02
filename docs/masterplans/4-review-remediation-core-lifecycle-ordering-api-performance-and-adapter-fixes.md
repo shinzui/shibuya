@@ -36,7 +36,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | In Progress |
+| 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | Complete |
 | 23 | Fix finalize-on-exception and batch-path reliability | docs/plans/23-fix-finalize-on-exception-and-batch-path-reliability.md | EP-22 | None | Not Started |
 | 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Not Started |
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Not Started |
@@ -78,10 +78,10 @@ The bounded keyed-scheduler `pendingLimit` is defined by EP-23 as `max 2 (2 * ma
 
 ## Progress
 
-- [ ] EP-22: `doneVar` set via `finally` on all child exit paths (halt, cancel, failure); `waitApp` no longer deadlocks after `AckHalt`
-- [ ] EP-22: `StopAllOnFailure` remapped to `NQE.IgnoreGraceful`; graceful child exit no longer kills siblings
-- [ ] EP-22: `link` made strategy-aware; `IgnoreFailures` isolates processor failures
-- [ ] EP-22: ingester `poll` race fixed with `waitCatch`; `runWithMetrics` drain deadlock fixed; `runApp` failure path tears down spawned processors
+- [x] EP-22: `doneVar` set via `finally` on all child exit paths (halt, cancel, failure); `waitApp` no longer deadlocks after `AckHalt`
+- [x] EP-22: `StopAllOnFailure` remapped to `NQE.IgnoreGraceful`; graceful child exit no longer kills siblings
+- [x] EP-22: `link` made strategy-aware; `IgnoreFailures` isolates processor failures
+- [x] EP-22: ingester `poll` race fixed with `waitCatch`; `runWithMetrics` drain deadlock fixed; `runApp` failure path tears down spawned processors
 - [ ] EP-23: handler exception finalizes with `AckRetry` on the single-message path
 - [ ] EP-23: batcher consumer exceptions propagate; batch halt isolation enforced; keyed scheduler bounded and bracketed
 - [ ] EP-23: `AckHandle` idempotency contract finalized and documented

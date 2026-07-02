@@ -121,7 +121,8 @@ This section must always reflect the actual current state of the work.
 - [x] M4: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
       `cabal test shibuya-core-test` (178 examples, 0 failures), `nix fmt`, and
       `nix flake check`.
-- [ ] Update the master plan's Progress section (the four EP-22 checkboxes) when done.
+- [x] Update the master plan's Progress section (the four EP-22 checkboxes) when done.
+      Completed 2026-07-02.
 
 
 ## Surprises & Discoveries
