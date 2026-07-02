@@ -19,7 +19,7 @@ import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision)
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, mkIngested)
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Streamly.Data.Stream qualified as Stream
 
@@ -64,11 +64,7 @@ getTrackedDecisions tracking = liftIO $ readIORef tracking.trackedDecisions
 -- observable.
 mkTrackedIngested :: (IOE :> es) => TrackingAck -> Envelope msg -> Ingested es msg
 mkTrackedIngested tracking env =
-  Ingested
-    { envelope = env,
-      ack = trackingAckHandle tracking env.messageId,
-      lease = Nothing
-    }
+  mkIngested env (trackingAckHandle tracking env.messageId)
 
 -- | Build an adapter from a list of envelopes where every message's acknowledgement
 -- is recorded into one shared 'TrackingAck'. Combine with 'getTrackedDecisions' to

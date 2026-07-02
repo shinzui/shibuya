@@ -11,39 +11,14 @@ module Main (main) where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, readMVar, tryPutMVar)
 import Control.Monad (forM_, void)
-import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
-import Shibuya.App
-  ( AppHandle,
-    ProcessorId (..),
-    ProcessorMetrics (..),
-    defaultAppConfig,
-    getAppMetrics,
-    mkBatchProcessor,
-    runApp,
-    stopApp,
-  )
-import Shibuya.Batch
-  ( BatchConfig (..),
-    BatchHandler,
-    BatchInfo (..),
-    BatchKey (..),
-    ackAllOk,
-    defaultBatchConfig,
-    failMessages,
-  )
-import Shibuya.Core.Ack (DeadLetterReason (..))
-import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Metrics (BatchStats (..), StreamStats (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 
 -- | The example payload. 'region' becomes the batch key; 'poison' orders are
@@ -68,25 +43,11 @@ sampleOrders =
   ]
 
 -- | Wrap an 'Order' in an 'Ingested' message with a tracking ack handle.
-mkIngested :: (IOE :> es) => TrackingAck -> Order -> Ingested es Order
-mkIngested tracking o =
+mkOrderIngested :: (IOE :> es) => TrackingAck -> Order -> Ingested es Order
+mkOrderIngested tracking o =
   let msgId = MessageId ("order-" <> Text.pack (show o.orderId))
-   in Ingested
-        { envelope =
-            Envelope
-              { messageId = msgId,
-                cursor = Nothing,
-                partition = Just o.region,
-                enqueuedAt = Nothing,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = o
-              },
-          ack = trackingAckHandle tracking msgId,
-          lease = Nothing
-        }
+      envelope = (mkEnvelope msgId o :: Envelope Order) {partition = Just o.region}
+   in mkIngested envelope (trackingAckHandle tracking msgId)
 
 -- | Adapter that emits the five orders and then blocks until 'shutdown' fills
 -- the MVar. Blocking (rather than ending the stream) keeps the partial "apac"
@@ -106,7 +67,7 @@ ordersAdapter tracking stopVar orders =
     step [] = do
       liftIO $ readMVar stopVar
       pure Nothing
-    step (o : os) = pure (Just (mkIngested tracking o, os))
+    step (o : os) = pure (Just (mkOrderIngested tracking o, os))
 
 -- | Batch configuration: group by region, two per batch, a long timeout so the
 -- timeout trigger never fires during this short run.

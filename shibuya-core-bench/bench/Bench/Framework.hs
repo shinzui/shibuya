@@ -3,7 +3,6 @@
 module Bench.Framework (benchmarks) where
 
 import Control.DeepSeq (NFData, deepseq)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -12,9 +11,9 @@ import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Generics (Generic)
 import Shibuya.Adapter.Mock (listAdapter, newTrackingAck, trackingAckHandle)
 import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested (..), mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Supervised (runWithMetrics)
 import Shibuya.Telemetry.Effect (runTracingNoop)
@@ -143,27 +142,12 @@ wrapAsIngested :: (IOE :> es) => [BenchMessage] -> Eff es [Ingested es BenchMess
 wrapAsIngested payloads = do
   now <- liftIO getCurrentTime
   tracking <- newTrackingAck
-  pure [mkIngested tracking now i p | (i, p) <- zip [(1 :: Int) ..] payloads]
+  pure [mkBenchIngested tracking now i p | (i, p) <- zip [(1 :: Int) ..] payloads]
   where
-    mkIngested tracking now i payload =
+    mkBenchIngested tracking now i payload =
       let msgId = MessageId $ Text.pack $ show i
-          envelope =
-            Envelope
-              { messageId = msgId,
-                cursor = Nothing,
-                partition = Nothing,
-                enqueuedAt = Just now,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = payload
-              }
-       in Ingested
-            { envelope = envelope,
-              ack = trackingAckHandle tracking msgId,
-              lease = Nothing
-            }
+          envelope = (mkEnvelope msgId payload) {enqueuedAt = Just now}
+       in mkIngested envelope (trackingAckHandle tracking msgId)
 
 -- | Pure streamly baseline for comparison
 streamlyBaseline :: Int -> IO Int

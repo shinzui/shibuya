@@ -2,7 +2,6 @@
 
 module Shibuya.RunnerSpec (spec) where
 
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
@@ -13,15 +12,14 @@ import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultA
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (ConfigError (..), PolicyError (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
-import Prelude hiding (Ordering)
 
 spec :: Spec
 spec = do
@@ -222,24 +220,12 @@ createTestMessages n = mapM createMessage [1 .. n]
     createMessage i = do
       let msgId = MessageId $ "msg-" <> (if i < 10 then "0" else "") <> Text.pack (show i)
           env =
-            Envelope
-              { messageId = msgId,
-                cursor = Just (CursorInt i),
-                partition = Nothing,
-                enqueuedAt = Just testTime,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = "message-" <> show i
+            (mkEnvelope msgId ("message-" <> show i))
+              { cursor = Just (CursorInt i),
+                enqueuedAt = Just testTime
               }
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack
-      pure $
-        Ingested
-          { envelope = env,
-            ack = ackHandle,
-            lease = Nothing
-          }
+      pure $ mkIngested env ackHandle
 
 -- | Create N test messages with tracking acks
 createTrackedMessages :: (IOE :> es) => TrackingAck -> Int -> Eff es [Ingested es String]
@@ -248,24 +234,12 @@ createTrackedMessages tracking n = mapM createMessage [1 .. n]
     createMessage i = do
       let msgId = MessageId $ "msg-" <> (if i < 10 then "0" else "") <> Text.pack (show i)
           env =
-            Envelope
-              { messageId = msgId,
-                cursor = Just (CursorInt i),
-                partition = Nothing,
-                enqueuedAt = Just testTime,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = "message-" <> show i
+            (mkEnvelope msgId ("message-" <> show i))
+              { cursor = Just (CursorInt i),
+                enqueuedAt = Just testTime
               }
           ackHandle = trackingAckHandle tracking msgId
-      pure $
-        Ingested
-          { envelope = env,
-            ack = ackHandle,
-            lease = Nothing
-          }
+      pure $ mkIngested env ackHandle
 
 -- | Create a test adapter from a list of messages
 testAdapter :: [Ingested es String] -> Adapter es String

@@ -74,10 +74,9 @@ import Shibuya.Internal.Runner.Supervised
     runSupervised,
     runSupervisedBatch,
   )
-import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..), validatePolicy)
 import Shibuya.Telemetry.Effect (Tracing)
 import UnliftIO (SomeException, catch, displayException, try)
-import Prelude hiding (Ordering)
 
 --------------------------------------------------------------------------------
 -- Supervision Strategy

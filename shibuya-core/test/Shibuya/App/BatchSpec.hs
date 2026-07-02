@@ -2,7 +2,6 @@ module Shibuya.App.BatchSpec (spec) where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (TVar, atomically, check, newTVarIO, readTVar, writeTVar)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (nub)
 import Data.Text qualified as Text
@@ -27,10 +26,10 @@ import Shibuya.Batch
     ackAllOk,
     defaultBatchConfig,
   )
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -135,18 +134,11 @@ createTrackedMessages tracking n = mapM mk [1 .. n]
     mk i = do
       let msgId = MessageId $ "msg-" <> (if i < 10 then "0" else "") <> Text.pack (show i)
           env =
-            Envelope
-              { messageId = msgId,
-                cursor = Just (CursorInt i),
-                partition = Nothing,
-                enqueuedAt = Just testTime,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = "message-" <> show i
+            (mkEnvelope msgId ("message-" <> show i))
+              { cursor = Just (CursorInt i),
+                enqueuedAt = Just testTime
               }
-      pure $ Ingested {envelope = env, ack = trackingAckHandle tracking msgId, lease = Nothing}
+      pure $ mkIngested env (trackingAckHandle tracking msgId)
 
 -- Finite adapter: ends as soon as its list is exhausted.
 listAdapter' :: [Ingested es String] -> Adapter es String

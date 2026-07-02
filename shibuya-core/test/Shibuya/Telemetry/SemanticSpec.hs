@@ -42,9 +42,9 @@ import OpenTelemetry.Util (appendOnlyBoundedCollectionValues)
 import Shibuya.Adapter.Mock (listAdapter)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.Supervised (runWithMetrics)
 import Shibuya.Telemetry.Effect (runTracing)
 import Test.Hspec
@@ -58,23 +58,8 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
 
     runEff $ runTracing tracer $ do
       let envelope =
-            Envelope
-              { messageId = MessageId "m-1",
-                cursor = Nothing,
-                partition = Nothing,
-                enqueuedAt = Nothing,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = ("hello" :: Text)
-              }
-          ingested =
-            Ingested
-              { envelope = envelope,
-                ack = AckHandle (\_ -> pure ()),
-                lease = Nothing
-              }
+            mkEnvelope (MessageId "m-1") ("hello" :: Text)
+          ingested = mkIngested envelope (AckHandle (\_ -> pure ()))
           adapter = listAdapter [ingested]
           handler _ = pure AckOk
           procId = ProcessorId "test-proc"
@@ -113,15 +98,8 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
 
     runEff $ runTracing tracer $ do
       let envelope =
-            Envelope
-              { messageId = MessageId "orders-2-42",
-                cursor = Nothing,
-                partition = Nothing,
-                enqueuedAt = Nothing,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes =
+            (mkEnvelope (MessageId "orders-2-42") ("hello" :: Text))
+              { attributes =
                   HashMap.fromList
                     [ ("messaging.system", toAttribute ("kafka" :: Text)),
                       ( "messaging.kafka.destination.partition",
@@ -130,15 +108,9 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
                       ( "messaging.kafka.message.offset",
                         toAttribute (42 :: Int64)
                       )
-                    ],
-                payload = ("hello" :: Text)
+                    ]
               }
-          ingested =
-            Ingested
-              { envelope = envelope,
-                ack = AckHandle (\_ -> pure ()),
-                lease = Nothing
-              }
+          ingested = mkIngested envelope (AckHandle (\_ -> pure ()))
           adapter = listAdapter [ingested]
           handler _ = pure AckOk
           procId = ProcessorId "orders-consumer"

@@ -58,7 +58,7 @@ import Shibuya.Core.Ack
     RetryDelay (..),
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics
   ( BatchStats (..),
     ProcessorId (..),
@@ -69,7 +69,7 @@ import Shibuya.Core.Metrics
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Internal.App (AppHandle (..))
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..))
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -77,7 +77,6 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic (assert, monadicIO, monitor, run)
 import UnliftIO (throwIO)
 import UnliftIO.Concurrent (threadDelay)
-import Prelude hiding (Ordering)
 
 tshowT :: Int -> Text
 tshowT = Text.pack . show
@@ -122,7 +121,7 @@ data ObservedBatch = ObservedBatch
 recordingHandler ::
   (IOE :> es) =>
   IORef [ObservedBatch] ->
-  (BatchInfo -> NonEmpty (Ingested es Int) -> BatchAck) ->
+  (BatchInfo -> NonEmpty (Message es Int) -> BatchAck) ->
   BatchHandler es Int
 recordingHandler ref decide bi msgs = do
   let obs = ObservedBatch bi [ing.envelope.messageId | ing <- toList msgs]
@@ -373,7 +372,7 @@ spec = describe "Shibuya.Batch reliability" $ do
               if n < 2
                 then liftIO $ throwIO (userError "transient")
                 else liftIO $ modifyIORef' trackRef ((mid, d) :)
-            ing = Ingested {envelope = mkEnvelope 1 (BatchKey "default") 1, ack = flakyHandle, lease = Nothing}
+            ing = mkIngested (mkEnvelope 1 (BatchKey "default") 1) flakyHandle
             cfg = (defaultBatchConfig @_ @Int) {batchSize = 1, batchTimeout = 0.1, batchKey = scenarioBatchKey}
             handler _ _ = pure ackAllOk
             proc = mkBatchProcessor (listAdapter [ing]) handler cfg
@@ -391,7 +390,7 @@ spec = describe "Shibuya.Batch reliability" $ do
       (tracked, mState) <- runEff $ runTracingNoop $ do
         let pid = ProcessorId "perm"
             failHandle = AckHandle $ \_ -> liftIO $ throwIO (userError "permanent")
-            ing1 = Ingested {envelope = mkEnvelope 1 (BatchKey "default") 1, ack = failHandle, lease = Nothing}
+            ing1 = mkIngested (mkEnvelope 1 (BatchKey "default") 1) failHandle
             ing2 = mkTrackedIngested tracking (mkEnvelope 2 (BatchKey "default") 2)
             cfg = (defaultBatchConfig @_ @Int) {batchSize = 2, batchTimeout = 0.1, batchKey = scenarioBatchKey}
             handler _ _ = pure ackAllOk

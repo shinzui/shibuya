@@ -9,7 +9,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 import Control.Monad (replicateM_)
 import Data.Function ((&))
-import Data.HashMap.Strict qualified as HashMap
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -18,26 +17,9 @@ import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import OpenTelemetry.Attributes (emptyAttributes)
 import OpenTelemetry.Trace qualified as OTelSdk
 import OpenTelemetry.Trace.Core qualified as OTel
-import Shibuya.Adapter (Adapter (..))
+import Shibuya
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
-import Shibuya.App
-  ( AppHandle,
-    ProcessorId (..),
-    ProcessorMetrics (..),
-    defaultAppConfig,
-    getAppMaster,
-    getAppMetrics,
-    mkProcessor,
-    runApp,
-    stopApp,
-  )
-import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Metrics (ProcessorState (..), StreamStats (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Handler (Handler)
 import Shibuya.Metrics (defaultConfig, withMetricsServer)
-import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Unfold qualified as Unfold
 import System.Environment (lookupEnv)
@@ -59,36 +41,20 @@ counterAdapter tracking name start step =
     { adapterName = name,
       source =
         Stream.unfold Unfold.fromList [start, start + step ..]
-          & Stream.mapM (mkIngested tracking name),
+          & Stream.mapM (mkCounterIngested tracking name),
       shutdown = liftIO $ Text.putStrLn $ "Shutting down " <> name <> " adapter"
     }
 
 -- | Create an Ingested message from a value.
-mkIngested ::
+mkCounterIngested ::
   (IOE :> es) =>
   TrackingAck ->
   Text ->
   Int ->
   Eff es (Ingested es Int)
-mkIngested tracking sourceName n = do
+mkCounterIngested tracking sourceName n = do
   let msgId = MessageId $ sourceName <> "-" <> Text.pack (show (abs n))
-  pure
-    Ingested
-      { envelope =
-          Envelope
-            { messageId = msgId,
-              cursor = Nothing,
-              partition = Nothing,
-              enqueuedAt = Nothing,
-              traceContext = Nothing,
-              headers = Nothing,
-              attempt = Nothing,
-              attributes = HashMap.empty,
-              payload = n
-            },
-        ack = trackingAckHandle tracking msgId,
-        lease = Nothing
-      }
+  pure $ mkIngested (mkEnvelope msgId n) (trackingAckHandle tracking msgId)
 
 -- | Handler that prints each message with its source.
 -- Includes a small delay to simulate real work and allow thread switching.

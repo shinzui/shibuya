@@ -5,7 +5,6 @@ module Shibuya.App.LifecycleSpec (spec) where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
@@ -27,13 +26,13 @@ import Shibuya.App
 import Shibuya.Batch (BatchConfig (..), ackAll, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.App (AppHandle (..))
 import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervised)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -269,23 +268,11 @@ createTestMessage :: (IOE :> es) => Int -> Eff es (Ingested es String)
 createTestMessage i = do
   let msgId = MessageId $ "msg-" <> (if i < 10 then "0" else "") <> Text.pack (show i)
       env =
-        Envelope
-          { messageId = msgId,
-            cursor = Just (CursorInt i),
-            partition = Nothing,
-            enqueuedAt = Just testTime,
-            traceContext = Nothing,
-            headers = Nothing,
-            attempt = Nothing,
-            attributes = HashMap.empty,
-            payload = "message-" <> show i
+        (mkEnvelope msgId ("message-" <> show i))
+          { cursor = Just (CursorInt i),
+            enqueuedAt = Just testTime
           }
-  pure $
-    Ingested
-      { envelope = env,
-        ack = AckHandle $ \_ -> pure (),
-        lease = Nothing
-      }
+  pure $ mkIngested env (AckHandle $ \_ -> pure ())
 
 testAdapter :: [Ingested es String] -> Adapter es String
 testAdapter messages =

@@ -15,8 +15,8 @@ import Shibuya.Batch
     BatchTrigger (..),
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Ingested (Ingested (..), mkIngested)
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.Batcher
   ( ReadyBatch,
     emptyBatcherState,
@@ -43,22 +43,13 @@ tshow = Text.pack . show
 -- partition equal to its batch key.
 mkIng :: Int -> BatchKey -> Ingested E String
 mkIng i (BatchKey k) =
-  Ingested
-    { envelope =
-        Envelope
-          { messageId = MessageId ("m-" <> tshow i),
-            cursor = Just (CursorInt i),
-            partition = Just k,
-            enqueuedAt = Nothing,
-            traceContext = Nothing,
-            headers = Nothing,
-            attempt = Nothing,
-            attributes = mempty,
-            payload = "payload-" <> show i
-          },
-      ack = AckHandle (\_ -> pure ()),
-      lease = Nothing
-    }
+  mkIngested
+    ( (mkEnvelope (MessageId ("m-" <> tshow i)) ("payload-" <> show i))
+        { cursor = Just (CursorInt i),
+          partition = Just k
+        }
+    )
+    (AckHandle (\_ -> pure ()))
 
 -- Key the config on the message's partition (Just k -> BatchKey k).
 partitionKeyConfig :: Int -> BatchConfig E String

@@ -4,11 +4,10 @@ module Shibuya.PolicySpec (spec) where
 
 import Shibuya.Policy
 import Test.Hspec
-import Prelude hiding (Ordering)
 
 spec :: Spec
 spec = do
-  describe "Ordering" $ do
+  describe "OrderingPolicy" $ do
     it "all constructors are distinguishable" $ do
       StrictInOrder `shouldNotBe` PartitionedInOrder
       PartitionedInOrder `shouldNotBe` Unordered

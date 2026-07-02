@@ -6,7 +6,6 @@ module Bench.Concurrency (benchmarks) where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.DeepSeq (NFData)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -16,13 +15,13 @@ import GHC.Generics (Generic)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor, isDone, runSupervised, runWithMetrics)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Tasty.Bench (Benchmark, bcompare, bench, bgroup, nfIO)
@@ -220,22 +219,6 @@ createIngestedMessages n = mapM createMessage [1 .. n]
   where
     createMessage i = do
       let msgId' = MessageId $ Text.pack $ show i
-          envelope =
-            Envelope
-              { messageId = msgId',
-                cursor = Nothing,
-                partition = Nothing,
-                enqueuedAt = Just benchTime,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = BenchMessage i (Text.pack $ "payload-" <> show i)
-              }
+          envelope = (mkEnvelope msgId' (BenchMessage i (Text.pack $ "payload-" <> show i))) {enqueuedAt = Just benchTime}
           ackHandle = AckHandle $ \_ -> pure () -- No-op ack
-      pure $
-        Ingested
-          { envelope = envelope,
-            ack = ackHandle,
-            lease = Nothing
-          }
+      pure $ mkIngested envelope ackHandle

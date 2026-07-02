@@ -56,7 +56,7 @@ import Data.Map.Strict qualified as Map
 import Data.String (IsString)
 import Effectful (Eff)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason)
-import Shibuya.Core.Ingested (Ingested)
+import Shibuya.Core.Ingested (Message)
 import Shibuya.Core.Types (Envelope, MessageId)
 import Shibuya.Prelude
 
@@ -134,7 +134,7 @@ defaultBatchConfig =
 -- decision), a batch handler receives every message in the batch plus its
 -- 'BatchInfo', and returns a single 'BatchAck' describing per-message
 -- outcomes. See the module haddock for the acknowledgement decision contract.
-type BatchHandler es msg = BatchInfo -> NonEmpty (Ingested es msg) -> Eff es BatchAck
+type BatchHandler es msg = BatchInfo -> NonEmpty (Message es msg) -> Eff es BatchAck
 
 -- | How to acknowledge every message in a batch. The framework resolves each
 -- retained message's decision by looking its 'MessageId' up in 'decisions', or

@@ -85,11 +85,11 @@ This section must always reflect the actual current state of the work.
 - [x] M2: deleted `HandlerError.HandlerTimeout`, `RuntimeError.InboxOverflow`, `StreamStats.dropped` + `incDropped` (including the example's "Dropped" print line and the `shibuya_messages_dropped_total` metric in `shibuya-metrics`); deleted `Shibuya.Telemetry.Config`; rewrote the `Shibuya.Telemetry` Quick Start. Completed 2026-07-02.
 - [x] M2: added `AppConfig` + `defaultAppConfig`; changed `runApp` to take `AppConfig` (clean break, no shim); added `ConfigError`/`InvalidInboxSize` validation (`inboxSize >= 1`) returning `Left`; added regression tests for inboxSize 0 and negative. Completed 2026-07-02.
 - [x] M2: `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt` completed; bounded `exe:shibuya-example` startup still shows the M1 non-terminating transcript caveat. Completed 2026-07-02.
-- [ ] M3: narrow the handler surface — add `Message es msg` (envelope + lease, no ack) to `Shibuya.Core.Ingested`; change `Handler` and `BatchHandler` to receive `Message`; framework keeps `Ingested` internally; update tests and examples.
-- [ ] M3: add `mkEnvelope` and `mkIngested` smart constructors; migrate example, tests, and bench to them.
-- [ ] M3: rename `Ordering` to `OrderingPolicy`; remove all `import Prelude hiding (Ordering)`; rename `Shibuya.Stream.batchStream` to `chunksOf`; verify/fix the `Ahead` Haddock; document (not newtype) `TraceHeaders` vs `Headers`.
-- [ ] M3: create the `Shibuya` umbrella module; deprecate `Shibuya.Core` toward it; port `shibuya-example/app/Main.hs` and `shibuya-example/app-batch/Main.hs` to `import Shibuya`.
-- [ ] M3: build + test + example green; `nix fmt`; commit.
+- [x] M3: narrowed the handler surface — added `Message es msg` (envelope + lease, no ack) to `Shibuya.Core.Ingested`; changed `Handler` and `BatchHandler` to receive `Message`; framework keeps `Ingested` internally; updated tests and examples. Completed 2026-07-02.
+- [x] M3: added `mkEnvelope` and `mkIngested` smart constructors; migrated examples, tests, bench, and `Shibuya.Adapter.Mock` to them. Completed 2026-07-02.
+- [x] M3: renamed `Ordering` to `OrderingPolicy`; removed all `import Prelude hiding (Ordering)`; renamed `Shibuya.Stream.batchStream` to `chunksOf`; verified EP-24 had already fixed the `Ahead` Haddock; documented `TraceHeaders` vs `Headers` as aliases, not newtypes. Completed 2026-07-02.
+- [x] M3: created the `Shibuya` umbrella module; changed `Shibuya.Core` to a deprecated compatibility re-export; ported `shibuya-example/app/Main.hs` and `shibuya-example/app-batch/Main.hs` to `import Shibuya`. Completed 2026-07-02.
+- [x] M3: `cabal build all`, `cabal test shibuya-core-test`, `nix fmt`, public-name greps, and a negative bad-handler compile check completed; bounded `exe:shibuya-example` verified startup and message processing, with the pre-existing non-terminating transcript caveat still present. Completed 2026-07-02.
 - [ ] M4: drop `effectful-core`, `uuid`, `vector` from build-depends; replace the three `Effectful.Internal.Unlift` imports with the stable `Effectful` exports; replace the 15 lens use sites with plain record updates and drop `lens` + `generic-lens` (fall back to "record as future work" if any site turns non-mechanical); run a `-Wunused-packages` audit.
 - [ ] M4: bump version to 0.8.0.0; write `shibuya-core/CHANGELOG.md` migration notes for every breaking item; bump and note `shibuya-metrics`; run `cabal haddock shibuya-core` clean.
 - [ ] M4: build + test + example green; `nix fmt`; final commit; update master plan registry row EP-25 to Complete.
@@ -116,6 +116,12 @@ implementation. Provide concise evidence.
 - 2026-07-02: With `NoFieldSelectors`, modules using record update syntax like
   `defaultAppConfig {inboxSize = 10}` must import `AppConfig (..)`, not only
   `defaultAppConfig`. This affected the test modules that intentionally override inbox size.
+
+- 2026-07-02: The M3 negative compile check must use the built `shibuya-core` package
+  (`cabal exec ghc -- -fno-code -package shibuya-core ...`), not `-ishibuya-core/src`.
+  Compiling source files directly misses Cabal's default extensions and fails too early.
+  Against the built package, a handler that evaluates `msg.ack` fails for the intended
+  reason: `Message es Int` has no `ack` field.
 
 
 ## Decision Log
@@ -270,6 +276,13 @@ Compare the result against the original purpose.
   `runApp` now takes a validated `AppConfig`, and invalid inbox sizes return
   `Left (AppConfigInvalid (InvalidInboxSize n))` before processor startup. The test suite now
   includes zero and negative inbox-size regressions.
+
+- 2026-07-02 M3 outcome: Application handlers now receive `Message` rather than `Ingested`,
+  so the ack finalizer is no longer reachable from handler code; `mkEnvelope`/`mkIngested`
+  cover in-repo construction; `OrderingPolicy`, `chunksOf`, the `Shibuya` umbrella, and the
+  deprecated `Shibuya.Core` shim are in place. Validation passed with `cabal build all`,
+  `cabal test shibuya-core-test` (201 examples), `nix fmt`, old-name greps, and the intended
+  bad-handler compile failure.
 
 
 ## Context and Orientation

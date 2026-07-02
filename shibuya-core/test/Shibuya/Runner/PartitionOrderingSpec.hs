@@ -5,7 +5,6 @@ module Shibuya.Runner.PartitionOrderingSpec (spec) where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (atomically, check, readTVar)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (nub, sort)
 import Data.Map.Strict qualified as Map
@@ -15,12 +14,13 @@ import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter.Mock (getTrackedDecisions, newTrackingAck, trackedListAdapter)
 import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Message (..))
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types qualified as Core
 import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervised)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Test.Hspec
 import Test.QuickCheck
@@ -125,14 +125,14 @@ runPartitioned ::
   IO [(MessageId, AckDecision)]
 runPartitioned messages concurrency =
   runPartitionedWithHandler messages concurrency $ \ingested -> do
-    let Ingested {envelope = Envelope {payload = Payload delay}} = ingested
+    let Message {envelope = Envelope {payload = Payload delay}} = ingested
     liftIO $ threadDelay delay
     pure AckOk
 
 runPartitionedWithHandler ::
   [(Maybe Text, Int)] ->
   Concurrency ->
-  (forall es. (IOE :> es) => Ingested es Payload -> Eff es AckDecision) ->
+  (forall es. (IOE :> es) => Message es Payload -> Eff es AckDecision) ->
   IO [(MessageId, AckDecision)]
 runPartitionedWithHandler messages concurrency handler =
   runEff $ runTracingNoop $ do
@@ -148,16 +148,9 @@ runPartitionedWithHandler messages concurrency handler =
 
 mkEnvelope :: Int -> (Maybe Text, Int) -> Envelope Payload
 mkEnvelope i (partition, delayMicros) =
-  Envelope
-    { messageId = makeId i,
-      cursor = Just (CursorInt i),
-      partition = partition,
-      enqueuedAt = Nothing,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = Nothing,
-      attributes = HashMap.empty,
-      payload = Payload {delayMicros}
+  (Core.mkEnvelope (makeId i) Payload {delayMicros})
+    { cursor = Just (CursorInt i),
+      partition = partition
     }
 
 makeIds :: Int -> [MessageId]

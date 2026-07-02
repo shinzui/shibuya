@@ -15,7 +15,6 @@ module Shibuya.Batch.TestHarness
   )
 where
 
-import Data.HashMap.Strict qualified as HashMap
 import Data.List (sort)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -25,6 +24,7 @@ import Data.Text qualified as Text
 import Shibuya.Batch (BatchKey (..))
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types qualified as Core
 import Test.QuickCheck
 
 -- | A randomized batch schedule. Each message index @i@ in @[1 .. msgCount]@ has a
@@ -81,16 +81,9 @@ instance Arbitrary BatchScenario where
 -- recover it).
 mkEnvelope :: Int -> BatchKey -> Int -> Envelope Int
 mkEnvelope i key payload =
-  Envelope
-    { messageId = MessageId ("msg-" <> tshow i),
-      cursor = Just (CursorInt i),
-      partition = Just key.unBatchKey,
-      enqueuedAt = Nothing,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = Nothing,
-      attributes = HashMap.empty,
-      payload = payload
+  (Core.mkEnvelope (MessageId ("msg-" <> tshow i)) payload)
+    { cursor = Just (CursorInt i),
+      partition = Just key.unBatchKey
     }
 
 -- | The envelopes for a scenario, in index order, each carrying its assigned key.

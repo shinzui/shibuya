@@ -66,7 +66,7 @@ import Shibuya.Core.Ack
     HaltReason (..),
     RetryDelay (..),
   )
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested (..), toMessage)
 import Shibuya.Core.Metrics
   ( BatchStats,
     InFlightInfo (..),
@@ -185,7 +185,7 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
           Nothing -> do
             result <-
               catchAny
-                (Right <$> handler info batch)
+                (Right <$> handler info (toMessage <$> batch))
                 ( \ex -> do
                     recordException traceSpan ex
                     pure (Left ())
@@ -339,7 +339,7 @@ processBatchesUntilDrained ::
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
   IORef (Maybe HaltReason) ->
   Eff es ()
-processBatchesUntilDrained metricsVar procId concurrency handler batchStream haltRef = do
+processBatchesUntilDrained metricsVar procId concurrency handler batchesStream haltRef = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
@@ -351,11 +351,11 @@ processBatchesUntilDrained metricsVar procId concurrency handler batchStream hal
     case concurrency of
       Serial ->
         Stream.fold Fold.drain $
-          Stream.mapM batchAction batchStream
+          Stream.mapM batchAction batchesStream
       Ahead n ->
-        runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchStream
+        runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchesStream
       Async n ->
-        runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchStream
+        runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchesStream
 
 fstBatchKey :: (BatchInfo, NonEmpty (Ingested es msg)) -> BatchKey
 fstBatchKey (info, _) = info.batchKey
@@ -376,8 +376,8 @@ runBatchesWithMetrics procId concurrency handler batches = do
   metricsVar <- liftIO $ newTVarIO (emptyProcessorMetrics now)
   haltRef <- liftIO $ newIORef Nothing
 
-  let batchStream = Stream.fromList batches
-  processBatchesUntilDrained metricsVar procId concurrency handler batchStream haltRef
+  let batchesStream = Stream.fromList batches
+  processBatchesUntilDrained metricsVar procId concurrency handler batchesStream haltRef
 
   maybeHalt <- liftIO $ readIORef haltRef
   case maybeHalt of

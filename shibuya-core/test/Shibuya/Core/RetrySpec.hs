@@ -2,12 +2,11 @@
 
 module Shibuya.Core.RetrySpec (spec) where
 
-import Data.HashMap.Strict qualified as HashMap
 import Data.Time (nominalDiffTimeToSeconds)
 import Effectful (runEff)
 import Shibuya.Core.Ack (AckDecision (..), RetryDelay (..))
 import Shibuya.Core.Retry
-import Shibuya.Core.Types (Attempt (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Attempt (..), Envelope (..), MessageId (..), mkEnvelope)
 import Test.Hspec
 import Test.QuickCheck
 
@@ -16,17 +15,7 @@ secondsOf (RetryDelay d) = realToFrac (nominalDiffTimeToSeconds d)
 
 testEnvelope :: Maybe Attempt -> Envelope ()
 testEnvelope a =
-  Envelope
-    { messageId = MessageId "test",
-      cursor = Nothing,
-      partition = Nothing,
-      enqueuedAt = Nothing,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = a,
-      attributes = HashMap.empty,
-      payload = ()
-    }
+  (mkEnvelope (MessageId "test") ()) {attempt = a}
 
 spec :: Spec
 spec = do

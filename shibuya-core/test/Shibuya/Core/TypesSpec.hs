@@ -2,7 +2,6 @@
 
 module Shibuya.Core.TypesSpec (spec) where
 
-import Data.HashMap.Strict qualified as HashMap
 import Data.Time (UTCTime (..), fromGregorian)
 import Shibuya.Core.Types
 import Test.Hspec
@@ -84,22 +83,27 @@ spec = do
           mapped = fmap show env
       mapped.headers `shouldBe` Just [("content-type", "application/json")]
 
+    it "mkEnvelope defaults optional metadata" $ do
+      let env = mkEnvelope (MessageId "test-id") ("payload" :: String)
+      env.messageId `shouldBe` MessageId "test-id"
+      env.cursor `shouldBe` Nothing
+      env.partition `shouldBe` Nothing
+      env.enqueuedAt `shouldBe` Nothing
+      env.traceContext `shouldBe` Nothing
+      env.headers `shouldBe` Nothing
+      env.attempt `shouldBe` Nothing
+      env.payload `shouldBe` "payload"
+
     it "defaults headers to Nothing in the test helper" $ do
       (testEnvelope (1 :: Int)).headers `shouldBe` Nothing
 
 -- Test helper
 testEnvelope :: msg -> Envelope msg
 testEnvelope msg =
-  Envelope
-    { messageId = MessageId "test-id",
-      cursor = Just (CursorInt 42),
+  (mkEnvelope (MessageId "test-id") msg)
+    { cursor = Just (CursorInt 42),
       partition = Just "partition-0",
-      enqueuedAt = Just testTime,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = Nothing,
-      attributes = HashMap.empty,
-      payload = msg
+      enqueuedAt = Just testTime
     }
 
 testTime :: UTCTime

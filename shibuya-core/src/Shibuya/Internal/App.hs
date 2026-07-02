@@ -16,8 +16,7 @@ import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Master (Master)
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Prelude hiding (Ordering)
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 
 -- | A queue processor pairs an adapter with a handler. The message type is
 -- existentially hidden, allowing heterogeneous queues in one 'runApp' call.
@@ -28,7 +27,7 @@ data QueueProcessor es where
   QueueProcessor ::
     { adapter :: Adapter es msg,
       handler :: Handler es msg,
-      ordering :: Ordering,
+      ordering :: OrderingPolicy,
       concurrency :: Concurrency
     } ->
     QueueProcessor es
@@ -36,7 +35,7 @@ data QueueProcessor es where
     { adapter :: Adapter es msg,
       batchHandler :: BatchHandler es msg,
       batchConfig :: BatchConfig es msg,
-      ordering :: Ordering,
+      ordering :: OrderingPolicy,
       concurrency :: Concurrency
     } ->
     QueueProcessor es

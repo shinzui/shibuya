@@ -20,6 +20,7 @@ common warnings
 library
   import: warnings
   exposed-modules:
+    Shibuya
     Shibuya.Adapter
     Shibuya.Adapter.Mock
     Shibuya.App

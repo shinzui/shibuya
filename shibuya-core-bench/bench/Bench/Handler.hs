@@ -3,7 +3,6 @@
 module Bench.Handler (benchmarks) where
 
 import Control.DeepSeq (NFData)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -12,9 +11,9 @@ import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Generics (Generic)
 import Shibuya.Adapter.Mock (listAdapter, newTrackingAck, trackingAckHandle)
 import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Supervised (runWithMetrics)
 import Shibuya.Telemetry.Effect (runTracingNoop)
@@ -118,26 +117,11 @@ createIngestedMessages n = do
   now <- liftIO getCurrentTime
   tracking <- newTrackingAck
   pure
-    [ mkIngested tracking now i
+    [ mkBenchIngested tracking now i
     | i <- [1 .. n]
     ]
   where
-    mkIngested tracking now i =
+    mkBenchIngested tracking now i =
       let msgId' = MessageId $ Text.pack $ show i
-          envelope =
-            Envelope
-              { messageId = msgId',
-                cursor = Nothing,
-                partition = Nothing,
-                enqueuedAt = Just now,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = BenchMessage i (Text.pack $ "payload-" <> show i)
-              }
-       in Ingested
-            { envelope = envelope,
-              ack = trackingAckHandle tracking msgId',
-              lease = Nothing
-            }
+          envelope = (mkEnvelope msgId' (BenchMessage i (Text.pack $ "payload-" <> show i))) {enqueuedAt = Just now}
+       in mkIngested envelope (trackingAckHandle tracking msgId')

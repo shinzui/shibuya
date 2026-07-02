@@ -8,7 +8,6 @@ import Control.Concurrent.STM
     readTVarIO,
     writeTVar,
   )
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty)
@@ -18,6 +17,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import Shibuya (ProcessorHalt (..))
 import Shibuya.Adapter.Mock
   ( TrackingAck (..),
     getTrackedDecisions,
@@ -33,7 +33,6 @@ import Shibuya.Batch
     defaultBatchKey,
     withFallback,
   )
-import Shibuya.Core (ProcessorHalt (..))
 import Shibuya.Core.Ack
   ( AckDecision (..),
     DeadLetterReason (..),
@@ -41,14 +40,14 @@ import Shibuya.Core.Ack
     RetryDelay (..),
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics
   ( BatchStats (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     StreamStats (..),
   )
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.BatchProcessor (runBatchesWithMetrics)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
@@ -96,11 +95,7 @@ spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
         -- then records success on the third.
         let mid = MessageId "flaky-1"
             ing =
-              Ingested
-                { envelope = mkEnv 1 mid,
-                  ack = flakyAckHandle counter tracking mid,
-                  lease = Nothing
-                }
+              mkIngested (mkEnv 1 mid) (flakyAckHandle counter tracking mid)
             info =
               BatchInfo
                 { batchKey = defaultBatchKey,
@@ -191,17 +186,9 @@ spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
         let mid1 = MessageId "perm-1"
             mid2 = MessageId "perm-2"
             ing1 =
-              Ingested
-                { envelope = mkEnv 1 mid1,
-                  ack = alwaysFailAckHandle,
-                  lease = Nothing
-                }
+              mkIngested (mkEnv 1 mid1) alwaysFailAckHandle
             ing2 =
-              Ingested
-                { envelope = mkEnv 2 mid2,
-                  ack = trackingAckHandle tracking mid2,
-                  lease = Nothing
-                }
+              mkIngested (mkEnv 2 mid2) (trackingAckHandle tracking mid2)
             info =
               BatchInfo
                 { batchKey = defaultBatchKey,
@@ -251,17 +238,7 @@ expectedIds = [MessageId ("msg-" <> tshow i) | i <- [1 .. 5 :: Int]]
 -- | Envelope for message @i@ with the given id.
 mkEnv :: Int -> MessageId -> Envelope String
 mkEnv i mid =
-  Envelope
-    { messageId = mid,
-      cursor = Nothing,
-      partition = Nothing,
-      enqueuedAt = Just testTime,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = Nothing,
-      attributes = HashMap.empty,
-      payload = "payload-" <> show i
-    }
+  (mkEnvelope mid ("payload-" <> show i)) {enqueuedAt = Just testTime}
 
 -- | Build a batch of @n@ messages (ids @msg-1@..@msg-n@) whose acks record into
 -- the given TrackingAck.
@@ -274,11 +251,7 @@ buildBatch ::
 buildBatch tracking n trig = do
   let mk i =
         let mid = MessageId ("msg-" <> tshow i)
-         in Ingested
-              { envelope = mkEnv i mid,
-                ack = trackingAckHandle tracking mid,
-                lease = Nothing
-              }
+         in mkIngested (mkEnv i mid) (trackingAckHandle tracking mid)
       msgs = map mk [1 .. n]
       info =
         BatchInfo
@@ -299,11 +272,7 @@ buildRangeBatch ::
 buildRangeBatch tracking ids trig = do
   let mk i =
         let mid = MessageId ("msg-" <> tshow i)
-         in Ingested
-              { envelope = mkEnv i mid,
-                ack = trackingAckHandle tracking mid,
-                lease = Nothing
-              }
+         in mkIngested (mkEnv i mid) (trackingAckHandle tracking mid)
       msgs = map mk ids
       info =
         BatchInfo
@@ -324,11 +293,7 @@ buildKeyedBatch ::
 buildKeyedBatch i key = do
   let mid = MessageId ("k-" <> tshow i)
       ing =
-        Ingested
-          { envelope = mkEnv i mid,
-            ack = AckHandle (\_ -> pure ()),
-            lease = Nothing
-          }
+        mkIngested (mkEnv i mid) (AckHandle (\_ -> pure ()))
       info =
         BatchInfo
           { batchKey = key,

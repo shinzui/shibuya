@@ -5,7 +5,7 @@ module Shibuya.Stream
     pollingStream,
 
     -- * Transformations
-    batchStream,
+    chunksOf,
     filterStream,
   )
 where
@@ -33,9 +33,10 @@ pollingStream interval poll =
         Nothing -> liftIO (threadDelay interval) >> pure Nothing
         Just msg -> pure (Just msg)
 
--- | Batch messages into chunks.
-batchStream :: (Monad m) => Int -> Stream m msg -> Stream m [msg]
-batchStream n = Stream.foldMany (Fold.take n Fold.toList)
+-- | Group a stream into lists of at most n elements.
+-- Unrelated to the batch-processing API in "Shibuya.Batch".
+chunksOf :: (Monad m) => Int -> Stream m msg -> Stream m [msg]
+chunksOf n = Stream.foldMany (Fold.take n Fold.toList)
 
 -- | Filter messages.
 filterStream :: (Monad m) => (msg -> Bool) -> Stream m msg -> Stream m msg

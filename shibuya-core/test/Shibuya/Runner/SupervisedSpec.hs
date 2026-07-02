@@ -5,12 +5,12 @@ module Shibuya.Runner.SupervisedSpec (spec) where
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (atomically, check, readTVar, readTVarIO)
 import Control.Monad (forM, forM_, replicateM)
-import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import Shibuya (ProcessorHalt (..))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock
   ( getTrackedDecisions,
@@ -27,10 +27,9 @@ import Shibuya.App
     stopAppGracefully,
   )
 import Shibuya.Batch.TestHarness (finalizedExactlyOnce)
-import Shibuya.Core (ProcessorHalt (..))
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     ProcessorId (..),
@@ -38,7 +37,7 @@ import Shibuya.Core.Metrics
     ProcessorState (..),
     StreamStats (..),
   )
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Master
   ( getAllMetrics,
@@ -54,7 +53,7 @@ import Shibuya.Internal.Runner.Supervised
     runSupervised,
     runWithMetrics,
   )
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -506,20 +505,18 @@ spec = do
             decisionsRef <- liftIO $ newIORef ([] :: [(MessageId, AckDecision)])
             let env = createTestEnvelope 1
                 ingested =
-                  Ingested
-                    { envelope = env,
-                      ack =
-                        AckHandle $ \decision ->
-                          liftIO $ do
-                            attempt <-
-                              atomicModifyIORef'
-                                attemptsRef
-                                (\n -> let n' = n + 1 in (n', n'))
-                            if attempt <= 2
-                              then ioError (userError "transient finalizer failure")
-                              else modifyIORef' decisionsRef ((env.messageId, decision) :),
-                      lease = Nothing
-                    }
+                  mkIngested
+                    env
+                    ( AckHandle $ \decision ->
+                        liftIO $ do
+                          attempt <-
+                            atomicModifyIORef'
+                              attemptsRef
+                              (\n -> let n' = n + 1 in (n', n'))
+                          if attempt <= 2
+                            then ioError (userError "transient finalizer failure")
+                            else modifyIORef' decisionsRef ((env.messageId, decision) :)
+                    )
                 adapter = testAdapter [ingested]
 
             _sp <- runWithMetrics 10 (ProcessorId "transient-finalizer") adapter alwaysAckOk
@@ -536,11 +533,7 @@ spec = do
             let env1 = createTestEnvelope 1
                 env2 = createTestEnvelope 2
                 failing =
-                  Ingested
-                    { envelope = env1,
-                      ack = AckHandle $ \_ -> liftIO $ ioError (userError "permanent finalizer failure"),
-                      lease = Nothing
-                    }
+                  mkIngested env1 (AckHandle $ \_ -> liftIO $ ioError (userError "permanent finalizer failure"))
                 trackedSecond = mkTrackedIngested tracking env2
                 adapter = testAdapter [failing, trackedSecond]
 
@@ -648,7 +641,7 @@ spec = do
           length completeOrder `shouldBe` 5
 
     -- The key property: all messages were processed
-    -- (Ordering of side effects may vary, but stream output is ordered)
+    -- (OrderingPolicy of side effects may vary, but stream output is ordered)
 
     describe "Robustness" $ do
       describe "Adapter source exceptions" $ do
@@ -1098,16 +1091,9 @@ testTime = UTCTime (fromGregorian 2026 1 1) 0
 
 createTestEnvelope :: Int -> Envelope String
 createTestEnvelope i =
-  Envelope
-    { messageId = MessageId $ "msg-" <> Text.pack (show i),
-      cursor = Just (CursorInt i),
-      partition = Nothing,
-      enqueuedAt = Just testTime,
-      traceContext = Nothing,
-      headers = Nothing,
-      attempt = Nothing,
-      attributes = HashMap.empty,
-      payload = "message-" <> show i
+  (mkEnvelope (MessageId $ "msg-" <> Text.pack (show i)) ("message-" <> show i))
+    { cursor = Just (CursorInt i),
+      enqueuedAt = Just testTime
     }
 
 createTestEnvelopes :: Int -> [Envelope String]
@@ -1119,12 +1105,7 @@ createTestMessages n = mapM createMessage [1 .. n]
     createMessage i = do
       let env = createTestEnvelope i
           ackHandle = AckHandle $ \_ -> pure ()
-      pure $
-        Ingested
-          { envelope = env,
-            ack = ackHandle,
-            lease = Nothing
-          }
+      pure $ mkIngested env ackHandle
 
 -- | Create a single message (for use in streaming contexts)
 -- Polymorphic over effect stack for use with tracing.
@@ -1132,12 +1113,7 @@ createSingleMessage :: (IOE :> es) => Int -> IO (Ingested es String)
 createSingleMessage i = do
   let env = createTestEnvelope i
       ackHandle = AckHandle $ \_ -> pure ()
-  pure $
-    Ingested
-      { envelope = env,
-        ack = ackHandle,
-        lease = Nothing
-      }
+  pure $ mkIngested env ackHandle
 
 testAdapter :: [Ingested es String] -> Adapter es String
 testAdapter messages =

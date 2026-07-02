@@ -54,7 +54,7 @@ import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
-import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Ingested (Ingested (..), toMessage)
 import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     ProcessorId (..),
@@ -73,7 +73,7 @@ import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Internal.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Prelude
 import Shibuya.Telemetry.Effect
   ( Tracing,
@@ -107,7 +107,6 @@ import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Stream.Prelude qualified as StreamP
 import UnliftIO (Async, catch, catchAny, displayException, finally, throwIO)
 import UnliftIO qualified as UIO
-import Prelude hiding (Ordering)
 
 -- | Handle for a supervised processor.
 -- Provides introspection into the running processor.
@@ -150,8 +149,8 @@ runSupervised ::
   Natural ->
   -- | Processor identifier
   ProcessorId ->
-  -- | Ordering policy
-  Ordering ->
+  -- | OrderingPolicy policy
+  OrderingPolicy ->
   -- | Concurrency mode
   Concurrency ->
   -- | Queue adapter
@@ -240,7 +239,7 @@ runIngesterAndProcessor ::
   TVar ProcessorMetrics ->
   ProcessorId ->
   Natural ->
-  Ordering ->
+  OrderingPolicy ->
   Concurrency ->
   Adapter es msg ->
   Handler es msg ->
@@ -478,7 +477,7 @@ processUntilDrained ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   ProcessorId ->
-  Ordering ->
+  OrderingPolicy ->
   Concurrency ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
@@ -587,7 +586,7 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
       -- finalization decision for an ingested message.
       handlerResult <-
         catchAny
-          (Right <$> handler ingested)
+          (Right <$> handler (toMessage ingested))
           ( \ex -> do
               recordException traceSpan ex
               pure (Left ex)

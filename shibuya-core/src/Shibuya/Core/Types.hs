@@ -13,6 +13,7 @@ module Shibuya.Core.Types
 
     -- * Message Envelope
     Envelope (..),
+    mkEnvelope,
 
     -- * Message Headers
     Headers,
@@ -63,7 +64,11 @@ newtype Attempt = Attempt {unAttempt :: Word}
 type Headers = [(ByteString, ByteString)]
 
 -- | W3C Trace Context headers for distributed tracing.
--- Contains traceparent and optionally tracestate headers.
+--
+-- This is a type alias, not a newtype: it deliberately shares the same
+-- wire representation as 'Headers'. Use it only for the narrow parsed
+-- trace-context projection (`traceparent` and optional `tracestate`);
+-- use 'Headers' for the full, non-lossy broker header set.
 type TraceHeaders = [(ByteString, ByteString)]
 
 -- | Normalized message envelope (Broadway.Message equivalent).
@@ -114,6 +119,22 @@ data Envelope msg = Envelope
     payload :: !msg
   }
   deriving stock (Eq, Show, Functor, Generic)
+
+-- | Construct an 'Envelope' from required fields, defaulting optional metadata.
+-- Set optional fields with record-update syntax on the result.
+mkEnvelope :: MessageId -> msg -> Envelope msg
+mkEnvelope messageId payload =
+  Envelope
+    { messageId = messageId,
+      cursor = Nothing,
+      partition = Nothing,
+      enqueuedAt = Nothing,
+      traceContext = Nothing,
+      headers = Nothing,
+      attempt = Nothing,
+      attributes = mempty,
+      payload = payload
+    }
 
 -- | Manual 'NFData' so the @attributes@ field's 'Attribute' values do
 -- not require an upstream NFData instance (which
