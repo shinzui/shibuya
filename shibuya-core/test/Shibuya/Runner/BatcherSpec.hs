@@ -6,7 +6,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Time (UTCTime (..), addUTCTime, fromGregorian)
+import Data.Word (Word64)
 import Effectful (Effect)
 import Shibuya.Batch
   ( BatchConfig (..),
@@ -61,8 +61,8 @@ partitionKeyConfig sz =
       tickInterval = Nothing
     }
 
-baseTime :: UTCTime
-baseTime = UTCTime (fromGregorian 2026 1 1) 0
+secondsToNanos :: Double -> Word64
+secondsToNanos seconds = round (seconds * 1e9)
 
 -- | Run a synthetic event list through the pure core and collect emitted batches.
 -- Events carry their own virtual time; a final flush drains the remainder so the
@@ -77,7 +77,7 @@ runEvents cfg = go emptyBatcherState
   where
     go st [] = snd (stepFlush st)
     go st ((secs, ev) : rest) =
-      let now = addUTCTime (realToFrac secs) baseTime
+      let now = secondsToNanos secs
           (st', out) = case ev of
             EvArr i k -> stepArrival cfg now (mkIng i k) st
             EvTick -> stepTick cfg now st

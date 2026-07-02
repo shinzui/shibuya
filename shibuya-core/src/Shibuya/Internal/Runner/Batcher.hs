@@ -33,28 +33,25 @@ module Shibuya.Internal.Runner.Batcher
 where
 
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Control.Concurrent.STM
-  ( TBQueue,
-    TVar,
+  ( TVar,
     atomically,
-    isEmptyTBQueue,
-    newTBQueueIO,
     newTVarIO,
     readTVar,
     readTVarIO,
     retry,
-    tryReadTBQueue,
-    writeTBQueue,
     writeTVar,
   )
-import Data.IORef (IORef, atomicModifyIORef', newIORef)
+import Control.Monad (when)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe)
-import Data.Time (diffUTCTime)
+import Data.Sequence (Seq (..), (><))
+import Data.Sequence qualified as Seq
+import Data.Word (Word64)
+import GHC.Clock (getMonotonicTimeNSec)
 import Shibuya.Batch (BatchConfig (..), BatchInfo (..), BatchKey, BatchTrigger (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..))
@@ -72,7 +69,7 @@ data Accum es msg = Accum
     -- | How many messages are buffered (== length of 'messages'). Always >= 1.
     count :: !Int,
     -- | When the first message for this key arrived (drives the timeout).
-    firstArrivalAt :: !UTCTime,
+    firstArrivalAt :: !Word64,
     -- | Partition of the first message, copied into the emitted batch info.
     partition0 :: !(Maybe Text)
   }
@@ -111,39 +108,42 @@ emitAccum key trig acc =
 -- the message fills its key's accumulator to batchSize.
 stepArrival ::
   BatchConfig es msg ->
-  UTCTime ->
+  Word64 ->
   Ingested es msg ->
   BatcherState es msg ->
   (BatcherState es msg, [ReadyBatch es msg])
 stepArrival cfg now ing (BatcherState accums) =
   let key = cfg.batchKey ing.envelope
-   in case Map.lookup key accums of
-        Nothing ->
-          let acc =
-                Accum
-                  { messages = [ing],
-                    count = 1,
-                    firstArrivalAt = now,
-                    partition0 = ing.envelope.partition
-                  }
-           in if cfg.batchSize <= 1
-                then (BatcherState (Map.delete key accums), [emitAccum key TriggerSize acc])
-                else (BatcherState (Map.insert key acc accums), [])
-        Just acc ->
-          let acc' = acc {messages = ing : acc.messages, count = acc.count + 1}
-           in if acc'.count >= cfg.batchSize
-                then (BatcherState (Map.delete key accums), [emitAccum key TriggerSize acc'])
-                else (BatcherState (Map.insert key acc' accums), [])
+      (ready, accums') = Map.alterF update key accums
+   in (BatcherState accums', ready)
+  where
+    update Nothing =
+      let acc =
+            Accum
+              { messages = [ing],
+                count = 1,
+                firstArrivalAt = now,
+                partition0 = ing.envelope.partition
+              }
+       in if cfg.batchSize <= 1
+            then ([emitAccum (cfg.batchKey ing.envelope) TriggerSize acc], Nothing)
+            else ([], Just acc)
+    update (Just acc) =
+      let key = cfg.batchKey ing.envelope
+          acc' = acc {messages = ing : acc.messages, count = acc.count + 1}
+       in if acc'.count >= cfg.batchSize
+            then ([emitAccum key TriggerSize acc'], Nothing)
+            else ([], Just acc')
 
 -- | Emit every accumulator whose timeout has elapsed as of the supplied time.
 stepTick ::
   BatchConfig es msg ->
-  UTCTime ->
+  Word64 ->
   BatcherState es msg ->
   (BatcherState es msg, [ReadyBatch es msg])
 stepTick cfg now (BatcherState accums) =
   let timedOut :: Accum es msg -> Bool
-      timedOut acc = diffUTCTime now acc.firstArrivalAt >= cfg.batchTimeout
+      timedOut acc = now >= acc.firstArrivalAt && now - acc.firstArrivalAt >= nominalToNanos cfg.batchTimeout
       (ripe, keep) = Map.partition timedOut accums
       ready = [emitAccum k TriggerTimeout acc | (k, acc) <- Map.toList ripe]
    in (BatcherState keep, ready)
@@ -155,26 +155,30 @@ stepFlush ::
 stepFlush (BatcherState accums) =
   (emptyBatcherState, [emitAccum k TriggerFlush acc | (k, acc) <- Map.toList accums])
 
--- | Run one pure step under the shared mutex, then push each emitted batch onto
--- the bounded output queue (blocking when it is full, which is how backpressure
--- propagates). Serializing state-transition + hand-off keeps a size-emit and a
--- timeout-emit for the same key from both firing (no double-emit) and preserves
--- the order in which batches reach the queue.
+-- | Run one pure step in the same STM transaction that appends emitted batches
+-- to the pending output buffer. Admission waits while the pending buffer is at
+-- capacity, so backpressure blocks without holding a separate mutex. One step
+-- may append a burst larger than the remaining capacity; the bound is therefore
+-- capacity plus one step's burst.
 emitStep ::
-  MVar () ->
-  IORef (BatcherState es msg) ->
-  TBQueue (ReadyBatch es msg) ->
+  TVar (BatcherState es msg, Seq (ReadyBatch es msg)) ->
+  Int ->
   (BatcherState es msg -> (BatcherState es msg, [ReadyBatch es msg])) ->
   IO ()
-emitStep lock stateRef outQ step =
-  withMVar lock $ \_ -> do
-    ready <- atomicModifyIORef' stateRef step
-    mapM_ (atomically . writeTBQueue outQ) ready
+emitStep stateVar capacity step =
+  atomically $ do
+    (state, pending) <- readTVar stateVar
+    when (Seq.length pending >= capacity) retry
+    let (state', ready) = step state
+    writeTVar stateVar (state', pending >< Seq.fromList ready)
 
 -- | Convert a 'NominalDiffTime' (seconds) into whole microseconds for
 -- 'threadDelay', clamped to at least 1 so a misconfiguration cannot spin.
 nominalToMicros :: NominalDiffTime -> Int
 nominalToMicros d = max 1 (round (realToFrac d * 1e6 :: Double))
+
+nominalToNanos :: NominalDiffTime -> Word64
+nominalToNanos d = round (realToFrac d * 1e9 :: Double)
 
 -- | Group a stream of individual messages into a stream of batches.
 --
@@ -191,16 +195,15 @@ runBatcher outputCapacity cfg input =
   Stream.bracketIO acquire release consume
   where
     tickMicros = nominalToMicros (fromMaybe cfg.batchTimeout cfg.tickInterval)
+    outputCapacityInt = max 1 (fromIntegral outputCapacity)
 
     acquire = do
-      lock <- newMVar ()
-      stateRef <- newIORef emptyBatcherState
-      outQ <- newTBQueueIO outputCapacity
+      stateVar <- newTVarIO (emptyBatcherState, Seq.empty)
       doneVar <- newTVarIO False
 
       let onArrival ing = do
-            now <- getCurrentTime
-            emitStep lock stateRef outQ (stepArrival cfg now ing)
+            now <- getMonotonicTimeNSec
+            emitStep stateVar outputCapacityInt (stepArrival cfg now ing)
 
           -- Consume the whole input, flush the remainder, then mark done.
           -- 'finally' guarantees doneVar is set even if the input stream throws,
@@ -210,7 +213,7 @@ runBatcher outputCapacity cfg input =
           consumer =
             ( do
                 Stream.fold Fold.drain (Stream.mapM onArrival input)
-                emitStep lock stateRef outQ stepFlush
+                emitStep stateVar outputCapacityInt stepFlush
             )
               `finally` atomically (writeTVar doneVar True)
 
@@ -220,40 +223,41 @@ runBatcher outputCapacity cfg input =
             if done
               then pure ()
               else do
-                now <- getCurrentTime
-                emitStep lock stateRef outQ (stepTick cfg now)
+                now <- getMonotonicTimeNSec
+                emitStep stateVar outputCapacityInt (stepTick cfg now)
                 tickerLoop
 
       consumerA <- async consumer
       tickerA <- async tickerLoop
-      pure (outQ, doneVar, consumerA, tickerA)
+      pure (stateVar, doneVar, consumerA, tickerA)
 
-    release (_outQ, _doneVar, consumerA, tickerA) = do
+    release (_stateVar, _doneVar, consumerA, tickerA) = do
       cancel tickerA
       cancel consumerA
 
-    consume (outQ, doneVar, consumerA, _tickerA) = drainQueue consumerA outQ doneVar
+    consume (stateVar, doneVar, consumerA, _tickerA) = drainQueue consumerA stateVar doneVar
 
 -- | Stream finished batches out of the bounded queue, ending when the consumer
 -- has flushed everything (doneVar), the queue has drained, and the consumer
 -- async is known to have completed successfully.
 drainQueue ::
   Async () ->
-  TBQueue (ReadyBatch es msg) ->
+  TVar (BatcherState es msg, Seq (ReadyBatch es msg)) ->
   TVar Bool ->
   Stream IO (ReadyBatch es msg)
-drainQueue consumerA outQ doneVar = Stream.unfoldrM step ()
+drainQueue consumerA stateVar doneVar = Stream.unfoldrM step ()
   where
     step _ = do
       drainStep <-
         atomically $ do
-          mReady <- tryReadTBQueue outQ
-          case mReady of
-            Just rb -> pure (DrainReady rb)
-            Nothing -> do
+          (state, pending) <- readTVar stateVar
+          case Seq.viewl pending of
+            rb Seq.:< rest -> do
+              writeTVar stateVar (state, rest)
+              pure (DrainReady rb)
+            Seq.EmptyL -> do
               done <- readTVar doneVar
-              qEmpty <- isEmptyTBQueue outQ
-              if done && qEmpty
+              if done
                 then pure DrainDone
                 else retry
       case drainStep of

@@ -69,9 +69,9 @@ This section must always reflect the actual current state of the work.
 - [x] 2026-07-02: M1: `cabal build all` and `cabal test shibuya-core-test` passed; benchmark re-run and before/after numbers recorded.
 - [x] 2026-07-02: M2: dummy span became a top-level constant; "zero overhead" Haddock softened; constant span attributes and the handler-started event hoisted out of the per-message path.
 - [x] 2026-07-02: M2: `cabal build all` and `cabal test shibuya-core-test` passed; tracing-disabled benchmark re-run and numbers recorded.
-- [ ] M3: `stepArrival` single-traversal via `Map.alterF`; batcher emit path restructured so no lock is held across a blocking queue write; batch timeout ticks moved to the monotonic clock.
-- [ ] M3: `maxThreads` added to both `parMapM` compositions; `BatchProcessor` decision double-lookup removed; `getAllMetricsIO`/`getProcessorMetricsIO` read TVars directly.
-- [ ] M3: tests green; benchmark re-run; numbers recorded; master plan progress boxes for EP-26 ticked.
+- [x] 2026-07-02: M3: `stepArrival` single-traversal via `Map.alterF`; batcher emit path restructured so no lock is held across a blocking queue write; batch timeout ticks moved to the monotonic clock.
+- [x] 2026-07-02: M3: `maxThreads` added to both `parMapM` compositions; `BatchProcessor` decision double-lookup removed; `getAllMetricsIO`/`getProcessorMetricsIO` read metrics handles directly.
+- [x] 2026-07-02: M3: `cabal build all` and `cabal test shibuya-core-test` passed; benchmark re-run; numbers recorded; master plan progress boxes for EP-26 ticked.
 
 
 ## Surprises & Discoveries
@@ -101,6 +101,11 @@ implementation. Provide concise evidence.
   M0 async8-noop-10000: 155 ms ± 14 ms, 71 MB allocated
   M1 async8-noop-10000: 164 ms ± 4.9 ms, 64 MB allocated
   ```
+
+- 2026-07-02: M3's explicit `maxThreads` bound preserves correctness but changes the no-op Async
+  benchmark back to roughly the M1 timing (`164 ms ± 7.3 ms`). The M2 run without the hard thread
+  bound was faster (`149 ms ± 6.7 ms`), so the final result records the semantic safety tradeoff:
+  configured concurrency is now a hard streamly thread bound, with no allocation regression.
 
 
 ## Decision Log
@@ -197,7 +202,15 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+EP-26 completed on 2026-07-02. Hot per-message metrics updates now use atomic counters sampled into
+the unchanged `ProcessorMetrics` snapshot type, and normal message completion no longer writes the
+cold metrics `TVar`. The disabled tracing path now reuses a top-level dummy span and hoists
+processor-constant span data out of `processOne`. The batcher now uses monotonic nanosecond time,
+single-traversal `Map.alterF` arrivals, and a single STM state plus pending-output buffer instead of
+holding an `MVar` across a blocking queue write. The final benchmark improved Serial no-op
+processing from `14.5 ms ± 970 μs` to `10.8 ms ± 558 μs` and allocation from 30 MB to 21 MB. Async 8
+allocation improved from 71 MB to 64 MB, but elapsed time finished at `164 ms ± 7.3 ms` because M3's
+explicit `maxThreads` bound trades scheduler freedom for the documented hard concurrency limit.
 
 
 ## Context and Orientation
@@ -629,7 +642,17 @@ fixes don't show in the per-message benchmark but must not hurt it). Tick the tw
 boxes in the master plan and set the registry row to Complete.
 
 ```text
-(To be filled at M3: paste final hot-path benchmark output.)
+M3 final:
+All
+  hot-path
+    serial-noop-10000: OK
+      10.8 ms ± 558 μs,  21 MB allocated, 2.6 KB copied, 339 MB peak memory
+    async8-noop-10000: OK
+      164  ms ± 7.3 ms,  64 MB allocated, 852 KB copied, 351 MB peak memory
+
+Validation:
+cabal build all: PASS
+cabal test shibuya-core-test: PASS, 201 examples, 0 failures
 ```
 
 

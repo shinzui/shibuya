@@ -39,7 +39,7 @@ import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
-import Data.Maybe (listToMaybe)
+import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import OpenTelemetry.Attributes (toAttribute)
@@ -178,17 +178,14 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
       results <-
         mapM
           ( \ingested -> do
-              let d =
-                    Map.findWithDefault
-                      resolvedAck.fallback
-                      ingested.envelope.messageId
-                      resolvedAck.decisions
+              let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
+                  d = fromMaybe resolvedAck.fallback explicitDecision
               finalResult <- finalizeWithRetry traceSpan ingested d
-              pure (ingested.envelope.messageId, d, finalResult)
+              pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
           )
           (NE.toList batch)
-      let decisions = [d | (_, d, _) <- results]
-          finalizeFailures = [(mid, ex) | (mid, _, Left ex) <- results]
+      let decisions = [d | (_, _, d, _) <- results]
+          finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
 
       -- Compute halt and partial-failure signals from the resolved decisions.
       let finalizationHalt =
@@ -202,8 +199,8 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
           firstHalt = finalizationHalt <|> listToMaybe [r | AckHalt r <- decisions]
           overrideFailures =
             [ ()
-            | ingested <- NE.toList batch,
-              Just d <- [Map.lookup ingested.envelope.messageId resolvedAck.decisions],
+            | (_, explicitlyNamed, d, _) <- results,
+              explicitlyNamed,
               isFailing d
             ]
           partialInc = not handlerThrew && not (null overrideFailures)

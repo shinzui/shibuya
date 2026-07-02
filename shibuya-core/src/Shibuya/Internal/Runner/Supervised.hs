@@ -520,10 +520,10 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
         partitioned n
       (_, Ahead n) ->
         Stream.fold Fold.drain $
-          StreamP.parMapM (StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
+          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
       (_, Async n) ->
         Stream.fold Fold.drain $
-          StreamP.parMapM (StreamP.maxBuffer n) processAction inboxStream
+          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer n) processAction inboxStream
 
     -- After draining, check if we halted
     maybeHalt <- readIORef haltRef

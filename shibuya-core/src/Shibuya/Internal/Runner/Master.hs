@@ -66,11 +66,7 @@ import UnliftIO (Async, async, cancel, link)
 
 -- | Messages for the master process.
 data MasterMessage
-  = -- | Get metrics for all processors
-    GetAllMetrics !(Listen MetricsMap)
-  | -- | Get metrics for a specific processor
-    GetProcessorMetrics ProcessorId !(Listen (Maybe ProcessorMetrics))
-  | -- | Register a processor's metrics handle
+  = -- | Register a processor's metrics handle
     RegisterProcessor !ProcessorId !MetricsHandle !(Listen ())
   | -- | Unregister a processor
     UnregisterProcessor !ProcessorId !(Listen ())
@@ -149,14 +145,6 @@ masterLoop state inbox = forever $ do
 -- | Handle a single master message.
 handleMessage :: MasterState -> MasterMessage -> IO ()
 handleMessage state msg = case msg of
-  GetAllMetrics respond -> do
-    handlesMap <- atomically $ readTVar state.metrics
-    metricsMap <- traverse sampleMetrics handlesMap
-    atomically $ respond metricsMap
-  GetProcessorMetrics pid respond -> do
-    handlesMap <- atomically $ readTVar state.metrics
-    result <- traverse sampleMetrics (Map.lookup pid handlesMap)
-    atomically $ respond result
   RegisterProcessor pid metricsHandle respond -> do
     atomically $ do
       modifyTVar' state.metrics $ Map.insert pid metricsHandle

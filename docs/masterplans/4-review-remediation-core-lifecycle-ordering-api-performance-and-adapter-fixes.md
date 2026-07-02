@@ -40,7 +40,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 | 23 | Fix finalize-on-exception and batch-path reliability | docs/plans/23-fix-finalize-on-exception-and-batch-path-reliability.md | EP-22 | None | Complete |
 | 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Complete |
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Complete |
-| 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | In Progress |
+| 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Complete |
 | 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Not Started |
 | 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | Not Started |
 
@@ -89,8 +89,8 @@ The bounded keyed-scheduler `pendingLimit` is defined by EP-23 as `max 2 (2 * ma
 - [x] EP-24: partition-keyed dispatch implemented for the single-message path
 - [x] EP-25: runner internals moved under `Shibuya.Internal.*`; `AppHandle`/`Master` opaque
 - [x] EP-25: dead API surface removed; `AppConfig` record with validation; umbrella module completed
-- [ ] EP-26: hot-path metrics moved to atomic counters; per-message STM transactions eliminated
-- [ ] EP-26: tracing dummy-span CAF, constant-attribute hoisting, `maxThreads` bound
+- [x] EP-26: hot-path metrics moved to atomic counters; per-message STM transactions eliminated
+- [x] EP-26: tracing dummy-span CAF, constant-attribute hoisting, `maxThreads` bound
 - [ ] EP-27: dead-letter send+delete made transactional and retry-safe
 - [ ] EP-27: ack-path retries; `AckHalt` visibility timeout configurable; config validation; prefetch removed or fixed
 - [ ] EP-28: `AckRetry` no longer stores the offset; failed messages are redelivered
