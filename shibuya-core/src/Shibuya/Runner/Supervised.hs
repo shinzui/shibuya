@@ -48,8 +48,7 @@ import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
-import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..))
-import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
@@ -58,6 +57,7 @@ import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
 import Shibuya.Runner.BatchProcessor (processBatchesUntilDrained)
 import Shibuya.Runner.Batcher (runBatcher)
+import Shibuya.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
@@ -554,53 +554,88 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
       -- Record handler start event
       addEvent traceSpan (mkEvent eventHandlerStarted [])
 
-      -- Call handler and finalize
-      result <-
+      -- Call handler and finalizer separately. A handler exception is
+      -- substituted with immediate retry so the adapter always observes a
+      -- finalization decision for an ingested message.
+      handlerResult <-
         catchAny
-          ( do
-              decision <- handler ingested
-              ingested.ack.finalize decision
-              pure (Right decision)
-          )
+          (Right <$> handler ingested)
           ( \ex -> do
               recordException traceSpan ex
-              pure $ Left $ HandlerException $ Text.pack $ show ex
+              pure (Left ex)
           )
+      let (decision, result) = case handlerResult of
+            Right d -> (d, Right d)
+            Left ex ->
+              ( AckRetry (RetryDelay 0),
+                Left $ HandlerException $ Text.pack $ show ex
+              )
+
+      when (isLeft handlerResult) $
+        addEvent traceSpan $
+          mkEvent
+            eventAckDecision
+            [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
+
+      finalizeResult <- finalizeWithRetry traceSpan ingested decision
 
       -- Record completion event and set status
-      case result of
-        Right decision -> do
-          let decisionText = showAckDecision decision
-          addEvent traceSpan $
-            mkEvent
-              eventHandlerCompleted
-              [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
-          addAttribute traceSpan attrShibuyaAckDecision decisionText
-
-          -- Set span status based on decision
-          case decision of
-            AckOk -> setStatus traceSpan OTel.Ok
-            AckRetry _ -> setStatus traceSpan OTel.Ok
-            AckDeadLetter reason ->
-              setStatus traceSpan $ OTel.Error $ showDeadLetterReason reason
-            AckHalt reason ->
-              setStatus traceSpan $ OTel.Error $ showHaltReason reason
-        Left err -> do
+      case finalizeResult of
+        Left _ -> do
           addEvent traceSpan $
             mkEvent
               eventAckDecision
-              [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
-          setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+              [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
+          setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
+        Right () -> case result of
+          Right decision' -> do
+            let decisionText = showAckDecision decision'
+            addEvent traceSpan $
+              mkEvent
+                eventHandlerCompleted
+                [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+            addAttribute traceSpan attrShibuyaAckDecision decisionText
+
+            -- Set span status based on decision
+            case decision' of
+              AckOk -> setStatus traceSpan OTel.Ok
+              AckRetry _ -> setStatus traceSpan OTel.Ok
+              AckDeadLetter reason ->
+                setStatus traceSpan $ OTel.Error $ showDeadLetterReason reason
+              AckHalt reason ->
+                setStatus traceSpan $ OTel.Error $ showHaltReason reason
+          Left err -> do
+            addEvent traceSpan $
+              mkEvent
+                eventAckDecision
+                [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+            setStatus traceSpan $ OTel.Error $ handlerErrorToText err
 
       -- Decrement in-flight and update stats
       now' <- liftIO getCurrentTime
-      liftIO $ atomically $ modifyTVar' metricsVar $ decrementAndUpdate result now'
+      liftIO $
+        atomically $
+          modifyTVar' metricsVar $
+            case finalizeResult of
+              Left _ -> decrementAndFinalizeFailure (finalizationFailureText msgIdText) now'
+              Right () -> decrementAndUpdate result now'
 
       -- Handle halt (set flag, don't throw - let stream drain)
-      case result of
-        Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
-        _ -> pure ()
+      case finalizeResult of
+        Left _ ->
+          liftIO $ atomicWriteIORef haltRef (Just (HaltFatal (finalizationFailureText msgIdText)))
+        Right () -> case result of
+          Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
+          _ -> pure ()
   where
+    isLeft :: Either a b -> Bool
+    isLeft (Left _) = True
+    isLeft (Right _) = False
+
+    finalizationFailureText :: Text -> Text
+    finalizationFailureText msgIdText =
+      "finalization failed for message id: " <> msgIdText
+
     showAckDecision :: AckDecision -> Text
     showAckDecision AckOk = "ack_ok"
     showAckDecision (AckRetry _) = "ack_retry"
@@ -643,3 +678,15 @@ decrementAndUpdate result now m =
   where
     haltReasonText (HaltOrderedStream t) = t
     haltReasonText (HaltFatal t) = t
+
+decrementAndFinalizeFailure ::
+  Text ->
+  UTCTime ->
+  ProcessorMetrics ->
+  ProcessorMetrics
+decrementAndFinalizeFailure failureText now m =
+  let newStats = incFailed m.stats
+   in m
+        { state = Failed failureText now,
+          stats = newStats
+        }

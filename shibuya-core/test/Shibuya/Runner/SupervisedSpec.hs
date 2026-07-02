@@ -7,10 +7,17 @@ import Control.Concurrent.STM (atomically, check, readTVar, readTVarIO)
 import Control.Monad (forM, forM_, replicateM)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter.Mock
+  ( getTrackedDecisions,
+    mkTrackedIngested,
+    newTrackingAck,
+    trackedListAdapter,
+  )
 import Shibuya.App
   ( ShutdownConfig (..),
     SupervisionStrategy (..),
@@ -18,8 +25,9 @@ import Shibuya.App
     runApp,
     stopAppGracefully,
   )
+import Shibuya.Batch.TestHarness (finalizedExactlyOnce)
 import Shibuya.Core (ProcessorHalt (..))
-import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
+import Shibuya.Core.Ack (AckDecision (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
@@ -462,6 +470,93 @@ spec = do
           -- Other messages (1, 3, 4, 5) should have succeeded
           let successes = [n | Right n <- results]
           length successes `shouldSatisfy` (>= 3)
+
+        it "finalizes throwing handlers with immediate retry" $ do
+          (metrics, tracked) <- runEff $ runTracingNoop $ do
+            tracking <- newTrackingAck
+            let envelopes = createTestEnvelopes 5
+                adapter = trackedListAdapter tracking envelopes
+                throwingIds = [MessageId "msg-2", MessageId "msg-4"]
+                handler ingested =
+                  if ingested.envelope.messageId `elem` throwingIds
+                    then error "handler failed for conservation test"
+                    else pure AckOk
+
+            sp <- runWithMetrics 10 (ProcessorId "handler-exception-finalize") adapter handler
+            decisions <- getTrackedDecisions tracking
+            finalMetrics <- getMetrics sp
+            pure (finalMetrics, decisions)
+
+          let expected =
+                Map.fromList
+                  [ (MessageId "msg-1", AckOk),
+                    (MessageId "msg-2", AckRetry (RetryDelay 0)),
+                    (MessageId "msg-3", AckOk),
+                    (MessageId "msg-4", AckRetry (RetryDelay 0)),
+                    (MessageId "msg-5", AckOk)
+                  ]
+          finalizedExactlyOnce tracked expected `shouldBe` Right ()
+          metrics.stats.processed `shouldBe` 3
+          metrics.stats.failed `shouldBe` 2
+
+        it "retries transient finalizer failures on the single-message path" $ do
+          (attempts, tracked) <- runEff $ runTracingNoop $ do
+            attemptsRef <- liftIO $ newIORef (0 :: Int)
+            decisionsRef <- liftIO $ newIORef ([] :: [(MessageId, AckDecision)])
+            let env = createTestEnvelope 1
+                ingested =
+                  Ingested
+                    { envelope = env,
+                      ack =
+                        AckHandle $ \decision ->
+                          liftIO $ do
+                            attempt <-
+                              atomicModifyIORef'
+                                attemptsRef
+                                (\n -> let n' = n + 1 in (n', n'))
+                            if attempt <= 2
+                              then ioError (userError "transient finalizer failure")
+                              else modifyIORef' decisionsRef ((env.messageId, decision) :),
+                      lease = Nothing
+                    }
+                adapter = testAdapter [ingested]
+
+            _sp <- runWithMetrics 10 (ProcessorId "transient-finalizer") adapter alwaysAckOk
+            attemptCount <- liftIO $ readIORef attemptsRef
+            decisions <- liftIO $ readIORef decisionsRef
+            pure (attemptCount, decisions)
+
+          attempts `shouldBe` 3
+          finalizedExactlyOnce tracked (Map.singleton (MessageId "msg-1") AckOk) `shouldBe` Right ()
+
+        it "halts loudly when finalizer retry is exhausted" $ do
+          (metrics, done, tracked) <- runEff $ runTracingNoop $ do
+            tracking <- newTrackingAck
+            let env1 = createTestEnvelope 1
+                env2 = createTestEnvelope 2
+                failing =
+                  Ingested
+                    { envelope = env1,
+                      ack = AckHandle $ \_ -> liftIO $ ioError (userError "permanent finalizer failure"),
+                      lease = Nothing
+                    }
+                trackedSecond = mkTrackedIngested tracking env2
+                adapter = testAdapter [failing, trackedSecond]
+
+            master <- startMaster IgnoreAll
+            sp <- runSupervised master 10 (ProcessorId "permanent-finalizer") (Async 2) adapter alwaysAckOk
+            liftIO $ threadDelay 700000
+            finalMetrics <- liftIO $ readTVarIO sp.metrics
+            doneState <- liftIO $ readTVarIO sp.done
+            decisions <- getTrackedDecisions tracking
+            stopMaster master
+            pure (finalMetrics, doneState, decisions)
+
+          done `shouldBe` True
+          case metrics.state of
+            Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "msg-1"
+            other -> expectationFailure $ "Expected Failed state naming msg-1, got: " ++ show other
+          finalizedExactlyOnce tracked (Map.singleton (MessageId "msg-2") AckOk) `shouldBe` Right ()
 
       describe "Metrics tracking" $ do
         it "tracks in-flight count during concurrent processing" $ do
@@ -1000,23 +1095,28 @@ spec = do
 testTime :: UTCTime
 testTime = UTCTime (fromGregorian 2026 1 1) 0
 
+createTestEnvelope :: Int -> Envelope String
+createTestEnvelope i =
+  Envelope
+    { messageId = MessageId $ "msg-" <> Text.pack (show i),
+      cursor = Just (CursorInt i),
+      partition = Nothing,
+      enqueuedAt = Just testTime,
+      traceContext = Nothing,
+      headers = Nothing,
+      attempt = Nothing,
+      attributes = HashMap.empty,
+      payload = "message-" <> show i
+    }
+
+createTestEnvelopes :: Int -> [Envelope String]
+createTestEnvelopes n = map createTestEnvelope [1 .. n]
+
 createTestMessages :: (IOE :> es) => Int -> Eff es [Ingested es String]
 createTestMessages n = mapM createMessage [1 .. n]
   where
     createMessage i = do
-      let msgId = MessageId $ "msg-" <> Text.pack (show i)
-          env =
-            Envelope
-              { messageId = msgId,
-                cursor = Just (CursorInt i),
-                partition = Nothing,
-                enqueuedAt = Just testTime,
-                traceContext = Nothing,
-                headers = Nothing,
-                attempt = Nothing,
-                attributes = HashMap.empty,
-                payload = "message-" <> show i
-              }
+      let env = createTestEnvelope i
           ackHandle = AckHandle $ \_ -> pure ()
       pure $
         Ingested
@@ -1029,19 +1129,7 @@ createTestMessages n = mapM createMessage [1 .. n]
 -- Polymorphic over effect stack for use with tracing.
 createSingleMessage :: (IOE :> es) => Int -> IO (Ingested es String)
 createSingleMessage i = do
-  let msgId = MessageId $ "msg-" <> Text.pack (show i)
-      env =
-        Envelope
-          { messageId = msgId,
-            cursor = Just (CursorInt i),
-            partition = Nothing,
-            enqueuedAt = Just testTime,
-            traceContext = Nothing,
-            headers = Nothing,
-            attempt = Nothing,
-            attributes = HashMap.empty,
-            payload = "message-" <> show i
-          }
+  let env = createTestEnvelope i
       ackHandle = AckHandle $ \_ -> pure ()
   pure $
     Ingested

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0.0 — Unreleased
+
+### Bug Fixes
+
+- Handler exceptions on the single-message runner path now finalize the message
+  with `AckRetry (RetryDelay 0)` using the same bounded finalizer retry helper
+  as batch processing, so adapters observe a disposition instead of silently
+  losing or stranding the delivery. Exhausted finalizer retry now halts the
+  processor loudly with the failed message id.
+
 ## 0.7.1.0 — 2026-06-15
 
 ### Bug Fixes

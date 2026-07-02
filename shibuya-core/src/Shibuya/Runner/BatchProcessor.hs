@@ -68,11 +68,11 @@ import Shibuya.Core.Ack
     HaltReason (..),
     RetryDelay (..),
   )
-import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
+import Shibuya.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Metrics
   ( BatchStats,
@@ -122,7 +122,6 @@ import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
 import UnliftIO (SomeException, catchAny, throwIO)
 import UnliftIO.Async (async)
-import UnliftIO.Concurrent (threadDelay)
 
 -- | Execute one emitted batch and finalize every retained message resiliently.
 --
@@ -317,31 +316,6 @@ haltReasonText (HaltFatal t) = t
 
 tshow :: (Show a) => a -> Text
 tshow = Text.pack . show
-
-finalizeRetryDelaysMicros :: [Int]
-finalizeRetryDelaysMicros = [10_000, 50_000, 250_000]
-
--- | Call a message finalizer until it succeeds or the bounded retry budget is
--- exhausted. The resolved decision is never recomputed between attempts.
-finalizeWithRetry ::
-  (IOE :> es, Tracing :> es) =>
-  OTel.Span ->
-  Ingested es msg ->
-  AckDecision ->
-  Eff es (Either SomeException ())
-finalizeWithRetry traceSpan ingested decision = go finalizeRetryDelaysMicros
-  where
-    go delays =
-      catchAny
-        (Right <$> ingested.ack.finalize decision)
-        ( \ex -> do
-            recordException traceSpan ex
-            case delays of
-              [] -> pure (Left ex)
-              delay : rest -> do
-                liftIO $ threadDelay delay
-                go rest
-        )
 
 -- | Fold the ready-batch stream, running each batch under the batch-concurrency
 -- policy. Batches with the same 'BatchKey' are always serialized in emission

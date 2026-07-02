@@ -63,12 +63,12 @@ and pass after, runnable with `cabal test shibuya-core-test` from the repository
 
 ## Progress
 
-- [ ] Verify EP-22 is complete (masterplan registry row 22 marked Complete; `Shibuya/Runner/Supervised.hs` uses `finally`-based `doneVar` writes and `waitCatch` on the ingester) and rebase this plan's file/line references onto the post-EP-22 tree.
-- [ ] M1: extract shared bounded-retry finalizer into `shibuya-core/src/Shibuya/Runner/Finalize.hs`; register the module in `shibuya-core/shibuya-core.cabal`.
-- [ ] M1: restructure `processOne` in `shibuya-core/src/Shibuya/Runner/Supervised.hs` so the handler call and the finalize call are isolated separately; handler exception substitutes `AckRetry (RetryDelay 0)`; finalize uses bounded retry; exhausted finalize retry sets the halt flag with a `HaltFatal` naming the message id.
-- [ ] M1: rewrite the Haddock contract in `shibuya-core/src/Shibuya/Core/AckHandle.hs` (remove "Must be called exactly once") and reference it from `shibuya-core/src/Shibuya/Handler.hs`.
-- [ ] M1: tests — single-message conservation with throwing handlers (exactly one finalize, decision `AckRetry (RetryDelay 0)`), transient finalize-retry success, exhausted finalize retry fails loudly with the message id.
-- [ ] M1: `cabal build all`, `cabal test shibuya-core-test`, `nix fmt`, commit with trailers.
+- [x] 2026-07-02: Verify EP-22 is complete (masterplan registry row 22 marked Complete; `Shibuya/Runner/Supervised.hs` uses `finally`-based `doneVar` writes and `waitCatch` on the ingester) and rebase this plan's file/line references onto the post-EP-22 tree.
+- [x] 2026-07-02: M1: extract shared bounded-retry finalizer into `shibuya-core/src/Shibuya/Runner/Finalize.hs`; register the module in `shibuya-core/shibuya-core.cabal`.
+- [x] 2026-07-02: M1: restructure `processOne` in `shibuya-core/src/Shibuya/Runner/Supervised.hs` so the handler call and the finalize call are isolated separately; handler exception substitutes `AckRetry (RetryDelay 0)`; finalize uses bounded retry; exhausted finalize retry sets the halt flag with a `HaltFatal` naming the message id.
+- [x] 2026-07-02: M1: rewrite the Haddock contract in `shibuya-core/src/Shibuya/Core/AckHandle.hs` (remove "Must be called exactly once") and reference it from `shibuya-core/src/Shibuya/Handler.hs`.
+- [x] 2026-07-02: M1: tests — single-message conservation with throwing handlers (exactly one finalize, decision `AckRetry (RetryDelay 0)`), transient finalize-retry success, exhausted finalize retry fails loudly with the message id.
+- [x] 2026-07-02: M1: `cabal build all`, `cabal test shibuya-core-test` (181 examples, 0 failures), `nix fmt`, commit with trailers.
 - [ ] M2: propagate batcher consumer failure in `shibuya-core/src/Shibuya/Runner/Batcher.hs` (`waitCatch` the consumer async at drain end, rethrow).
 - [ ] M2: tests — a throwing `batchKey` fails the processor loudly, no message is finalized more than once, no clean-completion report.
 - [ ] M2: build, test, format, commit with trailers.
@@ -794,3 +794,11 @@ contract wording and the M1 `AckRetry (RetryDelay 0)` substitution; EP-26 edits 
 `processOne` region afterwards and relies on M1's separation of handler isolation, decision
 resolution, and finalization; EP-25 will later move these modules under `Shibuya.Internal.*`
 and must find the contract wording already in place.
+
+
+## Revision Notes
+
+2026-07-02: Marked the EP-22 prerequisite and all M1 progress items complete after
+extracting `Shibuya.Runner.Finalize`, applying single-message finalize-on-exception
+semantics, updating the `AckHandle` and `Handler` Haddocks, adding regression tests, and
+validating with `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt`.
