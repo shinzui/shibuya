@@ -94,7 +94,7 @@ runTracing ::
   Eff es a
 runTracing t = evalStaticRep (TracingRep t True)
 
--- | Run with tracing disabled (zero overhead).
+-- | Run with tracing disabled (near-zero overhead).
 -- All tracing operations become no-ops.
 runTracingNoop ::
   (IOE :> es) =>
@@ -159,10 +159,7 @@ withSpan' ::
 withSpan' name args f = do
   TracingRep {tracer, tracingEnabled} <- getStaticRep
   if not tracingEnabled
-    then do
-      -- Create a dropped span for the callback
-      dummySpan <- liftIO mkDummySpan
-      f dummySpan
+    then f dummySpan
     else withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
       OTel.inSpan' tracer name args $ \traceSpan ->
         runInIO (f traceSpan)
@@ -292,24 +289,23 @@ withExtractedContext (Just parentCtx) action = do
 -- Internal Helpers
 --------------------------------------------------------------------------------
 
--- | Create a dummy/dropped span for use when tracing is disabled.
+-- | Shared non-recording span used when tracing is disabled.
 -- All operations on this span are no-ops.
-mkDummySpan :: IO OTel.Span
-mkDummySpan = do
-  -- Create a FrozenSpan with invalid (all-zeros) IDs
-  -- This creates a "Dropped" span that no-ops all operations
-  let dummyTraceId = case OTel.Id.bytesToTraceId (BS.replicate 16 0) of
-        Right tid -> tid
-        Left _ -> error "mkDummySpan: failed to create dummy TraceId"
-      dummySpanId = case OTel.Id.bytesToSpanId (BS.replicate 8 0) of
-        Right sid -> sid
-        Left _ -> error "mkDummySpan: failed to create dummy SpanId"
-      dummySpanContext =
-        OTel.SpanContext
-          { OTel.traceFlags = OTel.defaultTraceFlags,
-            OTel.isRemote = False,
-            OTel.traceId = dummyTraceId,
-            OTel.spanId = dummySpanId,
-            OTel.traceState = OTel.TraceState.empty
-          }
-  pure $ OTel.wrapSpanContext dummySpanContext
+dummySpan :: OTel.Span
+dummySpan = OTel.wrapSpanContext dummySpanContext
+  where
+    dummyTraceId = case OTel.Id.bytesToTraceId (BS.replicate 16 0) of
+      Right tid -> tid
+      Left _ -> error "dummySpan: failed to create dummy TraceId"
+    dummySpanId = case OTel.Id.bytesToSpanId (BS.replicate 8 0) of
+      Right sid -> sid
+      Left _ -> error "dummySpan: failed to create dummy SpanId"
+    dummySpanContext =
+      OTel.SpanContext
+        { OTel.traceFlags = OTel.defaultTraceFlags,
+          OTel.isRemote = False,
+          OTel.traceId = dummyTraceId,
+          OTel.spanId = dummySpanId,
+          OTel.traceState = OTel.TraceState.empty
+        }
+{-# NOINLINE dummySpan #-}

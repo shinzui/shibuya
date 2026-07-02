@@ -47,7 +47,7 @@ import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
-import OpenTelemetry.Attributes (toAttribute)
+import OpenTelemetry.Attributes (Attribute, toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
@@ -490,10 +490,18 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
         Serial -> 1
         Ahead n -> n
         Async n -> n
+      ProcessorId pidText = procId
+      spanName = processSpanName pidText
+      constantFrameworkAttrs =
+        HashMap.fromList
+          [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
+            (attrMessagingDestinationName, toAttribute pidText),
+            (attrMessagingOperation, toAttribute ("process" :: Text))
+          ]
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar haltRef
-        processAction = runInIO . processOne metricsHandle procId maxConc haltRef handler
+        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -523,24 +531,28 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
       Just reason -> throwIO $ ProcessorHalt reason
       Nothing -> pure ()
 
+handlerStartedEvent :: OTel.NewEvent
+handlerStartedEvent = mkEvent eventHandlerStarted []
+{-# NOINLINE handlerStartedEvent #-}
+
 -- | Process a single message with metrics tracking and tracing.
 -- Thread-safe for concurrent execution.
 processOne ::
   (IOE :> es, Tracing :> es) =>
   MetricsHandle ->
-  ProcessorId ->
+  Text ->
+  HashMap.HashMap Text Attribute ->
   Int ->
   IORef (Maybe HaltReason) ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsHandle procId maxConc haltRef handler ingested = do
+processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
-      ProcessorId pidText = procId
 
   withExtractedContext parentCtx $
-    withSpan' (processSpanName pidText) consumerSpanArgs $ \traceSpan -> do
+    withSpan' spanName consumerSpanArgs $ \traceSpan -> do
       -- Build the messaging.* attribute set: framework defaults first,
       -- then the adapter's HashMap layered on top so adapter keys with
       -- the same name override the framework's default. The explicit
@@ -550,15 +562,10 @@ processOne metricsHandle procId maxConc haltRef handler ingested = do
       -- against the underlying mutable Span.
       let MessageId msgIdText = ingested.envelope.messageId
           frameworkAttrs =
-            HashMap.fromList $
-              [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
-                (attrMessagingDestinationName, toAttribute pidText),
-                (attrMessagingOperation, toAttribute ("process" :: Text)),
-                (attrMessagingMessageId, toAttribute msgIdText)
-              ]
-                <> case ingested.envelope.partition of
-                  Just p -> [(attrShibuyaPartition, toAttribute p)]
-                  Nothing -> []
+            HashMap.insert attrMessagingMessageId (toAttribute msgIdText) $
+              case ingested.envelope.partition of
+                Just p -> HashMap.insert attrShibuyaPartition (toAttribute p) constantFrameworkAttrs
+                Nothing -> constantFrameworkAttrs
           mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
       addAttributes traceSpan mergedAttrs
 
@@ -569,7 +576,7 @@ processOne metricsHandle procId maxConc haltRef handler ingested = do
       addAttribute traceSpan attrShibuyaInflightMax maxConc
 
       -- Record handler start event
-      addEvent traceSpan (mkEvent eventHandlerStarted [])
+      addEvent traceSpan handlerStartedEvent
 
       -- Call handler and finalizer separately. A handler exception is
       -- substituted with immediate retry so the adapter always observes a

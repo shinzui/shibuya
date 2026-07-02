@@ -67,8 +67,8 @@ This section must always reflect the actual current state of the work.
 - [x] 2026-07-02: M1: rewrote `runIngesterWithMetrics`, `processOne`, and the batch-path metrics sites to use counters; normal completions no longer write the cold metrics `TVar`.
 - [x] 2026-07-02: M1: threaded `MetricsHandle` through `Supervised.hs`, `Master.hs`, `BatchProcessor.hs`, and updated tests that read `sp.metrics` directly.
 - [x] 2026-07-02: M1: `cabal build all` and `cabal test shibuya-core-test` passed; benchmark re-run and before/after numbers recorded.
-- [ ] M2: dummy span becomes a top-level constant; "zero overhead" Haddock softened; constant span attributes and the handler-started event hoisted out of the per-message path.
-- [ ] M2: tests green; tracing-disabled benchmark re-run; numbers recorded.
+- [x] 2026-07-02: M2: dummy span became a top-level constant; "zero overhead" Haddock softened; constant span attributes and the handler-started event hoisted out of the per-message path.
+- [x] 2026-07-02: M2: `cabal build all` and `cabal test shibuya-core-test` passed; tracing-disabled benchmark re-run and numbers recorded.
 - [ ] M3: `stepArrival` single-traversal via `Map.alterF`; batcher emit path restructured so no lock is held across a blocking queue write; batch timeout ticks moved to the monotonic clock.
 - [ ] M3: `maxThreads` added to both `parMapM` compositions; `BatchProcessor` decision double-lookup removed; `getAllMetricsIO`/`getProcessorMetricsIO` read TVars directly.
 - [ ] M3: tests green; benchmark re-run; numbers recorded; master plan progress boxes for EP-26 ticked.
@@ -538,7 +538,17 @@ enabled-mode spans still carry the same attribute set with the same precedence; 
 direction: a further, smaller improvement than M1 (allocation removal, not contention removal).
 
 ```text
-(To be filled at M2: paste hot-path benchmark output after the change.)
+M2 after tracing-disabled constants:
+All
+  hot-path
+    serial-noop-10000: OK
+      10.6 ms ± 801 μs,  21 MB allocated, 2.7 KB copied, 339 MB peak memory
+    async8-noop-10000: OK
+      149  ms ± 6.7 ms,  63 MB allocated, 831 KB copied, 350 MB peak memory
+
+Validation:
+cabal build all: PASS
+cabal test shibuya-core-test: PASS, 201 examples, 0 failures
 ```
 
 
