@@ -41,7 +41,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 | 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Complete |
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Complete |
 | 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Complete |
-| 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Not Started |
+| 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Complete |
 | 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -91,8 +91,8 @@ The bounded keyed-scheduler `pendingLimit` is defined by EP-23 as `max 2 (2 * ma
 - [x] EP-25: dead API surface removed; `AppConfig` record with validation; umbrella module completed
 - [x] EP-26: hot-path metrics moved to atomic counters; per-message STM transactions eliminated
 - [x] EP-26: tracing dummy-span CAF, constant-attribute hoisting, `maxThreads` bound
-- [ ] EP-27: dead-letter send+delete made transactional and retry-safe
-- [ ] EP-27: ack-path retries; `AckHalt` visibility timeout configurable; config validation; prefetch removed or fixed
+- [x] EP-27: dead-letter send+delete made transactional and retry-safe
+- [x] EP-27: ack-path retries; `AckHalt` visibility timeout configurable; config validation; prefetch removed or fixed
 - [ ] EP-28: `AckRetry` no longer stores the offset; failed messages are redelivered
 - [ ] EP-28: shutdown fixed (no-offset commit tolerated, poll-aware stream termination)
 - [ ] EP-28: ack-path Kafka errors classified; Serial-only constraint enforced and documented
@@ -109,6 +109,7 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 - The naive "one STM transaction" fix for the batcher's MVar-across-blocking-write issue deadlocks when a tick emits more batches than remaining queue capacity — EP-26 prescribes a state + pending-`Seq` `TVar` with admission control instead.
 - `PolicySpec.hs` currently asserts the buggy behavior ("allows Ahead/Async" for `PartitionedInOrder`) and `docs/architecture/CONCURRENCY.md` documents the wrong support matrix — EP-24 fixes both alongside the code.
 - EP-24's `shibuya-core` 0.8.0.0 version bump required a coordinated `shibuya-metrics` 0.8.0.0 bump and `shibuya-core ^>=0.8.0.0` dependency bound update; otherwise workspace-level `cabal build all` and even targeted `cabal test shibuya-core-test` could not solve dependencies because Cabal considered `shibuya-metrics` a user goal in the project.
+- EP-27's adapter version bump to `shibuya-pgmq-adapter` 0.9.0.0 exposed that parallel Cabal invocations in the same worktree can corrupt or split `dist-newstyle` build plans after a package-version change. A serial `cabal clean`, `cabal build all`, then `just test` produced a clean plan and green validation. Future adapter validation should avoid parallel Cabal commands against the same `dist-newstyle`.
 
 
 ## Decision Log

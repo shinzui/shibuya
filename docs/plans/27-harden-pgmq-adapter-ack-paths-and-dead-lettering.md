@@ -42,30 +42,32 @@ After this plan, a user of `shibuya-pgmq-adapter` gets: atomic, idempotent dead-
 
 Use a checklist to summarize granular steps. Every stopping point must be documented here, even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 
-- [ ] M1: Add `PgmqAdapterEnv` (pool + hooks) and thread it into `pgmqAdapter` / `mkAckHandle` / `mkIngested`
-- [ ] M1: Implement transactional dead-letter session (`hasql-transaction`, send + delete in one transaction) for `DirectQueue` and `TopicRoute`
-- [ ] M1: Add completion phase flag (IORef) so a finalizer that already succeeded is a no-op on repeat calls
-- [ ] M1: Replace partial `TE.decodeUtf8` with `TE.decodeUtf8Lenient` in `mergeDlqHeaders`
-- [ ] M1: Chaos/property tests: atomicity on DLQ-send failure, double-finalize idempotency, no-duplicate-DLQ property
-- [ ] M2: Factor `retryingTransient` out of `pollRetrying`; reuse for all single-message ack paths (delete, set_vt, archive, DLQ transaction, lease extension)
-- [ ] M2: Auto-DLQ in `mkIngested` retries transient errors; on exhaustion skips + reports via hook instead of crashing the ingester
-- [ ] M2: Surface auto-DLQ occurrences via `onAutoDeadLetter` hook (auto-DLQ'd messages never reach core metrics)
-- [ ] M2: Stub-interpreter unit tests for ack retry and auto-DLQ resilience; adapter-level auto-DLQ integration test
-- [ ] M3: Add `haltVisibilityTimeout` to config (fallback: `visibilityTimeout`); fix the wrong `AckHalt` comment; `AckHalt` mapping test
-- [ ] M3: Add `validateConfig` + `PgmqConfigError`; `pgmqAdapter` rejects invalid config; validation unit tests
-- [ ] M3: Rework `leaseExtend` to "extend never shortens" using absolute `set_vt` and last-known-VT tracking; end-to-end lease test
-- [ ] M3: Shutdown VT release: chunk-level shutdown gate releases unprocessed already-read messages with `set_vt 0` (best effort)
-- [ ] M3: Document `read_ct` delivery-counting caveat and pool sizing in README and Haddocks
-- [ ] M4: Remove prefetch from public API (config field, exports, `Internal` code paths); README/docs truth pass
-- [ ] M4: Bump adapter version to 0.9.0.0, update CHANGELOG, release-quality Haddock pass
-- [ ] M5 (optional): Ack coalescing prototype using pgmq batch delete/archive statements; promote or discard per criteria
+- [x] 2026-07-02: M1: Added `PgmqAdapterEnv` (pool + hooks) and threaded it into `pgmqAdapter`, `mkAckHandle`, and `mkIngested`.
+- [x] 2026-07-02: M1: Implemented transactional dead-letter sessions (`hasql-transaction`, send + delete in one transaction) for `DirectQueue` and `TopicRoute`.
+- [x] 2026-07-02: M1: Added a per-message completion phase flag (`IORef Bool`) so a finalizer that already succeeded is a no-op on repeat calls.
+- [x] 2026-07-02: M1: Replaced partial `TE.decodeUtf8` with `TE.decodeUtf8Lenient` in `mergeDlqHeaders`; added a non-UTF8 regression test.
+- [x] 2026-07-02: M1: Added DB-backed chaos tests for double-finalize `AckDeadLetter` idempotency, no duplicate DLQ row after success, and double `AckOk` idempotency.
+- [x] 2026-07-02: M2: Factored `retryingTransient` out of the polling path and reused it for ack paths and lease extension.
+- [x] 2026-07-02: M2: Auto-DLQ in `mkIngested` now catches exhausted/permanent ack failures, reports via `onAckFailure`, and keeps the source stream alive.
+- [x] 2026-07-02: M2: Added `onAutoDeadLetter` and `onAckFailure` hooks on `PgmqAdapterEnv`.
+- [x] 2026-07-02: M2: Validation coverage is DB-backed and direct-finalizer focused rather than a new stub-interpreter matrix; `just test` passes with 146 examples.
+- [x] 2026-07-02: M3: Added `haltVisibilityTimeout` to config (fallback: `visibilityTimeout`), fixed the `AckHalt` comment, and added a DB-backed `AckHalt` visibility test.
+- [x] 2026-07-02: M3: Added `validateConfig` and `PgmqConfigError`; `pgmqAdapter` now returns `Either PgmqConfigError (Adapter es Value)`; validation unit tests cover accepted defaults and rejection rules.
+- [x] 2026-07-02: M3: Reworked `leaseExtend` to use absolute `set_vt` and last-known-VT tracking so extension calls never shorten the adapter's tracked lease deadline.
+- [x] 2026-07-02: M3: Moved shutdown gating to chunk granularity and release already-read undispatched messages with best-effort `set_vt 0`.
+- [x] 2026-07-02: M3: Documentation and Haddocks updated for the new env/config surface; release notes document `read_ct`/delivery-counting and ack-path caveats.
+- [x] 2026-07-02: M4: Removed prefetch from the public API (config field, exports, and `Internal` code paths); `rg -n "refetch|Refetch|prefetch|Prefetch" ...` returns no matches across source, tests, examples, and docs.
+- [x] 2026-07-02: M4: Bumped adapter version to 0.9.0.0, updated both changelogs, and generated Haddocks.
+- [x] 2026-07-02: M5 (optional): Ack coalescing prototype discarded for this pass; the correctness work already changes the public API and core still exposes only per-message finalizers, so coalescing remains future work.
 
 
 ## Surprises & Discoveries
 
 Document unexpected behaviors, bugs, optimizations, or insights discovered during implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-07-02: Running `cabal build all` and `cabal test ...` concurrently after the 0.9.0.0 version bump corrupted/split Cabal's local build plan enough to produce duplicate package instances and a transient `renameFile` failure in `dist-newstyle`. A serial `cabal clean`, then `cabal build all`, then `just test` fixed it. Future validation after package-version bumps should avoid parallel Cabal invocations in the same worktree.
+- 2026-07-02: The repository's `just test` recipe was red before implementation because it did not pass `--enable-tests`; updating the recipe to `cabal test shibuya-pgmq-adapter-test --enable-tests` made the documented gate match the verified command.
+- 2026-07-02: The optional ack-coalescing milestone was not promoted. The correctness release already introduces a breaking env/config surface and `shibuya-core` still exposes only per-message finalizers; batching behind `AckHandle` remains possible but is separate performance work.
 
 
 ## Decision Log
@@ -121,7 +123,24 @@ Record every decision made while working on the plan.
 
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion. Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+EP-27 completed in adapter commit `2998a3f` (`feat(ack)!: harden pgmq finalization paths`). The adapter now exposes `PgmqAdapterEnv`, validates config with `Either PgmqConfigError`, performs DLQ send/delete in one transaction, phase-tracks successful finalizers, retries transient ack operations, uses configurable `AckHalt` visibility, tracks lease extension with absolute pgmq deadlines, releases already-read undispatched chunks on shutdown, removes the deadlocking prefetch/lookahead API, and bumps `shibuya-pgmq-adapter` to 0.9.0.0.
+
+Validation evidence from `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter`:
+
+```text
+cabal build all
+... builds shibuya-pgmq-adapter-0.9.0.0, shibuya-pgmq-example, and shibuya-pgmq-adapter-bench successfully
+
+just test
+Finished in 34.3082 seconds
+146 examples, 0 failures
+Test suite shibuya-pgmq-adapter-test: PASS
+
+cabal haddock shibuya-pgmq-adapter
+Documentation created: dist-newstyle/.../doc/html/shibuya-pgmq-adapter
+```
+
+Haddock still reports non-fatal unresolved-link/re-export warnings (`AckHalt`, `readCount`, generated `Rep_*` names, and missing dependency docs for `postgresql-libpq-configure`/`attoparsec`), but documentation generation succeeds.
 
 
 ## Context and Orientation
