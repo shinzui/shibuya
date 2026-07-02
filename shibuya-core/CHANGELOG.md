@@ -2,6 +2,22 @@
 
 ## 0.8.0.0 — Unreleased
 
+### Breaking Changes
+
+- `Shibuya.Runner.Supervised.runSupervised` now takes the `Ordering` policy
+  before `Concurrency`.
+- `BatchingProcessor` now rejects `PartitionedInOrder` combined with `Ahead`
+  or `Async`, because batches are scheduled by `BatchKey`, not
+  `Envelope.partition`.
+
+### New Features
+
+- `PartitionedInOrder` with `Ahead` or `Async` is now enforced for
+  single-message processors. Messages sharing an `Envelope.partition` key are
+  processed and acknowledged in arrival order, distinct partitions run
+  concurrently up to the configured bound, and messages with no partition key
+  are unconstrained.
+
 ### Bug Fixes
 
 - Handler exceptions on the single-message runner path now finalize the message
@@ -18,6 +34,11 @@
 - The keyed batch scheduler now keeps its pending queue bounded and owns its
   reader and worker threads with structured cleanup, preventing unbounded pulls
   under slow handlers and preventing finalization after forced shutdown returns.
+
+### Other Changes
+
+- Corrected `Ahead` documentation. It preserves stream-yield order only;
+  handler execution and acknowledgement may complete in any order.
 
 ## 0.7.1.0 — 2026-06-15
 

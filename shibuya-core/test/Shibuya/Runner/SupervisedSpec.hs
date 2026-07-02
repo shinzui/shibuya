@@ -32,7 +32,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Master
   ( getAllMetrics,
     getAllMetricsIO,
@@ -216,7 +216,7 @@ spec = do
           master <- startMaster IgnoreAll
 
           -- runSupervised catches ProcessorHalt, so we can check metrics
-          sp <- runSupervised master 10 (ProcessorId "halt-metrics") Serial adapter handler
+          sp <- runSupervised master 10 (ProcessorId "halt-metrics") Unordered Serial adapter handler
 
           -- Wait for processor to halt
           liftIO $ threadDelay 100000 -- 100ms
@@ -254,8 +254,8 @@ spec = do
 
           master <- startMaster IgnoreAll
 
-          _spA <- runSupervised master 10 (ProcessorId "A") Serial adapterA handlerA
-          _spB <- runSupervised master 10 (ProcessorId "B") Serial adapterB handlerB
+          _spA <- runSupervised master 10 (ProcessorId "A") Unordered Serial adapterA handlerA
+          _spB <- runSupervised master 10 (ProcessorId "B") Unordered Serial adapterB handlerB
 
           -- Wait for both to complete
           liftIO $ threadDelay 500000 -- 500ms
@@ -285,7 +285,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 10 (ProcessorId "ahead") (Ahead 3) adapter handler
+            _ <- runSupervised master 10 (ProcessorId "ahead") Unordered (Ahead 3) adapter handler
 
             -- Wait for completion
             liftIO $ threadDelay 300000 -- 300ms
@@ -318,7 +318,7 @@ spec = do
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
             -- Use Ahead with max 3 concurrent
-            _sp <- runSupervised master 10 (ProcessorId "ahead-limit") (Ahead 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "ahead-limit") Unordered (Ahead 3) adapter handler
 
             liftIO $ threadDelay 1000000 -- 1s to let it complete
             stopMaster master
@@ -341,7 +341,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 10 (ProcessorId "async") (Async 5) adapter handler
+            _ <- runSupervised master 10 (ProcessorId "async") Unordered (Async 5) adapter handler
 
             -- Wait for completion
             liftIO $ threadDelay 300000 -- 300ms
@@ -368,7 +368,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _sp <- runSupervised master 10 (ProcessorId "async-limit") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "async-limit") Unordered (Async 3) adapter handler
 
             liftIO $ threadDelay 1000000 -- 1s
             stopMaster master
@@ -397,7 +397,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _sp <- runSupervised master 10 (ProcessorId "halt-concurrent") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "halt-concurrent") Unordered (Async 3) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -425,7 +425,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _sp <- runSupervised master 10 (ProcessorId "halt-stop-read") (Async 3) adapter handler
+            _sp <- runSupervised master 10 (ProcessorId "halt-stop-read") Unordered (Async 3) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -458,7 +458,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 10 (ProcessorId "error-handling") (Async 3) adapter handler
+            _ <- runSupervised master 10 (ProcessorId "error-handling") Unordered (Async 3) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -544,7 +544,7 @@ spec = do
                 adapter = testAdapter [failing, trackedSecond]
 
             master <- startMaster IgnoreAll
-            sp <- runSupervised master 10 (ProcessorId "permanent-finalizer") (Async 2) adapter alwaysAckOk
+            sp <- runSupervised master 10 (ProcessorId "permanent-finalizer") Unordered (Async 2) adapter alwaysAckOk
             liftIO $ threadDelay 700000
             finalMetrics <- liftIO $ readTVarIO sp.metrics
             doneState <- liftIO $ readTVarIO sp.done
@@ -571,7 +571,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 10 (ProcessorId "metrics-test") (Async 3) adapter handler
+            sp <- runSupervised master 10 (ProcessorId "metrics-test") Unordered (Async 3) adapter handler
 
             -- Check metrics while processing
             liftIO $ do
@@ -598,7 +598,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            sp <- runSupervised master 10 (ProcessorId "max-conc") (Ahead 7) adapter handler
+            sp <- runSupervised master 10 (ProcessorId "max-conc") Unordered (Ahead 7) adapter handler
 
             -- Check metrics while processing
             result <- liftIO $ do
@@ -637,7 +637,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 10 (ProcessorId "ahead-order") (Ahead 5) adapter handler
+            _ <- runSupervised master 10 (ProcessorId "ahead-order") Unordered (Ahead 5) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -680,7 +680,7 @@ spec = do
                         pure AckOk
 
                   master <- startMaster IgnoreGraceful
-                  sp <- runSupervised master 10 (ProcessorId "failing-adapter") Serial adapter handler
+                  sp <- runSupervised master 10 (ProcessorId "failing-adapter") Unordered Serial adapter handler
                   liftIO $ atomicWriteIORef spRef (Just sp)
 
                   -- Wait for the linked ingester failure to reach this thread.
@@ -738,7 +738,7 @@ spec = do
                         pure AckOk
 
                   master <- startMaster IgnoreAll
-                  sp <- runSupervised master 10 (ProcessorId "failing-adapter-ignore") Serial adapter handler
+                  sp <- runSupervised master 10 (ProcessorId "failing-adapter-ignore") Unordered Serial adapter handler
                   liftIO $ atomicWriteIORef spRef (Just sp)
 
                   liftIO $ threadDelay 200000 -- 200ms
@@ -779,7 +779,7 @@ spec = do
                   handler _ = pure AckOk
 
               master <- startMaster IgnoreAll
-              sp <- runSupervised master 10 (ProcessorId $ "failing-immediate-" <> Text.pack (show i)) Serial adapter handler
+              sp <- runSupervised master 10 (ProcessorId $ "failing-immediate-" <> Text.pack (show i)) Unordered Serial adapter handler
 
               doneResult <-
                 liftIO $
@@ -807,7 +807,7 @@ spec = do
             let adapter = testAdapter messages
                 handler _ = pure AckOk
 
-            sp <- runSupervised master 10 (ProcessorId "rapid") Serial adapter handler
+            sp <- runSupervised master 10 (ProcessorId "rapid") Unordered Serial adapter handler
 
             -- Minimal wait
             liftIO $ threadDelay 10000 -- 10ms
@@ -834,7 +834,7 @@ spec = do
                     liftIO $ atomicModifyIORef' countRef (\n -> (n + 1, ()))
                     liftIO $ threadDelay 5000 -- 5ms
                     pure AckOk
-              runSupervised master 10 (ProcessorId $ "concurrent-" <> Text.pack (show i)) Serial adapter handler
+              runSupervised master 10 (ProcessorId $ "concurrent-" <> Text.pack (show i)) Unordered Serial adapter handler
 
             -- Wait briefly then stop
             liftIO $ threadDelay 100000 -- 100ms
@@ -887,8 +887,8 @@ spec = do
                   -- Use the NQE strategy backing StopAllOnFailure.
                   master <- startMaster IgnoreGraceful
 
-                  _spA <- runSupervised master 10 (ProcessorId "killall-A") Serial adapterA handlerA
-                  _spB <- runSupervised master 10 (ProcessorId "killall-B") Serial adapterB handlerB
+                  _spA <- runSupervised master 10 (ProcessorId "killall-A") Unordered Serial adapterA handlerA
+                  _spB <- runSupervised master 10 (ProcessorId "killall-B") Unordered Serial adapterB handlerB
 
                   -- Wait for A to fail and trigger KillAll
                   liftIO $ threadDelay 500000 -- 500ms
@@ -933,7 +933,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 10 (ProcessorId "multi-halt") (Async 5) adapter handler
+            _ <- runSupervised master 10 (ProcessorId "multi-halt") Unordered (Async 5) adapter handler
 
             liftIO $ threadDelay 500000 -- 500ms
             stopMaster master
@@ -960,7 +960,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _sp <- runSupervised master 100 (ProcessorId "load-test") (Async 10) adapter handler
+            _sp <- runSupervised master 100 (ProcessorId "load-test") Unordered (Async 10) adapter handler
 
             -- Wait for completion
             liftIO $ threadDelay 2000000 -- 2s
@@ -991,7 +991,7 @@ spec = do
 
             master <- startMaster IgnoreAll
             let adapter = testAdapter messages
-            _ <- runSupervised master 50 (ProcessorId "mixed-load") (Async 5) adapter handler
+            _ <- runSupervised master 50 (ProcessorId "mixed-load") Unordered (Async 5) adapter handler
 
             liftIO $ threadDelay 1000000 -- 1s
             stopMaster master

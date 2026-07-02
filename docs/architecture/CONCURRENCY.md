@@ -156,7 +156,7 @@ Shibuya defines three handler concurrency modes in `Policy.hs`:
 ```haskell
 data Concurrency
   = Serial       -- Process one message at a time
-  | Ahead !Int   -- Prefetch N, process in order
+  | Ahead !Int   -- Process N concurrently, yield stream results in input order
   | Async !Int   -- Process N concurrently
 ```
 
@@ -204,18 +204,20 @@ All three modes are fully implemented and can be configured per `QueueProcessor`
 │        [done] [done] [done]  ← Results buffered             │
 │           │                                                  │
 │           ▼                                                  │
-│        Output: msg1, msg2, msg3  ← In original order        │
+│        Stream yield: msg1, msg2, msg3  ← In original order  │
 │                                                              │
-│  Output order: msg1, msg2, msg3, msg4, msg5                 │
-│  Guaranteed: Input order = Output order                      │
+│  Handler/ack order: completion order                         │
+│  NOT guaranteed: ordered side effects or ordered acks         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Semantics:**
-- Prefetch N messages, process handlers concurrently
-- **Output order preserved** (like Streamly's `ordered True`)
+- Process up to N messages concurrently
+- Stream results are yielded downstream in input order (Streamly `ordered True`)
+- Handler execution and acknowledgement (`finalize`) run concurrently and may complete in any order
+- Shibuya discards the per-message stream result, so this ordering is not observable as ordered side effects or ordered acks
 - Better throughput than Serial for I/O-bound handlers
-- Use case: When order matters but handlers are slow
+- Use case: When downstream stream-yield order matters but handler side effects do not require ordering
 
 **Implementation:**
 Uses Streamly's `parMapM (maxBuffer n . ordered True)` internally.
@@ -225,7 +227,7 @@ Uses Streamly's `parMapM (maxBuffer n . ordered True)` internally.
 QueueProcessor
   { adapter     = myAdapter
   , handler     = myHandler
-  , ordering    = PartitionedInOrder
+  , ordering    = Unordered
   , concurrency = Ahead 3
   }
 ```
@@ -301,7 +303,7 @@ Certain combinations are invalid and will be rejected by `runApp`:
 | Unordered | ✅ | ✅ | ✅ |
 
 `StrictInOrder` requires `Serial` because it demands exact ordering.
-`PartitionedInOrder` allows all concurrency modes since ordering is per-partition.
+`PartitionedInOrder` allows all concurrency modes for single-message processors. With `Ahead n` and `Async n`, Shibuya uses a keyed scheduler: messages with the same `Envelope.partition` key are processed and acknowledged in arrival order, while different partitions run concurrently up to the global bound `n`. Messages with `partition = Nothing` are unconstrained. `BatchingProcessor` rejects `PartitionedInOrder` with `Ahead` or `Async` because batches are scheduled by `BatchKey`, not by `Envelope.partition`.
 `Unordered` allows all concurrency modes since there are no ordering guarantees.
 
 **Validation is enforced at startup:**
@@ -387,19 +389,31 @@ processUntilDrained metricsVar concurrency handler inbox streamDoneVar = do
   let inboxStream = inboxToStream inbox streamDoneVar haltRef
       processAction = processOne metricsVar maxConc haltRef handler
 
-  case concurrency of
-    Serial ->
+  case (ordering, concurrency) of
+    (_, Serial) ->
       Stream.fold Fold.drain $
         Stream.mapM processAction inboxStream
 
-    Ahead n ->
+    (PartitionedInOrder, Ahead n) ->
+      runKeyedScheduler n (2 * n) (.envelope.partition) processAction inboxStream
+
+    (PartitionedInOrder, Async n) ->
+      runKeyedScheduler n (2 * n) (.envelope.partition) processAction inboxStream
+
+    (_, Ahead n) ->
       Stream.fold Fold.drain $
         StreamP.parMapM (StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
 
-    Async n ->
+    (_, Async n) ->
       Stream.fold Fold.drain $
         StreamP.parMapM (StreamP.maxBuffer n) processAction inboxStream
 ```
+
+### Partition-Keyed Dispatch
+
+For `QueueProcessor` with `PartitionedInOrder` and a concurrent mode, the runner uses an internal bounded keyed scheduler. The scheduler reads messages in inbox order, starts at most N handlers at a time, and never starts a second message for a `Just partition` key while an earlier message for that key is active. It may skip over blocked keys to start work for other partitions, so one slow partition does not block unrelated partitions. Messages whose partition is `Nothing` do not enter the active-key set and can run freely subject to the global bound.
+
+`Ahead n` and `Async n` are equivalent under `PartitionedInOrder`: both use per-partition FIFO dispatch with a global bound. The usual `Ahead` stream-yield ordering is not observable because Shibuya drains `()` results and the relevant observable effects are handler side effects and finalization.
 
 ### In-Flight Tracking
 
@@ -424,9 +438,9 @@ When a handler returns `AckHalt`:
 
 ## Future Work
 
-1. **Ack ordering**: With Async, acks may complete out of order. Adapters should be aware of this.
+1. **Ack ordering**: With `Unordered` plus concurrent modes, acks may complete out of order. Adapters should be aware of this.
 
-2. **Per-partition concurrency**: For `PartitionedInOrder`, implement per-partition processing with concurrent partitions.
+2. **Batch partition ordering**: `BatchingProcessor` still rejects `PartitionedInOrder` with concurrent modes because batch scheduling is keyed by `BatchKey`, not by `Envelope.partition`.
 
 3. **Restart semantics**: Add one-for-one restart capability to recover individual failed processors.
 

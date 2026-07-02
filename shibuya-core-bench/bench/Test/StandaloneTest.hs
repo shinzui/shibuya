@@ -17,7 +17,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (runSupervised)
@@ -70,7 +70,7 @@ runWithConcurrency concurrency mkHandler n = do
               shutdown = pure ()
             }
     master <- startMaster IgnoreAll
-    _ <- runSupervised master 100 (ProcessorId "test") concurrency adapter handler
+    _ <- runSupervised master 100 (ProcessorId "test") Unordered concurrency adapter handler
     liftIO $ waitForCount counterRef n
     stopMaster master
     liftIO $ readIORef counterRef

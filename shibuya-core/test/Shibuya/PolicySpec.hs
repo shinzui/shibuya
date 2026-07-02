@@ -63,7 +63,32 @@ spec = do
       it "allows Async" $ do
         validatePolicy Unordered (Async 10) `shouldBe` Right ()
 
+    describe "validatePolicy matrix" $ do
+      let ok = True
+          rejected = False
+          cases =
+            [ (StrictInOrder, Serial, ok),
+              (StrictInOrder, Ahead 4, rejected),
+              (StrictInOrder, Async 4, rejected),
+              (PartitionedInOrder, Serial, ok),
+              (PartitionedInOrder, Ahead 4, ok),
+              (PartitionedInOrder, Async 4, ok),
+              (Unordered, Serial, ok),
+              (Unordered, Ahead 4, ok),
+              (Unordered, Async 4, ok)
+            ]
+      mapM_
+        ( \(ordering, concurrency, expected) ->
+            it (show ordering <> " + " <> show concurrency) $
+              isRight (validatePolicy ordering concurrency) `shouldBe` expected
+        )
+        cases
+
 -- Helper
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True
 isLeft (Right _) = False
+
+isRight :: Either a b -> Bool
+isRight (Right _) = True
+isRight (Left _) = False

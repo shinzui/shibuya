@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.0.0 — Unreleased
+
+### Breaking Changes
+
+- `shibuya-core`: `Shibuya.Runner.Supervised.runSupervised` now takes the
+  `Ordering` policy before `Concurrency`.
+- `shibuya-core`: batching processors now reject `PartitionedInOrder`
+  combined with `Ahead` or `Async`, because batches are scheduled by
+  `BatchKey`, not `Envelope.partition`.
+
+### New Features
+
+- `shibuya-core`: `PartitionedInOrder` with `Ahead` or `Async` is now
+  enforced for single-message processors. Messages sharing an
+  `Envelope.partition` key are processed and acknowledged in arrival order,
+  distinct partitions run concurrently up to the configured bound, and
+  messages with no partition key are unconstrained.
+
+### Other Changes
+
+- `shibuya-core`: corrected `Ahead` documentation. It preserves stream-yield
+  order only; handler execution and acknowledgement may complete in any order.
+- `shibuya-metrics`: version bumped to track `shibuya-core` 0.8.0.0. No
+  user-visible changes to `shibuya-metrics` itself.
+
 ## 0.7.1.0 — 2026-06-15
 
 ### Bug Fixes

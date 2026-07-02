@@ -28,7 +28,7 @@ import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
-import Shibuya.Policy (Concurrency (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
 import Shibuya.Runner.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
 import Shibuya.Runner.Supervised (SupervisedProcessor (..), runSupervised)
@@ -78,7 +78,7 @@ spec = describe "Shibuya.App lifecycle" $ do
   it "cancellation sets done" $ do
     doneAfterStop <- runEff $ runTracingNoop $ do
       master <- startMaster IgnoreAll
-      sp <- runSupervised master 10 (ProcessorId "cancelled") Serial infiniteAdapter alwaysAckOk
+      sp <- runSupervised master 10 (ProcessorId "cancelled") Unordered Serial infiniteAdapter alwaysAckOk
       liftIO $ threadDelay 50_000
       stopMaster master
       liftIO $ readTVarIO sp.done

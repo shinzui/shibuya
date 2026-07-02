@@ -12,6 +12,7 @@ import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
 import Shibuya.App
   ( AppError (..),
+    QueueProcessor (..),
     SupervisionStrategy (..),
     mkBatchProcessor,
     runApp,
@@ -28,6 +29,7 @@ import Shibuya.Batch
   )
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
@@ -49,6 +51,25 @@ spec = describe "Shibuya.App.Batch" $ do
       case result of
         Left (AppBatchConfigError _) -> pure ()
         Left e -> expectationFailure ("expected AppBatchConfigError, got: " ++ show e)
+        Right _ -> expectationFailure "expected Left, got a running AppHandle"
+
+    it "rejects PartitionedInOrder with concurrent batching" $ do
+      result <- runEff $ runTracingNoop $ do
+        sizeRef <- liftIO $ newIORef []
+        tracking <- newTrackingAck
+        messages <- createTrackedMessages tracking 1
+        let adapter = listAdapter' messages
+            processor =
+              BatchingProcessor
+                adapter
+                (recordingHandler sizeRef)
+                defaultBatchConfig
+                PartitionedInOrder
+                (Async 2)
+        runApp IgnoreFailures 100 [(ProcessorId "bad-policy", processor)]
+      case result of
+        Left (AppPolicyError _) -> pure ()
+        Left e -> expectationFailure ("expected AppPolicyError, got: " ++ show e)
         Right _ -> expectationFailure "expected Left, got a running AppHandle"
 
     -- Milestone 2: all N messages are acked exactly once, seen in batches.

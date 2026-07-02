@@ -38,7 +38,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 |---|-------|------|-----------|-----------|--------|
 | 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | Complete |
 | 23 | Fix finalize-on-exception and batch-path reliability | docs/plans/23-fix-finalize-on-exception-and-batch-path-reliability.md | EP-22 | None | Complete |
-| 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Not Started |
+| 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Complete |
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Not Started |
 | 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Not Started |
 | 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Not Started |
@@ -65,7 +65,7 @@ The `AckHandle` idempotency contract, stated in `shibuya-core/src/Shibuya/Core/A
 
 The handler-exception ack decision is owned by EP-23: on a handler exception the single-message path finalizes with `AckRetry (RetryDelay 0)`, matching the existing batch-path behavior in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs`. EP-28 consumes this: the Kafka adapter's `AckRetry` mapping must not store the offset (otherwise EP-23's fix would convert Kafka message loss from "silent skip" to "explicit commit-past"), which is exactly EP-28's first milestone.
 
-`validatePolicy` in `shibuya-core/src/Shibuya/Policy.hs` is owned by EP-24, which changes the set of accepted `Ordering`/`Concurrency` combinations. EP-25 must not relocate or rename `Policy` types until EP-24 is complete. EP-28 cites the rejection of `PartitionedInOrder` + `Async` in its Serial-only documentation.
+`validatePolicy` in `shibuya-core/src/Shibuya/Policy.hs` is owned by EP-24, which implemented `PartitionedInOrder` + `Ahead`/`Async` for single-message processors via partition-keyed dispatch and kept a batch-specific rejection in `validateAllPolicies`. EP-25 may now relocate or rename `Policy` types if it preserves these semantics. EP-28 should cite the implemented per-partition core behavior for single-message processors and the separate adapter-level Serial-only constraint.
 
 `SupervisionStrategy` and its NQE mapping in `shibuya-core/src/Shibuya/App.hs` are owned by EP-22 (`StopAllOnFailure` → `NQE.IgnoreGraceful`, conditional linking). EP-25 documents the final semantics.
 
@@ -85,8 +85,8 @@ The bounded keyed-scheduler `pendingLimit` is defined by EP-23 as `max 2 (2 * ma
 - [x] EP-23: handler exception finalizes with `AckRetry` on the single-message path
 - [x] EP-23: batcher consumer exceptions propagate; batch halt isolation enforced; keyed scheduler bounded and bracketed
 - [x] EP-23: `AckHandle` idempotency contract finalized and documented
-- [ ] EP-24: `validatePolicy` rejects unenforceable combinations; `Ahead` documentation corrected
-- [ ] EP-24: partition-keyed dispatch implemented (or the rejection made permanent with rationale)
+- [x] EP-24: `validatePolicy` accepts implemented `PartitionedInOrder` + concurrent single-message processors; batching processors reject the unsafe combination; `Ahead` documentation corrected
+- [x] EP-24: partition-keyed dispatch implemented for the single-message path
 - [ ] EP-25: runner internals moved under `Shibuya.Internal.*`; `AppHandle`/`Master` opaque
 - [ ] EP-25: dead API surface removed; `AppConfig` record with validation; umbrella module completed
 - [ ] EP-26: hot-path metrics moved to atomic counters; per-message STM transactions eliminated
@@ -108,6 +108,7 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 - pgmq 1.10+ has an absolute-timestamp `set_vt` overload (`setVisibilityTimeoutAt` in pgmq-hasql) returning the updated row, which lets EP-27 implement true "extend never shortens" lease semantics rather than merely documenting the hazard. pgmq-effectful's interpreter runs every operation as its own `Pool.use`, so EP-27's transactional dead-lettering bypasses the effect and uses the pool directly via a new adapter env record.
 - The naive "one STM transaction" fix for the batcher's MVar-across-blocking-write issue deadlocks when a tick emits more batches than remaining queue capacity — EP-26 prescribes a state + pending-`Seq` `TVar` with admission control instead.
 - `PolicySpec.hs` currently asserts the buggy behavior ("allows Ahead/Async" for `PartitionedInOrder`) and `docs/architecture/CONCURRENCY.md` documents the wrong support matrix — EP-24 fixes both alongside the code.
+- EP-24's `shibuya-core` 0.8.0.0 version bump required a coordinated `shibuya-metrics` 0.8.0.0 bump and `shibuya-core ^>=0.8.0.0` dependency bound update; otherwise workspace-level `cabal build all` and even targeted `cabal test shibuya-core-test` could not solve dependencies because Cabal considered `shibuya-metrics` a user goal in the project.
 
 
 ## Decision Log
@@ -138,6 +139,10 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 
 - Decision: `PartitionedInOrder` + concurrent modes is first rejected by `validatePolicy`, then (second milestone, optional) implemented via partition-keyed dispatch reusing the batch path's keyed-scheduler machinery.
   Rationale: The rejection is a one-line change that immediately stops the silent ordering-guarantee violation; the keyed dispatch is real machinery that deserves its own milestone with property tests. Shipping the rejection first means correctness does not wait on the feature.
+  Date: 2026-07-02
+
+- Decision: EP-24 completed the partition-keyed dispatch path rather than keeping the validation rejection permanent.
+  Rationale: The existing EP-23 keyed batch scheduler was already bounded and structured enough to extract into a generic scheduler. Property tests now demonstrate same-partition FIFO finalization, exactly-once finalization, global concurrency bounds, and cross-partition parallelism.
   Date: 2026-07-02
 
 - Decision: All core plans ship in a single shibuya-core 0.8.0.0 release owned by EP-25; EP-22/EP-23 write changelog entries without bumping the version, EP-24 opens the unreleased 0.8.0.0 changelog heading, and no intermediate core release is published mid-initiative.

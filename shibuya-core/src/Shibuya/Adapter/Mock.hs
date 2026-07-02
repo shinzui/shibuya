@@ -14,7 +14,7 @@ module Shibuya.Adapter.Mock
   )
 where
 
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Core.Ack (AckDecision)
@@ -47,7 +47,7 @@ trackingAckHandle ::
   AckHandle es
 trackingAckHandle tracking msgId =
   AckHandle $ \decision ->
-    liftIO $ modifyIORef' tracking.trackedDecisions ((msgId, decision) :)
+    liftIO $ atomicModifyIORef' tracking.trackedDecisions (\xs -> ((msgId, decision) : xs, ()))
 
 -- | Create a new TrackingAck.
 newTrackingAck :: (IOE :> es) => Eff es TrackingAck

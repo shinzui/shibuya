@@ -53,13 +53,14 @@ import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Prelude
 import Shibuya.Runner.BatchProcessor (processBatchesUntilDrained)
 import Shibuya.Runner.Batcher (runBatcher)
 import Shibuya.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Runner.Ingester (runIngesterWithMetrics)
+import Shibuya.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
 import Shibuya.Runner.Metrics
   ( InFlightInfo (..),
@@ -102,6 +103,7 @@ import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Stream.Prelude qualified as StreamP
 import UnliftIO (Async, catch, catchAny, displayException, finally, throwIO)
 import UnliftIO qualified as UIO
+import Prelude hiding (Ordering)
 
 -- | Handle for a supervised processor.
 -- Provides introspection into the running processor.
@@ -144,6 +146,8 @@ runSupervised ::
   Natural ->
   -- | Processor identifier
   ProcessorId ->
+  -- | Ordering policy
+  Ordering ->
   -- | Concurrency mode
   Concurrency ->
   -- | Queue adapter
@@ -151,7 +155,7 @@ runSupervised ::
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId concurrency adapter handler = do
+runSupervised master inboxSize procId ordering concurrency adapter handler = do
   now <- liftIO getCurrentTime
 
   -- Initialize state
@@ -169,7 +173,7 @@ runSupervised master inboxSize procId concurrency adapter handler = do
       runInIO
         ( -- Catch ProcessorHalt to prevent propagation via link
           -- (Halt is intentional, not a failure - other processors should continue)
-          ( runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler
+          ( runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter handler
               `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
           )
             `finally` unregisterProcessor master procId
@@ -213,7 +217,7 @@ runWithMetrics inboxSize procId adapter handler = do
   metricsVar <- liftIO $ newTVarIO initialMetrics
   doneVar <- liftIO $ newTVarIO False
 
-  runIngesterAndProcessor metricsVar procId inboxSize Serial adapter handler
+  runIngesterAndProcessor metricsVar procId inboxSize Unordered Serial adapter handler
     `finally` liftIO (atomically (writeTVar doneVar True))
 
   pure
@@ -232,11 +236,12 @@ runIngesterAndProcessor ::
   TVar ProcessorMetrics ->
   ProcessorId ->
   Natural ->
+  Ordering ->
   Concurrency ->
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler = do
+runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -253,7 +258,7 @@ runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler 
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       -- Processor: process messages, exit when stream done and inbox empty
-      runInIO $ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar
+      runInIO $ processUntilDrained metricsVar procId ordering concurrency handler inbox streamDoneVar
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
@@ -469,12 +474,13 @@ processUntilDrained ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   ProcessorId ->
+  Ordering ->
   Concurrency ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar = do
+processUntilDrained metricsVar procId ordering concurrency handler inbox streamDoneVar = do
   haltRef <- liftIO $ newIORef Nothing
 
   let maxConc = case concurrency of
@@ -485,15 +491,26 @@ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar = 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar haltRef
         processAction = runInIO . processOne metricsVar procId maxConc haltRef handler
+        partitioned n =
+          runKeyedScheduler
+            (max 1 n)
+            (max 2 (2 * max 1 n))
+            (\ingested -> ingested.envelope.partition)
+            processAction
+            inboxStream
 
-    case concurrency of
-      Serial ->
+    case (ordering, concurrency) of
+      (_, Serial) ->
         Stream.fold Fold.drain $
           Stream.mapM processAction inboxStream
-      Ahead n ->
+      (PartitionedInOrder, Ahead n) ->
+        partitioned n
+      (PartitionedInOrder, Async n) ->
+        partitioned n
+      (_, Ahead n) ->
         Stream.fold Fold.drain $
           StreamP.parMapM (StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
-      Async n ->
+      (_, Async n) ->
         Stream.fold Fold.drain $
           StreamP.parMapM (StreamP.maxBuffer n) processAction inboxStream
 

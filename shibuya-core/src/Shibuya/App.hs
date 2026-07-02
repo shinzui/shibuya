@@ -229,7 +229,20 @@ validateAllPolicies = traverse_ validateOne
         first AppPolicyError (validatePolicy ordering concurrency)
       BatchingProcessor {ordering, concurrency, batchConfig} -> do
         first AppPolicyError (validatePolicy ordering concurrency)
+        validateBatchOrdering ordering concurrency
         first AppBatchConfigError (validateBatchConfig batchConfig)
+
+    validateBatchOrdering PartitionedInOrder (Ahead _) =
+      Left $
+        AppPolicyError $
+          InvalidPolicyCombo
+            "PartitionedInOrder with Ahead/Async is supported only for QueueProcessor: batching processors schedule by BatchKey, not by Envelope.partition"
+    validateBatchOrdering PartitionedInOrder (Async _) =
+      Left $
+        AppPolicyError $
+          InvalidPolicyCombo
+            "PartitionedInOrder with Ahead/Async is supported only for QueueProcessor: batching processors schedule by BatchKey, not by Envelope.partition"
+    validateBatchOrdering _ _ = Right ()
 
 -- | Spawn all processors under supervision.
 spawnProcessors ::
@@ -241,8 +254,8 @@ spawnProcessors ::
 spawnProcessors master inboxSize = traverse spawnOne
   where
     spawnOne (procId, qp) = case qp of
-      QueueProcessor {adapter, handler, concurrency} -> do
-        sp <- runSupervised master inboxSize procId concurrency adapter handler
+      QueueProcessor {adapter, handler, ordering, concurrency} -> do
+        sp <- runSupervised master inboxSize procId ordering concurrency adapter handler
         pure (procId, (sp, qp))
       BatchingProcessor {adapter, batchHandler, batchConfig, concurrency} -> do
         sp <-

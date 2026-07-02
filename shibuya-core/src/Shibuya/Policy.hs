@@ -20,7 +20,9 @@ import Prelude hiding (Ordering)
 data Ordering
   = -- | Event-sourced subscriptions - must be Serial
     StrictInOrder
-  | -- | Kafka-style - parallel across partitions
+  | -- | Kafka-style ordering: messages with the same partition key are
+    -- processed and acknowledged in arrival order, while distinct partitions
+    -- may run concurrently. Messages without a partition key are unconstrained.
     PartitionedInOrder
   | -- | No ordering guarantees
     Unordered
@@ -30,7 +32,11 @@ data Ordering
 data Concurrency
   = -- | One message at a time
     Serial
-  | -- | Prefetch N, process in order
+  | -- | Process up to N messages concurrently. Stream results are yielded
+    -- downstream in input order, but handler execution and acknowledgement run
+    -- concurrently and may complete in any order. Since Shibuya discards the
+    -- per-message result, this ordered yielding is not observable as ordered
+    -- side effects or ordered acks.
     Ahead !Int
   | -- | Process N concurrently
     Async !Int

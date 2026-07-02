@@ -19,7 +19,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
 import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Runner.Supervised (SupervisedProcessor, isDone, runSupervised, runWithMetrics)
@@ -169,7 +169,7 @@ runWithConcurrency concurrency mkHandler n = do
         -- NOTE: This requires handlers with I/O (threadDelay) to allow
         -- proper thread scheduling. CPU-bound handlers may cause STM blocking.
         master <- startMaster IgnoreAll
-        sp <- runSupervised master 100 (ProcessorId "bench") concurrency adapter handler
+        sp <- runSupervised master 100 (ProcessorId "bench") Unordered concurrency adapter handler
         waitForDone sp
         stopMaster master
 

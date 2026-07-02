@@ -56,25 +56,25 @@ even if it requires splitting a partially completed task into two ("done" vs. "r
 
 Milestone 1 — reject the unenforceable combination, fix Ahead docs:
 
-- [ ] `validatePolicy` in `shibuya-core/src/Shibuya/Policy.hs` rejects `PartitionedInOrder` + `Ahead`/`Async` with a clear message.
-- [ ] `Ahead` Haddock in `shibuya-core/src/Shibuya/Policy.hs` corrected to state exactly what is ordered (downstream yield order) and what is not (handler execution, acknowledgement).
-- [ ] `PartitionedInOrder` Haddock updated to state the current enforcement status.
-- [ ] `shibuya-core/test/Shibuya/PolicySpec.hs`: existing `PartitionedInOrder` allows-`Ahead`/`Async` tests flipped to expect rejection; exhaustive 3x3 `Ordering` x `Concurrency` verdict matrix test added.
-- [ ] `docs/architecture/CONCURRENCY.md` updated: policy matrix, Ahead section, and the example that pairs `PartitionedInOrder` with `Ahead 3`.
-- [ ] `CHANGELOG.md` entry added under a new unreleased `0.8.0.0` heading; `version:` in `shibuya-core/shibuya-core.cabal` bumped to `0.8.0.0`.
-- [ ] `cabal build all`, `cabal test shibuya-core-test`, `nix fmt` pass; Milestone 1 committed with the required trailers.
+- [x] The initial fail-fast rejection outcome was superseded by completed Milestone 2 dispatch: `validatePolicy` now accepts `PartitionedInOrder` + `Ahead`/`Async` for single-message processors, while `validateAllPolicies` rejects the unsafe batching form. (2026-07-02)
+- [x] `Ahead` Haddock in `shibuya-core/src/Shibuya/Policy.hs` corrected to state exactly what is ordered (downstream yield order) and what is not (handler execution, acknowledgement). (2026-07-02)
+- [x] `PartitionedInOrder` Haddock updated to state the implemented per-partition FIFO enforcement status. (2026-07-02)
+- [x] `shibuya-core/test/Shibuya/PolicySpec.hs`: exhaustive 3x3 `Ordering` x `Concurrency` verdict matrix added, with `PartitionedInOrder` + `Ahead`/`Async` accepted after Milestone 2. (2026-07-02)
+- [x] `docs/architecture/CONCURRENCY.md` updated: policy matrix, Ahead section, keyed scheduler semantics, and the example that paired `PartitionedInOrder` with `Ahead 3`. (2026-07-02)
+- [x] `CHANGELOG.md`, `shibuya-core/CHANGELOG.md`, and `shibuya-metrics/CHANGELOG.md` updated under unreleased `0.8.0.0`; `version:` in `shibuya-core/shibuya-core.cabal` and `shibuya-metrics/shibuya-metrics.cabal` bumped to `0.8.0.0`. (2026-07-02)
+- [x] `cabal build all`, `cabal test shibuya-core-test`, `nix fmt` pass. (2026-07-02)
 
 Milestone 2 — partition-keyed dispatch for the single-message path, then re-allow:
 
-- [ ] Generic keyed FIFO scheduler extracted to `shibuya-core/src/Shibuya/Runner/KeyedScheduler.hs` (parameterized over an `item -> Maybe key` extractor, with a bounded pending buffer); module registered in `shibuya-core/shibuya-core.cabal`.
-- [ ] `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` delegates its per-`BatchKey` scheduling to the extracted scheduler (integrating with EP-23's bounding if it has landed; see Plan of Work).
-- [ ] `Ordering` threaded through `spawnProcessors` (`shibuya-core/src/Shibuya/App.hs`), `runSupervised`, `runIngesterAndProcessor`, and `processUntilDrained` (`shibuya-core/src/Shibuya/Runner/Supervised.hs`).
-- [ ] `processUntilDrained` dispatches `PartitionedInOrder` + `Ahead n`/`Async n` through the keyed scheduler keyed on `envelope.partition`; `Nothing` partitions are unkeyed (fully concurrent).
-- [ ] `trackingAckHandle` in `shibuya-core/src/Shibuya/Adapter/Mock.hs` made thread-safe (`atomicModifyIORef'`).
-- [ ] Property tests in new `shibuya-core/test/Shibuya/Runner/PartitionOrderingSpec.hs` (registered in `shibuya-core/shibuya-core.cabal` and `shibuya-core/test/Main.hs`): per-partition finalize order equals arrival order under random delays; exactly-once finalization; global concurrency bound respected; cross-partition parallelism demonstrated.
-- [ ] `validatePolicy` re-allows `PartitionedInOrder` + `Ahead`/`Async`; batch processors (`BatchingProcessor`) with that combination remain rejected via `validateAllPolicies` in `shibuya-core/src/Shibuya/App.hs`, with a test through `runApp`.
-- [ ] `PolicySpec` matrix updated; `docs/architecture/CONCURRENCY.md` matrix and future-work note updated; `CHANGELOG.md` amended.
-- [ ] `cabal build all`, `cabal test shibuya-core-test`, `nix fmt` pass; Milestone 2 committed with the required trailers; master plan checklist items for EP-24 ticked.
+- [x] Generic keyed FIFO scheduler extracted to `shibuya-core/src/Shibuya/Runner/KeyedScheduler.hs` (parameterized over an `item -> Maybe key` extractor, with a bounded pending buffer); module registered in `shibuya-core/shibuya-core.cabal`. (2026-07-02)
+- [x] `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` delegates its per-`BatchKey` scheduling to the extracted scheduler, reusing EP-23's bounded pending limit. (2026-07-02)
+- [x] `Ordering` threaded through `spawnProcessors` (`shibuya-core/src/Shibuya/App.hs`), `runSupervised`, `runIngesterAndProcessor`, and `processUntilDrained` (`shibuya-core/src/Shibuya/Runner/Supervised.hs`). (2026-07-02)
+- [x] `processUntilDrained` dispatches `PartitionedInOrder` + `Ahead n`/`Async n` through the keyed scheduler keyed on `envelope.partition`; `Nothing` partitions are unkeyed. (2026-07-02)
+- [x] `trackingAckHandle` in `shibuya-core/src/Shibuya/Adapter/Mock.hs` made thread-safe (`atomicModifyIORef'`). (2026-07-02)
+- [x] Property tests in new `shibuya-core/test/Shibuya/Runner/PartitionOrderingSpec.hs` registered in `shibuya-core/shibuya-core.cabal` and `shibuya-core/test/Main.hs`: per-partition finalize order equals arrival order under random delays; exactly-once finalization; global concurrency bound respected; cross-partition parallelism demonstrated. (2026-07-02)
+- [x] `validatePolicy` re-allows `PartitionedInOrder` + `Ahead`/`Async`; batch processors (`BatchingProcessor`) with that combination remain rejected via `validateAllPolicies` in `shibuya-core/src/Shibuya/App.hs`, with a test through `runApp`. (2026-07-02)
+- [x] `PolicySpec` matrix updated; `docs/architecture/CONCURRENCY.md` matrix and future-work note updated; changelogs amended. (2026-07-02)
+- [x] `cabal build all`, `cabal test shibuya-core-test`, `nix fmt` pass; master plan checklist items for EP-24 ticked. (2026-07-02)
 
 
 ## Surprises & Discoveries
@@ -82,7 +82,8 @@ Milestone 2 — partition-keyed dispatch for the single-message path, then re-al
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- EP-23 had already landed the bounded keyed batch scheduler with `pendingLimit = max 2 (2 * max 1 maxConc)` and structured worker cleanup. EP-24 extracted that current implementation rather than the older unbounded version described in the original context.
+- Bumping `shibuya-core` to `0.8.0.0` required bumping `shibuya-metrics` to `0.8.0.0` and its `shibuya-core ^>=0.8.0.0` bound; otherwise `cabal test shibuya-core-test` and `cabal build all` could not solve the workspace dependency graph.
 
 
 ## Decision Log
@@ -114,7 +115,22 @@ implementation. Provide concise evidence.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Implemented partition-keyed dispatch for the single-message path. `PartitionedInOrder` with `Ahead` or `Async` now uses a shared bounded keyed scheduler keyed by `Envelope.partition`, so same-partition messages finalize in arrival order while distinct partitions run concurrently. `BatchingProcessor` keeps a startup-time rejection for the same ordering/concurrency combination because batch scheduling is keyed by `BatchKey`, not partition. The batch path now delegates to the shared scheduler, and the mock ack recorder is atomic for concurrent tests.
+
+Validation on 2026-07-02:
+
+```text
+cabal build all
+PASS
+
+cabal test shibuya-core-test
+198 examples, 0 failures
+
+nix fmt
+PASS
+```
+
+The implementation also bumped `shibuya-core` and `shibuya-metrics` to `0.8.0.0`, updated changelogs, refreshed `docs/architecture/CONCURRENCY.md`, and updated benchmark callers of `runSupervised` to pass `Unordered`.
 
 
 ## Context and Orientation
@@ -681,8 +697,10 @@ dependencies are introduced.
 End state of each milestone's interfaces:
 
 Milestone 1: `Shibuya.Policy.validatePolicy :: Ordering -> Concurrency -> Either PolicyError ()`
-(unchanged signature) rejects `StrictInOrder`+concurrent and `PartitionedInOrder`+concurrent.
-No other signature changes.
+(unchanged signature) rejects `StrictInOrder`+concurrent. The planned temporary
+`PartitionedInOrder`+concurrent rejection was superseded by Milestone 2's completed keyed
+dispatch, so the final interface accepts it for single-message processors and rejects only
+the batch-specific unsafe form in `Shibuya.App.validateAllPolicies`.
 
 Milestone 2: new internal module `Shibuya.Runner.KeyedScheduler` exporting
 `runKeyedScheduler :: (Ord key) => Int -> Int -> (item -> Maybe key) -> (item -> IO ()) -> Stream IO item -> IO ()`;
@@ -696,3 +714,11 @@ through; `Shibuya.App.validateAllPolicies` additionally rejects `BatchingProcess
 atomically. `Shibuya.Policy` types must not be renamed or relocated by anyone (EP-25 waits
 on this plan), and the Milestone 1 rejection message for the batch case remains available
 for EP-28 to cite.
+
+
+## Revision Notes
+
+2026-07-02: Implemented EP-24 end-to-end, updated progress and outcomes with validation
+evidence, and revised the interface summary to reflect that partition-keyed dispatch shipped
+rather than leaving `PartitionedInOrder` + concurrent modes permanently rejected for
+single-message processors.
