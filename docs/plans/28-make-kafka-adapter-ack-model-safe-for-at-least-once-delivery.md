@@ -69,9 +69,9 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 - [x] M2: integration tests added for in-session `AckRetry` redelivery, abandoned-session redelivery, and handler-exception redelivery. (2026-07-02)
 - [ ] M2: live broker validation — `AckRetry` message is redelivered and eventually processed; committed offset never passes it prematurely.
 - [ ] M2: live broker validation — handler exception on message N leads to redelivery, never a silent skip.
-- [ ] M3: all Kafka calls inside `finalize` are caught and classified; transient errors get bounded retry; persistent errors set the fatal slot and terminate the source stream.
-- [ ] M3: failed `pausePartitions` on `AckHalt` no longer cancels the halt.
-- [ ] M3: unit tests with a mock `KafkaConsumer` interpreter for classification, bounded retry, and halt hardening.
+- [x] M3: all Kafka calls inside `finalize` are caught and classified; transient errors get bounded retry; persistent errors set the fatal slot and terminate the source stream. (2026-07-02)
+- [x] M3: failed `pausePartitions` on `AckHalt` no longer cancels the halt. (2026-07-02)
+- [x] M3: unit tests with a mock `KafkaConsumer` interpreter for classification, bounded retry, halt hardening, exact seek, seek-barrier semantics, and source fatal-slot propagation. (2026-07-02)
 - [ ] M4: `AckDeadLetter` interim policy implemented (store offset + loud stderr warning + Haddock/README warning).
 - [ ] M4: `offsetReset` config field removed; `topics` checked against the live subscription at construction; version bumped to 0.8.0.0 with changelog entry.
 - [ ] M4: Serial-only contract, halt/eviction lifecycle, and rebalance boundary documented in Haddocks and README; rebalance callback helper exported.
@@ -86,6 +86,7 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 - 2026-07-02: Plain `cabal build all` typechecked the changed adapter modules but failed at native link with `ld: library not found for -lrdkafka`; `nix develop -c cabal build all` provided the native library and completed successfully.
 - 2026-07-02: `nix develop -c cabal test shibuya-kafka-adapter --test-show-details=direct` built the test binary and all broker-free Adapter/Convert tests passed, but the Integration group could not be completed because Redpanda was not running on `localhost:9092` (`Connection refused`). The run was interrupted after repeated broker connection retries.
 - 2026-07-02: Cabal splits tasty `--pattern` expressions on spaces when passed via `--test-options`; running the built test binary directly with `--pattern '$2 == "Adapter" || $2 == "Convert"'` selected the broker-free groups successfully. Result: all 23 Adapter/Convert tests passed.
+- 2026-07-02: M3's mock `AckHandleTest` group can run broker-free by invoking the built test binary directly. `nix develop -c cabal build shibuya-kafka-adapter:test:shibuya-kafka-adapter-test` succeeded, and `nix develop -c dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-0.7.0.0/t/shibuya-kafka-adapter-test/build/shibuya-kafka-adapter-test/shibuya-kafka-adapter-test --pattern '$2 == "AckHandle" || $2 == "Adapter" || $2 == "Convert"'` passed all 30 selected tests.
 
 
 ## Decision Log
@@ -962,3 +963,5 @@ plan's final commit and note the version here.
 Revision note, 2026-07-02: M1 implementation began. Progress now records the shutdown fixes, the idle-shutdown integration test addition, the required `shibuya-core` 0.8 bound migration, and validation evidence from the Nix dev shell; live broker validation remains pending because no Redpanda broker was listening on `localhost:9092`.
 
 Revision note, 2026-07-02: M2 implementation added `KafkaAdapterState`, seek-based `AckRetry`, guarded stores, stale-record filtering, and three broker-backed redelivery tests. The test target compiles and broker-free groups pass; live Redpanda validation remains pending.
+
+Revision note, 2026-07-02: M3 implementation wrapped ack-path Kafka operations in bounded retry/classification, made the fatal-error slot preserve the first persistent failure, ensured `AckHalt` pause failures return normally, and added broker-free mock-interpreter tests for classification, retry counts, halt hardening, exact seeks, barrier behavior, and source fatal-slot propagation.
