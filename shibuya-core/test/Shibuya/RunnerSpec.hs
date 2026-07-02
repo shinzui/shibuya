@@ -9,10 +9,10 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppError (..), QueueProcessor (..), SupervisionStrategy (..), mkProcessor, runApp, waitApp)
+import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkProcessor, runApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Error (PolicyError (..))
+import Shibuya.Core.Error (ConfigError (..), PolicyError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
@@ -26,6 +26,28 @@ import Prelude hiding (Ordering)
 spec :: Spec
 spec = do
   describe "runApp" $ do
+    it "rejects inboxSize 0 before starting processors" $ do
+      result <- runEff $ runTracingNoop $ do
+        messages <- createTestMessages 1
+        let processor = mkProcessor (testAdapter messages) alwaysAckOk
+        runApp defaultAppConfig {inboxSize = 0} [(ProcessorId "invalid-config", processor)]
+
+      case result of
+        Left (AppConfigInvalid (InvalidInboxSize 0)) -> pure ()
+        Left err -> expectationFailure $ "Expected AppConfigInvalid, got: " ++ show err
+        Right _ -> expectationFailure "Expected config validation to fail"
+
+    it "rejects negative inboxSize before Natural conversion" $ do
+      result <- runEff $ runTracingNoop $ do
+        messages <- createTestMessages 1
+        let processor = mkProcessor (testAdapter messages) alwaysAckOk
+        runApp defaultAppConfig {inboxSize = -5} [(ProcessorId "invalid-config", processor)]
+
+      case result of
+        Left (AppConfigInvalid (InvalidInboxSize (-5))) -> pure ()
+        Left err -> expectationFailure $ "Expected AppConfigInvalid, got: " ++ show err
+        Right _ -> expectationFailure "Expected config validation to fail"
+
     it "processes messages from mock adapter" $ do
       result <- runEff $ runTracingNoop $ do
         -- Track processed messages
@@ -42,8 +64,7 @@ spec = do
         -- Run the app
         res <-
           runApp
-            IgnoreFailures
-            100
+            defaultAppConfig
             [ (ProcessorId "test", processor)
             ]
 
@@ -72,8 +93,7 @@ spec = do
         -- Run the app
         res <-
           runApp
-            IgnoreFailures
-            100
+            defaultAppConfig
             [ (ProcessorId "test", processor)
             ]
 
@@ -105,8 +125,7 @@ spec = do
 
         res <-
           runApp
-            IgnoreFailures
-            100
+            defaultAppConfig
             [ (ProcessorId "proc1", proc1),
               (ProcessorId "proc2", proc2)
             ]
@@ -128,7 +147,7 @@ spec = do
             -- Invalid combination: StrictInOrder requires Serial
             processor = QueueProcessor adapter handler StrictInOrder (Async 5)
 
-        runApp IgnoreFailures 100 [(ProcessorId "invalid", processor)]
+        runApp defaultAppConfig [(ProcessorId "invalid", processor)]
 
       case result of
         Left (AppPolicyError (InvalidPolicyCombo _)) -> pure ()
@@ -142,7 +161,7 @@ spec = do
             handler = alwaysAckOk
             processor = QueueProcessor adapter handler StrictInOrder (Ahead 5)
 
-        runApp IgnoreFailures 100 [(ProcessorId "invalid", processor)]
+        runApp defaultAppConfig [(ProcessorId "invalid", processor)]
 
       case result of
         Left (AppPolicyError (InvalidPolicyCombo _)) -> pure ()
@@ -160,8 +179,7 @@ spec = do
 
         res <-
           runApp
-            IgnoreFailures
-            100
+            defaultAppConfig
             [ (ProcessorId "async", proc1),
               (ProcessorId "ahead", proc2)
             ]

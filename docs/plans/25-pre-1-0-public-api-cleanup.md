@@ -82,9 +82,9 @@ This section must always reflect the actual current state of the work.
 - [x] M1: created `Shibuya.Internal.App` holding `AppHandle(..)` and `QueueProcessor(..)`; made `AppHandle` and `Master` opaque in `Shibuya.App` (type + accessors only); stopped exporting `MasterState`, `MasterMessage`, and all NQE types from any public module. Completed 2026-07-02.
 - [x] M1: moved `Shibuya.Prelude` to other-modules. Completed 2026-07-02.
 - [x] M1: updated in-repo consumers (`shibuya-core` tests, `shibuya-metrics`, `shibuya-example`, `shibuya-core-bench`) to the new module names; `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt` completed. A bounded `exe:shibuya-example` run verified startup and message processing, but the example did not reach its documented five metrics snapshots before timeout; see Surprises & Discoveries. Completed 2026-07-02.
-- [ ] M2: delete `HandlerError.HandlerTimeout`, `RuntimeError.InboxOverflow`, `StreamStats.dropped` + `incDropped` (including the example's "Dropped" print line and the `shibuya_messages_dropped_total` metric in `shibuya-metrics`); delete `Shibuya.Telemetry.Config`; rewrite the `Shibuya.Telemetry` Quick Start.
-- [ ] M2: add `AppConfig` + `defaultAppConfig`; change `runApp` to take `AppConfig` (clean break, no shim); add `ConfigError`/`InvalidInboxSize` validation (`inboxSize >= 1`) returning `Left`; add regression tests for inboxSize 0 and negative.
-- [ ] M2: build + test + example green; `nix fmt`; commit.
+- [x] M2: deleted `HandlerError.HandlerTimeout`, `RuntimeError.InboxOverflow`, `StreamStats.dropped` + `incDropped` (including the example's "Dropped" print line and the `shibuya_messages_dropped_total` metric in `shibuya-metrics`); deleted `Shibuya.Telemetry.Config`; rewrote the `Shibuya.Telemetry` Quick Start. Completed 2026-07-02.
+- [x] M2: added `AppConfig` + `defaultAppConfig`; changed `runApp` to take `AppConfig` (clean break, no shim); added `ConfigError`/`InvalidInboxSize` validation (`inboxSize >= 1`) returning `Left`; added regression tests for inboxSize 0 and negative. Completed 2026-07-02.
+- [x] M2: `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt` completed; bounded `exe:shibuya-example` startup still shows the M1 non-terminating transcript caveat. Completed 2026-07-02.
 - [ ] M3: narrow the handler surface — add `Message es msg` (envelope + lease, no ack) to `Shibuya.Core.Ingested`; change `Handler` and `BatchHandler` to receive `Message`; framework keeps `Ingested` internally; update tests and examples.
 - [ ] M3: add `mkEnvelope` and `mkIngested` smart constructors; migrate example, tests, and bench to them.
 - [ ] M3: rename `Ordering` to `OrderingPolicy`; remove all `import Prelude hiding (Ordering)`; rename `Shibuya.Stream.batchStream` to `chunksOf`; verify/fix the `Ahead` Haddock; document (not newtype) `TraceHeaders` vs `Headers`.
@@ -112,6 +112,10 @@ implementation. Provide concise evidence.
   ```
 
   The example uses infinite adapters and floods stdout from handlers. This appears to be pre-existing drift in the example transcript rather than an M1 module-move regression; `cabal build all` and the test suite are green.
+
+- 2026-07-02: With `NoFieldSelectors`, modules using record update syntax like
+  `defaultAppConfig {inboxSize = 10}` must import `AppConfig (..)`, not only
+  `defaultAppConfig`. This affected the test modules that intentionally override inbox size.
 
 
 ## Decision Log
@@ -261,6 +265,11 @@ Compare the result against the original purpose.
   `Shibuya.Core.Metrics` is the public metrics type module, `Shibuya.App` exposes
   `AppHandle` and `Master` abstractly, and in-repo packages compile against the new module
   paths. The next milestone can start from the final M1 namespace layout.
+
+- 2026-07-02 M2 outcome: Dead error/metrics/tracing-config surface has been removed,
+  `runApp` now takes a validated `AppConfig`, and invalid inbox sizes return
+  `Left (AppConfigInvalid (InvalidInboxSize n))` before processor startup. The test suite now
+  includes zero and negative inbox-size regressions.
 
 
 ## Context and Orientation
@@ -1006,3 +1015,6 @@ Milestone 4 — no new types; `shibuya-core.cabal` at `version: 0.8.0.0` with th
   `Shibuya.Internal.Runner.*`. Recorded the bounded `exe:shibuya-example` verification
   caveat: the example starts and processes messages but does not reach its documented
   self-terminating transcript within the verification timeout.
+- 2026-07-02: Recorded M2 implementation progress and validation evidence. The plan now
+  notes the `NoFieldSelectors` import requirement for `AppConfig (..)` when tests use record
+  update syntax.

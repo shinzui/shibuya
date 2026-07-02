@@ -13,9 +13,11 @@ import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
-  ( QueueProcessor,
+  ( AppConfig (..),
+    QueueProcessor,
     ShutdownConfig (..),
     SupervisionStrategy (..),
+    defaultAppConfig,
     mkBatchProcessor,
     mkProcessor,
     runApp,
@@ -237,7 +239,7 @@ runAppOrFail ::
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (AppHandle es)
 runAppOrFail strategy inboxSize processors = do
-  result <- runApp strategy inboxSize processors
+  result <- runApp defaultAppConfig {strategy = strategy, inboxSize = inboxSize} processors
   case result of
     Left err -> liftIO $ expectationFailure ("runApp failed: " <> show err) >> error "unreachable"
     Right app -> pure app

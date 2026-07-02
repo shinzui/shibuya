@@ -24,7 +24,7 @@ import Shibuya.App
   ( AppHandle,
     ProcessorId (..),
     ProcessorMetrics (..),
-    SupervisionStrategy (..),
+    defaultAppConfig,
     getAppMetrics,
     mkBatchProcessor,
     runApp,
@@ -186,8 +186,7 @@ app = do
 
   result <-
     runApp
-      IgnoreFailures
-      100 -- inbox size
+      defaultAppConfig
       [(ProcessorId "orders", processor)]
 
   case result of

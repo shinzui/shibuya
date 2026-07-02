@@ -44,7 +44,6 @@ library
     Shibuya.Policy
     Shibuya.Stream
     Shibuya.Telemetry
-    Shibuya.Telemetry.Config
     Shibuya.Telemetry.Effect
     Shibuya.Telemetry.Propagation
     Shibuya.Telemetry.Semantic

@@ -12,9 +12,14 @@ module Shibuya.Core.Error
     -- * Runtime Errors
     RuntimeError (..),
     runtimeErrorToText,
+
+    -- * Configuration Errors
+    ConfigError (..),
+    configErrorToText,
   )
 where
 
+import Data.Text qualified as Text
 import Shibuya.Prelude
 
 -- | Policy validation errors.
@@ -31,24 +36,29 @@ policyErrorToText (InvalidPolicyCombo msg) = msg
 data HandlerError
   = -- | Handler threw an exception
     HandlerException !Text
-  | -- | Handler timed out
-    HandlerTimeout
   deriving stock (Eq, Show, Generic)
 
 -- | Convert handler error to text for display.
 handlerErrorToText :: HandlerError -> Text
 handlerErrorToText (HandlerException msg) = msg
-handlerErrorToText HandlerTimeout = "Handler timed out"
 
 -- | Runtime errors during processing.
 data RuntimeError
   = -- | Supervisor failed
     SupervisorFailed !Text
-  | -- | Inbox overflow (backpressure failure)
-    InboxOverflow
   deriving stock (Eq, Show, Generic)
 
 -- | Convert runtime error to text for display.
 runtimeErrorToText :: RuntimeError -> Text
 runtimeErrorToText (SupervisorFailed msg) = msg
-runtimeErrorToText InboxOverflow = "Inbox overflow"
+
+-- | Application configuration errors, detected before any processor starts.
+data ConfigError
+  = -- | inboxSize must be >= 1; 0 stalls ingestion, negatives are nonsense.
+    InvalidInboxSize !Int
+  deriving stock (Eq, Show, Generic)
+
+-- | Convert configuration error to text for display.
+configErrorToText :: ConfigError -> Text
+configErrorToText (InvalidInboxSize n) =
+  "inboxSize must be >= 1, got " <> Text.pack (show n)

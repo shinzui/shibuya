@@ -13,7 +13,7 @@ import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle
 import Shibuya.App
   ( AppError (..),
     QueueProcessor (..),
-    SupervisionStrategy (..),
+    defaultAppConfig,
     mkBatchProcessor,
     runApp,
     stopApp,
@@ -47,7 +47,7 @@ spec = describe "Shibuya.App.Batch" $ do
         let adapter = listAdapter' messages
             badConfig = defaultBatchConfig {batchSize = 0}
             processor = mkBatchProcessor adapter (recordingHandler sizeRef) badConfig
-        runApp IgnoreFailures 100 [(ProcessorId "bad", processor)]
+        runApp defaultAppConfig [(ProcessorId "bad", processor)]
       case result of
         Left (AppBatchConfigError _) -> pure ()
         Left e -> expectationFailure ("expected AppBatchConfigError, got: " ++ show e)
@@ -66,7 +66,7 @@ spec = describe "Shibuya.App.Batch" $ do
                 defaultBatchConfig
                 PartitionedInOrder
                 (Async 2)
-        runApp IgnoreFailures 100 [(ProcessorId "bad-policy", processor)]
+        runApp defaultAppConfig [(ProcessorId "bad-policy", processor)]
       case result of
         Left (AppPolicyError _) -> pure ()
         Left e -> expectationFailure ("expected AppPolicyError, got: " ++ show e)
@@ -81,7 +81,7 @@ spec = describe "Shibuya.App.Batch" $ do
         let adapter = listAdapter' messages
             config = defaultBatchConfig {batchSize = 4, batchTimeout = 60}
             processor = mkBatchProcessor adapter (recordingHandler sizeRef) config
-        res <- runApp IgnoreFailures 100 [(ProcessorId "batch", processor)]
+        res <- runApp defaultAppConfig [(ProcessorId "batch", processor)]
         case res of
           Left err -> liftIO $ ioError (userError (show err))
           Right appHandle -> do
@@ -104,7 +104,7 @@ spec = describe "Shibuya.App.Batch" $ do
             -- Never fills (size 100) and never times out during the test (60s).
             config = defaultBatchConfig {batchSize = 100, batchTimeout = 60}
             processor = mkBatchProcessor adapter (recordingHandler sizeRef) config
-        res <- runApp IgnoreFailures 100 [(ProcessorId "flush", processor)]
+        res <- runApp defaultAppConfig [(ProcessorId "flush", processor)]
         case res of
           Left err -> liftIO $ ioError (userError (show err))
           Right appHandle -> do

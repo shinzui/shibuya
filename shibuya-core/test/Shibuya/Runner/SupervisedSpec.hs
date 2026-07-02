@@ -19,8 +19,9 @@ import Shibuya.Adapter.Mock
     trackedListAdapter,
   )
 import Shibuya.App
-  ( ShutdownConfig (..),
-    SupervisionStrategy (..),
+  ( AppConfig (..),
+    ShutdownConfig (..),
+    defaultAppConfig,
     mkProcessor,
     runApp,
     stopAppGracefully,
@@ -1021,7 +1022,7 @@ spec = do
           let adapter = testAdapter messages
               processor = mkProcessor adapter handler
 
-          result <- runApp IgnoreFailures 10 [(ProcessorId "drain-test", processor)]
+          result <- runApp defaultAppConfig {inboxSize = 10} [(ProcessorId "drain-test", processor)]
           case result of
             Left _ -> pure False
             Right appHandle -> do
@@ -1053,7 +1054,7 @@ spec = do
           let adapter = testAdapter messages
               processor = mkProcessor adapter handler
 
-          result <- runApp IgnoreFailures 5 [(ProcessorId "timeout-test", processor)]
+          result <- runApp defaultAppConfig {inboxSize = 5} [(ProcessorId "timeout-test", processor)]
           case result of
             Left _ -> pure True -- Treat error as "drained" for simplicity
             Right appHandle -> do
@@ -1079,7 +1080,7 @@ spec = do
           let adapter = testAdapter messages
               processor = mkProcessor adapter handler
 
-          result <- runApp IgnoreFailures 10 [(ProcessorId "quick-test", processor)]
+          result <- runApp defaultAppConfig {inboxSize = 10} [(ProcessorId "quick-test", processor)]
           case result of
             Left _ -> pure False
             Right appHandle -> do

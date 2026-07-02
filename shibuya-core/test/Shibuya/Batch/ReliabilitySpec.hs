@@ -31,9 +31,10 @@ import Shibuya.Adapter.Mock
     trackedListAdapter,
   )
 import Shibuya.App
-  ( QueueProcessor (..),
+  ( AppConfig (..),
+    QueueProcessor (..),
     ShutdownConfig (..),
-    SupervisionStrategy (..),
+    defaultAppConfig,
     mkBatchProcessor,
     runApp,
     stopAppGracefully,
@@ -89,7 +90,7 @@ runAppOrFail ::
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (AppHandle es)
 runAppOrFail inbox procs = do
-  res <- runApp IgnoreFailures inbox procs
+  res <- runApp defaultAppConfig {inboxSize = inbox} procs
   case res of
     Right app -> pure app
     Left e -> liftIO $ ioError (userError ("runApp failed: " <> show e))

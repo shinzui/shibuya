@@ -10,7 +10,7 @@
 --
 -- main = runEff $ do
 --   let processor = QueueProcessor myAdapter myHandler
---   result <- runApp IgnoreFailures 100 [(ProcessorId "main", processor)]
+--   result <- runApp defaultAppConfig [(ProcessorId "main", processor)]
 --   case result of
 --     Right handle -> waitApp handle
 --     Left err -> print err
@@ -47,6 +47,8 @@ module Shibuya.Core
 
     -- * App
     runApp,
+    AppConfig (..),
+    defaultAppConfig,
     AppError (..),
     QueueProcessor (..),
     mkProcessor,
@@ -67,6 +69,7 @@ module Shibuya.Core
     PolicyError (..),
     HandlerError (..),
     RuntimeError (..),
+    ConfigError (..),
 
     -- * Metrics
     ProcessorId (..),
@@ -82,10 +85,10 @@ module Shibuya.Core
 where
 
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), AppHandle, QueueProcessor (..), ShutdownConfig (..), SupervisionStrategy (..), defaultShutdownConfig, getAppMetrics, mkProcessor, runApp, stopApp, stopAppGracefully, waitApp)
+import Shibuya.App (AppConfig (..), AppError (..), AppHandle, QueueProcessor (..), ShutdownConfig (..), SupervisionStrategy (..), defaultAppConfig, defaultShutdownConfig, getAppMetrics, mkProcessor, runApp, stopApp, stopAppGracefully, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
+import Shibuya.Core.Error (ConfigError (..), HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
 import Shibuya.Core.Metrics (InFlightInfo (..), MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))

@@ -2,6 +2,8 @@
 module Shibuya.App
   ( -- * Running Processors
     runApp,
+    AppConfig (..),
+    defaultAppConfig,
     QueueProcessor (..),
     mkProcessor,
     mkBatchProcessor,
@@ -51,7 +53,7 @@ import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch
-import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
+import Shibuya.Core.Error (ConfigError (..), HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Metrics
   ( MetricsMap,
     ProcessorId (..),
@@ -134,7 +136,22 @@ data AppError
     AppRuntimeError !RuntimeError
   | -- | Invalid batch configuration for a 'BatchingProcessor'
     AppBatchConfigError !BatchConfigError
+  | -- | Invalid application configuration
+    AppConfigInvalid !ConfigError
   deriving stock (Eq, Show)
+
+-- | Configuration for 'runApp'.
+data AppConfig = AppConfig
+  { -- | How processor failures affect siblings.
+    strategy :: !SupervisionStrategy,
+    -- | Bounded-inbox capacity per processor (backpressure). Must be >= 1.
+    inboxSize :: !Int
+  }
+  deriving stock (Eq, Show, Generic)
+
+-- | 'IgnoreFailures' with an inbox of 100.
+defaultAppConfig :: AppConfig
+defaultAppConfig = AppConfig {strategy = IgnoreFailures, inboxSize = 100}
 
 -- | Run queue processors concurrently under NQE supervision.
 --
@@ -144,30 +161,28 @@ data AppError
 -- Example:
 --
 -- @
--- result <- runApp IgnoreFailures 100
+-- result <- runApp defaultAppConfig
 --   [ ("orders", QueueProcessor ordersAdapter ordersHandler)
 --   , ("events", QueueProcessor eventsAdapter eventsHandler)
 --   ]
 -- @
 runApp ::
   (IOE :> es, Tracing :> es) =>
-  -- | Supervision strategy
-  SupervisionStrategy ->
-  -- | Inbox size for backpressure
-  Int ->
+  -- | Application configuration
+  AppConfig ->
   -- | Named processors
   [(ProcessorId, QueueProcessor es)] ->
   Eff es (Either AppError (AppHandle es))
-runApp strategy inboxSize namedProcessors =
+runApp config namedProcessors =
   -- Validate all policies (and batch configs) first
-  case validateAllPolicies namedProcessors of
+  case validateAppConfig config *> validateAllPolicies namedProcessors of
     Left err -> pure $ Left err
     Right () -> do
-      let nqeStrategy = toNQEStrategy strategy
+      let nqeStrategy = toNQEStrategy config.strategy
       catch
         ( do
             master <- startMaster nqeStrategy
-            spawnResult <- try $ spawnProcessors master (fromIntegral inboxSize) namedProcessors
+            spawnResult <- try $ spawnProcessors master (fromIntegral config.inboxSize) namedProcessors
             case spawnResult of
               Left (e :: SomeException) -> do
                 stopMaster master
@@ -183,6 +198,12 @@ runApp strategy inboxSize namedProcessors =
         ( \(e :: SomeException) ->
             pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
         )
+
+-- | Validate app configuration before starting any processor.
+validateAppConfig :: AppConfig -> Either AppError ()
+validateAppConfig config
+  | config.inboxSize < 1 = Left $ AppConfigInvalid $ InvalidInboxSize config.inboxSize
+  | otherwise = Right ()
 
 -- | Validate all processor policies (and batch configs) before starting.
 validateAllPolicies :: [(ProcessorId, QueueProcessor es)] -> Either AppError ()

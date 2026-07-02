@@ -24,7 +24,7 @@ import Shibuya.App
   ( AppHandle,
     ProcessorId (..),
     ProcessorMetrics (..),
-    SupervisionStrategy (..),
+    defaultAppConfig,
     getAppMaster,
     getAppMetrics,
     mkProcessor,
@@ -115,7 +115,6 @@ printMetrics appHandle = do
       Text.putStrLn $ "  State:     " <> formatState pm.state
       Text.putStrLn $ "  Received:  " <> Text.pack (show pm.stats.received)
       Text.putStrLn $ "  Processed: " <> Text.pack (show pm.stats.processed)
-      Text.putStrLn $ "  Dropped:   " <> Text.pack (show pm.stats.dropped)
       Text.putStrLn $ "  Failed:    " <> Text.pack (show pm.stats.failed)
 
     formatState :: ProcessorState -> Text
@@ -170,8 +169,7 @@ app = do
   -- Run all processors concurrently under supervision
   result <-
     runApp
-      IgnoreFailures -- Keep running even if a processor fails
-      100 -- Inbox size
+      defaultAppConfig -- IgnoreFailures with inbox size 100
       [ (ProcessorId "orders", ordersProcessor),
         (ProcessorId "events", eventsProcessor)
       ]

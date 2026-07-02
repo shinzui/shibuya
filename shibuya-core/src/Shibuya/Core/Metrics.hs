@@ -32,7 +32,6 @@ module Shibuya.Core.Metrics
 
     -- * Metrics Updates
     incReceived,
-    incDropped,
     incProcessed,
     incFailed,
   )
@@ -122,8 +121,6 @@ instance FromJSON ProcessorState where
 data StreamStats = StreamStats
   { -- | Messages received from stream
     received :: !Int,
-    -- | Messages dropped (backpressure)
-    dropped :: !Int,
     -- | Messages successfully processed
     processed :: !Int,
     -- | Messages that failed processing
@@ -134,7 +131,7 @@ data StreamStats = StreamStats
 
 -- | Empty stream stats.
 emptyStreamStats :: StreamStats
-emptyStreamStats = StreamStats 0 0 0 0
+emptyStreamStats = StreamStats 0 0 0
 
 -- | Batch-processing statistics, tracked alongside per-message 'StreamStats'.
 data BatchStats = BatchStats
@@ -192,10 +189,6 @@ type MetricsMap = Map ProcessorId ProcessorMetrics
 -- | Increment received count.
 incReceived :: StreamStats -> StreamStats
 incReceived = #received %~ (+ 1)
-
--- | Increment dropped count.
-incDropped :: StreamStats -> StreamStats
-incDropped = #dropped %~ (+ 1)
 
 -- | Increment processed count.
 incProcessed :: StreamStats -> StreamStats

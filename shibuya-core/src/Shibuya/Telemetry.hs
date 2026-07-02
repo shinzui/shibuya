@@ -4,28 +4,26 @@
 --
 -- == Quick Start
 --
--- 1. Enable tracing in your config:
+-- 1. Initialize a tracer and run your app under 'runTracing'
+--    (or 'runTracingNoop' to disable tracing):
 --
 -- @
--- config = defaultAppConfig
---   { tracing = defaultTracingConfig { enabled = True }
---   }
+-- provider <- OTel.initializeTracerProvider
+-- let tracer = OTel.makeTracer provider instrumentationLibrary OTel.tracerOptions
+-- runEff $ runTracing tracer app
 -- @
 --
--- 2. Set environment variables for the OTLP exporter:
+-- 2. Configure the OTLP exporter with environment variables:
 --
 -- @
 -- export OTEL_SERVICE_NAME="my-service"
 -- export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
 -- @
 --
--- 3. Spans are automatically created for message processing.
---    See "Shibuya.Telemetry.Effect" for custom instrumentation.
+-- 3. Spans are created automatically per message; see
+--    "Shibuya.Telemetry.Effect" for custom instrumentation.
 module Shibuya.Telemetry
-  ( -- * Configuration
-    module Shibuya.Telemetry.Config,
-
-    -- * Effect
+  ( -- * Effect
     module Shibuya.Telemetry.Effect,
 
     -- * Context Propagation
@@ -36,7 +34,6 @@ module Shibuya.Telemetry
   )
 where
 
-import Shibuya.Telemetry.Config
 import Shibuya.Telemetry.Effect
 import Shibuya.Telemetry.Propagation
 import Shibuya.Telemetry.Semantic
