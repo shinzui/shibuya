@@ -72,11 +72,11 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 - [x] M3: all Kafka calls inside `finalize` are caught and classified; transient errors get bounded retry; persistent errors set the fatal slot and terminate the source stream. (2026-07-02)
 - [x] M3: failed `pausePartitions` on `AckHalt` no longer cancels the halt. (2026-07-02)
 - [x] M3: unit tests with a mock `KafkaConsumer` interpreter for classification, bounded retry, halt hardening, exact seek, seek-barrier semantics, and source fatal-slot propagation. (2026-07-02)
-- [ ] M4: `AckDeadLetter` interim policy implemented (store offset + loud stderr warning + Haddock/README warning).
-- [ ] M4: `offsetReset` config field removed; `topics` checked against the live subscription at construction; version bumped to 0.8.0.0 with changelog entry.
-- [ ] M4: Serial-only contract, halt/eviction lifecycle, and rebalance boundary documented in Haddocks and README; rebalance callback helper exported.
-- [ ] M4: misleading shutdown Haddock (commit-before-drain) corrected.
-- [ ] M4: `Convert.hs` computes `headersToList` once; benchmark run before and after with numbers recorded here.
+- [x] M4: `AckDeadLetter` interim policy implemented (store offset + loud stderr warning + Haddock/README warning). (2026-07-02)
+- [x] M4: `offsetReset` config field removed; `topics` checked against the live subscription at construction; version bumped to 0.8.0.0 with changelog entry. (2026-07-02)
+- [x] M4: Serial-only contract, halt/eviction lifecycle, and rebalance boundary documented in Haddocks and README; rebalance callback helper exported. (2026-07-02)
+- [x] M4: misleading shutdown Haddock (commit-before-drain) corrected. (2026-07-02)
+- [x] M4: `Convert.hs` computes `headersToList` once; benchmark run before and after with numbers recorded here. (2026-07-02)
 - [ ] Final: full test suite green against a live broker; Outcomes & Retrospective written; master plan checklist items for EP-28 ticked in the core repository.
 
 
@@ -87,6 +87,11 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 - 2026-07-02: `nix develop -c cabal test shibuya-kafka-adapter --test-show-details=direct` built the test binary and all broker-free Adapter/Convert tests passed, but the Integration group could not be completed because Redpanda was not running on `localhost:9092` (`Connection refused`). The run was interrupted after repeated broker connection retries.
 - 2026-07-02: Cabal splits tasty `--pattern` expressions on spaces when passed via `--test-options`; running the built test binary directly with `--pattern '$2 == "Adapter" || $2 == "Convert"'` selected the broker-free groups successfully. Result: all 23 Adapter/Convert tests passed.
 - 2026-07-02: M3's mock `AckHandleTest` group can run broker-free by invoking the built test binary directly. `nix develop -c cabal build shibuya-kafka-adapter:test:shibuya-kafka-adapter-test` succeeded, and `nix develop -c dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-0.7.0.0/t/shibuya-kafka-adapter-test/build/shibuya-kafka-adapter-test/shibuya-kafka-adapter-test --pattern '$2 == "AckHandle" || $2 == "Adapter" || $2 == "Convert"'` passed all 30 selected tests.
+- 2026-07-02: M4's focused broker-free validation passed after the 0.8.0.0 API break: `nix develop -c cabal build shibuya-kafka-adapter:test:shibuya-kafka-adapter-test` succeeded, and the built `shibuya-kafka-adapter-0.8.0.0` test binary with `--pattern '$2 == "AckHandle" || $2 == "Adapter" || $2 == "Convert"'` passed all 31 selected tests.
+- 2026-07-02: `nix develop -c cabal build all` succeeded after removing `KafkaAdapterConfig.offsetReset`, confirming the library, examples, and benchmark package compile against the new config shape.
+- 2026-07-02: `nix develop -c cabal haddock shibuya-kafka-adapter` succeeded with 100% coverage for adapter modules. Haddock still reports existing ambiguous-link/link-destination warnings from dependency/core re-exports, but no missing documentation remains for the new adapter exports.
+- 2026-07-02: Convert micro-benchmark before/after numbers were collected with `nix develop -c cabal bench shibuya-kafka-adapter-bench`. Before (detached worktree at M3 commit `7842d20`): `ConsumerRecord to Envelope / with trace headers` 613 ns +/- 56 ns; `without trace headers` 564 ns +/- 32 ns. After M4: `with trace headers` 613 ns +/- 53 ns; `without trace headers` 588 ns +/- 35 ns. The change removes duplicate `headersToList` work but does not show a clear wall-clock improvement in this noisy micro-benchmark run.
+- 2026-07-02: Live Redpanda validation was attempted with `nix develop -c just process-up`, but Redpanda repeatedly failed to start because its console port `8080` was already in use. The service session was interrupted and `nix develop -c just process-down` found no process-compose socket to stop.
 
 
 ## Decision Log
@@ -965,3 +970,5 @@ Revision note, 2026-07-02: M1 implementation began. Progress now records the shu
 Revision note, 2026-07-02: M2 implementation added `KafkaAdapterState`, seek-based `AckRetry`, guarded stores, stale-record filtering, and three broker-backed redelivery tests. The test target compiles and broker-free groups pass; live Redpanda validation remains pending.
 
 Revision note, 2026-07-02: M3 implementation wrapped ack-path Kafka operations in bounded retry/classification, made the fatal-error slot preserve the first persistent failure, ensured `AckHalt` pause failures return normally, and added broker-free mock-interpreter tests for classification, retry counts, halt hardening, exact seeks, barrier behavior, and source fatal-slot propagation.
+
+Revision note, 2026-07-02: M4 implementation added the loud interim dead-letter policy, removed `KafkaAdapterConfig.offsetReset`, added subscription/topic mismatch warnings, exported caller-owned adapter state plus `kafkaAdapterWith` and `kafkaRebalanceHandler`, updated README/Haddocks/changelog for Serial-only operation, halt/eviction, dead-letter/drop semantics, attempt-count limitations, and shutdown ordering, and changed conversion to materialize Kafka headers once. Code-level M4 acceptance passed; live Redpanda validation remains pending because Redpanda's console port `8080` was already occupied.

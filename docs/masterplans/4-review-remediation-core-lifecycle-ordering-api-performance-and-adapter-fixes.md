@@ -93,9 +93,9 @@ The bounded keyed-scheduler `pendingLimit` is defined by EP-23 as `max 2 (2 * ma
 - [x] EP-26: tracing dummy-span CAF, constant-attribute hoisting, `maxThreads` bound
 - [x] EP-27: dead-letter send+delete made transactional and retry-safe
 - [x] EP-27: ack-path retries; `AckHalt` visibility timeout configurable; config validation; prefetch removed or fixed
-- [ ] EP-28: `AckRetry` no longer stores the offset; failed messages are redelivered
-- [ ] EP-28: shutdown fixed (no-offset commit tolerated, poll-aware stream termination)
-- [ ] EP-28: ack-path Kafka errors classified; Serial-only constraint enforced and documented
+- [x] EP-28: `AckRetry` no longer stores the offset; failed messages are redelivered
+- [x] EP-28: shutdown fixed (no-offset commit tolerated, poll-aware stream termination)
+- [x] EP-28: ack-path Kafka errors classified; Serial-only constraint enforced and documented
 
 
 ## Surprises & Discoveries
@@ -112,6 +112,8 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 - EP-27's adapter version bump to `shibuya-pgmq-adapter` 0.9.0.0 exposed that parallel Cabal invocations in the same worktree can corrupt or split `dist-newstyle` build plans after a package-version change. A serial `cabal clean`, `cabal build all`, then `just test` produced a clean plan and green validation. Future adapter validation should avoid parallel Cabal commands against the same `dist-newstyle`.
 - EP-28 started against a sibling core checkout already at `shibuya-core` 0.8.0.0, so the Kafka adapter, benchmark package, and jitsurei package bounds had to move to `^>=0.8.0.0` before the workspace could solve. The `otel-demo` jitsurei also needed migration from pre-0.8 internal runner modules to the public `runApp`/`mkProcessor`/`waitApp` API.
 - EP-28 validation requires the Nix dev shell for native `librdkafka` linkage on this machine. Plain `cabal build all` typechecked the changed adapter modules but failed with `ld: library not found for -lrdkafka`; `nix develop -c cabal build all` completed successfully. Live integration tests still require Redpanda on `localhost:9092`; without it, broker-free tests pass and the Integration group reports connection refused.
+- EP-28 code-level implementation is complete as of 2026-07-02: M1-M4 are implemented, broker-free tests pass, Haddocks build, benchmarks were recorded, and `nix develop -c cabal build all` is green. The child ExecPlan remains open only for live Redpanda integration validation.
+- EP-28 live validation was attempted on 2026-07-02 with `nix develop -c just process-up`, but Redpanda could not start because its console port `8080` was already in use. The live broker checklist remains open until that local port conflict is resolved or the service is configured to use another console port.
 
 
 ## Decision Log
