@@ -30,17 +30,18 @@ library
     Shibuya.Core.Error
     Shibuya.Core.Ingested
     Shibuya.Core.Lease
+    Shibuya.Core.Metrics
     Shibuya.Core.Retry
     Shibuya.Core.Types
     Shibuya.Handler
+    Shibuya.Internal.App
+    Shibuya.Internal.Runner.BatchProcessor
+    Shibuya.Internal.Runner.Batcher
+    Shibuya.Internal.Runner.Finalize
+    Shibuya.Internal.Runner.KeyedScheduler
+    Shibuya.Internal.Runner.Master
+    Shibuya.Internal.Runner.Supervised
     Shibuya.Policy
-    Shibuya.Prelude
-    Shibuya.Runner.BatchProcessor
-    Shibuya.Runner.Batcher
-    Shibuya.Runner.Finalize
-    Shibuya.Runner.Master
-    Shibuya.Runner.Metrics
-    Shibuya.Runner.Supervised
     Shibuya.Stream
     Shibuya.Telemetry
     Shibuya.Telemetry.Config
@@ -49,11 +50,9 @@ library
     Shibuya.Telemetry.Semantic
 
   other-modules:
-    Shibuya.Runner.Halt
-    Shibuya.Runner.Ingester
-    Shibuya.Runner.KeyedScheduler
-    Shibuya.Runner.Processor
-    Shibuya.Runner.Serial
+    Shibuya.Internal.Runner.Halt
+    Shibuya.Internal.Runner.Ingester
+    Shibuya.Prelude
 
   default-extensions:
     DeriveAnyClass

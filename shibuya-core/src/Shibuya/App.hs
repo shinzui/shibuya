@@ -5,7 +5,7 @@ module Shibuya.App
     QueueProcessor (..),
     mkProcessor,
     mkBatchProcessor,
-    AppHandle (..),
+    AppHandle,
 
     -- * AppHandle Operations
     getAppMetrics,
@@ -23,6 +23,11 @@ module Shibuya.App
 
     -- * Errors
     AppError (..),
+    Master,
+    getAllMetrics,
+    getAllMetricsIO,
+    getProcessorMetrics,
+    getProcessorMetricsIO,
 
     -- * Batch API (re-exported from "Shibuya.Batch")
     module Shibuya.Batch,
@@ -38,7 +43,6 @@ import Control.Concurrent.STM (STM, atomically, check, orElse, readTVar, registe
 import Control.Monad (forM_, void)
 import Data.Bifunctor (first)
 import Data.Foldable (traverse_)
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time.Clock (NominalDiffTime)
@@ -48,24 +52,27 @@ import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
-import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
-import Shibuya.Runner.Master
-  ( Master,
-    getAllMetrics,
-    startMaster,
-    stopMaster,
-  )
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( MetricsMap,
     ProcessorId (..),
     ProcessorMetrics (..),
   )
-import Shibuya.Runner.Supervised
+import Shibuya.Internal.App (AppHandle (..), QueueProcessor (..), mkBatchProcessor, mkProcessor)
+import Shibuya.Internal.Runner.Master
+  ( Master,
+    getAllMetrics,
+    getAllMetricsIO,
+    getProcessorMetrics,
+    getProcessorMetricsIO,
+    startMaster,
+    stopMaster,
+  )
+import Shibuya.Internal.Runner.Supervised
   ( SupervisedProcessor (..),
     runSupervised,
     runSupervisedBatch,
   )
+import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
 import Shibuya.Telemetry.Effect (Tracing)
 import UnliftIO (SomeException, catch, displayException, try)
 import Prelude hiding (Ordering)
@@ -128,49 +135,6 @@ data AppError
   | -- | Invalid batch configuration for a 'BatchingProcessor'
     AppBatchConfigError !BatchConfigError
   deriving stock (Eq, Show)
-
--- | A queue processor pairs an adapter with a handler. The message type is
--- existentially hidden, allowing heterogeneous queues in one 'runApp' call.
---
--- 'QueueProcessor' processes one message at a time; 'BatchingProcessor' groups
--- messages into batches (see "Shibuya.Batch") and runs a 'BatchHandler' over each.
-data QueueProcessor es where
-  QueueProcessor ::
-    { adapter :: Adapter es msg,
-      handler :: Handler es msg,
-      ordering :: Ordering,
-      concurrency :: Concurrency
-    } ->
-    QueueProcessor es
-  BatchingProcessor ::
-    { adapter :: Adapter es msg,
-      batchHandler :: BatchHandler es msg,
-      batchConfig :: BatchConfig es msg,
-      ordering :: Ordering,
-      concurrency :: Concurrency
-    } ->
-    QueueProcessor es
-
--- | Convenience constructor with default policies (Unordered + Serial).
--- Provides backward compatibility with existing code.
-mkProcessor :: Adapter es msg -> Handler es msg -> QueueProcessor es
-mkProcessor adapter handler = QueueProcessor adapter handler Unordered Serial
-
--- | Convenience constructor for a batching processor with safe default policies
--- (Unordered ordering + Serial concurrency, i.e. one batch at a time).
-mkBatchProcessor ::
-  Adapter es msg -> BatchHandler es msg -> BatchConfig es msg -> QueueProcessor es
-mkBatchProcessor adapter batchHandler batchConfig =
-  BatchingProcessor adapter batchHandler batchConfig Unordered Serial
-
--- | Handle for a running multi-queue application.
--- Provides introspection and control over all processors.
-data AppHandle es = AppHandle
-  { -- | The master coordinator
-    master :: !Master,
-    -- | Map of processor IDs to their handles
-    processors :: !(Map ProcessorId (SupervisedProcessor, QueueProcessor es))
-  }
 
 -- | Run queue processors concurrently under NQE supervision.
 --

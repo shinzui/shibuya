@@ -23,13 +23,13 @@ import Network.Wai (Application, Response, pathInfo, responseLBS)
 import Network.Wai.Handler.Warp qualified as Warp
 import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
+import Shibuya.App (Master)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
 import Shibuya.Metrics.Prometheus (prometheusApp)
 import Shibuya.Metrics.Types (MetricsServer (..))
 import Shibuya.Metrics.WebSocket (WebSocketState, newWebSocketState, websocketApp)
-import Shibuya.Runner.Master (Master)
 
 -- | Start the metrics server without dependency checks.
 -- Returns a handle that can be used to stop the server.

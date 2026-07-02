@@ -3,7 +3,7 @@
 -- This module defines the types a user needs to opt a processor into batching:
 -- the batch handler, its configuration, the grouping key, and the batch
 -- acknowledgement result. It adds no runtime behavior; the accumulation engine
--- and execution stage live in the internal @Shibuya.Runner.*@ modules.
+-- and execution stage live in the internal @Shibuya.Internal.Runner.*@ modules.
 --
 -- == Acknowledgement decision contract
 --

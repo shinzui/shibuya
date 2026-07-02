@@ -1,5 +1,9 @@
--- | Bounded FIFO scheduler for work keyed by an optional partition key.
-module Shibuya.Runner.KeyedScheduler
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Bounded FIFO scheduler for work keyed by an optional partition key.
+module Shibuya.Internal.Runner.KeyedScheduler
   ( runKeyedScheduler,
   )
 where

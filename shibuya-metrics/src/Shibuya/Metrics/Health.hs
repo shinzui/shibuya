@@ -30,8 +30,8 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
-import Shibuya.Runner.Master (Master, getAllMetricsIO)
-import Shibuya.Runner.Metrics
+import Shibuya.App (Master, getAllMetricsIO)
+import Shibuya.Core.Metrics
   ( MetricsMap,
     ProcessorMetrics (..),
     ProcessorState (..),

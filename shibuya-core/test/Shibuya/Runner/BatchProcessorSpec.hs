@@ -42,22 +42,22 @@ import Shibuya.Core.Ack
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Policy (Concurrency (..))
-import Shibuya.Runner.BatchProcessor (runBatchesWithMetrics)
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( BatchStats (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     StreamStats (..),
   )
+import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Internal.Runner.BatchProcessor (runBatchesWithMetrics)
+import Shibuya.Policy (Concurrency (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Test.Hspec
 import UnliftIO (throwIO, try)
 import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
-spec = describe "Shibuya.Runner.BatchProcessor" $ do
+spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
   describe "decision resolution and finalization (M1)" $ do
     it "finalizes each of 5 messages successfully with per-message decisions" $ do
       (tracked, metrics) <- runEff $ runTracingNoop $ do

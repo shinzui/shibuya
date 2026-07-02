@@ -28,9 +28,9 @@ import Shibuya.Batch
     defaultBatchConfig,
   )
 import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Runner.Metrics (ProcessorId (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec

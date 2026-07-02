@@ -1,11 +1,15 @@
--- | Supervised runner - runs processors under NQE supervision with metrics.
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Supervised runner - runs processors under NQE supervision with metrics.
 -- This is the production runner with introspection and control.
 --
 -- Architecture:
 -- - Each processor runs as a child under the Master's supervisor
 -- - Metrics are tracked in a TVar and registered with the Master
 -- - Backpressure is provided via bounded inbox between stream and processor
-module Shibuya.Runner.Supervised
+module Shibuya.Internal.Runner.Supervised
   ( -- * Running with Supervision
     runSupervised,
     runSupervisedBatch,
@@ -51,18 +55,7 @@ import Shibuya.Batch (BatchConfig, BatchHandler)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Prelude
-import Shibuya.Runner.BatchProcessor (processBatchesUntilDrained)
-import Shibuya.Runner.Batcher (runBatcher)
-import Shibuya.Runner.Finalize (finalizeWithRetry)
-import Shibuya.Runner.Halt (ProcessorHalt (..))
-import Shibuya.Runner.Ingester (runIngesterWithMetrics)
-import Shibuya.Runner.KeyedScheduler (runKeyedScheduler)
-import Shibuya.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     ProcessorId (..),
     ProcessorMetrics (..),
@@ -71,6 +64,17 @@ import Shibuya.Runner.Metrics
     incFailed,
     incProcessed,
   )
+import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Handler (Handler)
+import Shibuya.Internal.Runner.BatchProcessor (processBatchesUntilDrained)
+import Shibuya.Internal.Runner.Batcher (runBatcher)
+import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
+import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
+import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics)
+import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
+import Shibuya.Internal.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
+import Shibuya.Policy (Concurrency (..), Ordering (..))
+import Shibuya.Prelude
 import Shibuya.Telemetry.Effect
   ( Tracing,
     addAttribute,

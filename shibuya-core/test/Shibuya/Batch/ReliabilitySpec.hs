@@ -31,8 +31,7 @@ import Shibuya.Adapter.Mock
     trackedListAdapter,
   )
 import Shibuya.App
-  ( AppHandle (..),
-    QueueProcessor (..),
+  ( QueueProcessor (..),
     ShutdownConfig (..),
     SupervisionStrategy (..),
     mkBatchProcessor,
@@ -59,16 +58,17 @@ import Shibuya.Core.Ack
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( BatchStats (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
   )
-import Shibuya.Runner.Supervised (SupervisedProcessor (..))
+import Shibuya.Core.Types (Envelope (..), MessageId (..))
+import Shibuya.Internal.App (AppHandle (..))
+import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..))
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec

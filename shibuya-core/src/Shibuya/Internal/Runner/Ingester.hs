@@ -1,6 +1,10 @@
--- | Ingester - reads from adapter stream and sends to inbox.
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Ingester - reads from adapter stream and sends to inbox.
 -- Provides backpressure via bounded inbox.
-module Shibuya.Runner.Ingester
+module Shibuya.Internal.Runner.Ingester
   ( runIngester,
     runIngesterWithMetrics,
   )
@@ -10,7 +14,7 @@ import Control.Concurrent.NQE.Process (Inbox, inboxToMailbox, send)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar')
 import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Core.Ingested (Ingested)
-import Shibuya.Runner.Metrics (ProcessorMetrics (..), incReceived)
+import Shibuya.Core.Metrics (ProcessorMetrics (..), incReceived)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream

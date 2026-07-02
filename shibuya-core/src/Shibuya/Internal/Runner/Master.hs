@@ -1,4 +1,8 @@
--- | Master process - central coordinator for queue processors.
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Master process - central coordinator for queue processors.
 -- Provides supervision, metrics collection, and control API.
 --
 -- Architecture:
@@ -6,7 +10,7 @@
 -- - Holds a Supervisor for managing child processors
 -- - Maintains TVar MetricsMap for O(1) metrics access
 -- - Processors register their metrics TVars with the Master
-module Shibuya.Runner.Master
+module Shibuya.Internal.Runner.Master
   ( -- * Master Handle
     Master (..),
     MasterState (..),
@@ -50,12 +54,12 @@ import Control.Monad (forever)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Effectful (Eff, IOE, liftIO, (:>))
-import Shibuya.Prelude
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( MetricsMap,
     ProcessorId,
     ProcessorMetrics,
   )
+import Shibuya.Prelude
 import UnliftIO (Async, async, cancel, link)
 
 -- | Messages for the master process.

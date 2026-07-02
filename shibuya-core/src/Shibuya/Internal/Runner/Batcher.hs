@@ -1,4 +1,8 @@
--- | Batch accumulation engine.
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Batch accumulation engine.
 --
 -- Groups a stream of individual 'Ingested' messages into batches by batch key.
 -- A batch is emitted when it reaches the configured size, when its per-key
@@ -13,7 +17,7 @@
 -- property-tested with no threads or wall-clock. 'runBatcher' is a thin IO
 -- wrapper that drives the core from a background consumer and a single timeout
 -- ticker, buffering results in a bounded queue for backpressure.
-module Shibuya.Runner.Batcher
+module Shibuya.Internal.Runner.Batcher
   ( -- * Pure accumulation core
     Accum (..),
     BatcherState (..),

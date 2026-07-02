@@ -13,8 +13,7 @@ import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
-  ( AppHandle (..),
-    QueueProcessor,
+  ( QueueProcessor,
     ShutdownConfig (..),
     SupervisionStrategy (..),
     mkBatchProcessor,
@@ -27,11 +26,12 @@ import Shibuya.Batch (BatchConfig (..), ackAll, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Internal.App (AppHandle (..))
+import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
+import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervised)
 import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Runner.Master (startMaster, stopMaster)
-import Shibuya.Runner.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
-import Shibuya.Runner.Supervised (SupervisedProcessor (..), runSupervised)
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec

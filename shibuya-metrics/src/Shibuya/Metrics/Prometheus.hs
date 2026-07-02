@@ -11,8 +11,8 @@ import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Network.HTTP.Types (hContentType, status200)
 import Network.Wai (Application, responseLBS)
-import Shibuya.Runner.Master (Master, getAllMetricsIO)
-import Shibuya.Runner.Metrics
+import Shibuya.App (Master, getAllMetricsIO)
+import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     MetricsMap,
     ProcessorId (..),

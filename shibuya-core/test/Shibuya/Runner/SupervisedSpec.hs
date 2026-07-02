@@ -30,30 +30,30 @@ import Shibuya.Core (ProcessorHalt (..))
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
-import Shibuya.Handler (Handler)
-import Shibuya.Policy (Concurrency (..), Ordering (..))
-import Shibuya.Runner.Master
-  ( getAllMetrics,
-    getAllMetricsIO,
-    getProcessorMetricsIO,
-    startMaster,
-    stopMaster,
-  )
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
   )
-import Shibuya.Runner.Supervised
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
+import Shibuya.Handler (Handler)
+import Shibuya.Internal.Runner.Master
+  ( getAllMetrics,
+    getAllMetricsIO,
+    getProcessorMetricsIO,
+    startMaster,
+    stopMaster,
+  )
+import Shibuya.Internal.Runner.Supervised
   ( SupervisedProcessor (..),
     getMetrics,
     isDone,
     runSupervised,
     runWithMetrics,
   )
+import Shibuya.Policy (Concurrency (..), Ordering (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -63,7 +63,7 @@ import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
 spec = do
-  describe "Shibuya.Runner.Master" $ do
+  describe "Shibuya.Internal.Runner.Master" $ do
     it "starts and stops cleanly" $ do
       result <- runEff $ runTracingNoop $ do
         master <- startMaster IgnoreAll
@@ -89,7 +89,7 @@ spec = do
       allMetrics `shouldSatisfy` maybe False null
       processorMetrics `shouldBe` Just Nothing
 
-  describe "Shibuya.Runner.Supervised" $ do
+  describe "Shibuya.Internal.Runner.Supervised" $ do
     describe "runWithMetrics" $ do
       it "processes messages and tracks metrics" $ do
         (finalMetrics, processedMsgs) <- runEff $ runTracingNoop $ do

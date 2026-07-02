@@ -1,10 +1,14 @@
--- | Shared resilient finalization for framework-owned ack paths.
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Shared resilient finalization for framework-owned ack paths.
 --
 -- Both single-message and batch processing call adapter-provided
 -- 'AckHandle.finalize' through this module. A transient finalizer exception is
 -- retried with the fixed schedule below; each retry uses the same already
 -- resolved 'AckDecision'.
-module Shibuya.Runner.Finalize
+module Shibuya.Internal.Runner.Finalize
   ( finalizeRetryDelaysMicros,
     finalizeWithRetry,
   )

@@ -24,10 +24,10 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Network.WebSockets qualified as WS
+import Shibuya.App (Master, getAllMetricsIO)
+import Shibuya.Core.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics)
 import Shibuya.Metrics.Config (MetricsServerConfig (..))
 import Shibuya.Metrics.Types (ClientMessage (..), ServerMessage (..))
-import Shibuya.Runner.Master (Master, getAllMetricsIO)
-import Shibuya.Runner.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics)
 
 --------------------------------------------------------------------------------
 -- WebSocket State

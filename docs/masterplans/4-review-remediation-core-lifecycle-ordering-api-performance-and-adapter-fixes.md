@@ -39,7 +39,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 | 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | Complete |
 | 23 | Fix finalize-on-exception and batch-path reliability | docs/plans/23-fix-finalize-on-exception-and-batch-path-reliability.md | EP-22 | None | Complete |
 | 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Complete |
-| 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Not Started |
+| 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | In Progress |
 | 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Not Started |
 | 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Not Started |
 | 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | Not Started |

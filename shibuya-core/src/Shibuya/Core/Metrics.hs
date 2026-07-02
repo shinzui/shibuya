@@ -1,6 +1,6 @@
 -- | Metrics and state tracking for processors.
 -- Provides introspection into what's happening in the system.
-module Shibuya.Runner.Metrics
+module Shibuya.Core.Metrics
   ( -- * Processor State
     ProcessorState (..),
     ProcessorId (..),

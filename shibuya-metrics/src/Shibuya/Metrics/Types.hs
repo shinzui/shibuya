@@ -22,7 +22,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import GHC.Generics (Generic)
 import Network.Wai.Handler.Warp (Port)
-import Shibuya.Runner.Metrics (MetricsMap, ProcessorId, ProcessorMetrics)
+import Shibuya.Core.Metrics (MetricsMap, ProcessorId, ProcessorMetrics)
 
 --------------------------------------------------------------------------------
 -- WebSocket Protocol

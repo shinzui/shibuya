@@ -1,4 +1,8 @@
--- | Batch execution stage: run a batch handler over an emitted batch, resolve
+-- | __Internal module.__ Exposed for the test suite and benchmarks only.
+-- No PVP guarantees: anything here may change or disappear in any release.
+-- Application authors should import "Shibuya" instead.
+--
+-- Batch execution stage: run a batch handler over an emitted batch, resolve
 -- one acknowledgement decision per retained message, and finalize resiliently.
 --
 -- This is the reliability heart of batch processing. For each ready batch it:
@@ -18,7 +22,7 @@
 --
 -- The decision loop iterates the framework's retained list, never the handler's
 -- output, so handler bugs cannot skip or misassign retained messages.
-module Shibuya.Runner.BatchProcessor
+module Shibuya.Internal.Runner.BatchProcessor
   ( -- * Batch execution
     processOneBatch,
     processBatchesUntilDrained,
@@ -63,13 +67,7 @@ import Shibuya.Core.Ack
     RetryDelay (..),
   )
 import Shibuya.Core.Ingested (Ingested (..))
-import Shibuya.Core.Types (Envelope (..))
-import Shibuya.Policy (Concurrency (..))
-import Shibuya.Prelude
-import Shibuya.Runner.Finalize (finalizeWithRetry)
-import Shibuya.Runner.Halt (ProcessorHalt (..))
-import Shibuya.Runner.KeyedScheduler (runKeyedScheduler)
-import Shibuya.Runner.Metrics
+import Shibuya.Core.Metrics
   ( BatchStats,
     InFlightInfo (..),
     ProcessorId (..),
@@ -86,6 +84,12 @@ import Shibuya.Runner.Metrics
     incSizeTriggered,
     incTimeoutTriggered,
   )
+import Shibuya.Core.Types (Envelope (..))
+import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
+import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
+import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
+import Shibuya.Policy (Concurrency (..))
+import Shibuya.Prelude
 import Shibuya.Telemetry.Effect
   ( Tracing,
     addAttribute,
@@ -357,7 +361,7 @@ fstBatchKey :: (BatchInfo, NonEmpty (Ingested es msg)) -> BatchKey
 fstBatchKey (info, _) = info.batchKey
 
 -- | Self-contained driver for finite batch lists (tests / simple setups).
--- Mirrors 'Shibuya.Runner.Supervised.runWithMetrics': creates its own metrics
+-- Mirrors 'Shibuya.Internal.Runner.Supervised.runWithMetrics': creates its own metrics
 -- TVar and halt flag, runs execution to completion, and — after draining —
 -- throws 'ProcessorHalt' if a batch requested a halt. Returns the final metrics.
 runBatchesWithMetrics ::

@@ -50,7 +50,7 @@ module Shibuya.Core
     AppError (..),
     QueueProcessor (..),
     mkProcessor,
-    AppHandle (..),
+    AppHandle,
     waitApp,
     stopApp,
     stopAppGracefully,
@@ -82,15 +82,15 @@ module Shibuya.Core
 where
 
 import Shibuya.Adapter (Adapter (..))
-import Shibuya.App (AppError (..), AppHandle (..), QueueProcessor (..), ShutdownConfig (..), SupervisionStrategy (..), defaultShutdownConfig, getAppMetrics, mkProcessor, runApp, stopApp, stopAppGracefully, waitApp)
+import Shibuya.App (AppError (..), AppHandle, QueueProcessor (..), ShutdownConfig (..), SupervisionStrategy (..), defaultShutdownConfig, getAppMetrics, mkProcessor, runApp, stopApp, stopAppGracefully, waitApp)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Lease (Lease (..))
+import Shibuya.Core.Metrics (InFlightInfo (..), MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
 import Shibuya.Core.Types (Attempt (..), Cursor (..), Envelope (..), Headers, MessageId (..))
 import Shibuya.Handler (Handler)
+import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
 import Shibuya.Policy (Concurrency (..), Ordering (..), validatePolicy)
-import Shibuya.Runner.Halt (ProcessorHalt (..))
-import Shibuya.Runner.Metrics (InFlightInfo (..), MetricsMap, ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), StreamStats (..))
 import Prelude hiding (Ordering)

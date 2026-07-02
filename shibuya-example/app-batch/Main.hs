@@ -41,8 +41,8 @@ import Shibuya.Batch
   )
 import Shibuya.Core.Ack (DeadLetterReason (..))
 import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Metrics (BatchStats (..), StreamStats (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Runner.Metrics (BatchStats (..), StreamStats (..))
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 

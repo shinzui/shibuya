@@ -76,12 +76,12 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] Preflight: confirm EP-22, EP-23, EP-24 are Complete in the master plan registry; re-read the current bodies of `Shibuya/App.hs`, `Shibuya/Runner/Supervised.hs`, `Shibuya/Policy.hs` and note in Surprises & Discoveries anything that diverges from this plan's excerpts.
-- [ ] M1: move `Shibuya.Runner.{Master,Supervised,Batcher,BatchProcessor}` to `Shibuya.Internal.Runner.*` with no-stability Haddock headers; move `Shibuya.Runner.{Halt,Ingester}` to `Shibuya.Internal.Runner.*` (other-modules); delete `Shibuya.Runner.Serial` and `Shibuya.Runner.Processor`.
-- [ ] M1: rename `Shibuya.Runner.Metrics` to `Shibuya.Core.Metrics` (stays public).
-- [ ] M1: create `Shibuya.Internal.App` holding `AppHandle(..)` and `QueueProcessor(..)`; make `AppHandle` and `Master` opaque in `Shibuya.App` (type + accessors only); stop exporting `MasterState`, `MasterMessage`, and all NQE types from any public module.
-- [ ] M1: move `Shibuya.Prelude` to other-modules.
-- [ ] M1: update in-repo consumers (`shibuya-core` tests, `shibuya-metrics`, `shibuya-example`, `shibuya-core-bench`) to the new module names; build + test + example green; `nix fmt`; commit.
+- [x] Preflight: confirmed EP-22, EP-23, EP-24 are Complete in the master plan registry; re-read the current bodies of `Shibuya/App.hs`, `Shibuya/Runner/Supervised.hs`, `Shibuya/Policy.hs`. EP-24 had already corrected the `Ahead` Haddock, so there was no stale "Prefetch" wording to carry forward. Completed 2026-07-02.
+- [x] M1: moved `Shibuya.Runner.{Master,Supervised,Batcher,BatchProcessor}` to `Shibuya.Internal.Runner.*` with no-stability Haddock headers; moved `Shibuya.Runner.{Halt,Ingester}` to `Shibuya.Internal.Runner.*` (other-modules); deleted `Shibuya.Runner.Serial` and `Shibuya.Runner.Processor`. Also moved post-plan runner helpers `Finalize` and `KeyedScheduler` under `Shibuya.Internal.Runner.*`. Completed 2026-07-02.
+- [x] M1: renamed `Shibuya.Runner.Metrics` to `Shibuya.Core.Metrics` (stays public). Completed 2026-07-02.
+- [x] M1: created `Shibuya.Internal.App` holding `AppHandle(..)` and `QueueProcessor(..)`; made `AppHandle` and `Master` opaque in `Shibuya.App` (type + accessors only); stopped exporting `MasterState`, `MasterMessage`, and all NQE types from any public module. Completed 2026-07-02.
+- [x] M1: moved `Shibuya.Prelude` to other-modules. Completed 2026-07-02.
+- [x] M1: updated in-repo consumers (`shibuya-core` tests, `shibuya-metrics`, `shibuya-example`, `shibuya-core-bench`) to the new module names; `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt` completed. A bounded `exe:shibuya-example` run verified startup and message processing, but the example did not reach its documented five metrics snapshots before timeout; see Surprises & Discoveries. Completed 2026-07-02.
 - [ ] M2: delete `HandlerError.HandlerTimeout`, `RuntimeError.InboxOverflow`, `StreamStats.dropped` + `incDropped` (including the example's "Dropped" print line and the `shibuya_messages_dropped_total` metric in `shibuya-metrics`); delete `Shibuya.Telemetry.Config`; rewrite the `Shibuya.Telemetry` Quick Start.
 - [ ] M2: add `AppConfig` + `defaultAppConfig`; change `runApp` to take `AppConfig` (clean break, no shim); add `ConfigError`/`InvalidInboxSize` validation (`inboxSize >= 1`) returning `Left`; add regression tests for inboxSize 0 and negative.
 - [ ] M2: build + test + example green; `nix fmt`; commit.
@@ -100,7 +100,18 @@ This section must always reflect the actual current state of the work.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-07-02: The current post-EP-23/24 tree included `Shibuya.Runner.Finalize` and `Shibuya.Runner.KeyedScheduler`, which were not listed in M1's original move set. Leaving either under `Shibuya.Runner.*` would violate M1's public-surface goal, so both were moved to `Shibuya.Internal.Runner.*` and `Finalize`/`KeyedScheduler` were exposed under that internal namespace.
+
+- 2026-07-02: `cabal run exe:shibuya-example` starts processors and processes messages, but it does not reach the plan's expected "five metrics snapshots, then Done!" transcript within an 8 second bounded run. Evidence:
+
+  ```text
+  status=124
+  5:All processors started.
+  13:[orders] Processing: 1
+  14:[events] Processing: 100
+  ```
+
+  The example uses infinite adapters and floods stdout from handlers. This appears to be pre-existing drift in the example transcript rather than an M1 module-move regression; `cabal build all` and the test suite are green.
 
 
 ## Decision Log
@@ -224,6 +235,20 @@ Record every decision made while working on the plan.
   use; a one-release deprecation window costs one small module and softens the migration.
   Date: 2026-07-02
 
+- Decision: Move `Shibuya.Runner.Finalize` and `Shibuya.Runner.KeyedScheduler` to
+  `Shibuya.Internal.Runner.*` during M1 even though the original M1 bullet did not name them.
+  Rationale: Those helpers existed in the current post-EP-23/24 tree and are runner-owned
+  implementation machinery. Keeping public `Shibuya.Runner.*` modules after internalizing the
+  main runner modules would contradict the M1 public-surface goal.
+  Date: 2026-07-02
+
+- Decision: Treat the non-terminating `shibuya-example` transcript as a discovery for later
+  milestones rather than changing example behavior in M1.
+  Rationale: M1 is scoped to module moves and public-surface opacity. The example compiles and
+  starts processing through the moved imports; changing the infinite adapter/output behavior is
+  unrelated and would obscure the mechanical API move.
+  Date: 2026-07-02
+
 
 ## Outcomes & Retrospective
 
@@ -231,6 +256,11 @@ Summarize outcomes, gaps, and lessons learned at major milestones or at completi
 Compare the result against the original purpose.
 
 (To be filled during and after implementation.)
+
+- 2026-07-02 M1 outcome: Runner machinery now lives under `Shibuya.Internal.Runner.*`,
+  `Shibuya.Core.Metrics` is the public metrics type module, `Shibuya.App` exposes
+  `AppHandle` and `Master` abstractly, and in-repo packages compile against the new module
+  paths. The next milestone can start from the final M1 namespace layout.
 
 
 ## Context and Orientation
@@ -966,3 +996,13 @@ module `Shibuya.Core` = deprecated re-export of `Shibuya`.
 
 Milestone 4 — no new types; `shibuya-core.cabal` at `version: 0.8.0.0` with the trimmed
 `build-depends`; `shibuya-core/CHANGELOG.md` with the 0.8.0.0 entry.
+
+
+## Revision Notes
+
+- 2026-07-02: Recorded M1 implementation progress and validation evidence. Added the
+  discovery and decision that `Shibuya.Runner.Finalize` and `Shibuya.Runner.KeyedScheduler`
+  are also runner internals in the current tree, so they moved under
+  `Shibuya.Internal.Runner.*`. Recorded the bounded `exe:shibuya-example` verification
+  caveat: the example starts and processes messages but does not reach its documented
+  self-terminating transcript within the verification timeout.

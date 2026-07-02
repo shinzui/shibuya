@@ -16,6 +16,8 @@ import Network.HTTP.Types
     status503,
   )
 import Network.Wai (Application, Response, pathInfo, responseLBS)
+import Shibuya.App (Master, getAllMetricsIO, getProcessorMetricsIO)
+import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Metrics.Health
   ( DependencyCheck,
     HealthConfig,
@@ -26,8 +28,6 @@ import Shibuya.Metrics.Health
     checkReadiness,
     defaultHealthConfig,
   )
-import Shibuya.Runner.Master (Master, getAllMetricsIO, getProcessorMetricsIO)
-import Shibuya.Runner.Metrics (ProcessorId (..))
 
 -- | WAI application for JSON endpoints (without dependency checks).
 -- Handles:

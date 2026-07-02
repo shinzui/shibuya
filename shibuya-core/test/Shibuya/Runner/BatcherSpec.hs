@@ -17,7 +17,7 @@ import Shibuya.Batch
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
-import Shibuya.Runner.Batcher
+import Shibuya.Internal.Runner.Batcher
   ( ReadyBatch,
     emptyBatcherState,
     runBatcher,
@@ -99,7 +99,7 @@ batchCursors :: NE.NonEmpty (Ingested E String) -> [Int]
 batchCursors ne = [c | ing <- NE.toList ne, Just (CursorInt c) <- [ing.envelope.cursor]]
 
 spec :: Spec
-spec = describe "Shibuya.Runner.Batcher" $ do
+spec = describe "Shibuya.Internal.Runner.Batcher" $ do
   describe "pure core (deterministic, no threads)" $ do
     it "emits a size-triggered batch of exactly batchSize" $ do
       let cfg = partitionKeyConfig 2

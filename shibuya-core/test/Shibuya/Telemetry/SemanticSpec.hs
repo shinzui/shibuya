@@ -43,9 +43,9 @@ import Shibuya.Adapter.Mock (listAdapter)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested (..))
+import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
-import Shibuya.Runner.Metrics (ProcessorId (..))
-import Shibuya.Runner.Supervised (runWithMetrics)
+import Shibuya.Internal.Runner.Supervised (runWithMetrics)
 import Shibuya.Telemetry.Effect (runTracing)
 import Test.Hspec
 
