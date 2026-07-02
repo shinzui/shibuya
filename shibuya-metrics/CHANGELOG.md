@@ -2,8 +2,16 @@
 
 ## 0.8.0.0 — Unreleased
 
-Version bumped to track `shibuya-core` 0.8.0.0. No user-visible changes
-to `shibuya-metrics` itself.
+### Breaking Changes
+
+- Version bumped to track `shibuya-core` 0.8.0.0.
+- The Prometheus endpoint no longer emits
+  `shibuya_messages_dropped_total`; `shibuya-core` removed the always-zero
+  `StreamStats.dropped` counter.
+- Internal imports moved from `Shibuya.Runner.Master` and
+  `Shibuya.Runner.Metrics` to the new public paths `Shibuya.App` and
+  `Shibuya.Core.Metrics`. Application code using `shibuya-metrics` through
+  `Shibuya.Metrics` does not need to change.
 
 ## 0.7.1.0 — 2026-06-15
 

@@ -4,14 +4,67 @@
 
 ### Breaking Changes
 
-- `Shibuya.Runner.Supervised.runSupervised` now takes the `Ordering` policy
-  before `Concurrency`.
+- New application code should import the `Shibuya` umbrella module. It
+  re-exports the stable app, handler, batch, retry, policy, metrics, and
+  tracing surface. `Shibuya.Core` remains as a deprecated compatibility
+  re-export for this release.
+- Runner internals moved under `Shibuya.Internal.Runner.*` and carry no PVP
+  stability guarantee. The public moves are:
+  `Shibuya.Runner.Metrics` -> `Shibuya.Core.Metrics`;
+  `Shibuya.Runner.{Master,Supervised,Batcher,BatchProcessor}` ->
+  `Shibuya.Internal.Runner.*`; `Shibuya.Runner.{Halt,Ingester}` ->
+  `Shibuya.Internal.Runner.*` as hidden implementation modules.
+  `Shibuya.Runner.Serial` and `Shibuya.Runner.Processor` were deleted.
+  `Shibuya.Prelude` is no longer exposed.
+- `AppHandle` and `Master` are now opaque in public modules. Use
+  `getAppMaster`, `getAppMetrics`, `waitApp`, `stopApp`, and
+  `stopAppGracefully` instead of record fields. Metrics servers should import
+  `Master`, `getAllMetricsIO`, and `getProcessorMetricsIO` from
+  `Shibuya.App`.
+- `runApp` now takes an `AppConfig` record and validates `inboxSize`.
+  Invalid sizes return `Left (AppConfigInvalid (InvalidInboxSize n))`
+  instead of crashing or stalling.
+
+  ```haskell
+  -- before
+  runApp IgnoreFailures 100 processors
+
+  -- after
+  runApp defaultAppConfig processors
+
+  -- custom strategy/size
+  runApp defaultAppConfig {strategy = IgnoreFailures, inboxSize = 100} processors
+  ```
+
+- Handlers now receive `Message es msg` instead of `Ingested es msg`.
+  Handlers that only use `.envelope` or `.lease` need a signature update;
+  handlers can no longer call the adapter finalizer directly. The framework
+  owns finalization and calls `AckHandle.finalize` after the handler returns
+  or throws. Adapter finalizers should remain idempotent or phase-tracked.
+- `BatchHandler` likewise receives `NonEmpty (Message es msg)` instead of
+  `NonEmpty (Ingested es msg)`.
+- Removed dead or misleading surface: `HandlerError.HandlerTimeout`,
+  `RuntimeError.InboxOverflow`, `StreamStats.dropped`, `incDropped`,
+  the always-zero `shibuya_messages_dropped_total` Prometheus metric, and
+  `Shibuya.Telemetry.Config`.
+- Renamed `Ordering` to `OrderingPolicy`, eliminating the need for
+  `import Prelude hiding (Ordering)`. `runSupervised` also takes the ordering
+  policy before `Concurrency`.
 - `BatchingProcessor` now rejects `PartitionedInOrder` combined with `Ahead`
   or `Async`, because batches are scheduled by `BatchKey`, not
   `Envelope.partition`.
+- Renamed `Shibuya.Stream.batchStream` to `chunksOf`.
 
 ### New Features
 
+- Added `mkEnvelope :: MessageId -> msg -> Envelope msg`. It fills optional
+  metadata with defaults; set optional fields with record update syntax. This
+  is the recommended construction path because future optional `Envelope`
+  fields can then be added without forcing adapter code to change, avoiding
+  the kind of major bumps required by 0.5.0.0 and 0.7.0.0.
+- Added `mkIngested :: Envelope msg -> AckHandle es -> Ingested es msg`.
+- Added `Message es msg`, the read-only handler view containing envelope and
+  optional lease.
 - `PartitionedInOrder` with `Ahead` or `Async` is now enforced for
   single-message processors. Messages sharing an `Envelope.partition` key are
   processed and acknowledged in arrival order, distinct partitions run
@@ -39,6 +92,14 @@
 
 - Corrected `Ahead` documentation. It preserves stream-yield order only;
   handler execution and acknowledgement may complete in any order.
+- `TraceHeaders` remains a type alias with the same representation as
+  `Headers`; its docs now clarify that it is only the parsed W3C trace-context
+  projection, while `Headers` is the complete broker header set.
+- `shibuya-pgmq-adapter` and `shibuya-kafka-adapter` should migrate envelope
+  construction to `mkEnvelope` in their next releases.
+- Removed unused dependencies from `shibuya-core`: `effectful-core`,
+  `generic-lens`, `lens`, `uuid`, and `vector`. Internal unlift imports now use
+  the stable top-level `Effectful` exports.
 
 ## 0.7.1.0 — 2026-06-15
 

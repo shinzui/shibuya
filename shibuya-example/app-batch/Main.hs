@@ -19,6 +19,7 @@ import Data.Text.IO qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya
 import Shibuya.Adapter.Mock (TrackingAck, newTrackingAck, trackingAckHandle)
+import Shibuya.Core.Types qualified as Types
 import Streamly.Data.Stream qualified as Stream
 
 -- | The example payload. 'region' becomes the batch key; 'poison' orders are
@@ -46,7 +47,7 @@ sampleOrders =
 mkOrderIngested :: (IOE :> es) => TrackingAck -> Order -> Ingested es Order
 mkOrderIngested tracking o =
   let msgId = MessageId ("order-" <> Text.pack (show o.orderId))
-      envelope = (mkEnvelope msgId o :: Envelope Order) {partition = Just o.region}
+      envelope = (mkEnvelope msgId o :: Envelope Order) {Types.partition = Just o.region}
    in mkIngested envelope (trackingAckHandle tracking msgId)
 
 -- | Adapter that emits the five orders and then blocks until 'shutdown' fills

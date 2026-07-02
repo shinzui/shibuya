@@ -90,9 +90,9 @@ This section must always reflect the actual current state of the work.
 - [x] M3: renamed `Ordering` to `OrderingPolicy`; removed all `import Prelude hiding (Ordering)`; renamed `Shibuya.Stream.batchStream` to `chunksOf`; verified EP-24 had already fixed the `Ahead` Haddock; documented `TraceHeaders` vs `Headers` as aliases, not newtypes. Completed 2026-07-02.
 - [x] M3: created the `Shibuya` umbrella module; changed `Shibuya.Core` to a deprecated compatibility re-export; ported `shibuya-example/app/Main.hs` and `shibuya-example/app-batch/Main.hs` to `import Shibuya`. Completed 2026-07-02.
 - [x] M3: `cabal build all`, `cabal test shibuya-core-test`, `nix fmt`, public-name greps, and a negative bad-handler compile check completed; bounded `exe:shibuya-example` verified startup and message processing, with the pre-existing non-terminating transcript caveat still present. Completed 2026-07-02.
-- [ ] M4: drop `effectful-core`, `uuid`, `vector` from build-depends; replace the three `Effectful.Internal.Unlift` imports with the stable `Effectful` exports; replace the 15 lens use sites with plain record updates and drop `lens` + `generic-lens` (fall back to "record as future work" if any site turns non-mechanical); run a `-Wunused-packages` audit.
-- [ ] M4: bump version to 0.8.0.0; write `shibuya-core/CHANGELOG.md` migration notes for every breaking item; bump and note `shibuya-metrics`; run `cabal haddock shibuya-core` clean.
-- [ ] M4: build + test + example green; `nix fmt`; final commit; update master plan registry row EP-25 to Complete.
+- [x] M4: dropped unused direct dependencies (`effectful-core`, `uuid`, `vector`, `lens`, `generic-lens`, plus stale per-component deps found by the audit); replaced `Effectful.Internal.Unlift` imports with stable `Effectful` exports; replaced the lens/generic-lens use sites with plain record updates. `-Wunused-packages` audit completed with only module-level/component-closure false positives remaining; see Surprises & Discoveries. Completed 2026-07-02.
+- [x] M4: kept `shibuya-core` and `shibuya-metrics` at 0.8.0.0; wrote `shibuya-core/CHANGELOG.md` migration notes for every breaking item; added `shibuya-metrics` changelog notes; ran `cabal haddock shibuya-core` with generated docs and 100% coverage. Prose/link Haddock warnings were eliminated; only generated `Generic` `Rep_*` link warnings and a missing dependency-doc warning for `attoparsec` remain. Completed 2026-07-02.
+- [x] M4: final gate completed: `nix fmt`, clean `cabal build all`, `cabal test shibuya-core-test` (201 examples, 0 failures), bounded `timeout 8s cabal run exe:shibuya-example` startup/processing check (expected timeout 124), final Haddock generation, and master plan registry update. Completed 2026-07-02.
 
 
 ## Surprises & Discoveries
@@ -122,6 +122,26 @@ implementation. Provide concise evidence.
   Compiling source files directly misses Cabal's default extensions and fails too early.
   Against the built package, a handler that evaluates `msg.ack` fails for the intended
   reason: `Message es Int` has no `ack` field.
+
+- 2026-07-02: The `-Wunused-packages` audit is useful for finding stale direct
+  dependencies, but it is too coarse to produce a warning-free workspace transcript here.
+  GHC reports unused packages per compiled module while Cabal supplies component-wide
+  package flags. After removing actionable stale dependencies (`effectful-core`, `uuid`,
+  `vector`, `lens`, `generic-lens`, `shibuya-metrics`'s `unliftio`, the bench `stm`,
+  and unused example/bench `unordered-containers` entries), remaining warnings were
+  component/module false positives: e.g. `prometheus-client` is unused in
+  `Shibuya.Metrics.Config` but used by `Shibuya.Metrics.Prometheus`, and `streamly`
+  appears unused in several mains/spec modules while used elsewhere in those components or
+  supplied through the local package dependency closure. A clean `cabal build all` after
+  `cabal clean` completed without those audit warnings.
+
+- 2026-07-02: `cabal haddock shibuya-core` now emits no source-prose or public-contract
+  link warnings and reports 100% coverage. It still emits Haddock's generated
+  "could not find link destinations" warnings for derived `Generic` associated `Rep_*`
+  names, plus an external-package warning that no installed Haddock docs exist for
+  `attoparsec`. These are generated-documentation limitations rather than broken
+  Shibuya Haddock comments; generated pages for `Shibuya`, `Shibuya.App`,
+  `Shibuya.Batch`, and `Shibuya.Internal.*` were spot-checked.
 
 
 ## Decision Log

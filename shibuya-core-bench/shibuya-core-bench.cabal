@@ -48,16 +48,14 @@ benchmark shibuya-core-bench
   build-depends:
     base ^>=4.21.0.0,
     deepseq,
-    effectful-core ^>=2.6,
+    effectful ^>=2.6,
     nqe,
     shibuya-core,
-    stm,
     streamly ^>=0.11,
     streamly-core ^>=0.3,
     tasty-bench ^>=0.4,
     text ^>=2.1,
     time,
-    unordered-containers ^>=0.2,
 
 executable standalone-test
   import: warnings
@@ -84,11 +82,10 @@ executable standalone-test
   build-depends:
     base ^>=4.21.0.0,
     deepseq,
-    effectful-core ^>=2.6,
+    effectful ^>=2.6,
     nqe,
     shibuya-core,
     streamly ^>=0.11,
     streamly-core ^>=0.3,
     text ^>=2.1,
     time,
-    unordered-containers ^>=0.2,

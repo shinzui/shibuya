@@ -136,7 +136,7 @@ stopMaster master = liftIO $ do
   -- Cancel the supervisor first - this triggers NQE's stopAll which cancels all children
   cancel (getProcessAsync master.state.supervisor)
   -- Then cancel the master message loop
-  cancel (master ^. #handle)
+  cancel master.handle
 
 -- | The master process main loop.
 masterLoop :: MasterState -> Inbox MasterMessage -> IO ()

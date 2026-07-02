@@ -44,9 +44,9 @@ spec = do
           `shouldSatisfy` (\x -> x > 3.99 && x <= 4.0)
       it "delay never exceeds the clamped baseExp" $
         property $ \(NonNegative n) ->
-          forAll (choose (0.0, 0.999999)) $ \sample ->
+          forAll (choose (0.0, 0.999999)) $ \jitterSample ->
             let attemptN = Attempt (fromIntegral (n :: Int))
-                delay = secondsOf (exponentialBackoffPure p attemptN sample)
+                delay = secondsOf (exponentialBackoffPure p attemptN jitterSample)
              in delay >= 0 && delay <= 300
 
     describe "EqualJitter" $ do
@@ -58,9 +58,9 @@ spec = do
           `shouldSatisfy` (\x -> x > 3.99 && x <= 4.0)
       it "delay is in [baseExp/2, baseExp]" $
         property $ \(NonNegative n) ->
-          forAll (choose (0.0, 0.999999)) $ \sample ->
+          forAll (choose (0.0, 0.999999)) $ \jitterSample ->
             let attemptN = Attempt (fromIntegral (n :: Int))
-                delay = secondsOf (exponentialBackoffPure p attemptN sample)
+                delay = secondsOf (exponentialBackoffPure p attemptN jitterSample)
              in delay >= 0 && delay <= 300
 
     describe "Attempt 0" $ do
@@ -69,8 +69,8 @@ spec = do
           `shouldBe` 1.0
       it "with FullJitter is in [0, base)" $
         property $
-          forAll (choose (0.0, 0.999999)) $ \sample ->
-            let delay = secondsOf (exponentialBackoffPure (defaultBackoffPolicy {jitter = FullJitter}) (Attempt 0) sample)
+          forAll (choose (0.0, 0.999999)) $ \jitterSample ->
+            let delay = secondsOf (exponentialBackoffPure (defaultBackoffPolicy {jitter = FullJitter}) (Attempt 0) jitterSample)
              in delay >= 0 && delay < 1.0
 
   describe "retryWithBackoff" $ do

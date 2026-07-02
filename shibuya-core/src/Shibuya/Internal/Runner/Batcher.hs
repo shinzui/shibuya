@@ -4,11 +4,11 @@
 --
 -- Batch accumulation engine.
 --
--- Groups a stream of individual 'Ingested' messages into batches by batch key.
+-- Groups a stream of individual ingested messages into batches by batch key.
 -- A batch is emitted when it reaches the configured size, when its per-key
 -- timeout elapses, or when the input ends / the processor drains. This module
 -- only /regroups/ messages: it never runs a handler and never touches an
--- 'AckHandle'. Its correctness property is message conservation — every input
+-- an ack handle. Its correctness property is message conservation — every input
 -- message appears in exactly one emitted batch, and per batch key arrival order
 -- is preserved.
 --
@@ -73,11 +73,11 @@ data Accum es msg = Accum
     count :: !Int,
     -- | When the first message for this key arrived (drives the timeout).
     firstArrivalAt :: !UTCTime,
-    -- | Partition of the first message, copied into the emitted 'BatchInfo'.
+    -- | Partition of the first message, copied into the emitted batch info.
     partition0 :: !(Maybe Text)
   }
 
--- | The engine's memory: one 'Accum' per active batch key.
+-- | The engine's memory: one accumulator per active batch key.
 newtype BatcherState es msg = BatcherState
   { accums :: Map BatchKey (Accum es msg)
   }
@@ -135,7 +135,7 @@ stepArrival cfg now ing (BatcherState accums) =
                 then (BatcherState (Map.delete key accums), [emitAccum key TriggerSize acc'])
                 else (BatcherState (Map.insert key acc' accums), [])
 
--- | Emit every accumulator whose timeout has elapsed as of 'now'.
+-- | Emit every accumulator whose timeout has elapsed as of the supplied time.
 stepTick ::
   BatchConfig es msg ->
   UTCTime ->

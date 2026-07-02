@@ -45,9 +45,8 @@ import Control.Monad (when)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
-import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
+import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
-import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
 import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
@@ -64,6 +63,7 @@ import Shibuya.Core.Metrics
     incFailed,
     incProcessed,
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.BatchProcessor (processBatchesUntilDrained)
@@ -267,7 +267,7 @@ runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter
           now <- getCurrentTime
           atomically $
             modifyTVar' metricsVar $ \m ->
-              m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
+              m {Metrics.state = Failed (Text.pack (displayException ingesterErr)) now}
           UIO.throwIO ingesterErr
         Right () -> pure ()
 
@@ -276,7 +276,7 @@ runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter
 -- Identical in shape to 'runSupervised' but the inner loop accumulates messages
 -- into batches (via the 'BatchConfig') and runs a 'BatchHandler' over each batch,
 -- finalizing every message exactly once. On a batch-handler halt the child exits
--- gracefully (the 'ProcessorHalt' is caught here), matching 'runSupervised'.
+-- gracefully (the processor halt is caught here), matching 'runSupervised'.
 runSupervisedBatch ::
   (IOE :> es, Tracing :> es) =>
   Master ->
@@ -381,9 +381,10 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
 -- ('runSupervised', 'runSupervisedBatch', and 'runWithMetricsBatch') own
 -- marking the processor done via 'finally'.
 --
--- 'processBatchesUntilDrained' (EP-18) only /sets/ 'haltRef' on a batch-handler
--- 'AckHalt' or exhausted finalization; it does not throw. So we read 'haltRef'
--- after it returns and throw 'ProcessorHalt' here, mirroring the single-message
+-- 'processBatchesUntilDrained' (EP-18) only /sets/ the halt reference on a
+-- batch-handler @AckHalt@ or exhausted finalization; it does not throw. So we
+-- read the halt reference after it returns and throw a processor halt here,
+-- mirroring the single-message
 -- 'processUntilDrained'.
 runIngesterAndProcessorBatch ::
   (IOE :> es, Tracing :> es) =>
@@ -423,14 +424,14 @@ runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig
         now <- getCurrentTime
         atomically $
           modifyTVar' metricsVar $ \m ->
-            m & #state .~ Failed (Text.pack (displayException processorErr)) now
+            m {Metrics.state = Failed (Text.pack (displayException processorErr)) now}
         UIO.throwIO processorErr
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
           atomically $
             modifyTVar' metricsVar $ \m ->
-              m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
+              m {Metrics.state = Failed (Text.pack (displayException ingesterErr)) now}
           UIO.throwIO ingesterErr
         Right () -> pure ()
 
@@ -569,7 +570,7 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
           let current = case m.state of
                 Processing info _ -> info.inFlight
                 _ -> 0
-           in m & #state .~ Processing (InFlightInfo (current + 1) maxConc) now
+           in m {Metrics.state = Processing (InFlightInfo (current + 1) maxConc) now}
         m <- readTVar metricsVar
         pure $ case m.state of
           Processing info _ -> info.inFlight

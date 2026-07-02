@@ -34,7 +34,7 @@ module Shibuya.Telemetry.Effect
     OTel.NewEvent (..),
     OTel.Tracer,
     OTel.defaultSpanArguments,
-    OTel.toAttribute,
+    toAttribute,
   )
 where
 
@@ -43,14 +43,13 @@ import Data.ByteString qualified as BS
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Text (Text)
-import Effectful (Dispatch (..), DispatchOf, Eff, Effect, IOE, liftIO, withEffToIO, (:>))
+import Effectful (Dispatch (..), DispatchOf, Eff, Effect, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static
   ( SideEffects (..),
     StaticRep,
     evalStaticRep,
     getStaticRep,
   )
-import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
 import OpenTelemetry.Attributes (Attribute, ToAttribute)
 import OpenTelemetry.Attributes qualified as Attr
 import OpenTelemetry.Context qualified as Ctx
@@ -233,6 +232,10 @@ setStatus traceSpan status = do
   if not tracingEnabled
     then pure ()
     else liftIO $ OTel.setStatus traceSpan status
+
+-- | Convert a value to an OpenTelemetry attribute.
+toAttribute :: (ToAttribute a) => a -> Attribute
+toAttribute = OTel.toAttribute
 
 --------------------------------------------------------------------------------
 -- Context Operations

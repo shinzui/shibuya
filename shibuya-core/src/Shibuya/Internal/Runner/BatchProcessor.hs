@@ -9,15 +9,15 @@
 --
 --   1. Opens an OpenTelemetry span scoped to the whole batch.
 --   2. Runs the user's 'BatchHandler' under exception isolation.
---   3. On success, uses the returned 'BatchAck'; on exception, substitutes the
+--   3. On success, uses the returned batch ack; on exception, substitutes the
 --      framework default @ackAll (AckRetry (RetryDelay 0))@ (redeliver the whole
 --      batch, no data loss).
 --   4. Resolves EVERY message in its OWN retained 'NonEmpty' list to one
---      decision, looking each decision up by 'MessageId' with a fallback.
+--      decision, looking each decision up by message id with a fallback.
 --   5. Calls each message's idempotent finalizer with bounded retry. If retry
 --      is exhausted, records the message id and fails the processor loudly.
---   6. On 'AckHalt', sets a shared halt flag (does not throw); the caller drains
---      then throws 'ProcessorHalt'.
+--   6. On @AckHalt@, sets a shared halt flag (does not throw); the caller drains
+--      then throws a processor halt.
 --   7. Records batch metrics.
 --
 -- The decision loop iterates the framework's retained list, never the handler's
@@ -49,8 +49,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Maybe (listToMaybe)
 import Data.Text qualified as Text
-import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
-import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
+import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Batch
@@ -84,6 +83,7 @@ import Shibuya.Core.Metrics
     incSizeTriggered,
     incTimeoutTriggered,
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
@@ -165,7 +165,7 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
           let current = case m.state of
                 Processing i _ -> i.inFlight
                 _ -> 0
-           in m & #state .~ Processing (InFlightInfo (current + 1) maxConc) now
+           in m {Metrics.state = Processing (InFlightInfo (current + 1) maxConc) now}
         m <- readTVar metricsVar
         pure $ case m.state of
           Processing i _ -> i.inFlight
@@ -326,10 +326,10 @@ tshow :: (Show a) => a -> Text
 tshow = Text.pack . show
 
 -- | Fold the ready-batch stream, running each batch under the batch-concurrency
--- policy. Batches with the same 'BatchKey' are always serialized in emission
+-- policy. Batches with the same batch key are always serialized in emission
 -- order; different keys may run concurrently up to the configured bound. This
 -- does NOT throw on halt; after draining, the caller inspects @haltRef@ and
--- throws 'ProcessorHalt' (see 'runBatchesWithMetrics').
+-- throws a processor halt (see 'runBatchesWithMetrics').
 processBatchesUntilDrained ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
@@ -363,7 +363,7 @@ fstBatchKey (info, _) = info.batchKey
 -- | Self-contained driver for finite batch lists (tests / simple setups).
 -- Mirrors 'Shibuya.Internal.Runner.Supervised.runWithMetrics': creates its own metrics
 -- TVar and halt flag, runs execution to completion, and — after draining —
--- throws 'ProcessorHalt' if a batch requested a halt. Returns the final metrics.
+-- throws a processor halt if a batch requested a halt. Returns the final metrics.
 runBatchesWithMetrics ::
   (IOE :> es, Tracing :> es) =>
   ProcessorId ->

@@ -39,7 +39,7 @@ runIngester source inbox = do
       source
 
 -- | Run the ingester with metrics tracking.
--- Increments 'received' count for each message sent to inbox.
+-- Increments the received count for each message sent to inbox.
 runIngesterWithMetrics ::
   (IOE :> es) =>
   -- | Metrics TVar (for updating received count)

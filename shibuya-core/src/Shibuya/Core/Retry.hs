@@ -1,7 +1,7 @@
 -- | Exponential backoff policy and pure evaluator.
 --
--- Handlers compute a 'RetryDelay' from a 'BackoffPolicy' and the current
--- delivery 'Attempt'. The pure evaluator takes a jitter sample in @[0,1)@
+-- Handlers compute a retry delay from a backoff policy and the current
+-- delivery attempt. The pure evaluator takes a jitter sample in @[0,1)@
 -- and is suitable for property tests.
 module Shibuya.Core.Retry
   ( -- * Policy
@@ -122,7 +122,7 @@ exponentialBackoff policy attempt = do
 -- | One-line helper for the common case: read 'envelope.attempt', compute a
 -- backoff delay, and return 'AckRetry'.
 --
--- Treats 'Nothing' attempt as @'Attempt' 0@ (first delivery), so handlers
+-- Treats @Nothing@ attempt as @Attempt 0@ (first delivery), so handlers
 -- consuming envelopes from adapters that do not track redeliveries still
 -- get a sensible base-delay retry.
 retryWithBackoff ::

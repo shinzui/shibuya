@@ -19,10 +19,10 @@ import Shibuya.Internal.Runner.Supervised (SupervisedProcessor)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 
 -- | A queue processor pairs an adapter with a handler. The message type is
--- existentially hidden, allowing heterogeneous queues in one 'runApp' call.
+-- existentially hidden, allowing heterogeneous queues in one @runApp@ call.
 --
--- 'QueueProcessor' processes one message at a time; 'BatchingProcessor' groups
--- messages into batches (see "Shibuya.Batch") and runs a 'BatchHandler' over each.
+-- @QueueProcessor@ processes one message at a time; @BatchingProcessor@ groups
+-- messages into batches (see "Shibuya.Batch") and runs a batch handler over each.
 data QueueProcessor es where
   QueueProcessor ::
     { adapter :: Adapter es msg,

@@ -52,7 +52,6 @@ library
     stm ^>=2.5,
     text ^>=2.1,
     time ^>=1.14,
-    unliftio ^>=0.2,
     wai ^>=3.2,
     wai-websockets ^>=3.0,
     warp ^>=3.4,

@@ -133,7 +133,7 @@ data StreamStats = StreamStats
 emptyStreamStats :: StreamStats
 emptyStreamStats = StreamStats 0 0 0
 
--- | Batch-processing statistics, tracked alongside per-message 'StreamStats'.
+-- | Batch-processing statistics, tracked alongside per-message stream stats.
 data BatchStats = BatchStats
   { -- | Number of batches emitted and executed.
     batchesEmitted :: !Int,
@@ -188,36 +188,36 @@ type MetricsMap = Map ProcessorId ProcessorMetrics
 
 -- | Increment received count.
 incReceived :: StreamStats -> StreamStats
-incReceived = #received %~ (+ 1)
+incReceived s = s {received = s.received + 1}
 
 -- | Increment processed count.
 incProcessed :: StreamStats -> StreamStats
-incProcessed = #processed %~ (+ 1)
+incProcessed s = s {processed = s.processed + 1}
 
 -- | Increment failed count.
 incFailed :: StreamStats -> StreamStats
-incFailed = #failed %~ (+ 1)
+incFailed s = s {failed = s.failed + 1}
 
 -- | Increment the emitted-batch counter.
 incBatchesEmitted :: BatchStats -> BatchStats
-incBatchesEmitted = #batchesEmitted %~ (+ 1)
+incBatchesEmitted s = s {batchesEmitted = s.batchesEmitted + 1}
 
 -- | Add to the total batched-messages counter.
 addBatchedMessages :: Int -> BatchStats -> BatchStats
-addBatchedMessages n = #batchedMessages %~ (+ n)
+addBatchedMessages n s = s {batchedMessages = s.batchedMessages + n}
 
 -- | Increment the partial-failure batch counter.
 incPartialFailures :: BatchStats -> BatchStats
-incPartialFailures = #partialFailures %~ (+ 1)
+incPartialFailures s = s {partialFailures = s.partialFailures + 1}
 
 -- | Increment the size-trigger counter.
 incSizeTriggered :: BatchStats -> BatchStats
-incSizeTriggered = #sizeTriggered %~ (+ 1)
+incSizeTriggered s = s {sizeTriggered = s.sizeTriggered + 1}
 
 -- | Increment the timeout-trigger counter.
 incTimeoutTriggered :: BatchStats -> BatchStats
-incTimeoutTriggered = #timeoutTriggered %~ (+ 1)
+incTimeoutTriggered s = s {timeoutTriggered = s.timeoutTriggered + 1}
 
 -- | Increment the flush-trigger counter.
 incFlushTriggered :: BatchStats -> BatchStats
-incFlushTriggered = #flushTriggered %~ (+ 1)
+incFlushTriggered s = s {flushTriggered = s.flushTriggered + 1}

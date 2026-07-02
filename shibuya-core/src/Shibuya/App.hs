@@ -93,7 +93,7 @@ data SupervisionStrategy
   | -- | Stop all processors if any fails.
     -- A single processor failure triggers shutdown of all processors.
     -- Graceful exits, including finite streams completing and handlers returning
-    -- 'AckHalt', do not stop sibling processors.
+    -- @AckHalt@, do not stop sibling processors.
     StopAllOnFailure
   deriving stock (Eq, Show, Generic)
 
@@ -139,7 +139,7 @@ data AppError
     AppConfigInvalid !ConfigError
   deriving stock (Eq, Show)
 
--- | Configuration for 'runApp'.
+-- | Configuration for @runApp@.
 data AppConfig = AppConfig
   { -- | How processor failures affect siblings.
     strategy :: !SupervisionStrategy,

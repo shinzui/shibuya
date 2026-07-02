@@ -57,9 +57,9 @@ newTrackingAck = liftIO $ TrackingAck <$> newIORef []
 getTrackedDecisions :: (IOE :> es) => TrackingAck -> Eff es [(MessageId, AckDecision)]
 getTrackedDecisions tracking = liftIO $ readIORef tracking.trackedDecisions
 
--- | Wrap an envelope into an 'Ingested' whose acknowledgement is recorded by the
--- given 'TrackingAck', keyed by the envelope's own 'MessageId'. The lease is
--- 'Nothing'. Every call to the resulting handle's 'finalize' appends one
+-- | Wrap an envelope into an ingested message whose acknowledgement is recorded by the
+-- given tracker, keyed by the envelope's own message id. The lease is
+-- @Nothing@. Every call to the resulting handle's @finalize@ appends one
 -- @(messageId, decision)@ pair to the tracking list, so duplicate finalizes are
 -- observable.
 mkTrackedIngested :: (IOE :> es) => TrackingAck -> Envelope msg -> Ingested es msg
@@ -67,7 +67,7 @@ mkTrackedIngested tracking env =
   mkIngested env (trackingAckHandle tracking env.messageId)
 
 -- | Build an adapter from a list of envelopes where every message's acknowledgement
--- is recorded into one shared 'TrackingAck'. Combine with 'getTrackedDecisions' to
+-- is recorded into one shared tracker. Combine with 'getTrackedDecisions' to
 -- assert one successful finalization per message across a normal run.
 trackedListAdapter :: (IOE :> es) => TrackingAck -> [Envelope msg] -> Adapter es msg
 trackedListAdapter tracking envs =

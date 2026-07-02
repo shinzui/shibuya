@@ -75,7 +75,7 @@ injectTraceContext otelSpan = do
 -- and the failing-consumer's trace shows up linked to the resulting
 -- message in the downstream trace store. The lower-level
 -- 'injectTraceContext' is still exported for callers that already
--- hold a 'Span' handle from inside a 'withSpan''.
+-- hold a span handle from inside a @withSpan'@ callback.
 currentTraceHeaders ::
   (Tracing :> es, IOE :> es) =>
   Eff es (Maybe TraceHeaders)

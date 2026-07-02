@@ -16,5 +16,5 @@ import Shibuya.Core.Ingested (Message)
 -- If a handler throws, the framework records the failure and finalizes the
 -- message with @AckRetry (RetryDelay 0)@ so the message is not lost. A handler
 -- that needs a different disposition should catch its own exception and return
--- the desired 'AckDecision'.
+-- the desired ack decision.
 type Handler es msg = Message es msg -> Eff es AckDecision

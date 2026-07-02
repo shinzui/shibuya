@@ -215,7 +215,7 @@ internalSpanArgs =
 --------------------------------------------------------------------------------
 
 -- | Create a NewEvent with the given name and attributes.
--- Use 'toAttribute' to convert values to Attribute.
+-- Use @toAttribute@ to convert values to Attribute.
 --
 -- Example:
 --

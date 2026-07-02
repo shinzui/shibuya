@@ -67,7 +67,7 @@ type Headers = [(ByteString, ByteString)]
 --
 -- This is a type alias, not a newtype: it deliberately shares the same
 -- wire representation as 'Headers'. Use it only for the narrow parsed
--- trace-context projection (`traceparent` and optional `tracestate`);
+-- trace-context projection (@traceparent@ and optional @tracestate@);
 -- use 'Headers' for the full, non-lossy broker header set.
 type TraceHeaders = [(ByteString, ByteString)]
 
@@ -87,12 +87,12 @@ data Envelope msg = Envelope
     -- | All message headers as delivered by the source broker, in
     -- order and including duplicates.
     --
-    -- 'Nothing' means the adapter does not surface headers at all;
-    -- 'Just []' means the adapter surfaces headers and this message
-    -- carried none. The W3C trace headers ('traceparent' /
-    -- 'tracestate') appear here verbatim /in addition to/ their
-    -- parsed form in 'traceContext'; this field is the faithful,
-    -- non-lossy view and 'traceContext' is the narrow projection the
+    -- @Nothing@ means the adapter does not surface headers at all;
+    -- @Just []@ means the adapter surfaces headers and this message
+    -- carried none. The W3C trace headers (@traceparent@ /
+    -- @tracestate@) appear here verbatim /in addition to/ their
+    -- parsed form in @traceContext@; this field is the faithful,
+    -- non-lossy view and @traceContext@ is the narrow projection the
     -- framework uses to re-establish a parent span.
     headers :: !(Maybe Headers),
     -- | Optional zero-indexed delivery counter.
@@ -120,7 +120,7 @@ data Envelope msg = Envelope
   }
   deriving stock (Eq, Show, Functor, Generic)
 
--- | Construct an 'Envelope' from required fields, defaulting optional metadata.
+-- | Construct an envelope from required fields, defaulting optional metadata.
 -- Set optional fields with record-update syntax on the result.
 mkEnvelope :: MessageId -> msg -> Envelope msg
 mkEnvelope messageId payload =
@@ -136,11 +136,11 @@ mkEnvelope messageId payload =
       payload = payload
     }
 
--- | Manual 'NFData' so the @attributes@ field's 'Attribute' values do
+-- | Manual 'NFData' for envelopes so the @attributes@ field's 'Attribute' values do
 -- not require an upstream NFData instance (which
 -- @hs-opentelemetry-api@ does not currently ship). Forces every other
 -- field deeply and reduces 'attributes' to WHNF — every 'Attribute'
--- leaf is a small primitive ('Text', 'Bool', 'Double', 'Int64'), so
+-- leaf is a small primitive (@Text@, @Bool@, @Double@, @Int64@), so
 -- WHNF is enough to evaluate the contained values when the HashMap
 -- is itself in WHNF.
 instance (NFData msg) => NFData (Envelope msg) where
