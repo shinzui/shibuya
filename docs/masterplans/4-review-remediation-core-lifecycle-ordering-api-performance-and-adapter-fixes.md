@@ -42,7 +42,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Complete |
 | 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Complete |
 | 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Complete |
-| 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | Not Started |
+| 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | In Progress |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-22).
@@ -110,6 +110,8 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 - `PolicySpec.hs` currently asserts the buggy behavior ("allows Ahead/Async" for `PartitionedInOrder`) and `docs/architecture/CONCURRENCY.md` documents the wrong support matrix — EP-24 fixes both alongside the code.
 - EP-24's `shibuya-core` 0.8.0.0 version bump required a coordinated `shibuya-metrics` 0.8.0.0 bump and `shibuya-core ^>=0.8.0.0` dependency bound update; otherwise workspace-level `cabal build all` and even targeted `cabal test shibuya-core-test` could not solve dependencies because Cabal considered `shibuya-metrics` a user goal in the project.
 - EP-27's adapter version bump to `shibuya-pgmq-adapter` 0.9.0.0 exposed that parallel Cabal invocations in the same worktree can corrupt or split `dist-newstyle` build plans after a package-version change. A serial `cabal clean`, `cabal build all`, then `just test` produced a clean plan and green validation. Future adapter validation should avoid parallel Cabal commands against the same `dist-newstyle`.
+- EP-28 started against a sibling core checkout already at `shibuya-core` 0.8.0.0, so the Kafka adapter, benchmark package, and jitsurei package bounds had to move to `^>=0.8.0.0` before the workspace could solve. The `otel-demo` jitsurei also needed migration from pre-0.8 internal runner modules to the public `runApp`/`mkProcessor`/`waitApp` API.
+- EP-28 validation requires the Nix dev shell for native `librdkafka` linkage on this machine. Plain `cabal build all` typechecked the changed adapter modules but failed with `ld: library not found for -lrdkafka`; `nix develop -c cabal build all` completed successfully. Live integration tests still require Redpanda on `localhost:9092`; without it, broker-free tests pass and the Integration group reports connection refused.
 
 
 ## Decision Log
@@ -158,3 +160,5 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 ## Outcomes & Retrospective
 
 (To be filled during and after implementation.)
+
+Revision note, 2026-07-02: EP-28 was marked In Progress and the master Surprises & Discoveries section was updated with the Kafka adapter's `shibuya-core` 0.8 migration and validation-environment findings from M1.

@@ -58,10 +58,11 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 
 ## Progress
 
-- [ ] M1: `shutdown` tolerates `RdKafkaRespErrNoOffset` from `commitAllOffsets`.
-- [ ] M1: poll loop checks the shutdown flag inside the poll step; `takeUntilShutdown` removed.
-- [ ] M1: integration test — idle-topic graceful shutdown completes promptly without error.
-- [ ] M1: existing test suite still green; committed with trailers.
+- [x] M1: `shutdown` tolerates `RdKafkaRespErrNoOffset` from `commitAllOffsets`. (2026-07-02)
+- [x] M1: poll loop checks the shutdown flag inside the poll step; `takeUntilShutdown` removed. (2026-07-02)
+- [x] M1: integration test added for idle-topic graceful shutdown completing promptly without error. (2026-07-02)
+- [ ] M1: live broker validation — idle-topic graceful shutdown test passes against Redpanda on `localhost:9092`.
+- [ ] M1: existing integration suite green with broker; broker-free Adapter/Convert tests passed before broker connection failures; `nix develop -c cabal build all` is green.
 - [ ] M2: `KafkaAdapterState` (shutdown flag, seek barrier, fatal-error slot) introduced in `Internal.hs`.
 - [ ] M2: `AckRetry` no longer stores the offset; seeks the partition back to the failed offset; honors `RetryDelay`.
 - [ ] M2: seek barrier guards the store path (no offset above a pending retry offset is ever stored) and filters stale records at the source.
@@ -80,7 +81,9 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
 
 ## Surprises & Discoveries
 
-(None yet.)
+- 2026-07-02: The sibling core checkout is already `shibuya-core-0.8.0.0`, so the adapter, bench, and jitsurei package bounds had to move from `^>=0.7.0.0` to `^>=0.8.0.0` before Cabal could solve the workspace. The `otel-demo` jitsurei also imported pre-0.8 internal runner modules and now uses the public `runApp`/`mkProcessor`/`waitApp` API.
+- 2026-07-02: Plain `cabal build all` typechecked the changed adapter modules but failed at native link with `ld: library not found for -lrdkafka`; `nix develop -c cabal build all` provided the native library and completed successfully.
+- 2026-07-02: `nix develop -c cabal test shibuya-kafka-adapter --test-show-details=direct` built the test binary and all broker-free Adapter/Convert tests passed, but the Integration group could not be completed because Redpanda was not running on `localhost:9092` (`Connection refused`). The run was interrupted after repeated broker connection retries.
 
 
 ## Decision Log
@@ -953,3 +956,5 @@ owns `validatePolicy` in `shibuya-core/src/Shibuya/Policy.hs`, whose rejection o
 `PartitionedInOrder` + `Async` the Serial-only documentation cites. If EP-23 ships as a
 new shibuya-core version, bump the `shibuya-core` bound in the adapter cabal file in this
 plan's final commit and note the version here.
+
+Revision note, 2026-07-02: M1 implementation began. Progress now records the shutdown fixes, the idle-shutdown integration test addition, the required `shibuya-core` 0.8 bound migration, and validation evidence from the Nix dev shell; live broker validation remains pending because no Redpanda broker was listening on `localhost:9092`.
