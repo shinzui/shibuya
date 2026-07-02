@@ -539,3 +539,86 @@ spec = describe "Shibuya.Batch reliability" $ do
         getTrackedDecisions tracking
       finalizedExactlyOnce tracked (Map.fromList [(MessageId ("msg-" <> tshowT i), AckOk) | i <- [1 .. 20 :: Int]])
         `shouldBe` Right ()
+
+    -- #12 Keyed scheduler pending bound.
+    it "bounds upstream pulls while keyed batch handlers are blocked" $ do
+      tracking <- runEff $ runTracingNoop newTrackingAck
+      pulledRef <- newIORef (0 :: Int)
+      (pulledWhileBlocked, tracked) <- runEff $ runTracingNoop $ do
+        gate <- liftIO $ newTVarIO False
+        let pid = ProcessorId "bounded-keyed"
+            totalMessages = 50
+            inboxSize = 2
+            pendingLimit = max 2 (2 * 2)
+            allowedPulls = inboxSize + inboxSize + pendingLimit + 2 + 10
+            source = Stream.unfoldrM (pullStep tracking pulledRef totalMessages) (1 :: Int)
+            adapter =
+              Adapter
+                { adapterName = "test:counting-source",
+                  source = source,
+                  shutdown = pure ()
+                }
+            cfg = (defaultBatchConfig @_ @Int) {batchSize = 1, batchTimeout = 30, batchKey = scenarioBatchKey}
+            handler _ _ = do
+              liftIO $ atomically $ readTVar gate >>= check
+              pure ackAllOk
+            proc =
+              BatchingProcessor
+                { adapter = adapter,
+                  batchHandler = handler,
+                  batchConfig = cfg,
+                  ordering = Unordered,
+                  concurrency = Async 2
+                }
+        app <- runAppOrFail inboxSize [(pid, proc)]
+        liftIO $ threadDelay 300000
+        pulled <- liftIO $ readIORef pulledRef
+        liftIO $ atomically $ writeTVar gate True
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 10}) app
+        t <- getTrackedDecisions tracking
+        liftIO $ pulled `shouldSatisfy` (<= allowedPulls)
+        pure (pulled, t)
+      pulledWhileBlocked `shouldSatisfy` (< 50)
+      finalizedExactlyOnce tracked (Map.fromList [(MessageId ("msg-" <> tshowT i), AckOk) | i <- [1 .. 50 :: Int]])
+        `shouldBe` Right ()
+
+    -- #13 Forced shutdown must not leak keyed scheduler workers.
+    it "does not finalize additional messages after forced shutdown returns" $ do
+      tracking <- runEff $ runTracingNoop newTrackingAck
+      (drained, trackedBefore, trackedAfter) <- runEff $ runTracingNoop $ do
+        let pid = ProcessorId "shutdown-no-leak"
+            cfg = (defaultBatchConfig @_ @Int) {batchSize = 1, batchTimeout = 30, batchKey = scenarioBatchKey}
+            handler _ _ = do
+              liftIO $ threadDelay 200000
+              pure ackAllOk
+            proc =
+              BatchingProcessor
+                { adapter = trackedListAdapter tracking (fixedEnvelopes 30),
+                  batchHandler = handler,
+                  batchConfig = cfg,
+                  ordering = Unordered,
+                  concurrency = Async 2
+                }
+        app <- runAppOrFail 2 [(pid, proc)]
+        liftIO $ threadDelay 50000
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 0.05}) app
+        t1 <- getTrackedDecisions tracking
+        liftIO $ threadDelay 300000
+        t2 <- getTrackedDecisions tracking
+        pure (d, t1, t2)
+      drained `shouldBe` False
+      trackedAfter `shouldBe` trackedBefore
+      Set.size (Set.fromList (map fst trackedAfter)) `shouldBe` length trackedAfter
+
+pullStep ::
+  (IOE :> es) =>
+  TrackingAck ->
+  IORef Int ->
+  Int ->
+  Int ->
+  Eff es (Maybe (Ingested es Int, Int))
+pullStep tracking pulledRef totalMessages i
+  | i > totalMessages = pure Nothing
+  | otherwise = do
+      liftIO $ modifyIORef' pulledRef (+ 1)
+      pure (Just (mkTrackedIngested tracking (mkEnvelope i (BatchKey "default") i), i + 1))

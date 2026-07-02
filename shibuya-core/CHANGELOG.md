@@ -15,6 +15,9 @@
 - Batch processing now isolates `AckHalt`: batches already emitted after a halt
   no longer re-enter the user batch handler, and their messages are finalized
   with `AckRetry (RetryDelay 0)` instead of being left unacknowledged.
+- The keyed batch scheduler now keeps its pending queue bounded and owns its
+  reader and worker threads with structured cleanup, preventing unbounded pulls
+  under slow handlers and preventing finalization after forced shutdown returns.
 
 ## 0.7.1.0 — 2026-06-15
 

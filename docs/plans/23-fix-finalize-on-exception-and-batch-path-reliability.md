@@ -75,10 +75,10 @@ and pass after, runnable with `cabal test shibuya-core-test` from the repository
 - [x] 2026-07-02: M3: halt isolation in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` — `processOneBatch` checks the halt flag before running the handler; halt-skipped batches finalize every message with `AckRetry (RetryDelay 0)` and are accounted like exception-substituted batches.
 - [x] 2026-07-02: M3: tests — after `AckHalt`, buffered batches never reach the batch handler yet all their messages are finalized exactly once with the retry decision.
 - [x] 2026-07-02: M3: `cabal build all`, `cabal test shibuya-core-test` (183 examples, 0 failures), `nix fmt`, commit with trailers.
-- [ ] M4: bound the keyed scheduler's pending buffer in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` (reader blocks when pending reaches `max 2 (2 * maxConcurrency)`).
-- [ ] M4: bracket the scheduler's reader and workers (structured concurrency; cancellation-safe `finishBatch` accounting; cancel-and-await all workers on any scheduler exit).
-- [ ] M4: tests — backpressure bound holds under a blocked handler; forced shutdown produces zero finalizations after `stopAppGracefully` returns; scheduler terminates after a worker is cancelled.
-- [ ] M4: build, test, format, commit with trailers; update masterplan Progress rows for EP-23; write Outcomes & Retrospective.
+- [x] 2026-07-02: M4: bound the keyed scheduler's pending buffer in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` (reader blocks when pending reaches `max 2 (2 * maxConcurrency)`).
+- [x] 2026-07-02: M4: bracket the scheduler's reader and workers (structured concurrency; cancellation-safe `finishBatch` accounting; cancel-and-await all workers on any scheduler exit).
+- [x] 2026-07-02: M4: tests — backpressure bound holds under a blocked handler; forced shutdown produces zero finalizations after `stopAppGracefully` returns; scheduler terminates after a worker is cancelled.
+- [x] 2026-07-02: M4: `cabal build all`, `cabal test shibuya-core-test` (185 examples, 0 failures), `nix fmt`, commit with trailers; update masterplan Progress rows for EP-23; write Outcomes & Retrospective.
 
 
 ## Surprises & Discoveries
@@ -172,7 +172,20 @@ implementation. Provide concise evidence.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+EP-23 is complete as of 2026-07-02. The single-message runner now finalizes
+handler exceptions as `AckRetry (RetryDelay 0)` with bounded retry and loud
+halt-on-exhaustion; the `AckHandle` and `Handler` documentation now state the
+idempotent finalization contract used by the adapter plans. Batch processing now
+propagates batcher consumer failures, skips post-halt batches without calling the
+user batch handler while still finalizing them, and keeps the keyed scheduler's
+pending work bounded and owned by structured cleanup.
+
+Validation evidence: `cabal build all` passed; `cabal test shibuya-core-test`
+passed with 185 examples and 0 failures; `nix fmt` completed. Regression coverage
+now includes throwing single-message handlers, transient and permanent finalizer
+failures, throwing `batchKey`, post-halt ready batches, bounded upstream pulls
+under a blocked keyed handler, and no new finalizations after forced shutdown
+returns.
 
 
 ## Context and Orientation
@@ -818,3 +831,8 @@ scenario, and validating with `cabal build all`, `cabal test shibuya-core-test`,
 `processOneBatch`, proving already-ready batches after a halt do not reach the
 user batch handler, and validating with `cabal build all`,
 `cabal test shibuya-core-test`, and `nix fmt`.
+
+2026-07-02: Marked M4 and EP-23 complete after bounding and bracketing the keyed
+batch scheduler, adding blocked-handler and forced-shutdown reliability
+scenarios, updating the MasterPlan registry and progress rows, and validating
+with `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt`.

@@ -29,6 +29,7 @@ module Shibuya.Runner.BatchProcessor
 where
 
 import Control.Applicative ((<|>))
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM
   ( STM,
     TVar,
@@ -42,7 +43,7 @@ import Control.Concurrent.STM
   )
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
-import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
+import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef, writeIORef)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
@@ -51,6 +52,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
+import Data.Unique (Unique, newUnique)
 import Effectful (Eff, IOE, liftIO, withEffToIO, (:>))
 import Effectful.Internal.Unlift (Limit (..), Persistence (..), UnliftStrategy (..))
 import OpenTelemetry.Attributes (toAttribute)
@@ -120,8 +122,8 @@ import Shibuya.Telemetry.Semantic
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (SomeException, catchAny, throwIO)
-import UnliftIO.Async (async)
+import UnliftIO (SomeException, catchAny, finally, throwIO)
+import UnliftIO.Async (Async, async, cancel, withAsync)
 
 -- | Execute one emitted batch and finalize every retained message resiliently.
 --
@@ -349,14 +351,15 @@ processBatchesUntilDrained metricsVar procId concurrency handler batchStream hal
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let batchAction = runInIO . processOneBatch metricsVar procId maxConc haltRef handler
+        pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
         Stream.fold Fold.drain $
           Stream.mapM batchAction batchStream
       Ahead n ->
-        runKeyedBatchScheduler n batchAction batchStream
+        runKeyedBatchScheduler n pendingLimit batchAction batchStream
       Async n ->
-        runKeyedBatchScheduler n batchAction batchStream
+        runKeyedBatchScheduler n pendingLimit batchAction batchStream
 
 -- | Per-key FIFO scheduler state, guarded by a single 'TVar'.
 data KeyedSchedulerState es msg = KeyedSchedulerState
@@ -383,46 +386,75 @@ emptyKeyedSchedulerState =
 
 runKeyedBatchScheduler ::
   Int ->
+  Int ->
   ((BatchInfo, NonEmpty (Ingested es msg)) -> IO ()) ->
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
   IO ()
-runKeyedBatchScheduler requestedConcurrency batchAction batchStream = do
+runKeyedBatchScheduler requestedConcurrency pendingLimit batchAction batchStream = do
   scheduler <- newTVarIO emptyKeyedSchedulerState
+  workers <- newTVarIO (Map.empty :: Map.Map Unique (Async ()))
   let maxConcurrency = max 1 requestedConcurrency
+      cancelWorkers = do
+        liveWorkers <- readTVarIO workers
+        traverse_ cancel (Map.elems liveWorkers)
 
-  _reader <-
-    async $
-      ( do
-          Stream.fold Fold.drain $
-            Stream.mapM (enqueueBatch scheduler) batchStream
-          atomically $ markInputDone scheduler Nothing
-      )
-        `catchAny` \ex ->
-          atomically $ markInputDone scheduler (Just ex)
+      reader =
+        ( do
+            Stream.fold Fold.drain $
+              Stream.mapM (enqueueBatch pendingLimit scheduler) batchStream
+            atomically $ markInputDone scheduler Nothing
+        )
+          `catchAny` \ex ->
+            atomically $ markInputDone scheduler (Just ex)
 
-  let loop = do
+      loop = do
         step <- atomically $ nextSchedulerStep maxConcurrency scheduler
         case step of
           SchedulerDone Nothing -> pure ()
           SchedulerDone (Just ex) -> throwIO ex
           StartBatch batch -> do
-            _worker <-
-              async $
-                (batchAction batch >> pure Nothing)
-                  `catchAny` (pure . Just)
-                  >>= atomically . finishBatch scheduler batch
+            workerId <- newUnique
+            startGate <- newEmptyMVar
+            worker <- async $ do
+              takeMVar startGate
+              runWorker scheduler workers workerId batchAction batch
+            atomically $ modifyTVar' workers (Map.insert workerId worker)
+            putMVar startGate ()
             loop
 
-  loop
+  withAsync reader $ \_reader ->
+    loop `finally` cancelWorkers
+
+runWorker ::
+  TVar (KeyedSchedulerState es msg) ->
+  TVar (Map.Map Unique (Async ())) ->
+  Unique ->
+  ((BatchInfo, NonEmpty (Ingested es msg)) -> IO ()) ->
+  (BatchInfo, NonEmpty (Ingested es msg)) ->
+  IO ()
+runWorker scheduler workers workerId batchAction batch = do
+  resultRef <- newIORef Nothing
+  let runBatch =
+        (batchAction batch >> pure Nothing)
+          `catchAny` (pure . Just)
+          >>= writeIORef resultRef
+      cleanup = do
+        result <- readIORef resultRef
+        atomically $ finishBatch scheduler batch result
+        atomically $ modifyTVar' workers (Map.delete workerId)
+  runBatch `finally` cleanup
 
 enqueueBatch ::
+  Int ->
   TVar (KeyedSchedulerState es msg) ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   IO ()
-enqueueBatch scheduler batch =
-  atomically $
-    modifyTVar' scheduler $ \s ->
-      s {pending = s.pending Seq.|> batch}
+enqueueBatch pendingLimit scheduler batch =
+  atomically $ do
+    s <- readTVar scheduler
+    if Seq.length s.pending >= pendingLimit
+      then retry
+      else writeTVar scheduler s {pending = s.pending Seq.|> batch}
 
 markInputDone ::
   TVar (KeyedSchedulerState es msg) ->
