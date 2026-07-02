@@ -60,9 +60,9 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] Verify EP-22 and EP-23 are marked Complete in the master plan registry; re-locate all cited code regions in the post-EP-22/23 tree.
-- [ ] M0: add `Bench.HotPath` module to `shibuya-core-bench` (no-op handler, mock list adapter, Serial and Async 8, 10k messages, tracing disabled).
-- [ ] M0: run the benchmark and paste baseline numbers into this plan's evidence block.
+- [x] 2026-07-02: Verified EP-22 and EP-23 are marked Complete in the master plan registry; re-located the current post-EP-22/23 code regions before starting M0.
+- [x] 2026-07-02: M0: added `Bench.HotPath` module to `shibuya-core-bench` (no-op handler, mock list adapter, Serial and Async 8, 10k messages, tracing disabled).
+- [x] 2026-07-02: M0: ran the benchmark and pasted baseline numbers into this plan's evidence block.
 - [ ] M1: add `atomic-primops` to `shibuya-core.cabal`; introduce `HotCounters`/`MetricsHandle`/`sampleMetrics` in `Shibuya/Runner/Metrics.hs`.
 - [ ] M1: rewrite `runIngesterWithMetrics`, `processOne`, `decrementAndUpdate`, and the batch-path metrics sites to use counters; move the `Processing` timestamp to the idle→processing transition.
 - [ ] M1: thread `MetricsHandle` through `Supervised.hs`, `Master.hs`, `BatchProcessor.hs`, and update tests/benches that read `sp.metrics` directly.
@@ -79,7 +79,14 @@ This section must always reflect the actual current state of the work.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-07-02: The M0 no-op benchmark confirms the expected contention signature before any metrics
+  changes: `async8-noop-10000` is much slower than Serial even though the handler only returns
+  `AckOk`. Evidence:
+
+  ```text
+  serial-noop-10000: 14.5 ms ± 970 μs
+  async8-noop-10000: 155 ms ± 14 ms
+  ```
 
 
 ## Decision Log
@@ -315,10 +322,17 @@ recorded in the evidence block below. Note: if `Async 8` with a no-op handler st
 slower than Serial at baseline, that is itself evidence of the contention this plan fixes — record
 it in Surprises & Discoveries, do not "fix" the benchmark to hide it.
 
-Baseline evidence (fill in when run; include machine note, e.g. `-N` capability count):
+Baseline evidence (run on 2026-07-02 with the benchmark binary's Cabal-configured `-with-rtsopts=-N`):
 
 ```text
-(To be filled at M0: paste the tasty-bench output for the hot-path group here.)
+All
+  hot-path
+    serial-noop-10000: OK
+      14.5 ms ± 970 μs,  30 MB allocated, 3.4 KB copied, 341 MB peak memory
+    async8-noop-10000: OK
+      155  ms ±  14 ms,  71 MB allocated, 807 KB copied, 343 MB peak memory
+
+All 2 tests passed (2.83s)
 ```
 
 

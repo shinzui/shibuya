@@ -33,6 +33,7 @@ benchmark shibuya-core-bench
     Bench.Concurrency
     Bench.Framework
     Bench.Handler
+    Bench.HotPath
 
   default-extensions:
     DeriveAnyClass
