@@ -17,7 +17,6 @@ import Data.List (isInfixOf)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (fromMaybe)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -327,6 +326,39 @@ spec = describe "Shibuya.Batch reliability" $ do
       let expected = Map.fromList [(MessageId ("msg-" <> tshowT i), AckRetry (RetryDelay 0)) | i <- [1 .. 4 :: Int]]
       finalizedExactlyOnce tracked expected `shouldBe` Right ()
       drained `shouldBe` True
+
+    -- #4b Batcher consumer exception -> processor failure, not clean completion.
+    it "propagates a throwing batchKey as processor failure without double finalizing" $ do
+      tracking <- runEff $ runTracingNoop newTrackingAck
+      (tracked, mState, done, drained) <- runEff $ runTracingNoop $ do
+        let pid = ProcessorId "batch-key-failure"
+            cfg =
+              (defaultBatchConfig @_ @Int)
+                { batchSize = 10,
+                  batchTimeout = 30,
+                  batchKey = \env ->
+                    if env.messageId == MessageId "msg-3"
+                      then error "boom in batchKey"
+                      else scenarioBatchKey env
+                }
+            handler _ _ = pure ackAllOk
+            adapter = trackedListAdapter tracking (fixedEnvelopes 5)
+            proc = mkBatchProcessor adapter handler cfg
+        app <- runAppOrFail 100 [(pid, proc)]
+        liftIO $ threadDelay 300000
+        m <- metricsFor app pid
+        doneState <- case Map.lookup pid app.processors of
+          Just (sp, _) -> liftIO $ readTVarIO sp.done
+          Nothing -> liftIO $ ioError (userError "missing batch-key-failure processor")
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+        t <- getTrackedDecisions tracking
+        pure (t, m.state, doneState, d)
+      case mState of
+        Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "boom in batchKey"
+        other -> expectationFailure ("expected Failed, got: " <> show other)
+      done `shouldBe` True
+      drained `shouldBe` True
+      tracked `shouldBe` []
 
     -- #5 Transient finalizer retry.
     it "retries a transient finalizer failure and records one success" $ do

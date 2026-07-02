@@ -69,9 +69,9 @@ and pass after, runnable with `cabal test shibuya-core-test` from the repository
 - [x] 2026-07-02: M1: rewrite the Haddock contract in `shibuya-core/src/Shibuya/Core/AckHandle.hs` (remove "Must be called exactly once") and reference it from `shibuya-core/src/Shibuya/Handler.hs`.
 - [x] 2026-07-02: M1: tests — single-message conservation with throwing handlers (exactly one finalize, decision `AckRetry (RetryDelay 0)`), transient finalize-retry success, exhausted finalize retry fails loudly with the message id.
 - [x] 2026-07-02: M1: `cabal build all`, `cabal test shibuya-core-test` (181 examples, 0 failures), `nix fmt`, commit with trailers.
-- [ ] M2: propagate batcher consumer failure in `shibuya-core/src/Shibuya/Runner/Batcher.hs` (`waitCatch` the consumer async at drain end, rethrow).
-- [ ] M2: tests — a throwing `batchKey` fails the processor loudly, no message is finalized more than once, no clean-completion report.
-- [ ] M2: build, test, format, commit with trailers.
+- [x] 2026-07-02: M2: propagate batcher consumer failure in `shibuya-core/src/Shibuya/Runner/Batcher.hs` (`waitCatch` the consumer async at drain end, rethrow).
+- [x] 2026-07-02: M2: tests — a throwing `batchKey` fails the processor loudly, no message is finalized more than once, no clean-completion report.
+- [x] 2026-07-02: M2: `cabal build all`, `cabal test shibuya-core-test` (182 examples, 0 failures), `nix fmt`, commit with trailers.
 - [ ] M3: halt isolation in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` — `processOneBatch` checks the halt flag before running the handler; halt-skipped batches finalize every message with `AckRetry (RetryDelay 0)` and are accounted like exception-substituted batches.
 - [ ] M3: tests — after `AckHalt`, buffered batches never reach the batch handler yet all their messages are finalized exactly once with the retry decision.
 - [ ] M3: build, test, format, commit with trailers.
@@ -86,7 +86,12 @@ and pass after, runnable with `cabal test shibuya-core-test` from the repository
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-07-02: Propagating the `runBatcher` consumer exception was not sufficient
+  by itself: `runIngesterAndProcessorBatch` also needed to mark processor-stage
+  exceptions as `Failed` before rethrowing. The focused `batchKey` regression
+  initially observed the rethrow but saw final metrics `Idle`; adding the
+  batch-processor-stage failure accounting made the processor state name the
+  thrown `boom in batchKey` exception.
 
 
 ## Decision Log
@@ -802,3 +807,9 @@ and must find the contract wording already in place.
 extracting `Shibuya.Runner.Finalize`, applying single-message finalize-on-exception
 semantics, updating the `AckHandle` and `Handler` Haddocks, adding regression tests, and
 validating with `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt`.
+
+2026-07-02: Marked M2 complete after threading the batcher consumer `Async` into
+`drainQueue`, rethrowing failed consumer results with `waitCatch`, marking batch
+processor-stage exceptions as `Failed`, adding a throwing-`batchKey` reliability
+scenario, and validating with `cabal build all`, `cabal test shibuya-core-test`, and
+`nix fmt`.

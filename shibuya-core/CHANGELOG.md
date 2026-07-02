@@ -9,6 +9,9 @@
   as batch processing, so adapters observe a disposition instead of silently
   losing or stranding the delivery. Exhausted finalizer retry now halts the
   processor loudly with the failed message id.
+- Batch accumulation failures, including exceptions from user-provided
+  `batchKey` functions, now fail the processor loudly instead of letting the
+  batcher consumer die while the processor reports clean completion.
 
 ## 0.7.1.0 — 2026-06-15
 

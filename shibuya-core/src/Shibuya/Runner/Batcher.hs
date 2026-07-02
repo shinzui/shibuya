@@ -58,8 +58,8 @@ import Shibuya.Prelude
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (finally)
-import UnliftIO.Async (async, cancel)
+import UnliftIO (finally, throwIO)
+import UnliftIO.Async (Async, async, cancel, waitCatch)
 
 -- | In-progress state for one batch key.
 data Accum es msg = Accum
@@ -85,6 +85,10 @@ emptyBatcherState = BatcherState Map.empty
 -- | A finished group ready to hand downstream: metadata plus its messages in
 -- arrival order. This is the exact value the execution stage (EP-18) consumes.
 type ReadyBatch es msg = (BatchInfo, NonEmpty (Ingested es msg))
+
+data DrainStep es msg
+  = DrainReady !(ReadyBatch es msg)
+  | DrainDone
 
 -- | Build a ReadyBatch from a completed accumulator. Reverses the buffered
 -- messages back into arrival order; safe because count >= 1.
@@ -196,9 +200,9 @@ runBatcher outputCapacity cfg input =
 
           -- Consume the whole input, flush the remainder, then mark done.
           -- 'finally' guarantees doneVar is set even if the input stream throws,
-          -- so the output stream below always terminates. Propagating a consumer
-          -- failure to the caller is the integration plan's concern (EP-19), just
-          -- as the per-message loop polls its ingester async.
+          -- so the output stream below always reaches the drain point. The drain
+          -- then observes this async with 'waitCatch' and rethrows any consumer
+          -- failure instead of reporting clean completion.
           consumer =
             ( do
                 Stream.fold Fold.drain (Stream.mapM onArrival input)
@@ -224,23 +228,33 @@ runBatcher outputCapacity cfg input =
       cancel tickerA
       cancel consumerA
 
-    consume (outQ, doneVar, _consumerA, _tickerA) = drainQueue outQ doneVar
+    consume (outQ, doneVar, consumerA, _tickerA) = drainQueue consumerA outQ doneVar
 
 -- | Stream finished batches out of the bounded queue, ending when the consumer
--- has flushed everything (doneVar) and the queue has drained.
+-- has flushed everything (doneVar), the queue has drained, and the consumer
+-- async is known to have completed successfully.
 drainQueue ::
+  Async () ->
   TBQueue (ReadyBatch es msg) ->
   TVar Bool ->
   Stream IO (ReadyBatch es msg)
-drainQueue outQ doneVar = Stream.unfoldrM step ()
+drainQueue consumerA outQ doneVar = Stream.unfoldrM step ()
   where
-    step _ = atomically $ do
-      mReady <- tryReadTBQueue outQ
-      case mReady of
-        Just rb -> pure (Just (rb, ()))
-        Nothing -> do
-          done <- readTVar doneVar
-          qEmpty <- isEmptyTBQueue outQ
-          if done && qEmpty
-            then pure Nothing
-            else retry
+    step _ = do
+      drainStep <-
+        atomically $ do
+          mReady <- tryReadTBQueue outQ
+          case mReady of
+            Just rb -> pure (DrainReady rb)
+            Nothing -> do
+              done <- readTVar doneVar
+              qEmpty <- isEmptyTBQueue outQ
+              if done && qEmpty
+                then pure DrainDone
+                else retry
+      case drainStep of
+        DrainReady rb -> pure (Just (rb, ()))
+        DrainDone ->
+          waitCatch consumerA >>= \case
+            Left ex -> throwIO ex
+            Right () -> pure Nothing

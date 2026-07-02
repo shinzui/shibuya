@@ -400,16 +400,23 @@ runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       let inboxStream = inboxToStream inbox streamDoneVar haltRef
           readyBatchStream = runBatcher inboxSize batchConfig inboxStream
-      runInIO $ do
-        processBatchesUntilDrained
-          metricsVar
-          procId
-          concurrency
-          batchHandler
-          readyBatchStream
-          haltRef
-        maybeHalt <- liftIO (readIORef haltRef)
-        maybe (pure ()) (throwIO . ProcessorHalt) maybeHalt
+          batchProcessor =
+            runInIO $ do
+              processBatchesUntilDrained
+                metricsVar
+                procId
+                concurrency
+                batchHandler
+                readyBatchStream
+                haltRef
+              maybeHalt <- liftIO (readIORef haltRef)
+              maybe (pure ()) (throwIO . ProcessorHalt) maybeHalt
+      batchProcessor `catchAny` \processorErr -> do
+        now <- getCurrentTime
+        atomically $
+          modifyTVar' metricsVar $ \m ->
+            m & #state .~ Failed (Text.pack (displayException processorErr)) now
+        UIO.throwIO processorErr
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
