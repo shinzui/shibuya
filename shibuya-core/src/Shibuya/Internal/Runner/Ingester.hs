@@ -11,10 +11,9 @@ module Shibuya.Internal.Runner.Ingester
 where
 
 import Control.Concurrent.NQE.Process (Inbox, inboxToMailbox, send)
-import Control.Concurrent.STM (TVar, atomically, modifyTVar')
 import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Core.Ingested (Ingested)
-import Shibuya.Core.Metrics (ProcessorMetrics (..), incReceived)
+import Shibuya.Core.Metrics (MetricsHandle, incrementReceived)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
@@ -42,21 +41,20 @@ runIngester source inbox = do
 -- Increments the received count for each message sent to inbox.
 runIngesterWithMetrics ::
   (IOE :> es) =>
-  -- | Metrics TVar (for updating received count)
-  TVar ProcessorMetrics ->
+  -- | Metrics handle (for updating received count)
+  MetricsHandle ->
   -- | Source stream from adapter
   Stream (Eff es) (Ingested es msg) ->
   -- | Target inbox (bounded for backpressure)
   Inbox (Ingested es msg) ->
   Eff es ()
-runIngesterWithMetrics metricsVar source inbox = do
+runIngesterWithMetrics metricsHandle source inbox = do
   let mailbox = inboxToMailbox inbox
   Stream.fold Fold.drain $
     Stream.mapM
       ( \msg -> do
           -- Increment received count
-          liftIO $ atomically $ modifyTVar' metricsVar $ \m ->
-            m {stats = incReceived m.stats}
+          liftIO $ incrementReceived metricsHandle
           -- Send to inbox (blocks if full - backpressure)
           liftIO $ send msg mailbox
           pure msg

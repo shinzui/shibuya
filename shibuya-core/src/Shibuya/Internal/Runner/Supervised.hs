@@ -55,13 +55,16 @@ import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..), toMessage)
 import Shibuya.Core.Metrics
-  ( InFlightInfo (..),
+  ( AckDecisionMetric (..),
+    MetricsHandle (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
-    emptyProcessorMetrics,
-    incFailed,
-    incProcessed,
+    beginProcessing,
+    finishFinalizationFailure,
+    finishProcessing,
+    newMetricsHandle,
+    sampleMetrics,
   )
 import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
@@ -112,7 +115,7 @@ import UnliftIO qualified as UIO
 -- Provides introspection into the running processor.
 data SupervisedProcessor = SupervisedProcessor
   { -- | Live metrics for this processor
-    metrics :: !(TVar ProcessorMetrics),
+    metrics :: !MetricsHandle,
     -- | The processor's ID
     processorId :: !ProcessorId,
     -- | Whether processing is complete
@@ -123,11 +126,11 @@ data SupervisedProcessor = SupervisedProcessor
 
 -- | Get current metrics for the processor.
 getMetrics :: (IOE :> es) => SupervisedProcessor -> Eff es ProcessorMetrics
-getMetrics sp = liftIO $ readTVarIO sp.metrics
+getMetrics sp = liftIO $ sampleMetrics sp.metrics
 
 -- | Get current state of the processor.
 getProcessorState :: (IOE :> es) => SupervisedProcessor -> Eff es ProcessorState
-getProcessorState sp = liftIO $ (.state) <$> readTVarIO sp.metrics
+getProcessorState sp = liftIO $ (.state) <$> sampleMetrics sp.metrics
 
 -- | Check if processing is done.
 isDone :: (IOE :> es) => SupervisedProcessor -> Eff es Bool
@@ -162,12 +165,11 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = do
   now <- liftIO getCurrentTime
 
   -- Initialize state
-  let initialMetrics = emptyProcessorMetrics now
-  metricsVar <- liftIO $ newTVarIO initialMetrics
+  metricsHandle <- liftIO $ newMetricsHandle now
   doneVar <- liftIO $ newTVarIO False
 
   -- Register with Master
-  registerProcessor master procId metricsVar
+  registerProcessor master procId metricsHandle
 
   -- Add as supervised child using NQE's Supervisor
   -- ConcUnlift Persistent allows the runInIO function to be used in the async child
@@ -176,7 +178,7 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = do
       runInIO
         ( -- Catch ProcessorHalt to prevent propagation via link
           -- (Halt is intentional, not a failure - other processors should continue)
-          ( runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter handler
+          ( runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
               `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
           )
             `finally` unregisterProcessor master procId
@@ -190,7 +192,7 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = do
 
   pure
     SupervisedProcessor
-      { metrics = metricsVar,
+      { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
         child = Just supervisedChild
@@ -216,16 +218,15 @@ runWithMetrics inboxSize procId adapter handler = do
   now <- liftIO getCurrentTime
 
   -- Initialize state
-  let initialMetrics = emptyProcessorMetrics now
-  metricsVar <- liftIO $ newTVarIO initialMetrics
+  metricsHandle <- liftIO $ newMetricsHandle now
   doneVar <- liftIO $ newTVarIO False
 
-  runIngesterAndProcessor metricsVar procId inboxSize Unordered Serial adapter handler
+  runIngesterAndProcessor metricsHandle procId inboxSize Unordered Serial adapter handler
     `finally` liftIO (atomically (writeTVar doneVar True))
 
   pure
     SupervisedProcessor
-      { metrics = metricsVar,
+      { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
         child = Nothing
@@ -236,7 +237,7 @@ runWithMetrics inboxSize procId adapter handler = do
 -- When stream exhausts, processor drains remaining messages and exits.
 runIngesterAndProcessor ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   Natural ->
   OrderingPolicy ->
@@ -244,7 +245,7 @@ runIngesterAndProcessor ::
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter handler = do
+runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -256,17 +257,17 @@ runIngesterAndProcessor metricsVar procId inboxSize ordering concurrency adapter
     -- Ingester: run until stream exhausts, then signal done
     -- Use finally to ensure streamDoneVar is always set, even if ingester fails
     let ingesterWithSignal =
-          runInIO (runIngesterWithMetrics metricsVar adapter.source inbox)
+          runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox)
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       -- Processor: process messages, exit when stream done and inbox empty
-      runInIO $ processUntilDrained metricsVar procId ordering concurrency handler inbox streamDoneVar
+      runInIO $ processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
           atomically $
-            modifyTVar' metricsVar $ \m ->
+            modifyTVar' metricsHandle.cold $ \m ->
               m {Metrics.state = Failed (Text.pack (displayException ingesterErr)) now}
           UIO.throwIO ingesterErr
         Right () -> pure ()
@@ -296,17 +297,16 @@ runSupervisedBatch ::
 runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = do
   now <- liftIO getCurrentTime
 
-  let initialMetrics = emptyProcessorMetrics now
-  metricsVar <- liftIO $ newTVarIO initialMetrics
+  metricsHandle <- liftIO $ newMetricsHandle now
   doneVar <- liftIO $ newTVarIO False
 
-  registerProcessor master procId metricsVar
+  registerProcessor master procId metricsHandle
 
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO
         ( ( runIngesterAndProcessorBatch
-              metricsVar
+              metricsHandle
               procId
               inboxSize
               concurrency
@@ -325,7 +325,7 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
 
   pure
     SupervisedProcessor
-      { metrics = metricsVar,
+      { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
         child = Just supervisedChild
@@ -346,12 +346,11 @@ runWithMetricsBatch ::
 runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandler = do
   now <- liftIO getCurrentTime
 
-  let initialMetrics = emptyProcessorMetrics now
-  metricsVar <- liftIO $ newTVarIO initialMetrics
+  metricsHandle <- liftIO $ newMetricsHandle now
   doneVar <- liftIO $ newTVarIO False
 
   runIngesterAndProcessorBatch
-    metricsVar
+    metricsHandle
     procId
     inboxSize
     concurrency
@@ -362,7 +361,7 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
 
   pure
     SupervisedProcessor
-      { metrics = metricsVar,
+      { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
         child = Nothing
@@ -388,7 +387,7 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
 -- 'processUntilDrained'.
 runIngesterAndProcessorBatch ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   Natural ->
   Concurrency ->
@@ -396,14 +395,14 @@ runIngesterAndProcessorBatch ::
   Adapter es msg ->
   BatchHandler es msg ->
   Eff es ()
-runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig adapter batchHandler = do
+runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchConfig adapter batchHandler = do
   inbox <- liftIO $ newBoundedInbox inboxSize
   streamDoneVar <- liftIO $ newTVarIO False
   haltRef <- liftIO $ newIORef Nothing
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
-          runInIO (runIngesterWithMetrics metricsVar adapter.source inbox)
+          runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox)
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
@@ -412,7 +411,7 @@ runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig
           batchProcessor =
             runInIO $ do
               processBatchesUntilDrained
-                metricsVar
+                metricsHandle
                 procId
                 concurrency
                 batchHandler
@@ -423,14 +422,14 @@ runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig
       batchProcessor `catchAny` \processorErr -> do
         now <- getCurrentTime
         atomically $
-          modifyTVar' metricsVar $ \m ->
+          modifyTVar' metricsHandle.cold $ \m ->
             m {Metrics.state = Failed (Text.pack (displayException processorErr)) now}
         UIO.throwIO processorErr
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
           atomically $
-            modifyTVar' metricsVar $ \m ->
+            modifyTVar' metricsHandle.cold $ \m ->
               m {Metrics.state = Failed (Text.pack (displayException ingesterErr)) now}
           UIO.throwIO ingesterErr
         Right () -> pure ()
@@ -476,7 +475,7 @@ inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
 -- Supports Serial, Ahead, and Async concurrency modes.
 processUntilDrained ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   OrderingPolicy ->
   Concurrency ->
@@ -484,7 +483,7 @@ processUntilDrained ::
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained metricsVar procId ordering concurrency handler inbox streamDoneVar = do
+processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
   haltRef <- liftIO $ newIORef Nothing
 
   let maxConc = case concurrency of
@@ -494,7 +493,7 @@ processUntilDrained metricsVar procId ordering concurrency handler inbox streamD
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar haltRef
-        processAction = runInIO . processOne metricsVar procId maxConc haltRef handler
+        processAction = runInIO . processOne metricsHandle procId maxConc haltRef handler
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -528,14 +527,14 @@ processUntilDrained metricsVar procId ordering concurrency handler inbox streamD
 -- Thread-safe for concurrent execution.
 processOne ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   Int ->
   IORef (Maybe HaltReason) ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsVar procId maxConc haltRef handler ingested = do
+processOne metricsHandle procId maxConc haltRef handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
       ProcessorId pidText = procId
@@ -563,18 +562,8 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
           mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
       addAttributes traceSpan mergedAttrs
 
-      -- Increment in-flight and add inflight attributes
-      now <- liftIO getCurrentTime
-      currentInflight <- liftIO $ atomically $ do
-        modifyTVar' metricsVar $ \m ->
-          let current = case m.state of
-                Processing info _ -> info.inFlight
-                _ -> 0
-           in m {Metrics.state = Processing (InFlightInfo (current + 1) maxConc) now}
-        m <- readTVar metricsVar
-        pure $ case m.state of
-          Processing info _ -> info.inFlight
-          _ -> 1
+      -- Increment in-flight and add inflight attributes.
+      currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
 
       addAttribute traceSpan attrShibuyaInflightCount currentInflight
       addAttribute traceSpan attrShibuyaInflightMax maxConc
@@ -639,14 +628,11 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
                 [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
             setStatus traceSpan $ OTel.Error $ handlerErrorToText err
 
-      -- Decrement in-flight and update stats
-      now' <- liftIO getCurrentTime
+      -- Decrement in-flight and update stats.
       liftIO $
-        atomically $
-          modifyTVar' metricsVar $
-            case finalizeResult of
-              Left _ -> decrementAndFinalizeFailure (finalizationFailureText msgIdText) now'
-              Right () -> decrementAndUpdate result now'
+        case finalizeResult of
+          Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
+          Right () -> finishProcessing metricsHandle (metricForResult result)
 
       -- Handle halt (set flag, don't throw - let stream drain)
       case finalizeResult of
@@ -679,42 +665,12 @@ processOne metricsVar procId maxConc haltRef handler ingested = do
     showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t
     showHaltReason (HaltFatal t) = "halt_fatal: " <> t
 
--- | Decrement in-flight count and update stats based on result.
-decrementAndUpdate ::
-  Either HandlerError AckDecision ->
-  UTCTime ->
-  ProcessorMetrics ->
-  ProcessorMetrics
-decrementAndUpdate result now m =
-  let newState = case m.state of
-        Processing info _ ->
-          if info.inFlight <= 1
-            then Idle
-            else Processing (info {inFlight = info.inFlight - 1}) now
-        other -> other
-      newStats = case result of
-        Right AckOk -> incProcessed m.stats
-        Right (AckRetry _) -> incProcessed m.stats
-        Right (AckDeadLetter _) -> incFailed m.stats
-        Right (AckHalt _) -> m.stats -- Mark as failed with halt message
-        Left _ -> incFailed m.stats
-      finalState = case result of
-        Right (AckHalt reason) -> Failed (haltReasonText reason) now
-        Left err -> Failed (handlerErrorToText err) now
-        _ -> newState
-   in m {state = finalState, stats = newStats}
+metricForResult :: Either HandlerError AckDecision -> Either Text AckDecisionMetric
+metricForResult (Left err) = Left (handlerErrorToText err)
+metricForResult (Right AckOk) = Right CountProcessed
+metricForResult (Right (AckRetry _)) = Right CountProcessed
+metricForResult (Right (AckDeadLetter _)) = Right CountFailed
+metricForResult (Right (AckHalt reason)) = Right (CountHalt (haltReasonText reason))
   where
     haltReasonText (HaltOrderedStream t) = t
     haltReasonText (HaltFatal t) = t
-
-decrementAndFinalizeFailure ::
-  Text ->
-  UTCTime ->
-  ProcessorMetrics ->
-  ProcessorMetrics
-decrementAndFinalizeFailure failureText now m =
-  let newStats = incFailed m.stats
-   in m
-        { state = Failed failureText now,
-          stats = newStats
-        }

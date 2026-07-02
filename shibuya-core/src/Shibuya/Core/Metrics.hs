@@ -26,6 +26,17 @@ module Shibuya.Core.Metrics
     -- * Combined Metrics
     ProcessorMetrics (..),
     emptyProcessorMetrics,
+    HotCounters (..),
+    MetricsHandle (..),
+    newMetricsHandle,
+    sampleMetrics,
+    incrementReceived,
+    beginProcessing,
+    AckDecisionMetric (..),
+    finishProcessing,
+    finishFinalizationFailure,
+    BatchTriggerMetric (..),
+    recordBatchOutcomeMetrics,
 
     -- * Metrics Map
     MetricsMap,
@@ -37,8 +48,13 @@ module Shibuya.Core.Metrics
   )
 where
 
+import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
+import Control.Monad (unless, void, when)
 import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:))
 import Data.Aeson qualified as Aeson
+import Data.Atomics.Counter (AtomicCounter, incrCounter, readCounter)
+import Data.Atomics.Counter qualified as Counter
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Map.Strict (Map)
 import Data.Text qualified as Text
 import Shibuya.Prelude
@@ -186,17 +202,198 @@ emptyProcessorMetrics now =
 -- | Map of processor IDs to their metrics.
 type MetricsMap = Map ProcessorId ProcessorMetrics
 
+-- | Hot per-message counters for one processor.
+--
+-- These counters are updated by fetch-and-add operations on the message hot
+-- path. The colder 'ProcessorMetrics' TVar inside 'MetricsHandle' stores state,
+-- batch counters, and metadata that change less frequently.
+data HotCounters = HotCounters
+  { received :: !AtomicCounter,
+    processed :: !AtomicCounter,
+    failed :: !AtomicCounter,
+    inFlight :: !AtomicCounter
+  }
+
+-- | Write-side metrics handle for one processor.
+data MetricsHandle = MetricsHandle
+  { hot :: !HotCounters,
+    maxConcurrencyRef :: !(IORef Int),
+    burstStartedRef :: !(IORef UTCTime),
+    stateActiveRef :: !(IORef Bool),
+    cold :: !(TVar ProcessorMetrics)
+  }
+
+newMetricsHandle :: UTCTime -> IO MetricsHandle
+newMetricsHandle now = do
+  received <- Counter.newCounter 0
+  processed <- Counter.newCounter 0
+  failed <- Counter.newCounter 0
+  inFlight <- Counter.newCounter 0
+  maxConcurrencyRef <- newIORef 1
+  burstStartedRef <- newIORef now
+  stateActiveRef <- newIORef False
+  cold <- newTVarIO (emptyProcessorMetrics now)
+  pure
+    MetricsHandle
+      { hot =
+          HotCounters
+            { received = received,
+              processed = processed,
+              failed = failed,
+              inFlight = inFlight
+            },
+        maxConcurrencyRef = maxConcurrencyRef,
+        burstStartedRef = burstStartedRef,
+        stateActiveRef = stateActiveRef,
+        cold = cold
+      }
+
+sampleMetrics :: MetricsHandle -> IO ProcessorMetrics
+sampleMetrics handle = do
+  coldSnapshot <- readTVarIO handle.cold
+  received <- readCounter handle.hot.received
+  processed <- readCounter handle.hot.processed
+  failed <- readCounter handle.hot.failed
+  inFlight <- readCounter handle.hot.inFlight
+  maxConcurrency <- readIORef handle.maxConcurrencyRef
+  burstStartedAt <- readIORef handle.burstStartedRef
+  let sampledStats =
+        StreamStats
+          { received = received,
+            processed = processed,
+            failed = failed
+          }
+      sampledState = case coldSnapshot.state of
+        Failed err timestamp -> Failed err timestamp
+        Stopped -> Stopped
+        _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt
+        _ -> Idle
+  pure coldSnapshot {state = sampledState, stats = sampledStats}
+
+incrementReceived :: MetricsHandle -> IO ()
+incrementReceived handle =
+  void $ incrCounter 1 handle.hot.received
+
+beginProcessing :: MetricsHandle -> Int -> IO Int
+beginProcessing handle maxConcurrency = do
+  currentInflight <- incrCounter 1 handle.hot.inFlight
+  when (currentInflight == 1) $ do
+    stateActive <- readIORef handle.stateActiveRef
+    unless stateActive $ do
+      now <- getCurrentTime
+      writeIORef handle.maxConcurrencyRef maxConcurrency
+      writeIORef handle.burstStartedRef now
+      writeIORef handle.stateActiveRef True
+      atomically $
+        modifyTVar' handle.cold $ \m ->
+          m {state = Processing (InFlightInfo currentInflight maxConcurrency) now}
+  pure currentInflight
+
+finishProcessing :: MetricsHandle -> Either Text AckDecisionMetric -> IO ()
+finishProcessing handle result = do
+  case result of
+    Right CountProcessed -> void $ incrCounter 1 handle.hot.processed
+    Right CountFailed -> void $ incrCounter 1 handle.hot.failed
+    Right CountNeither -> pure ()
+    Right (CountHalt _) -> pure ()
+    Left _ -> void $ incrCounter 1 handle.hot.failed
+  void $ incrCounter (-1) handle.hot.inFlight
+  case result of
+    Left failureText -> setFailed failureText
+    Right (CountHalt reasonText) -> setFailed reasonText
+    _ -> pure ()
+  where
+    setFailed failureText = do
+      now <- getCurrentTime
+      writeIORef handle.stateActiveRef False
+      atomically $
+        modifyTVar' handle.cold $ \m ->
+          m {state = Failed failureText now}
+
+finishFinalizationFailure :: MetricsHandle -> Text -> IO ()
+finishFinalizationFailure handle failureText =
+  finishProcessing handle (Left failureText)
+
+data AckDecisionMetric
+  = CountProcessed
+  | CountFailed
+  | CountNeither
+  | CountHalt !Text
+
+recordBatchOutcomeMetrics ::
+  MetricsHandle ->
+  BatchTriggerMetric ->
+  Int ->
+  Bool ->
+  Bool ->
+  [AckDecisionMetric] ->
+  Maybe Text ->
+  IO ()
+recordBatchOutcomeMetrics handle trigger size handlerThrew partialInc decisions firstHalt = do
+  let (processedDelta, failedDelta) =
+        foldl'
+          ( \(processedAcc, failedAcc) decision ->
+              if handlerThrew
+                then (processedAcc, failedAcc + 1)
+                else case decision of
+                  CountProcessed -> (processedAcc + 1, failedAcc)
+                  CountFailed -> (processedAcc, failedAcc + 1)
+                  CountNeither -> (processedAcc, failedAcc)
+                  CountHalt _ -> (processedAcc, failedAcc)
+          )
+          (0, 0)
+          decisions
+  when (processedDelta /= 0) $
+    void $
+      incrCounter processedDelta handle.hot.processed
+  when (failedDelta /= 0) $
+    void $
+      incrCounter failedDelta handle.hot.failed
+  void $ incrCounter (-1) handle.hot.inFlight
+  now <- getCurrentTime
+  atomically $
+    modifyTVar' handle.cold $ \m ->
+      let newState = case firstHalt of
+            Just reasonText -> Failed reasonText now
+            Nothing -> case m.state of
+              Failed {} -> m.state
+              Stopped -> Stopped
+              _ -> m.state
+          newBatch =
+            incTriggerMetric trigger
+              . (if partialInc then incPartialFailures else id)
+              . addBatchedMessages size
+              . incBatchesEmitted
+              $ m.batch
+       in m {state = newState, batch = newBatch}
+  case firstHalt of
+    Just _ -> writeIORef handle.stateActiveRef False
+    Nothing -> pure ()
+
+data BatchTriggerMetric
+  = CountTriggerSize
+  | CountTriggerTimeout
+  | CountTriggerFlush
+
+incTriggerMetric :: BatchTriggerMetric -> BatchStats -> BatchStats
+incTriggerMetric CountTriggerSize = incSizeTriggered
+incTriggerMetric CountTriggerTimeout = incTimeoutTriggered
+incTriggerMetric CountTriggerFlush = incFlushTriggered
+
 -- | Increment received count.
 incReceived :: StreamStats -> StreamStats
-incReceived s = s {received = s.received + 1}
+incReceived StreamStats {received, processed, failed} =
+  StreamStats {received = received + 1, processed = processed, failed = failed}
 
 -- | Increment processed count.
 incProcessed :: StreamStats -> StreamStats
-incProcessed s = s {processed = s.processed + 1}
+incProcessed StreamStats {received, processed, failed} =
+  StreamStats {received = received, processed = processed + 1, failed = failed}
 
 -- | Increment failed count.
 incFailed :: StreamStats -> StreamStats
-incFailed s = s {failed = s.failed + 1}
+incFailed StreamStats {received, processed, failed} =
+  StreamStats {received = received, processed = processed, failed = failed + 1}
 
 -- | Increment the emitted-batch counter.
 incBatchesEmitted :: BatchStats -> BatchStats

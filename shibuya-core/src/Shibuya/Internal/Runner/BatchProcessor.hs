@@ -33,14 +33,6 @@ module Shibuya.Internal.Runner.BatchProcessor
 where
 
 import Control.Applicative ((<|>))
-import Control.Concurrent.STM
-  ( TVar,
-    atomically,
-    modifyTVar',
-    newTVarIO,
-    readTVar,
-    readTVarIO,
-  )
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
@@ -67,23 +59,16 @@ import Shibuya.Core.Ack
   )
 import Shibuya.Core.Ingested (Ingested (..), toMessage)
 import Shibuya.Core.Metrics
-  ( BatchStats,
-    InFlightInfo (..),
+  ( AckDecisionMetric (..),
+    BatchTriggerMetric (..),
+    MetricsHandle (..),
     ProcessorId (..),
     ProcessorMetrics (..),
-    ProcessorState (..),
-    StreamStats,
-    addBatchedMessages,
-    emptyProcessorMetrics,
-    incBatchesEmitted,
-    incFailed,
-    incFlushTriggered,
-    incPartialFailures,
-    incProcessed,
-    incSizeTriggered,
-    incTimeoutTriggered,
+    beginProcessing,
+    newMetricsHandle,
+    recordBatchOutcomeMetrics,
+    sampleMetrics,
   )
-import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
@@ -128,14 +113,14 @@ import UnliftIO (catchAny, throwIO)
 -- returns normally, letting the stream drain.
 processOneBatch ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   Int ->
   IORef (Maybe HaltReason) ->
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
+processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -159,17 +144,7 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
       addAttributes traceSpan frameworkAttrs
 
       -- Increment in-flight (a batch counts as one in-flight unit) and report it.
-      now <- liftIO getCurrentTime
-      currentInflight <- liftIO $ atomically $ do
-        modifyTVar' metricsVar $ \m ->
-          let current = case m.state of
-                Processing i _ -> i.inFlight
-                _ -> 0
-           in m {Metrics.state = Processing (InFlightInfo (current + 1) maxConc) now}
-        m <- readTVar metricsVar
-        pure $ case m.state of
-          Processing i _ -> i.inFlight
-          _ -> 1
+      currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
       addAttribute traceSpan attrShibuyaInflightCount currentInflight
       addAttribute traceSpan attrShibuyaInflightMax maxConc
 
@@ -247,13 +222,18 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
 
       traverse_ (recordException traceSpan . snd) finalizeFailures
 
-      -- Record metrics: decrement in-flight, fold per-message stats, advance
-      -- batch counters, set Failed state on halt or exhausted finalization retry.
-      now' <- liftIO getCurrentTime
+      -- Record metrics: decrement in-flight, add per-message counter deltas,
+      -- advance batch counters, set Failed state on halt or exhausted
+      -- finalization retry.
       liftIO $
-        atomically $
-          modifyTVar' metricsVar $
-            recordBatchOutcome info handlerThrew partialInc decisions firstHalt now'
+        recordBatchOutcomeMetrics
+          metricsHandle
+          (triggerMetric info.trigger)
+          info.size
+          handlerThrew
+          partialInc
+          (decisionMetric <$> decisions)
+          (haltReasonText <$> firstHalt)
 
       -- Halt: set the shared flag; do NOT throw (let the stream drain).
       for_ firstHalt $ \reason ->
@@ -264,54 +244,16 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
     isFailing (AckRetry _) = True
     isFailing _ = False
 
--- | Pure metrics update applied after a batch is fully finalized.
-recordBatchOutcome ::
-  BatchInfo ->
-  -- | whether the handler threw (exception-substituted whole batch)
-  Bool ->
-  -- | whether to count a partial failure
-  Bool ->
-  -- | resolved decisions, in retained order
-  [AckDecision] ->
-  -- | first halt reason, if any
-  Maybe HaltReason ->
-  UTCTime ->
-  ProcessorMetrics ->
-  ProcessorMetrics
-recordBatchOutcome info handlerThrew partialInc decisions firstHalt now m =
-  m {state = finalState, stats = newStats, batch = newBatch}
-  where
-    decremented = case m.state of
-      Processing i _ ->
-        if i.inFlight <= 1
-          then Idle
-          else Processing (i {inFlight = i.inFlight - 1}) now
-      other -> other
-    -- Halt is terminal -> Failed; exception is recoverable -> keep normal state.
-    finalState = case firstHalt of
-      Just reason -> Failed (haltReasonText reason) now
-      Nothing -> decremented
-    newStats = foldl' (\s d -> perMsgStat handlerThrew d s) m.stats decisions
-    newBatch =
-      incTrigger info.trigger
-        . (if partialInc then incPartialFailures else id)
-        . addBatchedMessages info.size
-        . incBatchesEmitted
-        $ m.batch
+decisionMetric :: AckDecision -> AckDecisionMetric
+decisionMetric AckOk = CountProcessed
+decisionMetric (AckRetry _) = CountProcessed
+decisionMetric (AckDeadLetter _) = CountFailed
+decisionMetric (AckHalt reason) = CountHalt (haltReasonText reason)
 
--- | Map one message's outcome to a stats update. If the handler threw, every
--- message counts failed regardless of the substituted retry decision.
-perMsgStat :: Bool -> AckDecision -> StreamStats -> StreamStats
-perMsgStat True _ = incFailed
-perMsgStat False AckOk = incProcessed
-perMsgStat False (AckRetry _) = incProcessed
-perMsgStat False (AckDeadLetter _) = incFailed
-perMsgStat False (AckHalt _) = id
-
-incTrigger :: BatchTrigger -> BatchStats -> BatchStats
-incTrigger TriggerSize = incSizeTriggered
-incTrigger TriggerTimeout = incTimeoutTriggered
-incTrigger TriggerFlush = incFlushTriggered
+triggerMetric :: BatchTrigger -> BatchTriggerMetric
+triggerMetric TriggerSize = CountTriggerSize
+triggerMetric TriggerTimeout = CountTriggerTimeout
+triggerMetric TriggerFlush = CountTriggerFlush
 
 triggerText :: BatchTrigger -> Text
 triggerText TriggerSize = "size"
@@ -332,21 +274,21 @@ tshow = Text.pack . show
 -- throws a processor halt (see 'runBatchesWithMetrics').
 processBatchesUntilDrained ::
   (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
+  MetricsHandle ->
   ProcessorId ->
   Concurrency ->
   BatchHandler es msg ->
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
   IORef (Maybe HaltReason) ->
   Eff es ()
-processBatchesUntilDrained metricsVar procId concurrency handler batchesStream haltRef = do
+processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream haltRef = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
         Async n -> n
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let batchAction = runInIO . processOneBatch metricsVar procId maxConc haltRef handler
+    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc haltRef handler
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
@@ -373,13 +315,13 @@ runBatchesWithMetrics ::
   Eff es ProcessorMetrics
 runBatchesWithMetrics procId concurrency handler batches = do
   now <- liftIO getCurrentTime
-  metricsVar <- liftIO $ newTVarIO (emptyProcessorMetrics now)
+  metricsHandle <- liftIO $ newMetricsHandle now
   haltRef <- liftIO $ newIORef Nothing
 
   let batchesStream = Stream.fromList batches
-  processBatchesUntilDrained metricsVar procId concurrency handler batchesStream haltRef
+  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream haltRef
 
   maybeHalt <- liftIO $ readIORef haltRef
   case maybeHalt of
     Just reason -> throwIO (ProcessorHalt reason)
-    Nothing -> liftIO $ readTVarIO metricsVar
+    Nothing -> liftIO $ sampleMetrics metricsHandle

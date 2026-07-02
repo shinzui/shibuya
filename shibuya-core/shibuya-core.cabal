@@ -67,6 +67,7 @@ library
 
   build-depends:
     aeson ^>=2.2,
+    atomic-primops ^>=0.8.8,
     base ^>=4.21.0.0,
     bytestring ^>=0.12.2.0,
     containers ^>=0.7,

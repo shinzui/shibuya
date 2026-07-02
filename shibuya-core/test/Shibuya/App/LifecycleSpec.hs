@@ -27,7 +27,7 @@ import Shibuya.Batch (BatchConfig (..), ackAll, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, mkIngested)
-import Shibuya.Core.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
+import Shibuya.Core.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), sampleMetrics)
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.App (AppHandle (..))
 import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
@@ -253,7 +253,7 @@ processorMetrics app pid =
     AppHandle {processors = processorsMap} ->
       case Map.lookup pid processorsMap of
         Nothing -> liftIO $ expectationFailure ("missing processor: " <> show pid) >> error "unreachable"
-        Just (SupervisedProcessor {metrics = metricsVar}, _) -> liftIO $ readTVarIO metricsVar
+        Just (SupervisedProcessor {metrics = metricsHandle}, _) -> liftIO $ sampleMetrics metricsHandle
 
 alwaysAckOk :: (Applicative f) => a -> f AckDecision
 alwaysAckOk _ = pure AckOk

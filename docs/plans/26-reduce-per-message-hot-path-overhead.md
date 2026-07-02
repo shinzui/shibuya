@@ -63,10 +63,10 @@ This section must always reflect the actual current state of the work.
 - [x] 2026-07-02: Verified EP-22 and EP-23 are marked Complete in the master plan registry; re-located the current post-EP-22/23 code regions before starting M0.
 - [x] 2026-07-02: M0: added `Bench.HotPath` module to `shibuya-core-bench` (no-op handler, mock list adapter, Serial and Async 8, 10k messages, tracing disabled).
 - [x] 2026-07-02: M0: ran the benchmark and pasted baseline numbers into this plan's evidence block.
-- [ ] M1: add `atomic-primops` to `shibuya-core.cabal`; introduce `HotCounters`/`MetricsHandle`/`sampleMetrics` in `Shibuya/Runner/Metrics.hs`.
-- [ ] M1: rewrite `runIngesterWithMetrics`, `processOne`, `decrementAndUpdate`, and the batch-path metrics sites to use counters; move the `Processing` timestamp to the idle→processing transition.
-- [ ] M1: thread `MetricsHandle` through `Supervised.hs`, `Master.hs`, `BatchProcessor.hs`, and update tests/benches that read `sp.metrics` directly.
-- [ ] M1: full test suite green; benchmark re-run; before/after numbers recorded.
+- [x] 2026-07-02: M1: added `atomic-primops` to `shibuya-core.cabal`; introduced `HotCounters`/`MetricsHandle`/`sampleMetrics` in `Shibuya.Core.Metrics`.
+- [x] 2026-07-02: M1: rewrote `runIngesterWithMetrics`, `processOne`, and the batch-path metrics sites to use counters; normal completions no longer write the cold metrics `TVar`.
+- [x] 2026-07-02: M1: threaded `MetricsHandle` through `Supervised.hs`, `Master.hs`, `BatchProcessor.hs`, and updated tests that read `sp.metrics` directly.
+- [x] 2026-07-02: M1: `cabal build all` and `cabal test shibuya-core-test` passed; benchmark re-run and before/after numbers recorded.
 - [ ] M2: dummy span becomes a top-level constant; "zero overhead" Haddock softened; constant span attributes and the handler-started event hoisted out of the per-message path.
 - [ ] M2: tests green; tracing-disabled benchmark re-run; numbers recorded.
 - [ ] M3: `stepArrival` single-traversal via `Map.alterF`; batcher emit path restructured so no lock is held across a blocking queue write; batch timeout ticks moved to the monotonic clock.
@@ -86,6 +86,20 @@ implementation. Provide concise evidence.
   ```text
   serial-noop-10000: 14.5 ms ± 970 μs
   async8-noop-10000: 155 ms ± 14 ms
+  ```
+
+- 2026-07-02: M1 improved `serial-noop-10000` and reduced allocation, but did not improve the
+  no-op `Async 8` benchmark. The first M1 implementation still wrote the cold metrics state on every
+  normal completion and produced `async8-noop-10000: 173 ms ± 8.3 ms`; after removing normal
+  completion cold-state writes the final M1 run was still slower than M0 at `164 ms ± 4.9 ms`.
+  This indicates the no-op Async benchmark is dominated by stream scheduler/concurrency overhead as
+  well as metrics contention. Evidence:
+
+  ```text
+  M0 serial-noop-10000: 14.5 ms ± 970 μs, 30 MB allocated
+  M1 serial-noop-10000: 11.8 ms ± 578 μs, 21 MB allocated
+  M0 async8-noop-10000: 155 ms ± 14 ms, 71 MB allocated
+  M1 async8-noop-10000: 164 ms ± 4.9 ms, 64 MB allocated
   ```
 
 
@@ -167,6 +181,15 @@ Record every decision made while working on the plan.
   the per-batch constant attributes in `BatchProcessor.hs` is done opportunistically in M2 only if
   trivial (batches are orders of magnitude rarer than messages; it is not on the hot path).
   Date: 2026-07-01
+
+- Decision: In M1, normal message completion decrements the atomic in-flight counter but does not
+  write `Idle` back to the cold metrics `TVar`. `sampleMetrics` reports `Idle` whenever the sampled
+  in-flight counter is zero, regardless of the cold state.
+  Rationale: The initial counter implementation preserved behavior but still wrote the cold `TVar`
+  on every fast no-op completion, which kept a per-message synchronization point in the benchmark.
+  Deriving Idle from the sampled counter preserves all observable metrics assertions while keeping
+  normal completion off the cold-state path.
+  Date: 2026-07-02
 
 
 ## Outcomes & Retrospective
@@ -439,7 +462,25 @@ the most (contention removed); `serial-noop-10000` improves moderately (five STM
 clock reads per message become a handful of fetch-and-adds).
 
 ```text
-(To be filled at M1: paste hot-path benchmark output after the change, next to the M0 baseline.)
+M0 baseline:
+All
+  hot-path
+    serial-noop-10000: OK
+      14.5 ms ± 970 μs,  30 MB allocated, 3.4 KB copied, 341 MB peak memory
+    async8-noop-10000: OK
+      155  ms ±  14 ms,  71 MB allocated, 807 KB copied, 343 MB peak memory
+
+M1 after atomic counters:
+All
+  hot-path
+    serial-noop-10000: OK
+      11.8 ms ± 578 μs,  21 MB allocated, 3.0 KB copied, 339 MB peak memory
+    async8-noop-10000: OK
+      164  ms ± 4.9 ms,  64 MB allocated, 840 KB copied, 352 MB peak memory
+
+Validation:
+cabal build all: PASS
+cabal test shibuya-core-test: PASS, 201 examples, 0 failures
 ```
 
 

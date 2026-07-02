@@ -36,6 +36,7 @@ import Shibuya.Core.Metrics
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
+    sampleMetrics,
   )
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
@@ -220,7 +221,7 @@ spec = do
 
           -- Wait for processor to halt
           liftIO $ threadDelay 100000 -- 100ms
-          m <- liftIO $ readTVarIO sp.metrics
+          m <- liftIO $ sampleMetrics sp.metrics
           stopMaster master
           pure m
 
@@ -540,7 +541,7 @@ spec = do
             master <- startMaster IgnoreAll
             sp <- runSupervised master 10 (ProcessorId "permanent-finalizer") Unordered (Async 2) adapter alwaysAckOk
             liftIO $ threadDelay 700000
-            finalMetrics <- liftIO $ readTVarIO sp.metrics
+            finalMetrics <- liftIO $ sampleMetrics sp.metrics
             doneState <- liftIO $ readTVarIO sp.done
             decisions <- getTrackedDecisions tracking
             stopMaster master
@@ -570,7 +571,7 @@ spec = do
             -- Check metrics while processing
             liftIO $ do
               threadDelay 50000 -- 50ms - should be in the middle of processing
-              metrics <- readTVarIO sp.metrics
+              metrics <- sampleMetrics sp.metrics
               case metrics.state of
                 Processing info _ -> modifyIORef' maxInFlightObserved (max info.inFlight)
                 _ -> pure ()
@@ -597,7 +598,7 @@ spec = do
             -- Check metrics while processing
             result <- liftIO $ do
               threadDelay 25000 -- 25ms
-              metrics <- readTVarIO sp.metrics
+              metrics <- sampleMetrics sp.metrics
               case metrics.state of
                 Processing info _ -> pure $ Just info.maxConcurrency
                 _ -> pure Nothing
@@ -699,7 +700,7 @@ spec = do
             Just sp -> do
               done <- readTVarIO sp.done
               done `shouldBe` True
-              metrics <- readTVarIO sp.metrics
+              metrics <- sampleMetrics sp.metrics
               case metrics.state of
                 Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
                 other -> expectationFailure $ "Expected Failed state, got: " ++ show other
@@ -755,7 +756,7 @@ spec = do
             Just sp -> do
               done <- readTVarIO sp.done
               done `shouldBe` True
-              metrics <- readTVarIO sp.metrics
+              metrics <- sampleMetrics sp.metrics
               case metrics.state of
                 Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
                 other -> expectationFailure $ "Expected Failed state, got: " ++ show other
@@ -781,7 +782,7 @@ spec = do
                     atomically $ do
                       done <- readTVar sp.done
                       check done
-              metrics <- liftIO $ readTVarIO sp.metrics
+              metrics <- liftIO $ sampleMetrics sp.metrics
               stopMaster master
               pure (i, doneResult, metrics)
 

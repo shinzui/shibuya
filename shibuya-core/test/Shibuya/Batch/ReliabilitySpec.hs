@@ -65,6 +65,7 @@ import Shibuya.Core.Metrics
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
+    sampleMetrics,
   )
 import Shibuya.Core.Types (Envelope (..), MessageId (..))
 import Shibuya.Internal.App (AppHandle (..))
@@ -94,15 +95,15 @@ runAppOrFail inbox procs = do
     Right app -> pure app
     Left e -> liftIO $ ioError (userError ("runApp failed: " <> show e))
 
--- | Read a processor's live metrics directly from its 'SupervisedProcessor' TVar
+-- | Read a processor's live metrics directly from its 'SupervisedProcessor'
 -- (via the 'AppHandle'), NOT from the Master registry. A finished or halted
 -- processor unregisters its metrics from the Master in its @finally@, so
--- @getAppMetrics@ would return nothing for it; the TVar itself persists and holds
--- the final metrics.
+-- @getAppMetrics@ would return nothing for it; the metrics handle itself persists
+-- and holds the final counters/state.
 metricsFor :: (IOE :> es) => AppHandle es -> ProcessorId -> Eff es ProcessorMetrics
 metricsFor app pid =
   case Map.lookup pid app.processors of
-    Just (sp, _) -> liftIO $ readTVarIO sp.metrics
+    Just (sp, _) -> liftIO $ sampleMetrics sp.metrics
     Nothing -> liftIO $ ioError (userError ("no processor " <> show pid))
 
 --------------------------------------------------------------------------------

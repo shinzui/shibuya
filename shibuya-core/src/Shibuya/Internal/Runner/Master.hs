@@ -55,9 +55,11 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Core.Metrics
-  ( MetricsMap,
+  ( MetricsHandle,
+    MetricsMap,
     ProcessorId,
     ProcessorMetrics,
+    sampleMetrics,
   )
 import Shibuya.Prelude
 import UnliftIO (Async, async, cancel, link)
@@ -68,8 +70,8 @@ data MasterMessage
     GetAllMetrics !(Listen MetricsMap)
   | -- | Get metrics for a specific processor
     GetProcessorMetrics ProcessorId !(Listen (Maybe ProcessorMetrics))
-  | -- | Register a processor's metrics TVar
-    RegisterProcessor !ProcessorId !(TVar ProcessorMetrics) !(Listen ())
+  | -- | Register a processor's metrics handle
+    RegisterProcessor !ProcessorId !MetricsHandle !(Listen ())
   | -- | Unregister a processor
     UnregisterProcessor !ProcessorId !(Listen ())
   | -- | Shutdown all processors
@@ -77,8 +79,8 @@ data MasterMessage
 
 -- | Master state held in TVars.
 data MasterState = MasterState
-  { -- | Map of processor IDs to their metrics TVars
-    metrics :: !(TVar (Map ProcessorId (TVar ProcessorMetrics))),
+  { -- | Map of processor IDs to their metrics handles
+    metrics :: !(TVar (Map ProcessorId MetricsHandle)),
     -- | The supervisor managing child processors
     supervisor :: !Supervisor,
     -- | Whether child failures should be linked into the spawning thread.
@@ -148,21 +150,16 @@ masterLoop state inbox = forever $ do
 handleMessage :: MasterState -> MasterMessage -> IO ()
 handleMessage state msg = case msg of
   GetAllMetrics respond -> do
-    -- Read all metrics from their TVars
-    metricsMap <- atomically $ do
-      tvarsMap <- readTVar state.metrics
-      traverse readTVar tvarsMap
+    handlesMap <- atomically $ readTVar state.metrics
+    metricsMap <- traverse sampleMetrics handlesMap
     atomically $ respond metricsMap
   GetProcessorMetrics pid respond -> do
-    result <- atomically $ do
-      tvarsMap <- readTVar state.metrics
-      case Map.lookup pid tvarsMap of
-        Nothing -> pure Nothing
-        Just tvar -> Just <$> readTVar tvar
+    handlesMap <- atomically $ readTVar state.metrics
+    result <- traverse sampleMetrics (Map.lookup pid handlesMap)
     atomically $ respond result
-  RegisterProcessor pid metricsTVar respond -> do
+  RegisterProcessor pid metricsHandle respond -> do
     atomically $ do
-      modifyTVar' state.metrics $ Map.insert pid metricsTVar
+      modifyTVar' state.metrics $ Map.insert pid metricsHandle
     atomically $ respond ()
   UnregisterProcessor pid respond -> do
     atomically $ do
@@ -179,9 +176,9 @@ getAllMetrics = liftIO . getAllMetricsIO
 
 -- | Get metrics for all processors (IO version for web servers).
 getAllMetricsIO :: Master -> IO MetricsMap
-getAllMetricsIO master = atomically $ do
-  tvarsMap <- readTVar master.state.metrics
-  traverse readTVar tvarsMap
+getAllMetricsIO master = do
+  handlesMap <- atomically $ readTVar master.state.metrics
+  traverse sampleMetrics handlesMap
 
 -- | Get metrics for a specific processor.
 getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
@@ -189,15 +186,15 @@ getProcessorMetrics master = liftIO . getProcessorMetricsIO master
 
 -- | Get metrics for a specific processor (IO version for web servers).
 getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
-getProcessorMetricsIO master pid = atomically $ do
-  tvarsMap <- readTVar master.state.metrics
-  traverse readTVar (Map.lookup pid tvarsMap)
+getProcessorMetricsIO master pid = do
+  handlesMap <- atomically $ readTVar master.state.metrics
+  traverse sampleMetrics (Map.lookup pid handlesMap)
 
 -- | Register a processor with the master.
--- The processor should call this with its metrics TVar.
-registerProcessor :: (IOE :> es) => Master -> ProcessorId -> TVar ProcessorMetrics -> Eff es ()
-registerProcessor master pid metricsTVar =
-  liftIO $ atomically $ modifyTVar' master.state.metrics $ Map.insert pid metricsTVar
+-- The processor should call this with its metrics handle.
+registerProcessor :: (IOE :> es) => Master -> ProcessorId -> MetricsHandle -> Eff es ()
+registerProcessor master pid metricsHandle =
+  liftIO $ atomically $ modifyTVar' master.state.metrics $ Map.insert pid metricsHandle
 
 -- | Unregister a processor from the master.
 unregisterProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
