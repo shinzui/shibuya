@@ -77,7 +77,11 @@ data MasterState = MasterState
   { -- | Map of processor IDs to their metrics TVars
     metrics :: !(TVar (Map ProcessorId (TVar ProcessorMetrics))),
     -- | The supervisor managing child processors
-    supervisor :: !Supervisor
+    supervisor :: !Supervisor,
+    -- | Whether child failures should be linked into the spawning thread.
+    -- Derived from the supervision strategy: True for KillAll/IgnoreGraceful
+    -- (failure must reach the application), False for IgnoreAll/Notify.
+    propagateFailures :: !Bool
   }
   deriving (Generic)
 
@@ -101,7 +105,12 @@ startMaster strategy = liftIO $ do
   sup <- Supervisor.supervisor strategy
 
   metricsMapVar <- newTVarIO Map.empty
-  let masterState = MasterState metricsMapVar sup
+  let propagate = case strategy of
+        KillAll -> True
+        IgnoreGraceful -> True
+        IgnoreAll -> False
+        Notify _ -> False
+      masterState = MasterState metricsMapVar sup propagate
 
   masterInbox <- newInbox
 

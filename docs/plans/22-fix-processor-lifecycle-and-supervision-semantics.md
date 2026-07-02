@@ -94,16 +94,17 @@ This section must always reflect the actual current state of the work.
       2026-07-02.
 - [x] M2: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
       `cabal test shibuya-core-test` (173 examples, 0 failures), and `nix fmt`.
-- [ ] M3: Add `propagateFailures :: !Bool` to `MasterState` in
+- [x] M3: Add `propagateFailures :: !Bool` to `MasterState` in
       `shibuya-core/src/Shibuya/Runner/Master.hs`, derived from the NQE strategy in
-      `startMaster`.
-- [ ] M3: Make `UIO.link` conditional on `master.state.propagateFailures` in both
-      `runSupervised` and `runSupervisedBatch`.
-- [ ] M3: Rewrite the existing "Adapter source exceptions" test and the "KillAll
+      `startMaster`. Completed 2026-07-02.
+- [x] M3: Make `UIO.link` conditional on `master.state.propagateFailures` in both
+      `runSupervised` and `runSupervisedBatch`. Completed 2026-07-02.
+- [x] M3: Rewrite the existing "Adapter source exceptions" test and the "KillAll
       supervision strategy" test in
       `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs`; add an `IgnoreFailures`
-      end-to-end isolation test.
-- [ ] M3: Build, test, format, commit.
+      end-to-end isolation test. Completed 2026-07-02.
+- [x] M3: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
+      `cabal test shibuya-core-test` (175 examples, 0 failures), and `nix fmt`.
 - [ ] M4: Replace `UIO.poll` with `UIO.waitCatch` in both ingester-failure checks in
       `shibuya-core/src/Shibuya/Runner/Supervised.hs`; add the repeated
       failing-source test.

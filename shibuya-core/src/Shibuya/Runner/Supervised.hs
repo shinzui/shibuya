@@ -37,7 +37,7 @@ import Control.Concurrent.STM
     retry,
     writeTVar,
   )
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
@@ -176,8 +176,10 @@ runSupervised master inboxSize procId concurrency adapter handler = do
         )
         `finally` atomically (writeTVar doneVar True)
 
-  -- Link so exceptions propagate to the parent
-  unsafeEff_ $ UIO.link supervisedChild
+  -- Link so exceptions propagate to the parent for strategies that request it.
+  when master.state.propagateFailures $
+    unsafeEff_ $
+      UIO.link supervisedChild
 
   pure
     SupervisedProcessor
@@ -316,7 +318,9 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
         )
         `finally` atomically (writeTVar doneVar True)
 
-  unsafeEff_ $ UIO.link supervisedChild
+  when master.state.propagateFailures $
+    unsafeEff_ $
+      UIO.link supervisedChild
 
   pure
     SupervisedProcessor

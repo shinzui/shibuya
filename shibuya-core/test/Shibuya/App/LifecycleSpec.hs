@@ -7,12 +7,13 @@ import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
-  ( AppHandle,
+  ( AppHandle (..),
     QueueProcessor,
     ShutdownConfig (..),
     SupervisionStrategy (..),
@@ -29,7 +30,7 @@ import Shibuya.Core.Ingested (Ingested (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master (startMaster, stopMaster)
-import Shibuya.Runner.Metrics (ProcessorId (..))
+import Shibuya.Runner.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..))
 import Shibuya.Runner.Supervised (SupervisedProcessor (..), runSupervised)
 import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
@@ -195,6 +196,40 @@ spec = describe "Shibuya.App lifecycle" $ do
     countB <- readIORef countBRef
     countB `shouldSatisfy` (< 50)
 
+  it "IgnoreFailures isolates a failing processor" $ do
+    countBRef <- newIORef (0 :: Int)
+
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            messagesB <- createTestMessages 20
+            let handlerA _ = pure AckOk
+                handlerB _ = do
+                  liftIO $ threadDelay 10_000
+                  liftIO $ modifyIORef' countBRef (+ 1)
+                  pure AckOk
+                procA = mkProcessor (failingAfterAdapter 3 "Adapter A source failed!") handlerA
+                procB = mkProcessor (testAdapter messagesB) handlerB
+            app <-
+              runAppOrFail
+                IgnoreFailures
+                10
+                [(ProcessorId "ignore-fail-A", procA), (ProcessorId "ignore-fail-B", procB)]
+            waitApp app
+            metricsA <- processorMetrics app (ProcessorId "ignore-fail-A")
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            countB <- liftIO $ readIORef countBRef
+            pure (metricsA, countB)
+
+    case result of
+      Nothing -> expectationFailure "IgnoreFailures run timed out"
+      Just (metricsA, countB) -> do
+        countB `shouldBe` 20
+        case metricsA.state of
+          Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Adapter A source failed"
+          other -> expectationFailure $ "Expected failed processor metrics, got: " ++ show other
+
 runAppOrFail ::
   (IOE :> es, Tracing :> es) =>
   SupervisionStrategy ->
@@ -206,6 +241,18 @@ runAppOrFail strategy inboxSize processors = do
   case result of
     Left err -> liftIO $ expectationFailure ("runApp failed: " <> show err) >> error "unreachable"
     Right app -> pure app
+
+processorMetrics ::
+  (IOE :> es) =>
+  AppHandle es ->
+  ProcessorId ->
+  Eff es ProcessorMetrics
+processorMetrics app pid =
+  case app of
+    AppHandle {processors = processorsMap} ->
+      case Map.lookup pid processorsMap of
+        Nothing -> liftIO $ expectationFailure ("missing processor: " <> show pid) >> error "unreachable"
+        Just (SupervisedProcessor {metrics = metricsVar}, _) -> liftIO $ readTVarIO metricsVar
 
 alwaysAckOk :: (Applicative f) => a -> f AckDecision
 alwaysAckOk _ = pure AckOk

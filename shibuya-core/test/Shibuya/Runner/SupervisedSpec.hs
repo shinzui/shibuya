@@ -517,7 +517,7 @@ spec = do
 
     describe "Robustness" $ do
       describe "Adapter source exceptions" $ do
-        it "drains already-ingested messages, marks Failed, and propagates the ingester exception" $ do
+        it "drains already-ingested messages, marks Failed, and propagates the ingester exception under IgnoreGraceful" $ do
           processedRef <- newIORef (0 :: Int)
           spRef <- newIORef (Nothing :: Maybe SupervisedProcessor)
 
@@ -545,7 +545,7 @@ spec = do
                         liftIO $ modifyIORef' processedRef (+ 1)
                         pure AckOk
 
-                  master <- startMaster IgnoreAll
+                  master <- startMaster IgnoreGraceful
                   sp <- runSupervised master 10 (ProcessorId "failing-adapter") Serial adapter handler
                   liftIO $ atomicWriteIORef spRef (Just sp)
 
@@ -562,6 +562,62 @@ spec = do
               expectationFailure "Expected the ingester exception to propagate"
 
           -- Should have processed the 3 good messages before the error
+          processed <- readIORef processedRef
+          processed `shouldBe` 3
+
+          mSp <- readIORef spRef
+          case mSp of
+            Nothing -> expectationFailure "Expected supervised processor handle"
+            Just sp -> do
+              done <- readTVarIO sp.done
+              done `shouldBe` True
+              metrics <- readTVarIO sp.metrics
+              case metrics.state of
+                Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
+                other -> expectationFailure $ "Expected Failed state, got: " ++ show other
+
+        it "drains already-ingested messages and marks Failed without propagating under IgnoreAll" $ do
+          processedRef <- newIORef (0 :: Int)
+          spRef <- newIORef (Nothing :: Maybe SupervisedProcessor)
+
+          result <-
+            UIO.withAsync
+              ( runEff $ runTracingNoop $ do
+                  let failingSource = Stream.unfoldrM step (0 :: Int)
+                        where
+                          step n
+                            | n < 3 = do
+                                msg <- liftIO $ createSingleMessage (n + 1)
+                                pure $ Just (msg, n + 1)
+                            | n == 3 = error "Network failure mid-stream"
+                            | otherwise = pure Nothing
+
+                  let adapter =
+                        Adapter
+                          { adapterName = "test:failing-source",
+                            source = failingSource,
+                            shutdown = pure ()
+                          }
+
+                  let handler _ = do
+                        liftIO $ modifyIORef' processedRef (+ 1)
+                        pure AckOk
+
+                  master <- startMaster IgnoreAll
+                  sp <- runSupervised master 10 (ProcessorId "failing-adapter-ignore") Serial adapter handler
+                  liftIO $ atomicWriteIORef spRef (Just sp)
+
+                  liftIO $ threadDelay 200000 -- 200ms
+                  stopMaster master
+              )
+              UIO.waitCatch
+
+          case result of
+            Left err ->
+              expectationFailure $ "Expected IgnoreAll to isolate the ingester exception, got: " ++ show err
+            Right () ->
+              pure ()
+
           processed <- readIORef processedRef
           processed `shouldBe` 3
 
@@ -623,8 +679,8 @@ spec = do
           count <- readIORef countRef
           count `shouldSatisfy` (> 0)
 
-      describe "KillAll supervision strategy" $ do
-        it "stops all processors when adapter source fails with KillAll strategy" $ do
+      describe "IgnoreGraceful supervision strategy (StopAllOnFailure)" $ do
+        it "stops all processors when adapter source fails with IgnoreGraceful strategy" $ do
           countARef <- newIORef (0 :: Int)
           countBRef <- newIORef (0 :: Int)
 
@@ -663,8 +719,8 @@ spec = do
 
                   let adapterB = testAdapter messagesB
 
-                  -- Use KillAll strategy
-                  master <- startMaster KillAll
+                  -- Use the NQE strategy backing StopAllOnFailure.
+                  master <- startMaster IgnoreGraceful
 
                   _spA <- runSupervised master 10 (ProcessorId "killall-A") Serial adapterA handlerA
                   _spB <- runSupervised master 10 (ProcessorId "killall-B") Serial adapterB handlerB
