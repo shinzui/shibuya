@@ -73,18 +73,20 @@ Use a checklist to summarize granular steps. Every stopping point must be docume
 even if it requires splitting a partially completed task into two ("done" vs. "remaining").
 This section must always reflect the actual current state of the work.
 
-- [ ] M1: Remove `doneVar` writes (and the `doneVar` parameter) from
+- [x] M1: Remove `doneVar` writes (and the `doneVar` parameter) from
       `runIngesterAndProcessor` and `runIngesterAndProcessorBatch` in
-      `shibuya-core/src/Shibuya/Runner/Supervised.hs`.
-- [ ] M1: Set `doneVar` via an IO-level `finally` around the entire child action in
+      `shibuya-core/src/Shibuya/Runner/Supervised.hs`. Completed 2026-07-02.
+- [x] M1: Set `doneVar` via an IO-level `finally` around the entire child action in
       `runSupervised` and `runSupervisedBatch`; set it via `finally` in
       `runWithMetricsBatch`; delete the stale "leaves doneVar unset on halt" comment
-      above `runIngesterAndProcessorBatch`.
-- [ ] M1: Add `shibuya-core/test/Shibuya/App/LifecycleSpec.hs` (registered in
+      above `runIngesterAndProcessorBatch`. Completed 2026-07-02.
+- [x] M1: Add `shibuya-core/test/Shibuya/App/LifecycleSpec.hs` (registered in
       `shibuya-core/test/Main.hs` and in `other-modules` of
       `shibuya-core/shibuya-core.cabal`) with the halt/waitApp, halt/stopAppGracefully,
-      cancellation, and batch-halt regression tests.
-- [ ] M1: `cabal build all` and `cabal test shibuya-core-test` pass; `nix fmt`; commit.
+      cancellation, and batch-halt regression tests. Completed 2026-07-02.
+- [x] M1: `cabal build all` and `cabal test shibuya-core-test` pass; `nix fmt`; commit.
+      Completed 2026-07-02 with `cabal build all`, `cabal test shibuya-core-test`
+      (170 examples, 0 failures), and `nix fmt`.
 - [ ] M2: Change `toNQEStrategy` in `shibuya-core/src/Shibuya/App.hs` to map
       `StopAllOnFailure` to `NQE.IgnoreGraceful`.
 - [ ] M2: Add strategy-semantics tests (graceful completion and halt do not kill siblings
@@ -121,7 +123,12 @@ This section must always reflect the actual current state of the work.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-07-02: During the first full-suite run after the M1 changes, the pre-existing
+  batch reliability scenario "preserves per-key FIFO while allowing cross-key
+  concurrency" reported a missing `msg-2` under seed `1845348688`. Rerunning that exact
+  scenario with the same seed passed immediately, and the subsequent full suite passed
+  with 170 examples and 0 failures. This appears to be an existing timing-sensitive
+  batch test rather than a regression from the lifecycle changes.
 
 
 ## Decision Log

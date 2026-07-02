@@ -36,7 +36,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | Not Started |
+| 22 | Fix processor lifecycle and supervision semantics | docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md | None | None | In Progress |
 | 23 | Fix finalize-on-exception and batch-path reliability | docs/plans/23-fix-finalize-on-exception-and-batch-path-reliability.md | EP-22 | None | Not Started |
 | 24 | Enforce ordering policies or reject unsupported combinations | docs/plans/24-enforce-ordering-policies-or-reject-unsupported-combinations.md | None | EP-22 | Not Started |
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Not Started |

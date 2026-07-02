@@ -166,13 +166,15 @@ runSupervised master inboxSize procId concurrency adapter handler = do
   -- ConcUnlift Persistent allows the runInIO function to be used in the async child
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
-      runInIO $
-        -- Catch ProcessorHalt to prevent propagation via link
-        -- (Halt is intentional, not a failure - other processors should continue)
-        ( runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter handler
-            `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
+      runInIO
+        ( -- Catch ProcessorHalt to prevent propagation via link
+          -- (Halt is intentional, not a failure - other processors should continue)
+          ( runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler
+              `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
+          )
+            `finally` unregisterProcessor master procId
         )
-          `finally` unregisterProcessor master procId
+        `finally` atomically (writeTVar doneVar True)
 
   -- Link so exceptions propagate to the parent
   unsafeEff_ $ UIO.link supervisedChild
@@ -234,13 +236,12 @@ runIngesterAndProcessor ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   ProcessorId ->
-  TVar Bool ->
   Natural ->
   Concurrency ->
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter handler = do
+runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -264,12 +265,8 @@ runIngesterAndProcessor metricsVar procId doneVar inboxSize concurrency adapter 
           atomically $
             modifyTVar' metricsVar $ \m ->
               m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
-          atomically $ writeTVar doneVar True
           UIO.throwIO ingesterErr
         _ -> pure ()
-
-  -- Mark done when processor exits
-  liftIO $ atomically $ writeTVar doneVar True
 
 -- | Run a batching processor under the Master's supervision with metrics.
 --
@@ -304,19 +301,20 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
 
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
-      runInIO $
-        ( runIngesterAndProcessorBatch
-            metricsVar
-            procId
-            doneVar
-            inboxSize
-            concurrency
-            batchConfig
-            adapter
-            batchHandler
-            `catch` \(ProcessorHalt _) -> pure ()
+      runInIO
+        ( ( runIngesterAndProcessorBatch
+              metricsVar
+              procId
+              inboxSize
+              concurrency
+              batchConfig
+              adapter
+              batchHandler
+              `catch` \(ProcessorHalt _) -> pure ()
+          )
+            `finally` unregisterProcessor master procId
         )
-          `finally` unregisterProcessor master procId
+        `finally` atomically (writeTVar doneVar True)
 
   unsafeEff_ $ UIO.link supervisedChild
 
@@ -350,12 +348,12 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
   runIngesterAndProcessorBatch
     metricsVar
     procId
-    doneVar
     inboxSize
     concurrency
     batchConfig
     adapter
     batchHandler
+    `finally` liftIO (atomically (writeTVar doneVar True))
 
   pure
     SupervisedProcessor
@@ -374,25 +372,25 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
 -- when 'Adapter.shutdown' ends 'source'), the ingester completes, sets
 -- streamDoneVar, 'inboxToStream' terminates once the inbox is empty, the batcher
 -- reaches end-of-input and flushes all pending partial batches with TriggerFlush,
--- and only then does 'processBatchesUntilDrained' return and 'doneVar' get set.
+-- and only then does 'processBatchesUntilDrained' return. The spawn sites
+-- ('runSupervised', 'runSupervisedBatch', and 'runWithMetricsBatch') own
+-- marking the processor done via 'finally'.
 --
 -- 'processBatchesUntilDrained' (EP-18) only /sets/ 'haltRef' on a batch-handler
 -- 'AckHalt' or exhausted finalization; it does not throw. So we read 'haltRef'
 -- after it returns and throw 'ProcessorHalt' here, mirroring the single-message
--- 'processUntilDrained'. The throw (inside 'runInIO', before the ingester poll)
--- leaves 'doneVar' unset on halt, matching the single-message parity.
+-- 'processUntilDrained'.
 runIngesterAndProcessorBatch ::
   (IOE :> es, Tracing :> es) =>
   TVar ProcessorMetrics ->
   ProcessorId ->
-  TVar Bool ->
   Natural ->
   Concurrency ->
   BatchConfig es msg ->
   Adapter es msg ->
   BatchHandler es msg ->
   Eff es ()
-runIngesterAndProcessorBatch metricsVar procId doneVar inboxSize concurrency batchConfig adapter batchHandler = do
+runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig adapter batchHandler = do
   inbox <- liftIO $ newBoundedInbox inboxSize
   streamDoneVar <- liftIO $ newTVarIO False
   haltRef <- liftIO $ newIORef Nothing
@@ -421,11 +419,8 @@ runIngesterAndProcessorBatch metricsVar procId doneVar inboxSize concurrency bat
           atomically $
             modifyTVar' metricsVar $ \m ->
               m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
-          atomically $ writeTVar doneVar True
           UIO.throwIO ingesterErr
         _ -> pure ()
-
-  liftIO $ atomically $ writeTVar doneVar True
 
 -- | Convert inbox to a stream for use with streamly.
 -- Respects both the stream-done signal and halt flag.
