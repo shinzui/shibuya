@@ -177,15 +177,22 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
 
       addEvent traceSpan (mkEvent eventBatchStarted [])
 
+      alreadyHalted <- liftIO $ readIORef haltRef
+
       -- Run the handler under exception isolation. On any exception, record it
       -- on the span and substitute the whole-batch retry default.
-      handlerResult <-
-        catchAny
-          (Right <$> handler info batch)
-          ( \ex -> do
-              recordException traceSpan ex
-              pure (Left ())
-          )
+      (handlerResult, skippedAfterHalt) <-
+        case alreadyHalted of
+          Just _ -> pure (Left (), True)
+          Nothing -> do
+            result <-
+              catchAny
+                (Right <$> handler info batch)
+                ( \ex -> do
+                    recordException traceSpan ex
+                    pure (Left ())
+                )
+            pure (result, False)
       let (resolvedAck, handlerThrew) = case handlerResult of
             Right a -> (a, False)
             Left () -> (ackAll (AckRetry (RetryDelay 0)), True)
@@ -233,9 +240,12 @@ processOneBatch metricsVar procId maxConc haltRef handler (info, batch) = do
       case firstHalt of
         Just reason -> setStatus traceSpan (OTel.Error (haltReasonText reason))
         Nothing ->
-          if handlerThrew
-            then setStatus traceSpan (OTel.Error "batch handler exception")
-            else setStatus traceSpan OTel.Ok
+          if skippedAfterHalt
+            then setStatus traceSpan (OTel.Error "batch skipped after halt")
+            else
+              if handlerThrew
+                then setStatus traceSpan (OTel.Error "batch handler exception")
+                else setStatus traceSpan OTel.Ok
 
       traverse_ (recordException traceSpan . snd) finalizeFailures
 

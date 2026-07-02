@@ -9,7 +9,7 @@ import Control.Concurrent.STM
     writeTVar,
   )
 import Data.HashMap.Strict qualified as HashMap
-import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef)
+import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
@@ -153,6 +153,36 @@ spec = describe "Shibuya.Runner.BatchProcessor" $ do
       sort (map fst tracked) `shouldBe` expectedIds
       lookup (MessageId "msg-3") tracked `shouldBe` Just (AckHalt (HaltFatal "halt on 3"))
 
+    it "skips already-ready batches after halt and finalizes them with retry" $ do
+      tracking <- runEff $ runTracingNoop newTrackingAck
+      observedRef <- newIORef ([] :: [[MessageId]])
+      result <- try $ runEff $ runTracingNoop $ do
+        first <- buildRangeBatch tracking [1, 2] TriggerSize
+        second <- buildRangeBatch tracking [3, 4, 5] TriggerFlush
+        let handler _info msgs = do
+              let ids = [ing.envelope.messageId | ing <- NE.toList msgs]
+              liftIO $ modifyIORef' observedRef (ids :)
+              if MessageId "msg-2" `elem` ids
+                then pure $ withFallback AckOk [(MessageId "msg-2", AckHalt (HaltFatal "halt on 2"))]
+                else pure ackAllOk
+        _ <- runBatchesWithMetrics (ProcessorId "m3-halt-skip") Serial handler [first, second]
+        pure ()
+
+      case result of
+        Left (ProcessorHalt reason) -> reason `shouldBe` HaltFatal "halt on 2"
+        Right () -> expectationFailure "expected ProcessorHalt"
+
+      observed <- readIORef observedRef
+      observed `shouldBe` [[MessageId "msg-1", MessageId "msg-2"]]
+
+      tracked <- runEff $ runTracingNoop $ getTrackedDecisions tracking
+      lookup (MessageId "msg-1") tracked `shouldBe` Just AckOk
+      lookup (MessageId "msg-2") tracked `shouldBe` Just (AckHalt (HaltFatal "halt on 2"))
+      lookup (MessageId "msg-3") tracked `shouldBe` Just (AckRetry (RetryDelay 0))
+      lookup (MessageId "msg-4") tracked `shouldBe` Just (AckRetry (RetryDelay 0))
+      lookup (MessageId "msg-5") tracked `shouldBe` Just (AckRetry (RetryDelay 0))
+      sort (map fst tracked) `shouldBe` expectedIds
+
   describe "finalizer failure (M2)" $ do
     it "exhausts retries, names the failed MessageId, and still attempts the rest" $ do
       -- Two-message batch: msg-1 finalizer always throws; msg-2 records normally.
@@ -254,6 +284,31 @@ buildBatch tracking n trig = do
         BatchInfo
           { batchKey = defaultBatchKey,
             size = n,
+            trigger = trig,
+            partition = Nothing
+          }
+  pure (info, NE.fromList msgs)
+
+-- | Build a batch containing the exact message numbers requested.
+buildRangeBatch ::
+  (IOE :> es) =>
+  TrackingAck ->
+  [Int] ->
+  BatchTrigger ->
+  Eff es (BatchInfo, NonEmpty (Ingested es String))
+buildRangeBatch tracking ids trig = do
+  let mk i =
+        let mid = MessageId ("msg-" <> tshow i)
+         in Ingested
+              { envelope = mkEnv i mid,
+                ack = trackingAckHandle tracking mid,
+                lease = Nothing
+              }
+      msgs = map mk ids
+      info =
+        BatchInfo
+          { batchKey = defaultBatchKey,
+            size = length ids,
             trigger = trig,
             partition = Nothing
           }

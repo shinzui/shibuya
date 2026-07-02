@@ -12,6 +12,9 @@
 - Batch accumulation failures, including exceptions from user-provided
   `batchKey` functions, now fail the processor loudly instead of letting the
   batcher consumer die while the processor reports clean completion.
+- Batch processing now isolates `AckHalt`: batches already emitted after a halt
+  no longer re-enter the user batch handler, and their messages are finalized
+  with `AckRetry (RetryDelay 0)` instead of being left unacknowledged.
 
 ## 0.7.1.0 — 2026-06-15
 

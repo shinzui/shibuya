@@ -72,9 +72,9 @@ and pass after, runnable with `cabal test shibuya-core-test` from the repository
 - [x] 2026-07-02: M2: propagate batcher consumer failure in `shibuya-core/src/Shibuya/Runner/Batcher.hs` (`waitCatch` the consumer async at drain end, rethrow).
 - [x] 2026-07-02: M2: tests — a throwing `batchKey` fails the processor loudly, no message is finalized more than once, no clean-completion report.
 - [x] 2026-07-02: M2: `cabal build all`, `cabal test shibuya-core-test` (182 examples, 0 failures), `nix fmt`, commit with trailers.
-- [ ] M3: halt isolation in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` — `processOneBatch` checks the halt flag before running the handler; halt-skipped batches finalize every message with `AckRetry (RetryDelay 0)` and are accounted like exception-substituted batches.
-- [ ] M3: tests — after `AckHalt`, buffered batches never reach the batch handler yet all their messages are finalized exactly once with the retry decision.
-- [ ] M3: build, test, format, commit with trailers.
+- [x] 2026-07-02: M3: halt isolation in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` — `processOneBatch` checks the halt flag before running the handler; halt-skipped batches finalize every message with `AckRetry (RetryDelay 0)` and are accounted like exception-substituted batches.
+- [x] 2026-07-02: M3: tests — after `AckHalt`, buffered batches never reach the batch handler yet all their messages are finalized exactly once with the retry decision.
+- [x] 2026-07-02: M3: `cabal build all`, `cabal test shibuya-core-test` (183 examples, 0 failures), `nix fmt`, commit with trailers.
 - [ ] M4: bound the keyed scheduler's pending buffer in `shibuya-core/src/Shibuya/Runner/BatchProcessor.hs` (reader blocks when pending reaches `max 2 (2 * maxConcurrency)`).
 - [ ] M4: bracket the scheduler's reader and workers (structured concurrency; cancellation-safe `finishBatch` accounting; cancel-and-await all workers on any scheduler exit).
 - [ ] M4: tests — backpressure bound holds under a blocked handler; forced shutdown produces zero finalizations after `stopAppGracefully` returns; scheduler terminates after a worker is cancelled.
@@ -813,3 +813,8 @@ validating with `cabal build all`, `cabal test shibuya-core-test`, and `nix fmt`
 processor-stage exceptions as `Failed`, adding a throwing-`batchKey` reliability
 scenario, and validating with `cabal build all`, `cabal test shibuya-core-test`, and
 `nix fmt`.
+
+2026-07-02: Marked M3 complete after adding the halt-skip path in
+`processOneBatch`, proving already-ready batches after a halt do not reach the
+user batch handler, and validating with `cabal build all`,
+`cabal test shibuya-core-test`, and `nix fmt`.
