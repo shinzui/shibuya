@@ -87,11 +87,13 @@ This section must always reflect the actual current state of the work.
 - [x] M1: `cabal build all` and `cabal test shibuya-core-test` pass; `nix fmt`; commit.
       Completed 2026-07-02 with `cabal build all`, `cabal test shibuya-core-test`
       (170 examples, 0 failures), and `nix fmt`.
-- [ ] M2: Change `toNQEStrategy` in `shibuya-core/src/Shibuya/App.hs` to map
-      `StopAllOnFailure` to `NQE.IgnoreGraceful`.
-- [ ] M2: Add strategy-semantics tests (graceful completion and halt do not kill siblings
-      under `StopAllOnFailure`; failure does kill siblings and propagates).
-- [ ] M2: Build, test, format, commit.
+- [x] M2: Change `toNQEStrategy` in `shibuya-core/src/Shibuya/App.hs` to map
+      `StopAllOnFailure` to `NQE.IgnoreGraceful`. Completed 2026-07-02.
+- [x] M2: Add strategy-semantics tests (graceful completion and halt do not kill siblings
+      under `StopAllOnFailure`; failure does kill siblings and propagates). Completed
+      2026-07-02.
+- [x] M2: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
+      `cabal test shibuya-core-test` (173 examples, 0 failures), and `nix fmt`.
 - [ ] M3: Add `propagateFailures :: !Bool` to `MasterState` in
       `shibuya-core/src/Shibuya/Runner/Master.hs`, derived from the NQE strategy in
       `startMaster`.

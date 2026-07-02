@@ -6,6 +6,7 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
 import Data.HashMap.Strict qualified as HashMap
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
@@ -99,6 +100,101 @@ spec = describe "Shibuya.App lifecycle" $ do
 
     result `shouldBe` Just ()
 
+  it "graceful completion under StopAllOnFailure does not kill siblings" $ do
+    countBRef <- newIORef (0 :: Int)
+
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            messagesA <- createTestMessages 3
+            messagesB <- createTestMessages 30
+            let handlerA _ = pure AckOk
+                handlerB _ = do
+                  liftIO $ threadDelay 10_000
+                  liftIO $ modifyIORef' countBRef (+ 1)
+                  pure AckOk
+                procA = mkProcessor (testAdapter messagesA) handlerA
+                procB = mkProcessor (testAdapter messagesB) handlerB
+            app <-
+              runAppOrFail
+                StopAllOnFailure
+                10
+                [(ProcessorId "complete-A", procA), (ProcessorId "complete-B", procB)]
+            waitApp app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            liftIO $ readIORef countBRef
+
+    result `shouldBe` Just 30
+
+  it "halt under StopAllOnFailure does not kill siblings" $ do
+    countARef <- newIORef (0 :: Int)
+    countBRef <- newIORef (0 :: Int)
+
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            messagesA <- createTestMessages 10
+            messagesB <- createTestMessages 30
+            let handlerA _ = do
+                  count <- liftIO $ readIORef countARef
+                  liftIO $ modifyIORef' countARef (+ 1)
+                  if count >= 1
+                    then pure $ AckHalt (HaltFatal "A stops")
+                    else pure AckOk
+                handlerB _ = do
+                  liftIO $ threadDelay 10_000
+                  liftIO $ modifyIORef' countBRef (+ 1)
+                  pure AckOk
+                procA = mkProcessor (testAdapter messagesA) handlerA
+                procB = mkProcessor (testAdapter messagesB) handlerB
+            app <-
+              runAppOrFail
+                StopAllOnFailure
+                10
+                [(ProcessorId "halt-A", procA), (ProcessorId "halt-B", procB)]
+            waitApp app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            liftIO $ readIORef countBRef
+
+    result `shouldBe` Just 30
+
+  it "failure under StopAllOnFailure kills siblings and propagates" $ do
+    countBRef <- newIORef (0 :: Int)
+
+    result <-
+      UIO.withAsync
+        ( runEff $
+            runTracingNoop $ do
+              messagesB <- createTestMessages 50
+              let handlerA _ = pure AckOk
+                  handlerB _ = do
+                    liftIO $ threadDelay 20_000
+                    liftIO $ modifyIORef' countBRef (+ 1)
+                    pure AckOk
+                  procA = mkProcessor (failingAfterAdapter 3 "Adapter A source failed!") handlerA
+                  procB = mkProcessor (testAdapter messagesB) handlerB
+              app <-
+                runAppOrFail
+                  StopAllOnFailure
+                  10
+                  [(ProcessorId "fail-A", procA), (ProcessorId "fail-B", procB)]
+              liftIO $ threadDelay 500_000
+              _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+              pure ()
+        )
+        UIO.waitCatch
+
+    case result of
+      Left err ->
+        Text.pack (show err) `shouldSatisfy` Text.isInfixOf "Adapter A source failed"
+      Right () ->
+        expectationFailure "Expected adapter A source failure to propagate"
+
+    countB <- readIORef countBRef
+    countB `shouldSatisfy` (< 50)
+
 runAppOrFail ::
   (IOE :> es, Tracing :> es) =>
   SupervisionStrategy ->
@@ -149,6 +245,20 @@ testAdapter messages =
       source = Stream.fromList messages,
       shutdown = pure ()
     }
+
+failingAfterAdapter :: (IOE :> es) => Int -> Text.Text -> Adapter es String
+failingAfterAdapter goodCount failureText =
+  Adapter
+    { adapterName = "test:failing",
+      source = Stream.unfoldrM step (0 :: Int),
+      shutdown = pure ()
+    }
+  where
+    step n
+      | n < goodCount = do
+          msg <- createTestMessage (n + 1)
+          pure (Just (msg, n + 1))
+      | otherwise = error (Text.unpack failureText)
 
 infiniteAdapter :: (IOE :> es) => Adapter es String
 infiniteAdapter =

@@ -84,6 +84,8 @@ data SupervisionStrategy
     IgnoreFailures
   | -- | Stop all processors if any fails.
     -- A single processor failure triggers shutdown of all processors.
+    -- Graceful exits, including finite streams completing and handlers returning
+    -- 'AckHalt', do not stop sibling processors.
     StopAllOnFailure
   deriving stock (Eq, Show, Generic)
 
@@ -91,7 +93,7 @@ data SupervisionStrategy
 toNQEStrategy :: SupervisionStrategy -> NQE.Strategy
 toNQEStrategy = \case
   IgnoreFailures -> NQE.IgnoreAll
-  StopAllOnFailure -> NQE.KillAll
+  StopAllOnFailure -> NQE.IgnoreGraceful
 
 --------------------------------------------------------------------------------
 -- Shutdown Configuration
