@@ -67,7 +67,7 @@ import Shibuya.Runner.Supervised
     runSupervisedBatch,
   )
 import Shibuya.Telemetry.Effect (Tracing)
-import UnliftIO (SomeException, catch, displayException)
+import UnliftIO (SomeException, catch, displayException, try)
 import Prelude hiding (Ordering)
 
 --------------------------------------------------------------------------------
@@ -202,18 +202,19 @@ runApp strategy inboxSize namedProcessors =
       let nqeStrategy = toNQEStrategy strategy
       catch
         ( do
-            -- Start the master coordinator
             master <- startMaster nqeStrategy
-
-            -- Spawn each processor under supervision
-            processors <- spawnProcessors master (fromIntegral inboxSize) namedProcessors
-
-            pure $
-              Right
-                AppHandle
-                  { master = master,
-                    processors = Map.fromList processors
-                  }
+            spawnResult <- try $ spawnProcessors master (fromIntegral inboxSize) namedProcessors
+            case spawnResult of
+              Left (e :: SomeException) -> do
+                stopMaster master
+                pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
+              Right processors ->
+                pure $
+                  Right
+                    AppHandle
+                      { master = master,
+                        processors = Map.fromList processors
+                      }
         )
         ( \(e :: SomeException) ->
             pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e

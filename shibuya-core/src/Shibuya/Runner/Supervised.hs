@@ -24,7 +24,7 @@ module Shibuya.Runner.Supervised
   )
 where
 
-import Control.Concurrent.NQE.Process (Inbox, mailboxEmpty, mailboxEmptySTM, newBoundedInbox, receive, receiveSTM)
+import Control.Concurrent.NQE.Process (Inbox, mailboxEmptySTM, newBoundedInbox, receiveSTM)
 import Control.Concurrent.NQE.Supervisor (addChild)
 import Control.Concurrent.STM
   ( TVar,
@@ -37,7 +37,7 @@ import Control.Concurrent.STM
     retry,
     writeTVar,
   )
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
@@ -191,7 +191,9 @@ runSupervised master inboxSize procId concurrency adapter handler = do
 
 -- | Run a processor with metrics but without Master supervision.
 -- Useful for testing or simple single-processor setups.
--- This blocks until the stream is exhausted and all messages are processed.
+-- This blocks until the stream is exhausted and all messages are processed
+-- using serial processing with the same concurrent ingester/drainer shape as
+-- the supervised runner.
 runWithMetrics ::
   (IOE :> es, Tracing :> es) =>
   -- | Inbox size (for backpressure)
@@ -211,17 +213,8 @@ runWithMetrics inboxSize procId adapter handler = do
   metricsVar <- liftIO $ newTVarIO initialMetrics
   doneVar <- liftIO $ newTVarIO False
 
-  -- Create bounded inbox
-  inbox <- liftIO $ newBoundedInbox inboxSize
-
-  -- Run ingester to completion (all messages sent to inbox)
-  runIngesterWithMetrics metricsVar adapter.source inbox
-
-  -- Drain remaining messages from inbox
-  drainInboxWithMetrics metricsVar procId handler inbox
-
-  -- Mark done
-  liftIO $ atomically $ writeTVar doneVar True
+  runIngesterAndProcessor metricsVar procId inboxSize Serial adapter handler
+    `finally` liftIO (atomically (writeTVar doneVar True))
 
   pure
     SupervisedProcessor
@@ -261,14 +254,14 @@ runIngesterAndProcessor metricsVar procId inboxSize concurrency adapter handler 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       -- Processor: process messages, exit when stream done and inbox empty
       runInIO $ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar
-      UIO.poll ingesterAsync >>= \case
-        Just (Left ingesterErr) -> do
+      UIO.waitCatch ingesterAsync >>= \case
+        Left ingesterErr -> do
           now <- getCurrentTime
           atomically $
             modifyTVar' metricsVar $ \m ->
               m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
           UIO.throwIO ingesterErr
-        _ -> pure ()
+        Right () -> pure ()
 
 -- | Run a batching processor under the Master's supervision with metrics.
 --
@@ -417,14 +410,14 @@ runIngesterAndProcessorBatch metricsVar procId inboxSize concurrency batchConfig
           haltRef
         maybeHalt <- liftIO (readIORef haltRef)
         maybe (pure ()) (throwIO . ProcessorHalt) maybeHalt
-      UIO.poll ingesterAsync >>= \case
-        Just (Left ingesterErr) -> do
+      UIO.waitCatch ingesterAsync >>= \case
+        Left ingesterErr -> do
           now <- getCurrentTime
           atomically $
             modifyTVar' metricsVar $ \m ->
               m & #state .~ Failed (Text.pack (displayException ingesterErr)) now
           UIO.throwIO ingesterErr
-        _ -> pure ()
+        Right () -> pure ()
 
 -- | Convert inbox to a stream for use with streamly.
 -- Respects both the stream-done signal and halt flag.
@@ -502,30 +495,6 @@ processUntilDrained metricsVar procId concurrency handler inbox streamDoneVar = 
     case maybeHalt of
       Just reason -> throwIO $ ProcessorHalt reason
       Nothing -> pure ()
-
--- | Drain inbox until empty, with metrics tracking.
--- Used for testing with finite streams.
-drainInboxWithMetrics ::
-  (IOE :> es, Tracing :> es) =>
-  TVar ProcessorMetrics ->
-  ProcessorId ->
-  Handler es msg ->
-  Inbox (Ingested es msg) ->
-  Eff es ()
-drainInboxWithMetrics metricsVar procId handler inbox = do
-  haltRef <- liftIO $ newIORef Nothing
-  go haltRef
-  where
-    go haltRef = do
-      empty <- liftIO $ mailboxEmpty inbox
-      unless empty $ do
-        ingested <- liftIO $ receive inbox
-        processOne metricsVar procId 1 haltRef handler ingested
-        -- Check if halted
-        halted <- liftIO $ readIORef haltRef
-        case halted of
-          Just reason -> throwIO $ ProcessorHalt reason
-          Nothing -> go haltRef
 
 -- | Process a single message with metrics tracking and tracing.
 -- Thread-safe for concurrent execution.

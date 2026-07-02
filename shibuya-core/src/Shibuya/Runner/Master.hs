@@ -35,7 +35,6 @@ import Control.Concurrent.NQE.Process
     Listen,
     Process (..),
     newInbox,
-    query,
     receive,
   )
 import Control.Concurrent.NQE.Supervisor (Strategy (..), Supervisor)
@@ -172,33 +171,31 @@ handleMessage state msg = case msg of
 
 -- | Get metrics for all processors.
 getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap
-getAllMetrics master =
-  liftIO $
-    GetAllMetrics `query` master.inbox
+getAllMetrics = liftIO . getAllMetricsIO
 
 -- | Get metrics for all processors (IO version for web servers).
 getAllMetricsIO :: Master -> IO MetricsMap
-getAllMetricsIO master = GetAllMetrics `query` master.inbox
+getAllMetricsIO master = atomically $ do
+  tvarsMap <- readTVar master.state.metrics
+  traverse readTVar tvarsMap
 
 -- | Get metrics for a specific processor.
 getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
-getProcessorMetrics master pid =
-  liftIO $
-    GetProcessorMetrics pid `query` master.inbox
+getProcessorMetrics master = liftIO . getProcessorMetricsIO master
 
 -- | Get metrics for a specific processor (IO version for web servers).
 getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
-getProcessorMetricsIO master pid = GetProcessorMetrics pid `query` master.inbox
+getProcessorMetricsIO master pid = atomically $ do
+  tvarsMap <- readTVar master.state.metrics
+  traverse readTVar (Map.lookup pid tvarsMap)
 
 -- | Register a processor with the master.
 -- The processor should call this with its metrics TVar.
 registerProcessor :: (IOE :> es) => Master -> ProcessorId -> TVar ProcessorMetrics -> Eff es ()
 registerProcessor master pid metricsTVar =
-  liftIO $
-    RegisterProcessor pid metricsTVar `query` master.inbox
+  liftIO $ atomically $ modifyTVar' master.state.metrics $ Map.insert pid metricsTVar
 
 -- | Unregister a processor from the master.
 unregisterProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 unregisterProcessor master pid =
-  liftIO $
-    UnregisterProcessor pid `query` master.inbox
+  liftIO $ atomically $ modifyTVar' master.state.metrics $ Map.delete pid

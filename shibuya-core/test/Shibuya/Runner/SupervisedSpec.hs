@@ -3,8 +3,8 @@
 module Shibuya.Runner.SupervisedSpec (spec) where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
-import Control.Concurrent.STM (readTVarIO)
-import Control.Monad (forM, replicateM)
+import Control.Concurrent.STM (atomically, check, readTVar, readTVarIO)
+import Control.Monad (forM, forM_, replicateM)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
@@ -27,6 +27,8 @@ import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Runner.Master
   ( getAllMetrics,
+    getAllMetricsIO,
+    getProcessorMetricsIO,
     startMaster,
     stopMaster,
   )
@@ -68,6 +70,16 @@ spec = do
         stopMaster master
         pure m
       metrics `shouldSatisfy` null
+
+    it "metrics queries return after stopMaster" $ do
+      master <- runEff $ runTracingNoop $ startMaster IgnoreAll
+      runEff $ runTracingNoop $ stopMaster master
+
+      allMetrics <- UIO.timeout 1_000_000 (getAllMetricsIO master)
+      processorMetrics <- UIO.timeout 1_000_000 (getProcessorMetricsIO master (ProcessorId "x"))
+
+      allMetrics `shouldSatisfy` maybe False null
+      processorMetrics `shouldBe` Just Nothing
 
   describe "Shibuya.Runner.Supervised" $ do
     describe "runWithMetrics" $ do
@@ -127,6 +139,33 @@ spec = do
           isDone sp
 
         done `shouldBe` True
+
+      it "completes when the stream is longer than the inbox" $ do
+        processedRef <- newIORef (0 :: Int)
+
+        result <-
+          UIO.timeout 10_000_000 $
+            runEff $
+              runTracingNoop $ do
+                messages <- createTestMessages 100
+
+                let handler _ = do
+                      liftIO $ modifyIORef' processedRef (+ 1)
+                      pure AckOk
+                    adapter = testAdapter messages
+                    procId = ProcessorId "longer-than-inbox"
+
+                sp <- runWithMetrics 5 procId adapter handler
+                metrics <- getMetrics sp
+                processed <- liftIO $ readIORef processedRef
+                pure (metrics, processed)
+
+        case result of
+          Nothing -> expectationFailure "runWithMetrics timed out"
+          Just (finalMetrics, processed) -> do
+            processed `shouldBe` 100
+            finalMetrics.stats.received `shouldBe` 100
+            finalMetrics.stats.processed `shouldBe` 100
 
     describe "AckHalt behavior" $ do
       it "stops processing when handler returns AckHalt" $ do
@@ -631,6 +670,37 @@ spec = do
               case metrics.state of
                 Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "Network failure mid-stream"
                 other -> expectationFailure $ "Expected Failed state, got: " ++ show other
+
+        it "never drops an ingester failure (repeated)" $ do
+          results <- forM [(1 :: Int) .. 25] $ \i ->
+            runEff $ runTracingNoop $ do
+              let failingSource = Stream.unfoldrM (\() -> error "boom immediately") ()
+                  adapter =
+                    Adapter
+                      { adapterName = "test:failing-immediate",
+                        source = failingSource,
+                        shutdown = pure ()
+                      }
+                  handler _ = pure AckOk
+
+              master <- startMaster IgnoreAll
+              sp <- runSupervised master 10 (ProcessorId $ "failing-immediate-" <> Text.pack (show i)) Serial adapter handler
+
+              doneResult <-
+                liftIO $
+                  UIO.timeout 2_000_000 $
+                    atomically $ do
+                      done <- readTVar sp.done
+                      check done
+              metrics <- liftIO $ readTVarIO sp.metrics
+              stopMaster master
+              pure (i, doneResult, metrics)
+
+          forM_ results $ \(i, doneResult, metrics) -> do
+            doneResult `shouldBe` Just ()
+            case metrics.state of
+              Failed msg _ -> msg `shouldSatisfy` Text.isInfixOf "boom immediately"
+              other -> expectationFailure $ "Iteration " ++ show i ++ " expected Failed state, got: " ++ show other
 
       describe "Rapid start/stop cycles" $ do
         it "handles rapid start/stop without resource leaks" $ do

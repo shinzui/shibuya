@@ -105,19 +105,22 @@ This section must always reflect the actual current state of the work.
       end-to-end isolation test. Completed 2026-07-02.
 - [x] M3: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
       `cabal test shibuya-core-test` (175 examples, 0 failures), and `nix fmt`.
-- [ ] M4: Replace `UIO.poll` with `UIO.waitCatch` in both ingester-failure checks in
+- [x] M4: Replace `UIO.poll` with `UIO.waitCatch` in both ingester-failure checks in
       `shibuya-core/src/Shibuya/Runner/Supervised.hs`; add the repeated
-      failing-source test.
-- [ ] M4: Rewrite `runWithMetrics` to delegate to `runIngesterAndProcessor` (concurrent
+      failing-source test. Completed 2026-07-02.
+- [x] M4: Rewrite `runWithMetrics` to delegate to `runIngesterAndProcessor` (concurrent
       draining); delete `drainInboxWithMetrics`; add the longer-than-inbox test.
-- [ ] M4: Tear down the master in `runApp` (in `shibuya-core/src/Shibuya/App.hs`) when
-      `spawnProcessors` throws.
-- [ ] M4: Convert master introspection and registration
+      Completed 2026-07-02.
+- [x] M4: Tear down the master in `runApp` (in `shibuya-core/src/Shibuya/App.hs`) when
+      `spawnProcessors` throws. Completed 2026-07-02.
+- [x] M4: Convert master introspection and registration
       (`getAllMetrics`, `getAllMetricsIO`, `getProcessorMetrics`,
       `getProcessorMetricsIO`, `registerProcessor`, `unregisterProcessor`) in
       `shibuya-core/src/Shibuya/Runner/Master.hs` to direct TVar operations; add the
-      metrics-after-stop test.
-- [ ] M4: Build, test, format, commit.
+      metrics-after-stop test. Completed 2026-07-02.
+- [x] M4: Build, test, format, commit. Completed 2026-07-02 with `cabal build all`,
+      `cabal test shibuya-core-test` (178 examples, 0 failures), `nix fmt`, and
+      `nix flake check`.
 - [ ] Update the master plan's Progress section (the four EP-22 checkboxes) when done.
 
 
@@ -203,7 +206,15 @@ Record every decision made while working on the plan.
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+- 2026-07-02: EP-22 is implemented. `doneVar` is now set at the supervised child/run
+  boundary via `finally`; `StopAllOnFailure` maps to `NQE.IgnoreGraceful`; child `link`
+  is strategy-aware so `IgnoreFailures` isolates failures; ingester failures use
+  `waitCatch` rather than the racy `poll`; standalone `runWithMetrics` drains
+  concurrently; `runApp` tears down the master if processor spawning fails; and metrics
+  queries/register/unregister operate directly on the master's metrics TVar. The final
+  validation passed with `cabal build all`, `cabal test shibuya-core-test` (178 examples,
+  0 failures), `nix fmt`, and `nix flake check`. No follow-up remains inside EP-22;
+  EP-23 can build on the `finally`-based lifecycle structure.
 
 
 ## Context and Orientation
