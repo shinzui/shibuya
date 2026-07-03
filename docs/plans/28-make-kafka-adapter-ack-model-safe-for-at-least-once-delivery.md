@@ -205,8 +205,13 @@ cabal test shibuya-kafka-adapter --test-show-details=direct   # in another shell
   the finalize path that must seek to redeliver a retried message, and GHC's
   deadlock detector then wedges the pipeline with `BlockedIndefinitelyOnSTM`;
   bounding the poll keeps the lock available so finalize interleaves and the
-  ingester re-polls to see the redelivered record. `pollTimeout` above the cap is
-  clamped for the poll (it is still used verbatim as the seek timeout). This is an
+  ingester re-polls to see the redelivered record. The same cap is applied to the
+  retry seek (via a shared `boundedLockTimeout` helper): a seek that cannot
+  complete would otherwise hold the lock for the full `pollTimeout`, the same
+  long-blocking-under-lock hazard; a healthy seek acknowledges in single-digit
+  milliseconds so the cap only bites on a stuck seek, where surfacing it fast
+  through the ack path's bounded retry and fatal slot is desired. `pollTimeout`
+  above the cap is therefore clamped for both the poll and the seek. This is an
   adapter-only change; kafka-effectful and hw-kafka-client are untouched.
   Date: 2026-07-03
 
@@ -1027,3 +1032,5 @@ Revision note, 2026-07-02: M3 implementation wrapped ack-path Kafka operations i
 Revision note, 2026-07-02: M4 implementation added the loud interim dead-letter policy, removed `KafkaAdapterConfig.offsetReset`, added subscription/topic mismatch warnings, exported caller-owned adapter state plus `kafkaAdapterWith` and `kafkaRebalanceHandler`, updated README/Haddocks/changelog for Serial-only operation, halt/eviction, dead-letter/drop semantics, attempt-count limitations, and shutdown ordering, and changed conversion to materialize Kafka headers once. Code-level M4 acceptance passed. Live Redpanda validation now passes for 8 of 9 integration tests after freeing port `8080` and switching tests to IPv4 loopback; the handler-exception live case remains open because it exits with native code 139.
 
 Revision note, 2026-07-03: Diagnosed and fixed the code-139 crash. It was a consumer-access race exposed only under `runApp` (concurrent ingester poll + processor seek), which corrupted librdkafka's fetch queue (SIGSEGV in `rd_kafka_consume_batch_queue`). The adapter now serializes every consumer call behind `KafkaAdapterState.consumerLock` and caps each poll at `maxPollHoldMillis = 100` ms so the lock stays available to the finalize path (an unbounded locked poll deadlocked the pipeline via GHC's `BlockedIndefinitelyOnSTM` detector). Committed in the adapter repository as `65139f5`. All 40 tests pass against Redpanda (handler-exception case: 10/10 reruns). No kafka-effectful/hw-kafka-client changes. All milestones and the final gate are now complete; Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective updated accordingly.
+
+Revision note, 2026-07-03: Hardening follow-up — the retry seek is now capped with the same `boundedLockTimeout` helper as the poll, so a stuck seek can no longer hold the consumer lock for the full `pollTimeout`. Committed in the adapter repository as `22b821c`. Re-validated: full suite green (40 tests), handler-exception redelivery 5/5 reruns.
