@@ -42,7 +42,7 @@ Seven plans is within the two-to-seven bound, so no phase structure is required,
 | 25 | Pre-1.0 public API cleanup | docs/plans/25-pre-1-0-public-api-cleanup.md | EP-22, EP-23, EP-24 | None | Complete |
 | 26 | Reduce per-message hot-path overhead | docs/plans/26-reduce-per-message-hot-path-overhead.md | EP-22, EP-23 | None | Complete |
 | 27 | Harden PGMQ adapter ack paths and dead-lettering | docs/plans/27-harden-pgmq-adapter-ack-paths-and-dead-lettering.md | None | EP-23 | Complete |
-| 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | In Progress |
+| 28 | Make Kafka adapter ack model safe for at-least-once delivery | docs/plans/28-make-kafka-adapter-ack-model-safe-for-at-least-once-delivery.md | None | EP-23, EP-24 | Complete |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-22).
@@ -115,6 +115,7 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 - EP-28 code-level implementation is complete as of 2026-07-02: M1-M4 are implemented, broker-free tests pass, Haddocks build, benchmarks were recorded, and `nix develop -c cabal build all` is green. The child ExecPlan remains open only for live Redpanda integration validation.
 - EP-28 live validation initially failed because Redpanda's console port `8080` was already in use by an orphaned `process-compose up postgres create_schema -t=false` process. After killing that process, Redpanda started. The adapter test harness was then fixed to use `127.0.0.1:9092` because librdkafka resolved `localhost` to IPv6 `::1` while Redpanda was exposed on IPv4.
 - EP-28 live validation now passes for 8 of 9 integration tests plus all broker-free tests: the full suite excluding `Handler exception redelivers instead of skipping` passed 39 tests against Redpanda. The remaining handler-exception integration case exits with native code 139 immediately after topic creation, so the child ExecPlan remains open for that crash.
+- EP-28's code-139 crash (2026-07-03) was a cross-cutting discovery about how adapters interact with core's runtime, not a Kafka-only quirk: `runApp` polls the adapter `source` on the ingester thread (`Shibuya/Internal/Runner/Supervised.hs`, `runIngesterAndProcessor`, `ConcUnlift Persistent`) concurrently with the processor thread that runs `finalize`. Any adapter whose `AckHandle` calls back into a non-thread-safe client during `finalize` (here librdkafka seek/store) can race the concurrent `source` poll. The Kafka adapter absorbed this locally (a consumer-wide lock plus a bounded poll timeout), and no core change was needed, but the general lesson for future adapters is recorded in EP-28's retrospective: validate through `runApp`, not just single-threaded source drills, because `consumeN`-style tests never exercise the poll/finalize concurrency. The all-`Serial` processor still runs its ingester and processor on separate threads, so "Serial" does not mean "single-threaded adapter access."
 
 
 ## Decision Log
@@ -162,6 +163,38 @@ Discoveries made while authoring the child plans (2026-07-02), recorded here bec
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+All seven child plans are Complete. The initiative delivered every confirmed
+critical and major review finding across the three repositories:
+
+- Core lifecycle and supervision (EP-22): `AckHalt` no longer deadlocks
+  `waitApp`; `StopAllOnFailure`/`IgnoreFailures` behave as documented; the
+  ingester `poll` race and `runWithMetrics` drain deadlock are fixed.
+- Finalize/batch reliability (EP-23): handler exceptions finalize with
+  `AckRetry`; batch consumer failures propagate; halt isolation holds; the keyed
+  scheduler is bounded and bracketed; the `AckHandle` idempotency contract is
+  codified.
+- Ordering policies (EP-24): `PartitionedInOrder` is enforced with real
+  partition-keyed dispatch for single-message processors and rejected for the
+  unsafe batch combination.
+- API cleanup (EP-25): runner internals moved under `Shibuya.Internal.*`;
+  `AppHandle`/`Master` opaque; dead surface removed; shipped as
+  `shibuya-core` 0.8.0.0.
+- Performance (EP-26): per-message metrics on atomic counters; tracing hot-path
+  hoisting; per-message STM removed.
+- PGMQ adapter (EP-27): transactional, retry-safe dead-lettering; ack-path
+  retries; prefetch footgun removed; `shibuya-pgmq-adapter` 0.9.0.0.
+- Kafka adapter (EP-28): `AckRetry`/handler exceptions redeliver via seek
+  instead of committing past; loud dead-lettering; classified ack-path errors;
+  Serial-only contract documented; `shibuya-kafka-adapter` 0.8.0.0.
+
+Cross-cutting lesson (from EP-28's final crash): `runApp` runs each processor's
+ingester and finalize on separate threads even in `Serial` mode, so an adapter
+that calls a non-thread-safe client from `finalize` must serialize that client
+against its own `source` poll. Single-threaded source drills do not surface this
+— adapters that will run under `runApp` should carry a `runApp`-based test from
+their first milestone. This is captured in EP-28's Surprises & Discoveries and
+Retrospective and in this master plan's Surprises section.
 
 Revision note, 2026-07-02: EP-28 was marked In Progress and the master Surprises & Discoveries section was updated with the Kafka adapter's `shibuya-core` 0.8 migration and validation-environment findings from M1.
+
+Revision note, 2026-07-03: EP-28's final blocker — the `Handler exception redelivers instead of skipping` native crash (exit 139) — was root-caused to a consumer-access race exposed only under `runApp` and fixed within the Kafka adapter (consumer-wide lock + bounded poll timeout; committed in the adapter repository as `65139f5`). All 40 adapter tests pass against Redpanda. EP-28 is marked Complete in the Exec-Plan Registry; the master Surprises & Discoveries and Outcomes & Retrospective sections were filled in, completing the initiative (all seven child plans Complete).
