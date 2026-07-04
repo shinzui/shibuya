@@ -5,9 +5,11 @@
 
 ---
 
-> **⚠️ Work in Progress**
+> **⚠️ Pre-1.0**
 >
-> Shibuya is under active development and not yet complete. The API may change significantly before the first stable release. 
+> Shibuya is pre-1.0. The core API went through a cleanup for 0.8.0.0 and is
+> stabilizing, but it may still change before the first stable release.
+> Upgrading from 0.7.x? See the [migration guide](docs/user/migrating-to-0.8.md).
 
 ---
 
@@ -24,7 +26,7 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.8.0.0 — Unreleased)
+### Current Status (v0.8.0.0)
 
 | Feature | Status |
 |---------|--------|
@@ -69,6 +71,12 @@ their own cadence:
   single-message processors by a keyed scheduler.
 - `mkEnvelope` and `mkIngested` are the recommended constructors for adapter
   authors.
+- **New** — first-class batch processing (`Shibuya.Batch`, `mkBatchProcessor`)
+  and a faster hot path (atomic per-message metrics, allocation-free disabled
+  tracing).
+
+📖 **Upgrading from 0.7.x?** See the
+[migration guide](docs/user/migrating-to-0.8.md) — most changes are mechanical.
 
 ### What's New in 0.6.0.0
 
@@ -111,7 +119,6 @@ module Main where
 import Shibuya
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Effectful
-import Effectful.Concurrent (runConcurrent)
 
 -- Your domain type
 data OrderEvent = OrderEvent
@@ -132,7 +139,7 @@ handleOrder msg = do
     Left err  -> AckRetry (RetryDelay 30)   -- Retry in 30 seconds
 
 main :: IO ()
-main = runEff . runConcurrent . runTracingNoop $ do
+main = runEff . runTracingNoop $ do
   let ordersProcessor = QueueProcessor
         { adapter = myAdapter       -- your adapter of choice
         , handler = handleOrder
@@ -292,7 +299,7 @@ Configure tracing via standard OpenTelemetry environment variables:
 Run multiple independent queues concurrently with `runApp`:
 
 ```haskell
-main = runEff . runConcurrent . runTracingNoop $ do
+main = runEff . runTracingNoop $ do
   let ordersProcessor = QueueProcessor
         { adapter = ordersAdapter
         , handler = handleOrders
@@ -327,6 +334,7 @@ main = runEff . runConcurrent . runTracingNoop $ do
 
 - [Usage Guide](docs/USAGE_GUIDE.md) - Detailed usage examples
 - [Getting Started](docs/user/getting-started.md) - Framework walkthrough
+- [Migrating to 0.8.0.0](docs/user/migrating-to-0.8.md) - Upgrading from 0.7.x
 - [Architecture](docs/UNIFIED_ARCHITECTURE.md) - System design and module structure
 - [Architecture Details](docs/architecture/) - Core types, message flow, metrics, concurrency
 - [CHANGELOG](CHANGELOG.md) - Release history

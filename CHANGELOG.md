@@ -29,6 +29,9 @@ needs small mechanical changes.
   handler code (the framework retains `Ingested` internally). New `mkEnvelope`
   and `mkIngested` smart constructors are provided for adapters and tests, and a
   new `Shibuya` umbrella module re-exports the public surface.
+- `shibuya-core`: the ordering-policy type `Ordering` was renamed to
+  `OrderingPolicy`, removing the need for consumers to hide `Prelude.Ordering`.
+  Update `QueueProcessor` fields and any explicit type signatures accordingly.
 - `shibuya-core`: dependencies trimmed — `lens`, `generic-lens`,
   `effectful-core`, `uuid`, and `vector` were dropped. Lens use-sites became
   plain record updates and the `Effectful.Internal.Unlift` imports moved to the

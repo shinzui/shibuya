@@ -83,6 +83,14 @@ What this means in practice:
 Lease-based visibility extension is unchanged — `msg.lease` still yields the
 optional `Lease`.
 
+### The `Ordering` policy type is now `OrderingPolicy`
+
+The ordering-policy type was renamed from `Ordering` to `OrderingPolicy`
+(so consumers no longer need to hide `Prelude.Ordering`). The constructors
+(`Unordered`, `StrictInOrder`, `PartitionedInOrder`) are unchanged — only the
+type name changed, so update any explicit signatures or imports that referenced
+`Ordering`.
+
 ## 4. Runner internals moved under `Shibuya.Internal.*`
 
 The runner implementation modules are no longer part of the public API. If you
