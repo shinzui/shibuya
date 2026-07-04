@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0.0 — Unreleased
+## 0.8.0.0 — 2026-07-04
 
 ### Breaking Changes
 

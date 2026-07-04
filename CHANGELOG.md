@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0.0 — Unreleased
+## 0.8.0.0 — 2026-07-04
 
 This release bundles first-class batch processing with the review-remediation
 initiative (processor lifecycle, ordering enforcement, a pre-1.0 API cleanup,
