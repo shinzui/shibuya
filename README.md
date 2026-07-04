@@ -5,99 +5,52 @@
 
 ---
 
-> **⚠️ Pre-1.0**
->
-> Shibuya is pre-1.0. The core API went through a cleanup for 0.8.0.0 and is
-> stabilizing, but it may still change before the first stable release.
-> Upgrading from 0.7.x? See the [migration guide](docs/user/migrating-to-0.8.md).
+> **Pre-1.0** — Shibuya is pre-1.0. The core API went through a cleanup for
+> 0.8.0.0 and is stabilizing, but it may still change before the first stable
+> release. Upgrading from 0.7.x? See the
+> [migration guide](docs/user/migrating-to-0.8.md).
 
 ---
 
-Shibuya provides a unified abstraction over various message queue backends (Kafka, PostgreSQL queues, SQS, Redis) with built-in supervision, backpressure, and composable stream transformations.
+Shibuya is a supervised queue-processing framework for Haskell, inspired by
+[Broadway](https://github.com/dashbitco/broadway). It provides a unified
+abstraction over message-queue backends (Kafka, PostgreSQL/pgmq, and more) with
+built-in supervision, backpressure, explicit acknowledgement semantics, and
+composable Streamly pipelines — so you write a handler once and swap backends
+freely.
 
 ## Features
 
-- **Unified Queue Abstraction** - Write handlers once, swap queue backends freely
-- **Supervised Processing** - Failure isolation via NQE supervision
-- **Backpressure** - Bounded inboxes prevent memory exhaustion
-- **Explicit Ack Semantics** - Handlers express intent (ack, retry, dead-letter, halt), framework handles mechanics
-- **First-Class Batching** - Accumulate by key with size/timeout/flush triggers, `BatchAck` decisions, and resilient finalization
-- **Metrics & Introspection** - Real-time visibility into processor state and statistics
-- **Stream Transformations** - Composable pipelines powered by Streamly
-- **Effectful** - All effects tracked via the Effectful library
-
-### Current Status (v0.8.0.0)
-
-| Feature | Status |
-|---------|--------|
-| Serial Processing | Implemented |
-| Backpressure (bounded inbox) | Implemented |
-| Ack Semantics (Ok/Retry/DLQ/Halt) | Implemented |
-| Metrics & Introspection | Implemented |
-| NQE Supervision | Implemented |
-| Concurrent Processing (Ahead/Async) | Implemented |
-| Partitioned Ordering for single-message processors | Implemented |
-| First-Class Batching (size/timeout/key) | Implemented |
-| OpenTelemetry Tracing | Implemented |
-| Graceful Shutdown (drain timeout) | Implemented |
-| Policy Validation | Implemented |
+- **Unified queue abstraction** — write handlers once, swap queue backends freely.
+- **Supervised processing** — failure isolation via NQE supervision.
+- **Backpressure** — bounded inboxes prevent memory exhaustion.
+- **Explicit ack semantics** — handlers express intent (ack, retry, dead-letter,
+  halt); the framework owns finalization.
+- **First-class batching** — accumulate by key with size/timeout/flush triggers
+  and per-message `BatchAck` decisions.
+- **Ordering & concurrency** — serial, ahead-of-time, async, and partition-keyed
+  in-order processing.
+- **Built-in retries** — exponential backoff with jitter, driven by the adapter's
+  delivery count.
+- **OpenTelemetry tracing** — per-message spans and context propagation, with a
+  zero-overhead path when disabled.
+- **Metrics & introspection** — real-time visibility into processor state and
+  statistics.
 
 ## Adapters
 
-Queue backends live in sibling repositories so they can release on
-their own cadence:
+Queue backends live in sibling repositories so they can release on their own
+cadence:
 
 - [`shibuya-kafka-adapter`](https://github.com/shinzui/shibuya-kafka-adapter)
   — Apache Kafka via `hw-kafka-client` and `kafka-effectful`.
 - [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
   — PostgreSQL message queue (pgmq) via `pgmq-hs`.
 
-### What's New in 0.8.0.0
-
-- **Breaking** — `runApp` now takes an `AppConfig` record:
-  `runApp defaultAppConfig processors`. Customize with record updates such as
-  `defaultAppConfig { strategy = StopAllOnFailure, inboxSize = 500 }`.
-- **Breaking** — handlers receive `Message es msg`, not internal
-  `Ingested es msg`. The framework retains the `AckHandle` and owns
-  finalization.
-- **Breaking** — `Ordering` is now `OrderingPolicy`, removing the need to hide
-  `Prelude.Ordering`.
-- **Breaking** — runner internals moved under `Shibuya.Internal.Runner.*`;
-  application code should import the `Shibuya` umbrella module.
-- **Breaking** — removed dead surface: `StreamStats.dropped`,
-  `HandlerTimeout`, `InboxOverflow`, and the always-zero dropped Prometheus
-  metric.
-- `PartitionedInOrder` with `Ahead` or `Async` is now enforced for
-  single-message processors by a keyed scheduler.
-- `mkEnvelope` and `mkIngested` are the recommended constructors for adapter
-  authors.
-- **New** — first-class batch processing (`Shibuya.Batch`, `mkBatchProcessor`)
-  and a faster hot path (atomic per-message metrics, allocation-free disabled
-  tracing).
-
-📖 **Upgrading from 0.7.x?** See the
-[migration guide](docs/user/migrating-to-0.8.md) — most changes are mechanical.
-
-### What's New in 0.6.0.0
-
-- **Breaking** — OpenTelemetry messaging spans now emit
-  `messaging.operation.type = "process"` instead of the deprecated
-  `messaging.operation = "process"` wire key. The Haskell constant
-  `attrMessagingOperation` keeps its name and resolves to the current
-  semantic-conventions key, so source imports keep compiling, but
-  dashboards, alerts, and trace queries filtering on
-  `messaging.operation` must move to `messaging.operation.type`.
-- Upgraded the OpenTelemetry dependencies to the 1.0 ecosystem
-  (`hs-opentelemetry-api ^>= 1.0`, propagator and exporters to
-  match) and sourced Shibuya's generic messaging keys from
-  `hs-opentelemetry-semantic-conventions ^>= 1.40`.
-
-See the [CHANGELOG](CHANGELOG.md) for full release history.
-
 ## Installation
 
-Released versions are available on [Hackage](https://hackage.haskell.org/package/shibuya-core).
-For the current 0.8.0.0 source tree, add:
+Released versions are available on
+[Hackage](https://hackage.haskell.org/package/shibuya-core):
 
 ```cabal
 build-depends:
@@ -105,9 +58,10 @@ build-depends:
 ```
 
 Optional packages:
+
 - [`shibuya-metrics`](https://hackage.haskell.org/package/shibuya-metrics) — HTTP/JSON, Prometheus, and WebSocket metrics endpoints
-- [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter) — PostgreSQL message queue adapter (standalone repo)
-- [`shibuya-kafka-adapter`](https://github.com/shinzui/shibuya-kafka-adapter) — Apache Kafka adapter (standalone repo)
+- [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter) — PostgreSQL message queue adapter
+- [`shibuya-kafka-adapter`](https://github.com/shinzui/shibuya-kafka-adapter) — Apache Kafka adapter
 
 ## Quick Start
 
@@ -156,9 +110,13 @@ main = runEff . runTracingNoop $ do
     Right appHandle -> waitApp appHandle
 ```
 
+For app authors, a single `import Shibuya` re-exports everything you need. See
+the [getting-started guide](docs/user/getting-started.md) for a full walkthrough.
+
 ## Ack Decisions
 
-Handlers return an `AckDecision` to express intent:
+Handlers return an `AckDecision` to express intent; the framework performs the
+corresponding queue operation:
 
 ```haskell
 AckOk                              -- Message processed successfully
@@ -169,17 +127,21 @@ AckHalt (HaltFatal reason)         -- Stop processing entirely
 
 ## Configuration
 
-```haskell
--- runApp takes:
---   AppConfig - supervision strategy and inbox size
---   [(ProcessorId, QueueProcessor es)] - Named processors
+`runApp` takes an `AppConfig` (supervision strategy + inbox size) and a list of
+named processors:
 
+```haskell
 result <- runApp
   defaultAppConfig { inboxSize = 500 }
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   ]
+```
 
+Each `QueueProcessor` chooses how its messages are ordered and how concurrently
+they run:
+
+```haskell
 -- QueueProcessor fields:
 --   adapter     - Queue backend (source stream + shutdown)
 --   handler     - Your message handler
@@ -187,11 +149,13 @@ result <- runApp
 --   concurrency - Serial | Ahead Natural | Async Natural
 ```
 
-## Exponential Backoff
+`mkProcessor` builds an `Unordered`/`Serial` processor for the common case; use
+`mkBatchProcessor` for batch handlers.
 
-Shibuya 0.4 ships a built-in exponential-backoff helper for handlers
-that want exponentially-growing, jittered retry intervals without
-having to compute the math themselves:
+## Retries with Exponential Backoff
+
+Shibuya ships a built-in exponential-backoff helper so handlers get
+exponentially-growing, jittered retry intervals without doing the math:
 
 ```haskell
 import Shibuya.Core.Retry (defaultBackoffPolicy, retryWithBackoff)
@@ -203,100 +167,38 @@ myHandler msg = do
     Left _err -> retryWithBackoff defaultBackoffPolicy msg.envelope
 ```
 
-`defaultBackoffPolicy` is AWS's published "exponential backoff with
-full jitter" recommendation: 1 s base, factor 2, capped at 5 minutes.
-The available `Jitter` strategies are `NoJitter`, `FullJitter`
-(default), and `EqualJitter`; switch by record-updating the policy
-(`defaultBackoffPolicy { jitter = NoJitter }`).
+`defaultBackoffPolicy` follows AWS's "exponential backoff with full jitter"
+recommendation (1 s base, factor 2, capped at 5 minutes); the `Jitter`
+strategies are `NoJitter`, `FullJitter` (default), and `EqualJitter`. The helper
+grows the delay using `msg.envelope.attempt` (the adapter's redelivery count,
+e.g. pgmq's `read_count`), falling back to the base delay when it is `Nothing`.
 
-Adapters that track per-message redelivery counts populate
-`msg.envelope.attempt :: Maybe Attempt`; the helper reads it and
-grows the delay each time the same message returns. The PGMQ adapter
-sources the counter from pgmq's `read_count` column. Adapters that do
-not track redeliveries leave `attempt = Nothing`, in which case
-`retryWithBackoff` treats the delivery as `Attempt 0` (base delay).
-
-A runnable end-to-end demonstration lives in the
-[`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
-repo's `shibuya-pgmq-example/` package. With a local Postgres
-reachable via `DATABASE_URL`, run:
-
-```sh
-# Terminal 1 — consumer
-cabal run shibuya-pgmq-consumer -- backoff-demo nojitter
-
-# Terminal 2 — enqueue one message
-cabal run shibuya-pgmq-simulator -- one-shot backoff_demo
-```
-
-The consumer's stdout shows the message being delivered four times,
-with the wallclock gaps growing 1 s, 2 s, 4 s, then succeeding on the
-fourth delivery. Drop the `nojitter` flag for the default
-full-jittered policy.
+A runnable end-to-end demo lives in the
+[`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter) repo
+(`shibuya-pgmq-example`, `backoff-demo` subcommand).
 
 ## Distributed Tracing
 
-Shibuya includes built-in OpenTelemetry tracing support for distributed observability.
-
-### Enabling Tracing
+Shibuya has built-in OpenTelemetry tracing. Wrap your app in `runTracing tracer`
+to enable it, or `runTracingNoop` for a zero-overhead disabled path:
 
 ```haskell
 import Shibuya.Telemetry.Effect (runTracing, runTracingNoop)
-import OpenTelemetry.Trace qualified as OTel
 
-main :: IO ()
-main = do
-  -- Initialize OpenTelemetry (via SDK or your preferred method)
-  provider <- initTracerProvider  -- Your initialization
-  let tracer = OTel.makeTracer provider "my-service" OTel.tracerOptions
-
-  -- Run with tracing enabled
-  runEff $ runTracing tracer $ do
-    result <- runApp defaultAppConfig processors
-    -- ...
-
-  -- Or run with tracing disabled (zero overhead)
-  runEff $ runTracingNoop $ do
-    result <- runApp defaultAppConfig processors
-    -- ...
+runEff $ runTracing tracer $ do
+  runApp defaultAppConfig processors
 ```
 
-### What Gets Traced
-
-Each message creates a span with:
-- **Span name**: `"<destination> process"` (e.g. `"shibuya-consumer process"`), following the OpenTelemetry messaging-spans recommendation
-- **Span kind**: `Consumer`
-- **Attributes**:
-  - `messaging.system`: "shibuya"
-  - `messaging.operation.type`: "process"
-  - `messaging.destination.name`: The processor id
-  - `messaging.message.id`: The message ID
-  - `shibuya.partition`: Partition (if present)
-  - `shibuya.inflight.count`: Current in-flight messages
-  - `shibuya.inflight.max`: Max concurrency
-  - `shibuya.ack.decision`: Handler's ack decision
-- **Events**: `shibuya.handler.started`, `shibuya.handler.completed`, `shibuya.ack.decision` (plus the standard `exception` event on handler exceptions, via `recordException`)
-- **Context propagation**: Parent context from `traceContext` message headers
-
-### Local Testing with Jaeger
-
-```bash
-# Start Jaeger
-docker compose -f docker-compose.otel.yaml up -d
-
-# View traces at http://localhost:16686
-```
-
-### Environment Variables
-
-Configure tracing via standard OpenTelemetry environment variables:
-- `OTEL_SERVICE_NAME` - Service name in traces
-- `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP collector endpoint
-- `OTEL_TRACES_SAMPLER` - Sampling strategy (e.g., `always_on`, `parentbased_always_on`)
+Each message opens a `Consumer`-kind span named `"<destination> process"` with
+`messaging.*` attributes, in-flight gauges, and the handler's ack decision, and
+propagates parent context from the message's trace headers. Configuration,
+Jaeger setup, and the supported `OTEL_*` environment variables are covered in the
+[OpenTelemetry guide](docs/user/opentelemetry.md).
 
 ## Running Multiple Processors
 
-Run multiple independent queues concurrently with `runApp`:
+Run multiple independent queues concurrently under one `runApp`, then introspect
+or shut them down through the returned handle:
 
 ```haskell
 main = runEff . runTracingNoop $ do
@@ -321,41 +223,41 @@ main = runEff . runTracingNoop $ do
   case result of
     Left err -> print err
     Right appHandle -> do
-      -- Monitor metrics
       metrics <- getAppMetrics appHandle
       forM_ (Map.toList metrics) $ \(ProcessorId name, pm) ->
         putStrLn $ name <> ": " <> show pm.stats.processed <> " processed"
 
-      -- Wait for completion or use stopApp/stopAppGracefully to shut down
+      -- Wait for completion, or use stopApp / stopAppGracefully to shut down.
       waitApp appHandle
 ```
 
 ## Documentation
 
-- [Usage Guide](docs/USAGE_GUIDE.md) - Detailed usage examples
-- [Getting Started](docs/user/getting-started.md) - Framework walkthrough
-- [Migrating to 0.8.0.0](docs/user/migrating-to-0.8.md) - Upgrading from 0.7.x
-- [Architecture](docs/UNIFIED_ARCHITECTURE.md) - System design and module structure
-- [Architecture Details](docs/architecture/) - Core types, message flow, metrics, concurrency
-- [CHANGELOG](CHANGELOG.md) - Release history
+- [Getting Started](docs/user/getting-started.md) — framework walkthrough
+- [Usage Guide](docs/USAGE_GUIDE.md) — detailed usage examples
+- [OpenTelemetry](docs/user/opentelemetry.md) — tracing setup and configuration
+- [Architecture](docs/UNIFIED_ARCHITECTURE.md) — system design and module structure
+- [Architecture Details](docs/architecture/) — core types, message flow, metrics, concurrency
+- [Migrating to 0.8.0.0](docs/user/migrating-to-0.8.md) — upgrading from 0.7.x
+- [CHANGELOG](CHANGELOG.md) — release history and per-version notes
 
-Adapter-specific docs (PGMQ, Kafka, ...) live with their respective
-adapters — see the [Adapters](#adapters) section above.
+Adapter-specific docs (PGMQ, Kafka, …) live with their respective adapters — see
+[Adapters](#adapters) above.
 
 ## Design Principles
 
-1. **Separation of Concerns** - Streamly handles I/O and backpressure, NQE handles supervision
-2. **Explicit Semantics** - Handlers express intent, not mechanics
-3. **Adapter Abstraction** - Queue-specific logic lives in adapters, not the core
-4. **Composable** - Stream pipelines are composable and testable in isolation
-5. **Effectful** - All effects tracked for testability and safety
+1. **Separation of concerns** — Streamly handles I/O and backpressure, NQE handles supervision.
+2. **Explicit semantics** — handlers express intent, not mechanics.
+3. **Adapter abstraction** — queue-specific logic lives in adapters, not the core.
+4. **Composable** — stream pipelines are composable and testable in isolation.
+5. **Effectful** — all effects are tracked for testability and safety.
 
 ## References
 
-- [Broadway (Elixir)](https://github.com/dashbitco/broadway) - Primary inspiration
-- [Streamly](https://hackage.haskell.org/package/streamly) - Stream processing
-- [Effectful](https://hackage.haskell.org/package/effectful) - Effect system
-- [NQE](https://hackage.haskell.org/package/nqe) - Actor supervision
+- [Broadway (Elixir)](https://github.com/dashbitco/broadway) — primary inspiration
+- [Streamly](https://hackage.haskell.org/package/streamly) — stream processing
+- [Effectful](https://hackage.haskell.org/package/effectful) — effect system
+- [NQE](https://hackage.haskell.org/package/nqe) — actor supervision
 
 ## License
 
