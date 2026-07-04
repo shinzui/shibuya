@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0.1 — 2026-07-04
+
+### Other Changes
+
+- Reduced per-message allocation on the `Async` and `Ahead` concurrency paths
+  by widening the streamly dispatch buffer to `2 * n` (the thread bound stays
+  at `n`). A buffer equal to the thread count throttled worker dispatch and
+  caused dispatch churn that allocated up to +90% on the `Async`
+  concurrency-levels benchmarks (EP-30). No API or behavior change.
+- Documented the accepted ~126 bytes/message cost of the separate handler and
+  finalizer exception frames that guarantee "always finalize" (EP-31).
+
 ## 0.8.0.0 — 2026-07-04
 
 ### Breaking Changes

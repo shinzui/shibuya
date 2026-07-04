@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0.1 — 2026-07-04
+
+Version bumped to track `shibuya-core` 0.8.0.1. No user-visible changes
+to `shibuya-metrics` itself.
+
 ## 0.8.0.0 — 2026-07-04
 
 ### Breaking Changes

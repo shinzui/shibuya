@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0.1 — 2026-07-04
+
+A patch release with internal performance work on `shibuya-core`; no API
+or behavior changes. `shibuya-metrics` is bumped to track it.
+
+### Other Changes
+
+- `shibuya-core`: cut per-message allocation on the `Async` and `Ahead`
+  concurrency paths by widening the streamly dispatch buffer to `2 * n`
+  while keeping the `n`-thread concurrency bound. A buffer equal to the
+  thread count throttled worker dispatch, causing churn that allocated up
+  to +90% on the `Async` concurrency-levels benchmarks (EP-30).
+- `shibuya-core`: documented the accepted ~126 bytes/message cost of the
+  separate handler/finalizer exception frames that back the always-finalize
+  guarantee (EP-31), and fixed a benchmark-only nested `atomically` crash by
+  forcing the tasty-bench `env` value (EP-29).
+
 ## 0.8.0.0 — 2026-07-04
 
 This release bundles first-class batch processing with the review-remediation
