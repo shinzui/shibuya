@@ -108,14 +108,53 @@ Show the user ALL changes (version bumps, dependency bounds, changelog entries) 
   - Note: newly created files must be `git add`-ed before nix evaluation will see them, since nix uses the git tree.
   - If any check fails, fix the issue before proceeding.
 
-### 5. Commit, tag, and push
+### 5. Check for performance regressions (non-patch releases only)
+
+**Skip this step for `patch` (bug-fix) releases.** For `minor` and `major` releases, run the benchmark suite and compare against the previous release to catch performance/allocation regressions before publishing. This guards the ~4x-vs-streamly overhead and per-message allocation budget that EP-30/EP-31 established.
+
+The benchmark package is `shibuya-core-bench` (not released to Hackage; uses [tasty-bench](https://hackage.haskell.org/package/tasty-bench), which supports CSV baselines and `--fail-if-slower`). See `shibuya-core-bench/README.md` for full details.
+
+Procedure:
+
+1. **Capture a baseline from the previous release tag.** Use a detached git worktree so the working tree (with the pending version/changelog edits) stays untouched:
+
+   ```bash
+   git worktree add /tmp/shibuya-bench-baseline <last-tag>
+   cabal bench shibuya-core-bench \
+     --project-dir /tmp/shibuya-bench-baseline \
+     --benchmark-options="--csv /tmp/shibuya-baseline.csv --stdev 5 --timeout 120"
+   ```
+
+   (If `--project-dir` is not usable in this setup, `cd /tmp/shibuya-bench-baseline` and run `cabal bench` there instead. Prefer a worktree over `git stash`/checkout so uncommitted release edits are never disturbed.)
+
+2. **Run the current tree against that baseline** with a failure threshold. tasty-bench fails the run if any benchmark is slower than the threshold percent:
+
+   ```bash
+   cabal bench shibuya-core-bench \
+     --benchmark-options="--baseline /tmp/shibuya-baseline.csv --fail-if-slower 10 --stdev 5 --timeout 120"
+   ```
+
+3. **Interpret the results:**
+   - A non-zero exit / any benchmark flagged slower than the threshold is a **regression**. Also inspect the `allocated` column — an allocation increase (even if time is within noise) is a regression per EP-30/EP-31 and must be explained.
+   - The `--fail-if-slower 10` gate is deliberately tight. With `--stdev 5` the measurement noise floor is roughly ±5%, so a single borderline result (just over 10%) may still be noise. Re-run with a tighter `--stdev` (e.g. `3`) and/or larger `--timeout` before concluding. Machine load matters — close other apps.
+   - If a genuine regression is found, **stop and report it to the user** with the before/after numbers. Do not proceed to release until the user either accepts the regression (e.g. an intentional trade-off, which should be noted in the changelog) or the regression is fixed.
+
+4. **Clean up the worktree** when done:
+
+   ```bash
+   git worktree remove /tmp/shibuya-bench-baseline
+   ```
+
+If there is no previous release tag (first release), note that no baseline comparison is possible and just record the current numbers for future comparison.
+
+### 6. Commit, tag, and push
 
 - Stage all modified `.cabal` and `CHANGELOG.md` files.
 - Create a single commit using a Conventional Commits message: `chore(release): <new-version>` (project-wide convention — see global CLAUDE.md). The body should summarize what's in the release and why this is the chosen bump.
 - Create a single annotated git tag: `git tag -a v<version> -m "Release <version>"`
 - Push the commit and tag: `git push && git push --tags`
 
-### 6. Publish to Hackage (in dependency order)
+### 7. Publish to Hackage (in dependency order)
 
 For EACH package, in dependency order (shibuya-core → shibuya-metrics):
 
@@ -135,7 +174,7 @@ After all packages are published, present a summary:
 | shibuya-core | X.Y.Z.W | https://hackage.haskell.org/package/shibuya-core-X.Y.Z.W |
 | shibuya-metrics | X.Y.Z.W | https://hackage.haskell.org/package/shibuya-metrics-X.Y.Z.W |
 
-### 7. Create GitHub release
+### 8. Create GitHub release
 
 After all Hackage uploads succeed, create a GitHub release for the tag:
 
@@ -164,6 +203,7 @@ EOF
 - Always ask the user to confirm the version bump and changelogs before committing.
 - Always publish in dependency order: shibuya-core → shibuya-metrics.
 - Never skip `cabal check`, tests, or `nix flake check`.
+- For `minor` and `major` releases, never skip the benchmark regression check (step 5). If a genuine regression is found, stop and get the user's decision before releasing. It is only skipped for `patch` (bug-fix) releases.
 - If any step fails (including `nix flake check`), stop and report the error rather than continuing.
 - If a Hackage upload fails for a package, do NOT continue uploading subsequent packages that depend on it.
 - Run `nix fmt` before committing to ensure proper formatting.
