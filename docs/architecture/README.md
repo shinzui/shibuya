@@ -43,10 +43,10 @@ Shibuya is a queue processing framework for Haskell, inspired by Broadway (Elixi
 | Component | Module | Purpose |
 |-----------|--------|---------|
 | `runApp` | `Shibuya.App` | Entry point, starts Master and processors |
-| `Master` | `Shibuya.Runner.Master` | Holds Supervisor and MetricsMap |
+| `Master` | `Shibuya.Internal.Runner.Master` | Holds Supervisor and MetricsMap |
 | `Supervisor` | NQE | Manages processor lifecycles |
-| `Ingester` | `Shibuya.Runner.Ingester` | Reads from adapter, sends to inbox |
-| `Processor` | `Shibuya.Runner.Processor` | Receives from inbox, calls handler |
+| `Ingester` | `Shibuya.Internal.Runner.Ingester` | Reads from adapter, sends to inbox |
+| `Processor` | `Shibuya.Internal.Runner.Supervised` | Receives from inbox, calls handler |
 | `Adapter` | `Shibuya.Adapter` | Queue-specific message source |
 | `Handler` | `Shibuya.Handler` | User-defined message processing |
 
@@ -84,12 +84,12 @@ Adapter.source (Stream)
 
 ```haskell
 import Shibuya.App
+import Shibuya.Telemetry.Effect (runTracingNoop)
 
 main :: IO ()
-main = runEff $ do
+main = runEff . runTracingNoop $ do
   result <- runApp
-    IgnoreFailures      -- Supervision strategy
-    100                 -- Inbox size (backpressure)
+    defaultAppConfig    -- IgnoreFailures + inboxSize 100
     [ (ProcessorId "orders", mkProcessor ordersAdapter ordersHandler)
     ]
 

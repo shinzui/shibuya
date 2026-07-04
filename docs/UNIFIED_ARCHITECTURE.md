@@ -1,247 +1,94 @@
 # Shibuya Framework Architecture
 
-Shibuya is a supervised queue processing framework for Haskell, inspired by [Broadway](https://github.com/dashbitco/broadway) from Elixir. It provides a unified abstraction over various message queue backends (Kafka, PostgreSQL queues, SQS, Redis) with built-in supervision, backpressure, and composable stream transformations.
+Shibuya is a supervised queue processing framework for Haskell. The core
+package owns the common runtime: adapter ingestion, bounded backpressure,
+handler execution, explicit ack decisions, batching, supervision, metrics, and
+OpenTelemetry spans. Queue-specific broker behavior lives in adapter packages.
 
-## Design Principles
+For deeper references, see:
 
-1. **Separation of Concerns**: Streamly handles I/O, polling, batching, and backpressure. NQE handles concurrency, supervision, and state management.
-2. **Explicit Semantics**: Handlers express intent (ack, retry, dead-letter, halt) - the framework handles mechanics.
-3. **Adapter Abstraction**: Queue-specific logic lives in adapters, not the core framework.
-4. **Composable Transformations**: Stream pipelines are composable and testable in isolation.
-5. **Effectful by Default**: All effects are tracked via the Effectful library.
+- [Core Types](architecture/CORE_TYPES.md)
+- [Message Flow](architecture/MESSAGE_FLOW.md)
+- [Concurrency](architecture/CONCURRENCY.md)
+- [Metrics](architecture/METRICS.md)
+- [OpenTelemetry](user/opentelemetry.md)
 
-## Architecture Overview
+## Runtime Shape
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Master Process                                  │
-│                                                                             │
-│  ┌─────────────────┐    ┌────────────────────────────────────────────────┐ │
-│  │  MetricsMap     │    │              NQE Supervisor                    │ │
-│  │  (TVar)         │    │                                                │ │
-│  │                 │    │  ┌────────────────────────────────────────┐   │ │
-│  │  proc-1 ──────────────►│         Supervised Processor 1          │───────► Kafka Topic A
-│  │  proc-2 ───┐    │    │  │                                        │   │ │
-│  │  ...       │    │    │  │  Adapter ──► Stream ──► Handler        │   │ │
-│  └────────────│────┘    │  │             (Streamly)   │             │   │ │
-│               │         │  │                          ▼             │   │ │
-│               │         │  │                    AckHandle.finalize  │   │ │
-│               │         │  │                          │             │   │ │
-│               └─────────│──│──────────── Metrics ◄────┘             │   │ │
-│                         │  └────────────────────────────────────────┘   │ │
-│                         │                                                │ │
-│                         │  ┌────────────────────────────────────────┐   │ │
-│                         │  │         Supervised Processor 2         │───────► PostgreSQL Queue
-│                         │  │         (postgres adapter)             │   │ │
-│                         │  └────────────────────────────────────────┘   │ │
-│                         │                                                │ │
-│                         │  ┌────────────────────────────────────────┐   │ │
-│                         │  │         Supervised Processor 3         │───────► SQS Queue
-│                         │  │         (sqs adapter)                  │   │ │
-│                         │  └────────────────────────────────────────┘   │ │
-│                         └────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
+```text
+runApp AppConfig [(ProcessorId, QueueProcessor)]
+        |
+        v
+      Master
+        |
+        +-- Supervised processor "orders"
+        |     Adapter.source -> bounded inbox -> Handler/BatchHandler -> AckHandle.finalize
+        |
+        +-- Supervised processor "events"
+              Adapter.source -> bounded inbox -> Handler/BatchHandler -> AckHandle.finalize
 ```
 
-### Key Components
+Each processor has its own adapter stream, bounded inbox, runner, metrics
+handle, and shutdown path. The shared `Master` holds the NQE supervisor and the
+metrics registry used by `getAppMetrics` and `shibuya-metrics`.
 
-| Component | Responsibility |
-|-----------|----------------|
-| **Master** | Central coordinator, holds MetricsMap, spawns Supervisor |
-| **NQE Supervisor** | Manages child processor lifecycles, applies restart strategy |
-| **Supervised Processor** | Runs adapter stream, calls handler, updates metrics |
-| **MetricsMap** | TVar-based map for O(1) introspection of all processors |
+## Public Entry Point
 
-## Module Structure
-
-```
-Shibuya/
-├── Core.hs                 -- Re-exports public API
-├── Core/
-│   ├── Types.hs           -- MessageId, Cursor, Envelope, TraceHeaders
-│   ├── Ack.hs             -- AckDecision, RetryDelay, DeadLetterReason
-│   ├── Error.hs           -- PolicyError, HandlerError, RuntimeError
-│   ├── Lease.hs           -- Optional lease for visibility timeout
-│   ├── AckHandle.hs       -- Effectful ack finalization
-│   └── Ingested.hs        -- Complete message bundle for handlers
-├── Handler.hs             -- Handler type alias
-├── Adapter.hs             -- Adapter interface
-├── Adapter/
-│   └── Mock.hs            -- Mock adapter for testing
-├── Policy.hs              -- Ordering and Concurrency policies
-├── Prelude.hs             -- Common imports
-├── Telemetry.hs           -- Telemetry re-exports
-├── Telemetry/
-│   ├── Config.hs          -- TracingConfig
-│   ├── Effect.hs          -- Tracing effect for OpenTelemetry spans
-│   ├── Propagation.hs     -- W3C trace context propagation
-│   └── Semantic.hs        -- OpenTelemetry semantic conventions
-├── Runner/
-│   ├── Metrics.hs         -- ProcessorState, StreamStats, ProcessorMetrics
-│   ├── Master.hs          -- Master process (NQE supervision + metrics)
-│   ├── Supervised.hs      -- Supervised processor runner
-│   ├── Serial.hs          -- Simple sequential runner
-│   ├── Ingester.hs        -- Stream to inbox bridge
-│   ├── Processor.hs       -- Inbox to handler bridge
-│   └── Halt.hs            -- Halt handling
-├── Stream.hs              -- Stream utilities (polling, batch, filter)
-└── App.hs                 -- Top-level entry point (runApp)
-```
-
----
-
-## Layer 1: Core Types
-
-These types exist everywhere and should be extremely stable. No behavior, no effects, no policy.
-
-### Shibuya.Core.Types
+Most application code imports `Shibuya` or `Shibuya.App`.
 
 ```haskell
-module Shibuya.Core.Types
-  ( MessageId(..)
-  , Cursor(..)
-  , Envelope(..)
-  , TraceHeaders
-  ) where
+runApp
+  :: (IOE :> es, Tracing :> es)
+  => AppConfig
+  -> [(ProcessorId, QueueProcessor es)]
+  -> Eff es (Either AppError (AppHandle es))
 
-import Data.ByteString (ByteString)
-import Data.Text (Text)
-import Data.Time (UTCTime)
-
--- | Stable identity for idempotency & observability
-newtype MessageId = MessageId { unMessageId :: Text }
-  deriving stock (Eq, Ord, Show)
-
--- | Optional cursor / offset / global position
-data Cursor
-  = CursorInt !Int
-  | CursorText !Text
-  deriving stock (Eq, Ord, Show)
-
--- | W3C Trace Context headers for distributed tracing
-type TraceHeaders = [(ByteString, ByteString)]
-
--- | Normalized message envelope (Broadway.Message equivalent)
-data Envelope msg = Envelope
-  { messageId    :: !MessageId
-  , cursor       :: !(Maybe Cursor)
-  , partition    :: !(Maybe Text)
-  , enqueuedAt   :: !(Maybe UTCTime)
-  , traceContext :: !(Maybe TraceHeaders)
-  , payload      :: !msg
+data AppConfig = AppConfig
+  { strategy  :: !SupervisionStrategy
+  , inboxSize :: !Int
   }
-  deriving stock (Eq, Show, Functor, Generic)
+
+defaultAppConfig :: AppConfig
+-- IgnoreFailures, inboxSize = 100
 ```
 
----
+`runApp` validates the application config, ordering/concurrency policies, and
+batch configs before starting processors. `inboxSize` must be at least 1.
 
-## Layer 2: Ack Semantics
-
-Handlers decide meaning, not mechanics. This is explicit to support halt-on-error for ordered streams.
-
-### Shibuya.Core.Ack
+## Processor Types
 
 ```haskell
-module Shibuya.Core.Ack
-  ( RetryDelay(..)
-  , DeadLetterReason(..)
-  , HaltReason(..)
-  , AckDecision(..)
-  ) where
+data QueueProcessor es where
+  QueueProcessor ::
+    { adapter     :: Adapter es msg
+    , handler     :: Handler es msg
+    , ordering    :: OrderingPolicy
+    , concurrency :: Concurrency
+    } -> QueueProcessor es
 
-import Data.Text (Text)
-import Data.Time (NominalDiffTime)
+  BatchingProcessor ::
+    { adapter      :: Adapter es msg
+    , batchHandler :: BatchHandler es msg
+    , batchConfig  :: BatchConfig es msg
+    , ordering     :: OrderingPolicy
+    , concurrency  :: Concurrency
+    } -> QueueProcessor es
 
--- | Delay before retry
-newtype RetryDelay = RetryDelay { unRetryDelay :: NominalDiffTime }
-  deriving stock (Eq, Show)
+mkProcessor
+  :: Adapter es msg -> Handler es msg -> QueueProcessor es
 
--- | Why a message is being dead-lettered
-data DeadLetterReason
-  = PoisonPill !Text
-  | InvalidPayload !Text
-  | MaxRetriesExceeded
-  deriving stock (Eq, Show)
-
--- | Why processing should halt
-data HaltReason
-  = HaltOrderedStream !Text  -- Must stop to preserve ordering
-  | HaltFatal !Text          -- Unrecoverable error
-  deriving stock (Eq, Show)
-
--- | Handler outcome (semantic, not mechanical)
-data AckDecision
-  = AckOk                          -- Processed successfully
-  | AckRetry !RetryDelay           -- Retry after delay
-  | AckDeadLetter !DeadLetterReason -- Move to DLQ
-  | AckHalt !HaltReason            -- Stop processing
-  deriving stock (Eq, Show)
+mkBatchProcessor
+  :: Adapter es msg -> BatchHandler es msg -> BatchConfig es msg -> QueueProcessor es
 ```
 
----
+The smart constructors use `Unordered` + `Serial` defaults. Set the fields
+directly when a processor needs stricter ordering or more concurrency.
 
-## Layer 3: Lease (Optional)
+## Message Types
 
-Lease exists only to model temporary ownership (SQS visibility timeout, DB locks). Kafka adapters won't use this.
-
-### Shibuya.Core.Lease
-
-```haskell
-module Shibuya.Core.Lease
-  ( Lease(..)
-  ) where
-
-import Data.Text (Text)
-import Data.Time (NominalDiffTime)
-import Effectful (Eff)
-
--- | Optional capability for sources with visibility/ownership
-data Lease es = Lease
-  { leaseId     :: !Text
-  , leaseExtend :: NominalDiffTime -> Eff es ()
-  }
-```
-
----
-
-## Layer 4: AckHandle
-
-This is the Broadway.Acknowledger equivalent, but typed. Must be called exactly once.
-
-### Shibuya.Core.AckHandle
+Adapters emit framework-internal `Ingested` values:
 
 ```haskell
-module Shibuya.Core.AckHandle
-  ( AckHandle(..)
-  ) where
-
-import Shibuya.Core.Ack (AckDecision)
-import Effectful (Eff)
-
--- | Mechanical ack interface (adapter-provided)
-newtype AckHandle es = AckHandle
-  { finalize :: AckDecision -> Eff es ()
-  }
-```
-
----
-
-## Layer 5: Ingested Message
-
-What flows through the runner into handlers. Broadway.Message + Acknowledger + optional lease.
-
-### Shibuya.Core.Ingested
-
-```haskell
-module Shibuya.Core.Ingested
-  ( Ingested(..)
-  ) where
-
-import Shibuya.Core.Types (Envelope)
-import Shibuya.Core.Lease (Lease)
-import Shibuya.Core.AckHandle (AckHandle)
-
--- | What handlers receive
 data Ingested es msg = Ingested
   { envelope :: !(Envelope msg)
   , ack      :: !(AckHandle es)
@@ -249,492 +96,163 @@ data Ingested es msg = Ingested
   }
 ```
 
----
-
-## Layer 6: Handler API
-
-This is all application authors need to know. Handlers cannot ack directly, cannot influence concurrency, and express intent only.
-
-### Shibuya.Handler
+Handlers receive the read-only projection:
 
 ```haskell
-module Shibuya.Handler
-  ( Handler
-  ) where
+data Message es msg = Message
+  { envelope :: !(Envelope msg)
+  , lease    :: !(Maybe (Lease es))
+  }
 
-import Shibuya.Core.Ingested (Ingested)
-import Shibuya.Core.Ack (AckDecision)
-import Effectful (Eff)
-
--- | Handler function type
-type Handler es msg = Ingested es msg -> Eff es AckDecision
+type Handler es msg = Message es msg -> Eff es AckDecision
 ```
 
----
+The framework retains the `AckHandle` and finalizes exactly once per delivery
+decision, retrying the same decision when finalization itself throws.
 
-## Layer 7: Adapter API
-
-Adapters bridge external systems to the framework. Adapter owns queue semantics; runner never touches offsets directly.
-
-### Shibuya.Adapter
+## Envelope
 
 ```haskell
-module Shibuya.Adapter
-  ( Adapter(..)
-  ) where
-
-import Data.Text (Text)
-import Shibuya.Core.Ingested (Ingested)
-import Effectful (Eff)
-import Streamly.Data.Stream (Stream)
-
--- | Queue adapter interface
-data Adapter es msg = Adapter
-  { adapterName :: !Text
-
-  -- | Stream of leased messages
-  , source :: Stream (Eff es) (Ingested es msg)
-
-  -- | Stop polling, release resources
-  , shutdown :: Eff es ()
+data Envelope msg = Envelope
+  { messageId    :: !MessageId
+  , cursor       :: !(Maybe Cursor)
+  , partition    :: !(Maybe Text)
+  , enqueuedAt   :: !(Maybe UTCTime)
+  , traceContext :: !(Maybe TraceHeaders)
+  , headers      :: !(Maybe Headers)
+  , attempt      :: !(Maybe Attempt)
+  , attributes   :: !(HashMap Text Attribute)
+  , payload      :: !msg
   }
 ```
 
----
+`headers` is the lossless broker-header view. `traceContext` is the parsed W3C
+projection used to parent the Consumer span. `attributes` lets adapters attach
+typed OpenTelemetry attributes to Shibuya's per-message span.
 
-## Layer 8: Ordering & Concurrency Policy
-
-Runner policy that maps ordering guarantees to concurrency constraints.
-
-### Shibuya.Policy
+## Ack Decisions
 
 ```haskell
-module Shibuya.Policy
-  ( Ordering(..)
-  , Concurrency(..)
-  , validatePolicy
-  ) where
+data AckDecision
+  = AckOk
+  | AckRetry !RetryDelay
+  | AckDeadLetter !DeadLetterReason
+  | AckHalt !HaltReason
+```
 
--- | Message ordering guarantees
-data Ordering
-  = StrictInOrder      -- Event-sourced subscriptions (must be Serial)
-  | PartitionedInOrder -- Kafka-style (parallel across partitions)
-  | Unordered          -- No ordering guarantees
-  deriving stock (Eq, Show)
+Handlers express intent; adapters implement mechanics in `AckHandle.finalize`.
+If a handler throws, the runner records the failure and finalizes the message as
+`AckRetry (RetryDelay 0)` so it is not lost.
 
--- | Concurrency mode
+## Batching
+
+Batching processors insert a batcher between the bounded inbox and the handler.
+Messages accumulate per `BatchKey` and emit on size, timeout, or shutdown flush.
+
+```haskell
+type BatchHandler es msg =
+  BatchInfo -> NonEmpty (Message es msg) -> Eff es BatchAck
+
+data BatchAck = BatchAck
+  { decisions :: !(Map MessageId AckDecision)
+  , fallback  :: !AckDecision
+  }
+```
+
+The runtime resolves one decision for every retained message in the emitted
+batch: a `MessageId` lookup in `decisions`, or `fallback` when absent. It then
+applies each resolved decision through that message's idempotent finalizer with
+bounded retry.
+
+`BatchingProcessor` rejects `PartitionedInOrder` with `Ahead` or `Async` because
+batches are scheduled by `BatchKey`, not by `Envelope.partition`.
+
+## Ordering and Concurrency
+
+```haskell
+data OrderingPolicy
+  = StrictInOrder
+  | PartitionedInOrder
+  | Unordered
+
 data Concurrency
-  = Serial            -- One message at a time
-  | Ahead !Int        -- Prefetch N, process in order
-  | Async !Int        -- Process N concurrently
-  deriving stock (Eq, Show)
-
--- | Validate policy combinations
--- Invariant: StrictInOrder => Serial
-validatePolicy :: Ordering -> Concurrency -> Either PolicyError ()
-validatePolicy StrictInOrder (Ahead _) = Left (InvalidPolicyCombo "StrictInOrder requires Serial concurrency")
-validatePolicy StrictInOrder (Async _) = Left (InvalidPolicyCombo "StrictInOrder requires Serial concurrency")
-validatePolicy _ _ = Right ()
+  = Serial
+  | Ahead !Int
+  | Async !Int
 ```
 
----
+`StrictInOrder` requires `Serial`. `PartitionedInOrder` with concurrent
+single-message processors uses the internal keyed scheduler: messages sharing a
+`Just partition` key are processed and finalized in arrival order, while
+different partitions can run concurrently up to the configured bound. Messages
+without a partition key are unconstrained.
 
-## Layer 9: Application Entry Point
-
-Where Streamly wiring, supervision, ack lifecycle, and halt semantics are applied.
-
-### Shibuya.App
-
-```haskell
-module Shibuya.App
-  ( -- * Running Processors
-    runApp
-  , QueueProcessor(..)
-  , mkProcessor
-  , AppHandle(..)
-    -- * AppHandle Operations
-  , getAppMetrics
-  , stopApp
-  , stopAppGracefully
-  , waitApp
-    -- * Shutdown
-  , ShutdownConfig(..)
-  , defaultShutdownConfig
-    -- * Errors
-  , AppError(..)
-    -- * Supervision
-  , SupervisionStrategy(..)
-    -- * Re-exports
-  , ProcessorId(..)
-  , ProcessorMetrics(..)
-  ) where
-
--- | A queue processor pairs an adapter with its handler.
--- The message type is existentially hidden, allowing heterogeneous queues.
-data QueueProcessor es where
-  QueueProcessor ::
-    { adapter     :: Adapter es msg
-    , handler     :: Handler es msg
-    , ordering    :: Ordering
-    , concurrency :: Concurrency
-    } -> QueueProcessor es
-
--- | Convenience constructor with Serial/Unordered defaults.
-mkProcessor :: Adapter es msg -> Handler es msg -> QueueProcessor es
-
--- | Handle for a running multi-queue application.
-data AppHandle es = AppHandle
-  { master :: !Master
-  , processors :: !(Map ProcessorId (SupervisedProcessor, QueueProcessor es))
-  }
-
--- | Shutdown configuration.
-data ShutdownConfig = ShutdownConfig
-  { drainTimeout :: !NominalDiffTime
-  }
-
-defaultShutdownConfig :: ShutdownConfig
-
-data AppError
-  = AppPolicyError !PolicyError
-  | AppHandlerError !HandlerError
-  | AppRuntimeError !RuntimeError
-  deriving stock (Eq, Show)
-
--- | Run queue processors concurrently under NQE supervision.
-runApp
-  :: (IOE :> es, Tracing :> es)
-  => SupervisionStrategy               -- ^ How to handle processor failures
-  -> Int                               -- ^ Inbox size for backpressure
-  -> [(ProcessorId, QueueProcessor es)] -- ^ Named processors
-  -> Eff es (Either AppError (AppHandle es))
-
--- | Get metrics for all processors.
-getAppMetrics :: (IOE :> es) => AppHandle es -> Eff es MetricsMap
-
--- | Gracefully stop all processors.
-stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
-
--- | Gracefully stop with drain timeout. Returns True if completed within timeout.
-stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
-
--- | Wait for all processors to complete.
-waitApp :: (IOE :> es) => AppHandle es -> Eff es ()
-```
-
----
-
-## Master Process & Supervision
-
-The Master process provides centralized supervision and introspection for all processors.
-
-### Shibuya.Runner.Metrics
-
-```haskell
-module Shibuya.Runner.Metrics
-  ( ProcessorState(..)
-  , ProcessorId(..)
-  , StreamStats(..)
-  , ProcessorMetrics(..)
-  , MetricsMap
-  ) where
-
--- | Processor identifier
-newtype ProcessorId = ProcessorId { unProcessorId :: Text }
-  deriving stock (Eq, Ord, Show, Generic)
-
--- | In-flight tracking for concurrent processing
-data InFlightInfo = InFlightInfo
-  { inFlight       :: !Int   -- Currently processing
-  , maxConcurrency :: !Int   -- Configured max (1 for Serial)
-  }
-  deriving stock (Eq, Show, Generic)
-
--- | Processor runtime state
-data ProcessorState
-  = Idle                              -- Waiting for messages
-  | Processing !InFlightInfo !UTCTime -- Currently processing (in-flight info, last activity)
-  | Failed !Text !UTCTime             -- Failed with error
-  | Stopped                           -- Processor has been stopped
-  deriving stock (Eq, Show, Generic)
-
--- | Stream statistics
-data StreamStats = StreamStats
-  { received  :: !Int   -- Messages received from stream
-  , dropped   :: !Int   -- Messages dropped (backpressure)
-  , processed :: !Int   -- Messages successfully processed
-  , failed    :: !Int   -- Messages that failed processing
-  }
-  deriving stock (Eq, Show, Generic)
-
--- | Combined processor metrics
-data ProcessorMetrics = ProcessorMetrics
-  { state     :: !ProcessorState
-  , stats     :: !StreamStats
-  , startedAt :: !UTCTime
-  }
-  deriving stock (Eq, Show, Generic)
-
--- | Map of processor IDs to their metrics
-type MetricsMap = Map ProcessorId ProcessorMetrics
-```
-
-### Shibuya.Runner.Master
-
-The Master is an NQE process that:
-- Creates and manages an NQE Supervisor for child processors
-- Maintains a `TVar (Map ProcessorId (TVar ProcessorMetrics))` for introspection
-- Handles control messages via message-passing
-
-```haskell
-module Shibuya.Runner.Master
-  ( Master(..)
-  , MasterState(..)
-  , MasterMessage(..)
-  , startMaster
-  , stopMaster
-  , getAllMetrics
-  , getProcessorMetrics
-  , registerProcessor
-  , unregisterProcessor
-  ) where
-
--- | Messages for the master process
-data MasterMessage
-  = GetAllMetrics (Listen MetricsMap)
-  | GetProcessorMetrics ProcessorId (Listen (Maybe ProcessorMetrics))
-  | RegisterProcessor ProcessorId (TVar ProcessorMetrics) (Listen ())
-  | UnregisterProcessor ProcessorId (Listen ())
-  | Shutdown (Listen ())
-
--- | Master handle
-data Master = Master
-  { handle :: !(Async ())
-  , state  :: !MasterState
-  , inbox  :: !(Inbox MasterMessage)
-  }
-
--- | Start the master process
-startMaster :: (IOE :> es) => Strategy -> Eff es Master
-
--- | Stop the master and all child processors
-stopMaster :: (IOE :> es) => Master -> Eff es ()
-
--- | Get metrics for all processors
-getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap
-```
-
-### Shibuya.Runner.Supervised
-
-Runs processors under the Master's supervision with metrics tracking:
-
-```haskell
-module Shibuya.Runner.Supervised
-  ( SupervisedProcessor(..)
-  , runSupervised
-  , runWithMetrics
-  , getMetrics
-  , getProcessorState
-  , isDone
-  ) where
-
--- | Handle for a supervised processor
-data SupervisedProcessor = SupervisedProcessor
-  { metrics     :: !(TVar ProcessorMetrics)
-  , processorId :: !ProcessorId
-  , done        :: !(TVar Bool)
-  , child       :: !(Maybe (Async ()))
-  }
-
--- | Run processor under Master's supervision
-runSupervised
-  :: (IOE :> es)
-  => Master
-  -> Natural           -- Inbox size
-  -> ProcessorId
-  -> Adapter es msg
-  -> Handler es msg
-  -> Eff es SupervisedProcessor
-
--- | Run with metrics but without supervision (for testing)
-runWithMetrics
-  :: (IOE :> es)
-  => Natural
-  -> ProcessorId
-  -> Adapter es msg
-  -> Handler es msg
-  -> Eff es SupervisedProcessor
-```
-
-### Supervision Strategies
-
-Shibuya defines its own `SupervisionStrategy` type that maps to NQE strategies:
-
-| SupervisionStrategy | NQE Strategy | Behavior |
-|---------------------|--------------|----------|
-| `IgnoreFailures` | `IgnoreAll` | Keep running, ignore dead children |
-| `StopAllOnFailure` | `KillAll` | Stop all children and propagate exception |
+## Supervision and Shutdown
 
 ```haskell
 data SupervisionStrategy
-  = IgnoreFailures    -- Other processors continue if one fails
-  | StopAllOnFailure  -- All processors stop if any fails
-  deriving stock (Eq, Show, Generic)
-```
+  = IgnoreFailures
+  | StopAllOnFailure
 
----
-
-## Data Flow
-
-```
-External Queue (Kafka/Postgres/SQS)
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Adapter.source                              │
-│  (Stream (Eff es) (Ingested es msg))                           │
-│                                                                 │
-│  Produces: Envelope + AckHandle + Maybe Lease                  │
-└─────────────────────────────────────────────────────────────────┘
-     │
-     ▼ (optional transformations: filter, batch, rate-limit)
-┌─────────────────────────────────────────────────────────────────┐
-│                     Bounded Inbox                               │
-│  (backpressure via NQE mailbox)                                │
-└─────────────────────────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Handler                                  │
-│  (Ingested es msg -> Eff es AckDecision)                       │
-└─────────────────────────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    AckHandle.finalize                           │
-│  (Commits offset, schedules retry, routes to DLQ, or halts)    │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Stream Utilities (Shibuya.Stream)
-
-Common stream transformations for use with adapters.
-
-```haskell
-module Shibuya.Stream
-  ( -- * Stream Sources
-    pollingStream
-    -- * Transformations
-  , batchStream
-  , filterStream
-  ) where
-
--- | Create a polling stream from a poll action
-pollingStream
-  :: (IOE :> es)
-  => Int                    -- ^ Poll interval (microseconds)
-  -> Eff es (Maybe msg)     -- ^ Poll action
-  -> Stream (Eff es) msg
-
--- | Batch messages into chunks
-batchStream :: Int -> Stream m msg -> Stream m [msg]
-
--- | Filter messages based on a predicate
-filterStream :: (msg -> Bool) -> Stream m msg -> Stream m msg
-```
-
----
-
-## Testing Strategy
-
-Each layer can be tested independently:
-
-| Layer | Test Approach |
-|-------|---------------|
-| Core.Types | Unit tests for Eq, Ord, Show, Functor laws |
-| Core.Ack | Unit tests for pattern matching |
-| Core.Lease | Mock lease extension |
-| Core.AckHandle | Track finalize calls |
-| Core.Ingested | Construction tests |
-| Handler | Property tests with mock Ingested |
-| Adapter | Mock streams, verify Ingested production |
-| Policy | Unit tests for validatePolicy |
-| Runner.Metrics | Unit tests for metric updates |
-| Runner.Master | Start/stop, metrics registration |
-| Runner.Supervised | Metrics tracking, processor state |
-| Runner | Integration with mock adapter |
-| App | Full integration tests |
-
-Current test count: **91 tests passing**
-
----
-
-## Adapter Implementation Guide
-
-To implement a new adapter:
-
-1. **Create the stream source** that polls your queue
-2. **Wrap messages in Envelope** with appropriate metadata
-3. **Create AckHandle** that commits/retries/dead-letters based on decision
-4. **Optionally create Lease** for visibility timeout extension
-5. **Bundle into Ingested** and yield from stream
-
-Example skeleton:
-
-```haskell
-postgresAdapter
-  :: (IOE :> es)
-  => ConnectionPool
-  -> Text           -- ^ Queue name
-  -> Adapter es JobPayload
-postgresAdapter pool queueName = Adapter
-  { adapterName = "postgres:" <> queueName
-  , source = postgresStream pool queueName
-  , shutdown = pure ()
-  }
-
-postgresStream
-  :: (IOE :> es)
-  => ConnectionPool
-  -> Text
-  -> Stream (Eff es) (Ingested es JobPayload)
-postgresStream pool queueName = pollingStream 100_000 $ do
-  mJob <- liftIO $ pollJob pool queueName
-  pure $ fmap (jobToIngested pool) mJob
-
-jobToIngested :: ConnectionPool -> Job -> Ingested es JobPayload
-jobToIngested pool job = Ingested
-  { envelope = Envelope
-      { messageId    = MessageId (jobId job)
-      , cursor       = Just (CursorInt (jobPosition job))
-      , partition    = Nothing
-      , enqueuedAt   = Just (jobCreatedAt job)
-      , traceContext = Nothing
-      , payload      = jobPayload job
-      }
-  , ack = AckHandle $ \decision -> case decision of
-      AckOk -> liftIO $ markComplete pool (jobId job)
-      AckRetry delay -> liftIO $ scheduleRetry pool (jobId job) delay
-      AckDeadLetter reason -> liftIO $ moveToDLQ pool (jobId job) reason
-      AckHalt _ -> pure () -- Runner handles halt
-  , lease = Nothing -- Postgres uses row locks, not visibility timeout
+data ShutdownConfig = ShutdownConfig
+  { drainTimeout :: !NominalDiffTime
   }
 ```
 
----
+`IgnoreFailures` maps to NQE `IgnoreAll`; failed processors stay failed while
+siblings continue. `StopAllOnFailure` maps to NQE `IgnoreGraceful`; real
+failures stop siblings, but graceful exits do not.
 
-## Related Documentation
+`stopApp` is `stopAppGracefully defaultShutdownConfig`. Shutdown signals every
+adapter, waits for processors to drain until the timeout, then stops the master
+and any remaining supervised processors.
 
-- [CONCURRENCY.md](architecture/CONCURRENCY.md) - Detailed concurrency architecture
-- [USAGE_GUIDE.md](USAGE_GUIDE.md) - User guide with examples
+## Metrics
 
----
+```haskell
+data ProcessorMetrics = ProcessorMetrics
+  { state     :: !ProcessorState
+  , stats     :: !StreamStats
+  , batch     :: !BatchStats
+  , startedAt :: !UTCTime
+  }
 
-## References
+data StreamStats = StreamStats
+  { received  :: !Int
+  , processed :: !Int
+  , failed    :: !Int
+  }
+```
 
-- [Broadway (Elixir)](https://github.com/dashbitco/broadway) - Primary inspiration
-- [Streamly](https://hackage.haskell.org/package/streamly) - Stream processing
-- [Effectful](https://hackage.haskell.org/package/effectful) - Effect system
-- [NQE](https://hackage.haskell.org/package/nqe) - Actor supervision
+Hot per-message counters use atomic fetch-and-add operations. Colder state,
+batch counters, and metadata live in the processor's `MetricsHandle` and are
+sampled by `getAppMetrics`, `getAllMetrics`, and the metrics server.
+
+## Adapter Skeleton
+
+```haskell
+myAdapter :: (IOE :> es) => Adapter es Payload
+myAdapter =
+  Adapter
+    { adapterName = "my-queue"
+    , source = myStreamOfIngestedMessages
+    , shutdown = closeConsumer
+    }
+
+toIngested :: NativeMessage -> Ingested es Payload
+toIngested msg =
+  let msgId = MessageId msg.id
+      env =
+        (mkEnvelope msgId msg.payload)
+          { cursor = Just (CursorText msg.offset)
+          , partition = msg.partitionKey
+          , headers = Just msg.headers
+          , traceContext = extractTraceHeaders msg.headers
+          , attempt = msg.deliveryAttempt
+          , attributes = msg.otelAttributes
+          }
+   in mkIngested env (AckHandle (finalizeNative msg))
+```
+
+Adapter source streams should stop when `shutdown` is called so graceful
+shutdown can drain already-ingested messages and flush partial batches.

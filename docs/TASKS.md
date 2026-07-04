@@ -3,6 +3,7 @@
 > **Historical Document**
 >
 > This was the original implementation task tracker. Some details (field name prefixes like `envId`/`ssReceived`/`pmState`, `AppError` constructors, test counts) have diverged as the codebase evolved. Phase 11 has been partially fulfilled by the `shibuya-pgmq-adapter` package. See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for current types and architecture.
+> Do not copy type signatures or module paths from this file into new code.
 
 This document breaks down the Shibuya framework into atomic, testable tasks. Each task is designed to be completed independently with its own tests.
 

@@ -72,7 +72,7 @@ messages into batches and runs a `BatchHandler` once per emitted batch.
 │                    │    • batchTimeout elapsed → TriggerTimeout│          │
 │                    │    • drain / shutdown    → TriggerFlush   │          │
 │                    └────────────────────┬─────────────────────┘          │
-│                                         │ NonEmpty (Ingested es msg)      │
+│                                         │ NonEmpty (Message es msg)       │
 │                                         ▼         + BatchInfo             │
 │                    ┌──────────────────────────────────────────┐          │
 │                    │           Batch handler                   │          │
@@ -110,7 +110,7 @@ partial batch (`TriggerFlush`). The `BatchInfo` passed to the handler records
 which `trigger` fired.
 
 **Batch handler.** The `BatchHandler` receives the `BatchInfo` and the whole
-batch as a `NonEmpty (Ingested es msg)`, runs once, and returns a single
+batch as a `NonEmpty (Message es msg)`, runs once, and returns a single
 `BatchAck`.
 
 **One decision per retained message + bounded retry / fail loud.** Given the
@@ -128,7 +128,7 @@ affected `MessageId`; it is not swallowed.
 Each queue processor runs in its own independent pipeline:
 
 ```
-runApp strategy inboxSize
+runApp AppConfig { strategy, inboxSize }
   [ (ProcessorId "orders", mkProcessor ordersAdapter ordersHandler)
   , (ProcessorId "events", mkProcessor eventsAdapter eventsHandler)
   ]
@@ -167,12 +167,14 @@ Each queue processor is **completely independent**:
 ### 1. Application Startup
 
 ```haskell
-runApp strategy inboxSize processors
+runApp config processors
 ```
 
-1. `startMaster strategy` - Creates NQE Supervisor and MetricsMap
-2. For each `(procId, QueueProcessor adapter handler)`:
-   - `runSupervised master inboxSize procId adapter handler`
+1. Validate `config.inboxSize`, all ordering/concurrency policies, and every
+   batch config before starting any processor.
+2. `startMaster config.strategy` - Creates NQE Supervisor and MetricsMap
+3. For each `(procId, QueueProcessor adapter handler)`:
+   - `runSupervised master config.inboxSize procId ordering concurrency adapter handler`
    - Creates its own bounded inbox
    - Registers its metrics TVar with Master
    - Spawns as supervised child
@@ -214,11 +216,12 @@ Loop:
    - No: Continue
 2. `receive inbox` (blocks if empty)
 3. Update state to `Processing`
-4. Call `handler ingested`
-5. Call `ingested.ack.finalize decision`
-6. Update metrics based on decision
-7. Update state to `Idle`
-8. Loop
+4. Project the internal `Ingested` value to handler-facing `Message`
+5. Call `handler message`
+6. Call `ingested.ack.finalize decision`
+7. Update metrics based on decision
+8. Update state to `Idle`
+9. Loop
 
 ### 5. Graceful Shutdown
 
@@ -229,8 +232,11 @@ stopApp appHandle
 1. Call `adapter.shutdown` for all adapters
 2. Adapters stop producing messages
 3. Ingesters complete when streams exhaust
-4. Processors drain remaining messages
-5. `stopMaster` cancels supervisor
+4. Processors drain remaining messages for `defaultShutdownConfig.drainTimeout`
+5. `stopMaster` cancels any remaining supervised processors
+
+`stopAppGracefully customConfig appHandle` runs the same sequence with a custom
+drain timeout and returns `True` if every processor drained before the timeout.
 
 ## Backpressure
 

@@ -22,14 +22,14 @@ import Control.Exception (bracket)
 import OpenTelemetry.Trace (initializeGlobalTracerProvider, makeTracer,
                             shutdownTracerProvider, tracerOptions)
 import Shibuya.Telemetry.Effect (runTracing)
-import Shibuya.App (runApp, SupervisionStrategy (..), waitApp)
+import Shibuya.App (defaultAppConfig, runApp, waitApp)
 
 main :: IO ()
 main = bracket initializeGlobalTracerProvider shutdownTracerProvider $ \provider -> do
   let tracer = makeTracer provider "my-service" tracerOptions
   runEff . runTracing tracer $ do
     adapter <- pgmqAdapter config           -- or kafkaAdapter config
-    Right appHandle <- runApp IgnoreFailures 100
+    Right appHandle <- runApp defaultAppConfig
       [ (ProcessorId "orders", QueueProcessor adapter myHandler Unordered Serial) ]
     waitApp appHandle
 ```
@@ -77,7 +77,7 @@ per the OpenTelemetry messaging-spans spec. The span:
     carried one (otherwise it's a root span).
 -   Carries the spec-aligned messaging attributes
     `messaging.system`, `messaging.destination.name`,
-    `messaging.operation = "process"`, `messaging.message.id`, plus
+    `messaging.operation.type = "process"`, `messaging.message.id`, plus
     Shibuya-specific `shibuya.inflight.count`,
     `shibuya.inflight.max`, `shibuya.ack.decision`.
 -   Carries any **adapter-supplied** attributes from
@@ -160,7 +160,7 @@ HashMap.union envelope.attributes frameworkDefaults
 ```
 
 The framework's `messaging.destination.name`,
-`messaging.operation`, `messaging.message.id` derive from the
+`messaging.operation.type`, `messaging.message.id` derive from the
 `ProcessorId` and `Envelope.messageId` — adapters should not
 duplicate those keys.
 
@@ -177,8 +177,8 @@ import Shibuya.Telemetry.Effect (withSpan, withSpan', addAttribute, setStatus)
 import Shibuya.Telemetry.Semantic (internalSpanArgs)
 
 myHandler :: (Tracing :> es, IOE :> es) => Handler es Order
-myHandler ingested = do
-  let order = ingested.envelope.payload
+myHandler msg = do
+  let order = msg.envelope.payload
 
   -- Span 1: validation
   withSpan "validate-order" internalSpanArgs $ do
@@ -209,9 +209,9 @@ operation.
 
 Tracing is end-to-end as long as every producer and consumer along
 the chain reads and writes the W3C `traceparent` header on the
-queue. **Adapters handle the consumer side automatically:** every
-in-tree adapter populates `Envelope.traceContext` from queue-native
-headers in its `Convert.hs`.
+queue. **Adapters handle the consumer side automatically:** Shibuya
+adapters should populate `Envelope.traceContext` from queue-native
+headers when constructing envelopes.
 
 The producer side — including DLQ writes from inside a Shibuya
 handler — needs help.
@@ -225,7 +225,7 @@ yours. Use `currentTraceHeaders`:
 ```haskell
 import Shibuya.Telemetry.Propagation (currentTraceHeaders)
 
-myHandler ingested = do
+myHandler msg = do
   ...
   outgoingHeaders <- currentTraceHeaders
   -- outgoingHeaders :: Maybe TraceHeaders
@@ -280,7 +280,7 @@ both fields at envelope-construction time inside your `Convert.hs`:
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import OpenTelemetry.Attributes (Attribute, toAttribute)
-import Shibuya.Core.Types (Envelope (..), TraceHeaders)
+import Shibuya.Core.Types (Envelope (..), Headers, TraceHeaders)
 
 myAdapterToEnvelope :: NativeMessage -> Envelope MyPayload
 myAdapterToEnvelope msg =
@@ -290,6 +290,7 @@ myAdapterToEnvelope msg =
     , partition    = Just (Text.pack (show msg.partitionId))
     , enqueuedAt   = Just msg.timestamp
     , traceContext = extractTraceHeaders msg.headers   -- W3C in
+    , headers      = Just msg.headers                   -- all broker headers
     , attempt      = Nothing                            -- if no redelivery counter
     , attributes   = mkAttributes msg                   -- typed labels out
     , payload      = msg.body
@@ -317,7 +318,7 @@ Rules of thumb:
     will treat the per-message span as a root.
 -   **`attributes`** — populate **only** the keys your broker uniquely
     contributes. Don't duplicate `messaging.destination.name`,
-    `messaging.operation`, or `messaging.message.id` — the framework
+    `messaging.operation.type`, or `messaging.message.id` — the framework
     derives those from the `ProcessorId` and the envelope's
     `MessageId`. **Do** override `messaging.system` if your broker
     isn't generic Shibuya.
@@ -386,7 +387,7 @@ The framework always sets these on its per-message span:
 |-----|------|--------|
 | `messaging.system` | Text | `"shibuya"` (overridable by adapter) |
 | `messaging.destination.name` | Text | `ProcessorId` |
-| `messaging.operation` | Text | Always `"process"` |
+| `messaging.operation.type` | Text | Always `"process"` |
 | `messaging.message.id` | Text | `Envelope.messageId` |
 | `shibuya.partition` | Text | `Envelope.partition` (when present) |
 | `shibuya.inflight.count` | Int | Current in-flight count |
@@ -440,10 +441,5 @@ import Shibuya.Telemetry.Semantic
 
 -   [Getting Started](./getting-started.md) — handlers, ack
     decisions, `runApp`.
--   `docs/plans/9-otel-audit-findings.md` — the audit that drove the
-    `0.5.0.0` API shape (single Consumer span per message,
-    `Envelope.attributes` hook, `currentTraceHeaders` helper).
--   `docs/plans/OPENTELEMETRY_INTEGRATION.md` — original design doc;
-    partially superseded but useful as historical context.
 -   [OpenTelemetry messaging semantic conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/)
 -   [W3C Trace Context](https://www.w3.org/TR/trace-context/)

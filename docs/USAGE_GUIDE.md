@@ -3,6 +3,7 @@
 This guide has been split into focused guides under [`docs/user/`](./user/README.md):
 
 - **[Getting Started](./user/getting-started.md)** - Handlers, ack decisions, runApp, supervision, metrics, graceful shutdown
+- **[OpenTelemetry Tracing](./user/opentelemetry.md)** - Consumer spans, trace propagation, adapter attributes, local Jaeger checks
 
 Adapter-specific guides live with their respective adapter repos:
 

@@ -24,20 +24,21 @@ Shibuya provides a unified abstraction over various message queue backends (Kafk
 - **Stream Transformations** - Composable pipelines powered by Streamly
 - **Effectful** - All effects tracked via the Effectful library
 
-### Current Status (v0.7.0.0 — [Hackage](https://hackage.haskell.org/package/shibuya-core-0.7.0.0))
+### Current Status (v0.8.0.0 — Unreleased)
 
 | Feature | Status |
 |---------|--------|
-| Serial Processing | ✅ Implemented |
-| Backpressure (bounded inbox) | ✅ Implemented |
-| Ack Semantics (Ok/Retry/DLQ/Halt) | ✅ Implemented |
-| Metrics & Introspection | ✅ Implemented |
-| NQE Supervision | ✅ Implemented |
-| Concurrent Processing (Ahead/Async) | ✅ Implemented |
-| First-Class Batching (size/timeout/key) | ✅ Implemented |
-| OpenTelemetry Tracing | ✅ Implemented |
-| Graceful Shutdown (drain timeout) | ✅ Implemented |
-| Policy Validation | ✅ Implemented |
+| Serial Processing | Implemented |
+| Backpressure (bounded inbox) | Implemented |
+| Ack Semantics (Ok/Retry/DLQ/Halt) | Implemented |
+| Metrics & Introspection | Implemented |
+| NQE Supervision | Implemented |
+| Concurrent Processing (Ahead/Async) | Implemented |
+| Partitioned Ordering for single-message processors | Implemented |
+| First-Class Batching (size/timeout/key) | Implemented |
+| OpenTelemetry Tracing | Implemented |
+| Graceful Shutdown (drain timeout) | Implemented |
+| Policy Validation | Implemented |
 
 ## Adapters
 
@@ -49,23 +50,25 @@ their own cadence:
 - [`shibuya-pgmq-adapter`](https://github.com/shinzui/shibuya-pgmq-adapter)
   — PostgreSQL message queue (pgmq) via `pgmq-hs`.
 
-### What's New in 0.7.0.0
+### What's New in 0.8.0.0
 
-- **Adapter-supplied message headers** — `Envelope` gained a
-  `headers :: !(Maybe Headers)` field carrying every message header
-  the source broker delivered, in order and including duplicates.
-  `Nothing` means the adapter does not surface headers; `Just []`
-  means it does and the message had none. The new `Headers` type
-  alias (`[(ByteString, ByteString)]`) is exported from
-  `Shibuya.Core` and `Shibuya.Core.Types`.
-- **Breaking** — direct constructions of `Envelope` must add the
-  new `headers` field.
-- All `.cabal` files now declare `cabal-version: 3.12` instead of
-  `3.14`, so Nix toolchains whose bundled Cabal predates 3.14 can
-  build the packages. No package-description syntax that required
-  3.14 was in use, so this is behavior-preserving.
-- `shibuya-metrics` is re-released at 0.7.0.0 to track the shared
-  version; it has no user-visible changes of its own.
+- **Breaking** — `runApp` now takes an `AppConfig` record:
+  `runApp defaultAppConfig processors`. Customize with record updates such as
+  `defaultAppConfig { strategy = StopAllOnFailure, inboxSize = 500 }`.
+- **Breaking** — handlers receive `Message es msg`, not internal
+  `Ingested es msg`. The framework retains the `AckHandle` and owns
+  finalization.
+- **Breaking** — `Ordering` is now `OrderingPolicy`, removing the need to hide
+  `Prelude.Ordering`.
+- **Breaking** — runner internals moved under `Shibuya.Internal.Runner.*`;
+  application code should import the `Shibuya` umbrella module.
+- **Breaking** — removed dead surface: `StreamStats.dropped`,
+  `HandlerTimeout`, `InboxOverflow`, and the always-zero dropped Prometheus
+  metric.
+- `PartitionedInOrder` with `Ahead` or `Async` is now enforced for
+  single-message processors by a keyed scheduler.
+- `mkEnvelope` and `mkIngested` are the recommended constructors for adapter
+  authors.
 
 ### What's New in 0.6.0.0
 
@@ -85,11 +88,12 @@ See the [CHANGELOG](CHANGELOG.md) for full release history.
 
 ## Installation
 
-Available on [Hackage](https://hackage.haskell.org/package/shibuya-core). Add to your `cabal` file:
+Released versions are available on [Hackage](https://hackage.haskell.org/package/shibuya-core).
+For the current 0.8.0.0 source tree, add:
 
 ```cabal
 build-depends:
-    shibuya-core ^>=0.7.0.0
+    shibuya-core ^>=0.8.0.0
 ```
 
 Optional packages:
@@ -104,7 +108,7 @@ Optional packages:
 
 module Main where
 
-import Shibuya.App
+import Shibuya
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Effectful
 import Effectful.Concurrent (runConcurrent)
@@ -118,8 +122,8 @@ data OrderEvent = OrderEvent
 
 -- Your handler - just return what should happen
 handleOrder :: Handler es OrderEvent
-handleOrder ingested = do
-  let order = ingested.envelope.payload
+handleOrder msg = do
+  let order = msg.envelope.payload
 
   result <- liftIO $ processOrder order
 
@@ -136,7 +140,7 @@ main = runEff . runConcurrent . runTracingNoop $ do
         , concurrency = Serial
         }
 
-  result <- runApp IgnoreFailures 100
+  result <- runApp defaultAppConfig
     [ (ProcessorId "orders", ordersProcessor)
     ]
 
@@ -160,13 +164,11 @@ AckHalt (HaltFatal reason)         -- Stop processing entirely
 
 ```haskell
 -- runApp takes:
---   SupervisionStrategy - How to handle processor failures
---   Int                 - Inbox size for backpressure
+--   AppConfig - supervision strategy and inbox size
 --   [(ProcessorId, QueueProcessor es)] - Named processors
 
 result <- runApp
-  IgnoreFailures   -- Keep running even if a processor fails
-  500              -- Inbox buffer size
+  defaultAppConfig { inboxSize = 500 }
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   ]
@@ -174,7 +176,7 @@ result <- runApp
 -- QueueProcessor fields:
 --   adapter     - Queue backend (source stream + shutdown)
 --   handler     - Your message handler
---   ordering    - Unordered | StrictInOrder
+--   ordering    - Unordered | StrictInOrder | PartitionedInOrder
 --   concurrency - Serial | Ahead Natural | Async Natural
 ```
 
@@ -187,11 +189,11 @@ having to compute the math themselves:
 ```haskell
 import Shibuya.Core.Retry (defaultBackoffPolicy, retryWithBackoff)
 
-myHandler ingested = do
-  result <- tryProcess ingested.envelope.payload
+myHandler msg = do
+  result <- tryProcess msg.envelope.payload
   case result of
     Right ()  -> pure AckOk
-    Left _err -> retryWithBackoff defaultBackoffPolicy ingested.envelope
+    Left _err -> retryWithBackoff defaultBackoffPolicy msg.envelope
 ```
 
 `defaultBackoffPolicy` is AWS's published "exponential backoff with
@@ -201,7 +203,7 @@ The available `Jitter` strategies are `NoJitter`, `FullJitter`
 (`defaultBackoffPolicy { jitter = NoJitter }`).
 
 Adapters that track per-message redelivery counts populate
-`ingested.envelope.attempt :: Maybe Attempt`; the helper reads it and
+`msg.envelope.attempt :: Maybe Attempt`; the helper reads it and
 grows the delay each time the same message returns. The PGMQ adapter
 sources the counter from pgmq's `read_count` column. Adapters that do
 not track redeliveries leave `attempt = Nothing`, in which case
@@ -243,12 +245,12 @@ main = do
 
   -- Run with tracing enabled
   runEff $ runTracing tracer $ do
-    result <- runApp IgnoreFailures 100 processors
+    result <- runApp defaultAppConfig processors
     -- ...
 
   -- Or run with tracing disabled (zero overhead)
   runEff $ runTracingNoop $ do
-    result <- runApp IgnoreFailures 100 processors
+    result <- runApp defaultAppConfig processors
     -- ...
 ```
 
@@ -304,7 +306,7 @@ main = runEff . runConcurrent . runTracingNoop $ do
         , concurrency = Serial
         }
 
-  result <- runApp IgnoreFailures 100
+  result <- runApp defaultAppConfig
     [ (ProcessorId "orders", ordersProcessor)
     , (ProcessorId "events", eventsProcessor)
     ]

@@ -14,7 +14,7 @@ A comprehensive comparison between **Shibuya** (Haskell) and **Broadway** (Elixi
 | **Supervision** | Multi-level OTP supervision tree | NQE Master + Supervisor | Broadway more granular |
 | **Batching** | First-class: batch_size, batch_timeout, batch_key, dynamic sizing | First-class: `batchSize`, `batchTimeout`, `batchKey`, `BatchAck` with resilient finalization | ✅ Closed (v1; no dynamic sizing) |
 | **Rate Limiting** | Built-in, runtime-adjustable | Not built-in | **Major gap** |
-| **Partitioning** | `partition_by` at every stage, hash-based dispatch | `PartitionedInOrder` policy (documented, not enforced) | **Major gap** |
+| **Partitioning** | `partition_by` at every stage, hash-based dispatch | `PartitionedInOrder` keyed scheduling for single-message processors | Partial gap: batching uses `BatchKey`, not `Envelope.partition` |
 | **Telemetry** | `:telemetry` events at every pipeline stage | OpenTelemetry tracing + custom metrics | Different approach, both good |
 | **Graceful Shutdown** | Drain producers → flush batchers → ack → timeout | Signal adapters → drain inbox → timeout | Comparable |
 | **Testing** | `test_message/3`, `test_batch/3`, `DummyProducer`, `CallerAcknowledger` | `listAdapter`, `TrackingAck` | Broadway richer |
@@ -49,7 +49,9 @@ Adapter.source (stream) → Ingester (async, bounded inbox) → Processor → Ac
 ```
 The adapter produces a Streamly stream, the ingester buffers into a bounded inbox, and the processor handles messages one at a time.
 
-**Key Difference:** Broadway's batching stage is integral to its architecture—many real-world use cases (database inserts, API calls, S3 uploads) benefit enormously from batching. Shibuya processes messages individually.
+**Key Difference:** Broadway's batching stage is integral to its architecture.
+Shibuya supports first-class batching, but it is opt-in per processor and does
+not include Broadway's pre-batch `handle_message` + `put_batcher` routing stage.
 
 ### 2. Backpressure
 
@@ -73,7 +75,7 @@ The adapter produces a Streamly stream, the ingester buffers into a bounded inbo
 (or the `BatchingProcessor` constructor). Messages are accumulated by a pure
 `batchKey` (each key has its own size counter and timeout) and a batch is emitted
 on the first of `batchSize`, `batchTimeout`, or a shutdown flush. The
-`BatchHandler` runs once over the whole batch (a `NonEmpty (Ingested es msg)`
+`BatchHandler` runs once over the whole batch (a `NonEmpty (Message es msg)`
 plus `BatchInfo`) and returns a `BatchAck` — a per-`MessageId` decision map with
 a `fallback` for messages it did not name. The framework resolves exactly one
 decision for every retained message and applies it through the message's
@@ -104,7 +106,13 @@ partition_by: fn msg -> :erlang.phash2(msg.data.user_id) end
 ```
 Messages with the same partition always go to the same stage instance, guaranteeing per-partition ordering with cross-partition concurrency.
 
-**Shibuya:** `PartitionedInOrder` policy documents the contract but doesn't enforce it. The framework doesn't route messages by partition key—this is left to the adapter.
+**Shibuya:** `PartitionedInOrder` with `Ahead n` or `Async n` is enforced for
+single-message processors by an internal keyed scheduler. Messages sharing a
+`Just Envelope.partition` key are processed and acknowledged in arrival order;
+different partitions can run concurrently up to the configured bound. Messages
+with `partition = Nothing` are unconstrained. Batching processors reject
+`PartitionedInOrder` with concurrent modes because batches are scheduled by
+`BatchKey`, not by `Envelope.partition`.
 
 ### 6. Supervision & Fault Tolerance
 

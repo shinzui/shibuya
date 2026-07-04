@@ -4,45 +4,50 @@ Shibuya is a supervised queue processing framework for Haskell. This guide cover
 
 ## Writing Handlers
 
-A handler receives an `Ingested` message and returns an `AckDecision`:
+A handler receives a read-only `Message` and returns an `AckDecision`:
 
 ```haskell
-type Handler es msg = Ingested es msg -> Eff es AckDecision
+type Handler es msg = Message es msg -> Eff es AckDecision
 ```
 
-### The Ingested Type
+### The Message Type
 
 ```haskell
-data Ingested es msg = Ingested
-  { envelope :: Envelope msg   -- The message with metadata
-  , ack      :: AckHandle es   -- Internal, don't use directly
-  , lease    :: Maybe (Lease es) -- For extending visibility timeout
+data Message es msg = Message
+  { envelope :: Envelope msg       -- The message with metadata
+  , lease    :: Maybe (Lease es)   -- For extending visibility timeout
   }
 ```
+
+Adapters construct the internal `Ingested` value, which also carries the
+adapter's `AckHandle`. Application handlers do not receive that handle; the
+framework owns finalization and calls it after the handler returns.
 
 ### Accessing Message Data
 
 ```haskell
 handleMessage :: Handler '[IOE] MyEvent
-handleMessage ingested = do
+handleMessage msg = do
   -- Get the payload
-  let event = payload (envelope ingested)
+  let event = payload (envelope msg)
 
   -- Access metadata
-  let msgId = messageId (envelope ingested)
-  let maybeCursor = cursor (envelope ingested)
-  let maybePartition = partition (envelope ingested)
-  let maybeEnqueuedAt = enqueuedAt (envelope ingested)
-  let maybeAttempt = attempt (envelope ingested)  -- Just (Attempt 0) on first delivery
+  let msgId = messageId (envelope msg)
+  let maybeCursor = cursor (envelope msg)
+  let maybePartition = partition (envelope msg)
+  let maybeEnqueuedAt = enqueuedAt (envelope msg)
+  let maybeHeaders = headers (envelope msg)      -- All broker headers, if surfaced
+  let maybeAttempt = attempt (envelope msg)  -- Just (Attempt 0) on first delivery
 
   -- Process...
   pure AckOk
 ```
 
 The envelope also carries `traceContext` (incoming W3C trace headers)
-and `attributes` (adapter-supplied OTel span labels) — see
-[OpenTelemetry Tracing](./opentelemetry.md) for how those fields drive
-the per-message Consumer span.
+and `attributes` (adapter-supplied OTel span labels). `headers` is the
+lossless broker header view, while `traceContext` is only the parsed W3C
+projection used to parent the per-message Consumer span. See
+[OpenTelemetry Tracing](./opentelemetry.md) for details.
 
 ### Ack Decisions
 
@@ -69,9 +74,9 @@ pure $ AckHalt (HaltFatal "unrecoverable error")
 
 ```haskell
 handleEvent :: Handler '[IOE, Log] MyEvent
-handleEvent ingested = do
-  let event = payload (envelope ingested)
-  let msgId = unMessageId $ messageId (envelope ingested)
+handleEvent msg = do
+  let event = payload (envelope msg)
+  let msgId = unMessageId $ messageId (envelope msg)
 
   log Info $ "Processing message: " <> msgId
 
@@ -103,8 +108,7 @@ handleEvent ingested = do
 ```haskell
 runApp
   :: (IOE :> es, Tracing :> es)
-  => SupervisionStrategy               -- How to handle processor failures
-  -> Int                               -- Inbox size for backpressure
+  => AppConfig                         -- Supervision and inbox size
   -> [(ProcessorId, QueueProcessor es)] -- Named processors
   -> Eff es (Either AppError (AppHandle es))
 ```
@@ -112,7 +116,7 @@ runApp
 ### Single Processor
 
 ```haskell
-result <- runApp IgnoreFailures 100
+result <- runApp defaultAppConfig
   [ (ProcessorId "orders", ordersProcessor)
   ]
 ```
@@ -120,7 +124,9 @@ result <- runApp IgnoreFailures 100
 ### Multiple Processors
 
 ```haskell
-result <- runApp IgnoreFailures 500
+let config = defaultAppConfig { inboxSize = 500 }
+
+result <- runApp config
   [ (ProcessorId "orders", ordersProcessor)
   , (ProcessorId "events", eventsProcessor)
   , (ProcessorId "notifications", notificationsProcessor)
@@ -155,11 +161,40 @@ The inbox size controls backpressure - how many messages are buffered between th
 
 ```haskell
 -- Independent processors - failures don't affect each other
-result <- runApp IgnoreFailures 100 processors
+result <- runApp defaultAppConfig processors
 
 -- All-or-nothing - if one fails, stop everything
-result <- runApp StopAllOnFailure 100 processors
+result <- runApp defaultAppConfig { strategy = StopAllOnFailure } processors
 ```
+
+## Batch Processing
+
+Use `mkBatchProcessor` when downstream work is naturally bulk-oriented. The
+adapter still emits individual messages; Shibuya groups them by `BatchKey` and
+emits a batch on size, timeout, or shutdown flush.
+
+```haskell
+batchCfg :: BatchConfig es Order
+batchCfg =
+  defaultBatchConfig
+    { batchSize = 100
+    , batchTimeout = 1
+    , batchKey = \env -> BatchKey env.payload.customerId
+    }
+
+handleBatch :: (IOE :> es) => BatchHandler es Order
+handleBatch info messages = do
+  result <- liftIO $ bulkInsert (fmap (.envelope.payload) messages)
+  pure $ case result of
+    Right () -> ackAllOk
+    Left failedIds -> failMessages [(mid, InvalidPayload "bulk insert failed") | mid <- failedIds]
+
+let ordersProcessor = mkBatchProcessor ordersAdapter handleBatch batchCfg
+```
+
+`BatchHandler` receives `NonEmpty (Message es msg)` and returns `BatchAck`.
+`ackAllOk`, `ackAll`, `ackExcept`, `withFallback`, and `failMessages` cover the
+common acknowledgement shapes.
 
 ## Monitoring & Metrics
 
@@ -176,6 +211,7 @@ metrics <- getAppMetrics appHandle
 data ProcessorMetrics = ProcessorMetrics
   { state     :: !ProcessorState  -- Current state
   , stats     :: !StreamStats     -- Cumulative statistics
+  , batch     :: !BatchStats      -- Batch counters, zero for non-batching processors
   , startedAt :: !UTCTime         -- When processor started
   }
 
@@ -187,9 +223,17 @@ data ProcessorState
 
 data StreamStats = StreamStats
   { received  :: !Int  -- Total messages received
-  , dropped   :: !Int  -- Dropped due to backpressure
   , processed :: !Int  -- Successfully processed
   , failed    :: !Int  -- Failed processing
+  }
+
+data BatchStats = BatchStats
+  { batchesEmitted  :: !Int
+  , batchedMessages :: !Int
+  , partialFailures :: !Int
+  , sizeTriggered   :: !Int
+  , timeoutTriggered :: !Int
+  , flushTriggered  :: !Int
   }
 ```
 
@@ -238,8 +282,10 @@ unless success $
 ```haskell
 data AppError
   = AppPolicyError !PolicyError      -- Invalid ordering/concurrency combination
-  | AppHandlerError !HandlerError    -- Handler exception or timeout
-  | AppRuntimeError !RuntimeError    -- Supervisor failure or inbox overflow
+  | AppHandlerError !HandlerError    -- Handler exception
+  | AppRuntimeError !RuntimeError    -- Supervisor failure
+  | AppBatchConfigError !BatchConfigError
+  | AppConfigInvalid !ConfigError
 ```
 
 ## Current Limitations

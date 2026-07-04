@@ -1,5 +1,13 @@
 # Runner Bug Fixes (v0.1.0)
 
+> **Historical Note**
+>
+> This records the original v0.1.0 runner fixes. Current runner modules live
+> under `Shibuya.Internal.Runner.*`, and later releases changed ingester
+> exception handling to fail the processor loudly after draining already-ingested
+> messages. Use this as incident history, not as the current runner API
+> reference.
+
 This document describes three critical bugs discovered in the runner subsystem during benchmark testing, along with their root causes and fixes.
 
 ## Summary

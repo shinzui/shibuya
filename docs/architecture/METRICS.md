@@ -45,7 +45,6 @@ data ProcessorState
 ```haskell
 data StreamStats = StreamStats
   { received  :: !Int  -- Messages received from adapter
-  , dropped   :: !Int  -- Messages dropped (reserved for future)
   , processed :: !Int  -- Messages successfully processed
   , failed    :: !Int  -- Messages that failed processing
   }
@@ -56,7 +55,6 @@ Counters for message processing:
 | Counter | Incremented When |
 |---------|-----------------|
 | `received` | Ingester sends message to inbox |
-| `dropped` | Reserved for drop-on-full strategy |
 | `processed` | Handler returns `AckOk` or `AckRetry` |
 | `failed` | Handler returns `AckDeadLetter` or throws |
 
@@ -185,15 +183,18 @@ getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
 ```
 
 Each processor:
-1. Creates its own `TVar ProcessorMetrics`
-2. Registers TVar with Master on startup
-3. Updates TVar directly during processing
-4. Unregisters from Master on shutdown
+1. Creates its own `MetricsHandle`
+2. Registers the handle with Master on startup
+3. Updates hot per-message counters with fetch-and-add operations
+4. Updates colder state, batch counters, and metadata in a `TVar ProcessorMetrics`
+5. Samples the hot and cold state together when metrics are read
+6. Unregisters from Master on shutdown
 
 This design allows:
 - O(1) metrics reads (no locking needed for reads)
 - Processors update their own metrics independently
 - Master provides aggregated view
+- The per-message hot path avoids STM writes for simple counters
 
 ## Example: Monitoring Processing
 
@@ -225,6 +226,6 @@ data SupervisionStrategy
 | SupervisionStrategy | NQE Strategy | Behavior |
 |---------------------|--------------|----------|
 | `IgnoreFailures` | `IgnoreAll` | Keep running, ignore dead children |
-| `StopAllOnFailure` | `KillAll` | Stop all children and propagate exception |
+| `StopAllOnFailure` | `IgnoreGraceful` | Stop all children on failure, but do not treat graceful exits as failures |
 
 Recommended: `IgnoreFailures` for most queue processing (let individual processors fail without affecting others).

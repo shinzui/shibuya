@@ -10,7 +10,7 @@ Shibuya's concurrency is built on three distinct layers:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Application Layer                              │
 │                                                                          │
-│   runApp IgnoreFailures 100 [(pid, QueueProcessor adapter handler)]     │
+│   runApp defaultAppConfig [(pid, mkProcessor adapter handler)]          │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -48,7 +48,7 @@ Shibuya's concurrency is built on three distinct layers:
 | Feature | Description |
 |---------|-------------|
 | Thread spawning | `addChild` spawns supervised async threads |
-| Supervision strategies | `IgnoreAll`, `KillAll` control failure behavior |
+| Supervision strategies | `IgnoreAll`, `IgnoreGraceful` control failure behavior |
 | Process linking | `link` propagates exceptions to parent |
 | Bounded inboxes | `newBoundedInbox` creates bounded channels |
 | Message passing | `send`/`receive` for typed communication |
@@ -132,12 +132,12 @@ myAdapter = Adapter
 | Feature | Description |
 |---------|-------------|
 | Pipeline creation | One ingester→inbox→processor per queue |
-| Handler invocation | Calling handlers with `Ingested` messages |
+| Handler invocation | Calling handlers with read-only `Message` values |
 | Ack semantics | Routing `AckOk`/`AckRetry`/`AckDeadLetter`/`AckHalt` |
 | Metrics | Tracking received/processed/failed counts |
 | Handler-level concurrency | Serial/Async/Ahead modes (see below) |
 
-**Current implementation (v0.1.0):**
+**Current implementation:**
 
 Shibuya supports three handler concurrency modes:
 
@@ -283,10 +283,10 @@ QueueProcessor
 
 ## Ordering Policies
 
-The `Ordering` policy documents the message ordering contract:
+The `OrderingPolicy` policy documents the message ordering contract:
 
 ```haskell
-data Ordering
+data OrderingPolicy
   = StrictInOrder       -- Every message in exact order
   | PartitionedInOrder  -- Order within partitions (like Kafka)
   | Unordered           -- No ordering guarantees
@@ -296,7 +296,7 @@ data Ordering
 
 Certain combinations are invalid and will be rejected by `runApp`:
 
-| Ordering | Serial | Ahead | Async |
+| OrderingPolicy for `QueueProcessor` | Serial | Ahead | Async |
 |----------|--------|-------|-------|
 | StrictInOrder | ✅ | ❌ | ❌ |
 | PartitionedInOrder | ✅ | ✅ | ✅ |
@@ -309,8 +309,8 @@ Certain combinations are invalid and will be rejected by `runApp`:
 **Validation is enforced at startup:**
 ```haskell
 -- runApp validates all policies before starting processors
-case validateAllPolicies namedProcessors of
-  Left err -> pure $ Left $ AppPolicyError err
+case validateAppConfig config *> validateAllPolicies namedProcessors of
+  Left err -> pure $ Left err
   Right () -> -- proceed with startup
 ```
 
@@ -368,7 +368,7 @@ case validateAllPolicies namedProcessors of
 
 ---
 
-## Current Limitations (v0.1.0)
+## Current Limitations
 
 1. **No restart semantics**: NQE doesn't have one-for-one restart. Failed processors stay failed (with `IgnoreFailures`) or all stop (with `StopAllOnFailure`).
 
@@ -440,7 +440,7 @@ When a handler returns `AckHalt`:
 
 1. **Ack ordering**: With `Unordered` plus concurrent modes, acks may complete out of order. Adapters should be aware of this.
 
-2. **Batch partition ordering**: `BatchingProcessor` still rejects `PartitionedInOrder` with concurrent modes because batch scheduling is keyed by `BatchKey`, not by `Envelope.partition`.
+2. **Batch partition ordering**: `BatchingProcessor` rejects `PartitionedInOrder` with concurrent modes because batch scheduling is keyed by `BatchKey`, not by `Envelope.partition`.
 
 3. **Restart semantics**: Add one-for-one restart capability to recover individual failed processors.
 

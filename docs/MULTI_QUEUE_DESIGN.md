@@ -3,6 +3,7 @@
 > **Historical Design Document**
 >
 > This was the original design document for multi-queue processing. The feature has been implemented but some details (supervision strategy names, `QueueProcessor` fields, `AppError` constructors) have diverged from this document. See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for the current architecture.
+> Do not copy type signatures or module paths from this file into new code.
 
 ## Overview
 

@@ -34,6 +34,9 @@ data Envelope msg = Envelope
   , partition    :: !(Maybe Text)
   , enqueuedAt   :: !(Maybe UTCTime)
   , traceContext :: !(Maybe TraceHeaders)
+  , headers      :: !(Maybe Headers)
+  , attempt      :: !(Maybe Attempt)
+  , attributes   :: !(HashMap Text Attribute)
   , payload      :: !msg
   }
 ```
@@ -46,8 +49,21 @@ Normalized message container. Adapters convert queue-specific formats into `Enve
 | `cursor` | Position in stream (optional) |
 | `partition` | Partition key for ordered delivery (optional) |
 | `enqueuedAt` | When message was queued (optional) |
-| `traceContext` | W3C trace context headers for distributed tracing (optional) |
+| `traceContext` | Parsed W3C trace context headers for distributed tracing (optional) |
+| `headers` | Lossless broker headers, preserving order and duplicates (optional) |
+| `attempt` | Zero-indexed delivery attempt, if the adapter can report it |
+| `attributes` | Adapter-supplied OpenTelemetry attributes for the per-message span |
 | `payload` | The actual message data |
+
+### Headers
+
+```haskell
+type Headers = [(ByteString, ByteString)]
+```
+
+Raw message headers as delivered by the source broker. Order is preserved and
+duplicate keys are allowed. `Nothing` means the adapter does not surface headers;
+`Just []` means it does and this message had none.
 
 ### TraceHeaders
 
@@ -55,9 +71,21 @@ Normalized message container. Adapters convert queue-specific formats into `Enve
 type TraceHeaders = [(ByteString, ByteString)]
 ```
 
-W3C Trace Context headers for distributed tracing. Typically contains `"traceparent"` and optionally `"tracestate"` headers. Used by the telemetry layer to propagate trace context across queue boundaries.
+W3C Trace Context headers for distributed tracing. Typically contains
+`"traceparent"` and optionally `"tracestate"` headers. This is the narrow parsed
+projection the telemetry layer uses to parent the Consumer span; the original
+headers also remain in `headers` when the adapter surfaces them.
 
-## What Handlers Receive
+### Attempt
+
+```haskell
+newtype Attempt = Attempt { unAttempt :: Word }
+```
+
+Zero-indexed delivery attempt count. `Just (Attempt 0)` is the first delivery;
+`Nothing` means the adapter does not track redeliveries.
+
+## Adapter-Ingested Messages
 
 ### Ingested
 
@@ -69,13 +97,32 @@ data Ingested es msg = Ingested
   }
 ```
 
-The single type that flows through the system. Handlers receive this and return an `AckDecision`.
+The framework-side type that flows through the runner. Adapters construct this;
+handlers receive its read-only `Message` projection and return an `AckDecision`.
 
 | Field | Purpose |
 |-------|---------|
 | `envelope` | Message metadata + payload |
-| `ack` | Handle for acknowledgment (managed by framework) |
+| `ack` | Adapter finalizer, managed by the framework |
 | `lease` | Optional visibility timeout extension |
+
+Application handlers do not receive `Ingested` directly. The runner projects it
+to the read-only `Message` type before invoking user code.
+
+## What Handlers Receive
+
+### Message
+
+```haskell
+data Message es msg = Message
+  { envelope :: !(Envelope msg)
+  , lease    :: !(Maybe (Lease es))
+  }
+```
+
+Handlers receive `Message`, not `Ingested`, so they cannot ack directly or
+finalize with two conflicting decisions. They return an `AckDecision`; the
+framework applies that decision through the retained `AckHandle`.
 
 ### AckHandle
 
@@ -151,10 +198,11 @@ Why processing should stop. Important for ordered streams where out-of-order pro
 ## Handler Type
 
 ```haskell
-type Handler es msg = Ingested es msg -> Eff es AckDecision
+type Handler es msg = Message es msg -> Eff es AckDecision
 ```
 
-A handler is simply a function from `Ingested` to `AckDecision`. The `es` type parameter allows effectful operations (IO, database, etc.).
+A handler is simply a function from `Message` to `AckDecision`. The `es` type
+parameter allows effectful operations (IO, database, etc.).
 
 ## Adapter Type
 
@@ -249,7 +297,7 @@ a bad config surfaces from `runApp` as `AppBatchConfigError`.
 
 ```haskell
 type BatchHandler es msg =
-  BatchInfo -> NonEmpty (Ingested es msg) -> Eff es BatchAck
+  BatchInfo -> NonEmpty (Message es msg) -> Eff es BatchAck
 ```
 
 Unlike `Handler` (one message → one decision), a batch handler receives every
@@ -300,11 +348,11 @@ Smart constructors build a `BatchAck` without touching the `Map` directly:
 ```haskell
 data QueueProcessor es where
   QueueProcessor    :: { adapter :: Adapter es msg, handler :: Handler es msg
-                       , ordering :: Ordering, concurrency :: Concurrency
+                       , ordering :: OrderingPolicy, concurrency :: Concurrency
                        } -> QueueProcessor es
   BatchingProcessor :: { adapter :: Adapter es msg, batchHandler :: BatchHandler es msg
                        , batchConfig :: BatchConfig es msg
-                       , ordering :: Ordering, concurrency :: Concurrency
+                       , ordering :: OrderingPolicy, concurrency :: Concurrency
                        } -> QueueProcessor es
 
 mkBatchProcessor ::
@@ -319,6 +367,10 @@ reused to bound how many batches run concurrently while preserving FIFO
 execution within each `BatchKey`: `Serial` runs one batch at a time in emission
 order, `Ahead n` runs batches concurrently but finalizes in order, and `Async n`
 runs batches concurrently without ordering.
+
+`BatchingProcessor` rejects `PartitionedInOrder` with `Ahead` or `Async` at
+startup because batching is scheduled by `BatchKey`, not by
+`Envelope.partition`.
 
 A runnable example lives at `shibuya-example/app-batch/Main.hs`
 (`cabal run shibuya-batch-example`).
@@ -351,11 +403,12 @@ data PolicyError
 
 data HandlerError
   = HandlerException !Text
-  | HandlerTimeout
 
 data RuntimeError
   = SupervisorFailed !Text
-  | InboxOverflow
+
+data ConfigError
+  = InvalidInboxSize !Int
 ```
 
 Error types used to categorize failures in the framework:
@@ -363,8 +416,9 @@ Error types used to categorize failures in the framework:
 | Type | Purpose |
 |------|---------|
 | `PolicyError` | Invalid ordering/concurrency policy combinations |
-| `HandlerError` | Handler threw an exception or timed out |
-| `RuntimeError` | Supervisor failures or inbox overflow |
+| `HandlerError` | Handler threw an exception |
+| `RuntimeError` | Supervisor failures |
+| `ConfigError` | Invalid application configuration |
 
 These are wrapped by `AppError` in `Shibuya.App`:
 
@@ -374,4 +428,5 @@ data AppError
   | AppHandlerError !HandlerError
   | AppRuntimeError !RuntimeError
   | AppBatchConfigError !BatchConfigError
+  | AppConfigInvalid !ConfigError
 ```

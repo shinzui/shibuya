@@ -3,6 +3,7 @@
 > **Historical Design Document**
 >
 > This is a pre-implementation design sketch that uses raw NQE/Streamly APIs directly. The actual Shibuya framework wraps these with its own types (`SupervisionStrategy`, `Adapter`, `Handler`, `AckDecision`, etc.). See [UNIFIED_ARCHITECTURE.md](UNIFIED_ARCHITECTURE.md) for the current architecture.
+> Do not copy type signatures or module paths from this file into new code.
 
 This document presents an alternative architecture for the queue processors use case, leveraging Streamly for stream-based message ingestion.
 
@@ -855,4 +856,3 @@ roundRobinStream mailboxes stream = do
 - No need for transformations
 - Direct control over timing
 - Fewer moving parts preferred
-
