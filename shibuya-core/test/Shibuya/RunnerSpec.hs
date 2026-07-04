@@ -8,7 +8,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkProcessor, runApp, waitApp)
+import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkProcessor, runApp, stopApp, waitApp)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (ConfigError (..), PolicyError (..))
@@ -70,6 +70,12 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
+            -- Stop the app to cancel the (always-linked) master coordinator.
+            -- Without this the idle master blocks forever on its mailbox and the
+            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
+            -- through the link as a flaky ExceptionInLinkedThread landing on
+            -- whichever test happens to be running when GC fires.
+            stopApp appHandle
             pure $ Right ()
 
       -- Verify result
@@ -101,6 +107,9 @@ spec = do
             pure (decs, Left err)
           Right appHandle -> do
             waitApp appHandle
+            -- See note in "processes messages from mock adapter": stop the app so
+            -- the linked master does not deadlock and flake a later test.
+            stopApp appHandle
             decs <- liftIO $ readIORef tracking.trackedDecisions
             pure (decs, Right ())
 
@@ -132,6 +141,12 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
+            -- Stop the app to cancel the (always-linked) master coordinator.
+            -- Without this the idle master blocks forever on its mailbox and the
+            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
+            -- through the link as a flaky ExceptionInLinkedThread landing on
+            -- whichever test happens to be running when GC fires.
+            stopApp appHandle
             pure $ Right ()
 
       result `shouldBe` Right ()
@@ -185,6 +200,12 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
+            -- Stop the app to cancel the (always-linked) master coordinator.
+            -- Without this the idle master blocks forever on its mailbox and the
+            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
+            -- through the link as a flaky ExceptionInLinkedThread landing on
+            -- whichever test happens to be running when GC fires.
+            stopApp appHandle
             pure $ Right ()
 
       result `shouldBe` Right ()
