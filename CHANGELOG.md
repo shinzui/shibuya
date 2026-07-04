@@ -2,28 +2,97 @@
 
 ## 0.8.0.0 — Unreleased
 
+This release bundles first-class batch processing with the review-remediation
+initiative (processor lifecycle, ordering enforcement, a pre-1.0 API cleanup,
+and hot-path performance work).
+
 ### Breaking Changes
 
-- `shibuya-core`: `Shibuya.Runner.Supervised.runSupervised` now takes the
-  `Ordering` policy before `Concurrency`.
-- `shibuya-core`: batching processors now reject `PartitionedInOrder`
-  combined with `Ahead` or `Async`, because batches are scheduled by
-  `BatchKey`, not `Envelope.partition`.
+- `shibuya-core`: runner machinery is now internal. The runner implementation
+  modules moved under `Shibuya.Internal.*` (e.g. `Shibuya.Internal.Runner.*`,
+  `Shibuya.Internal.App`), and `AppHandle` and `Master` are now abstract — their
+  constructors are no longer exported from `Shibuya.App`. Metrics types remain
+  public through `Shibuya.Core.Metrics`.
+- `shibuya-core`: `runApp` now takes a validated `AppConfig` record instead of
+  positional supervision-strategy and inbox-size arguments, and rejects invalid
+  inbox sizes before startup. The dead timeout/overflow `AppError`s, the unused
+  tracing-config module, and the always-zero dropped-message metric surface were
+  removed.
+- `shibuya-core`: handlers now receive `Message es msg` (envelope + lease, no
+  ack) instead of `Ingested`. `Handler` and `BatchHandler` are now
+  `Message es msg -> Eff es …`, so the ack finalizer is no longer reachable from
+  handler code (the framework retains `Ingested` internally). New `mkEnvelope`
+  and `mkIngested` smart constructors are provided for adapters and tests, and a
+  new `Shibuya` umbrella module re-exports the public surface.
+- `shibuya-core`: dependencies trimmed — `lens`, `generic-lens`,
+  `effectful-core`, `uuid`, and `vector` were dropped. Lens use-sites became
+  plain record updates and the `Effectful.Internal.Unlift` imports moved to the
+  stable `Effectful` exports.
+- `shibuya-core`: batching processors reject `PartitionedInOrder` combined with
+  `Ahead` or `Async`, because batches are scheduled by `BatchKey`, not
+  `Envelope.partition`.
+- `shibuya-core`: `StopAllOnFailure` now maps to NQE's `IgnoreGraceful`
+  supervision strategy, so a graceful child exit no longer stops its siblings —
+  only a failure does. This restores the documented halt-isolation behavior.
 
 ### New Features
 
-- `shibuya-core`: `PartitionedInOrder` with `Ahead` or `Async` is now
-  enforced for single-message processors. Messages sharing an
-  `Envelope.partition` key are processed and acknowledged in arrival order,
-  distinct partitions run concurrently up to the configured bound, and
-  messages with no partition key are unconstrained.
+- `shibuya-core`: **first-class batch processing.** New `Shibuya.Batch` module
+  defining `BatchKey`, `BatchTrigger`, `BatchInfo`, `BatchConfig`,
+  `BatchHandler`, `BatchAck`, and `BatchConfigError`, with smart constructors
+  (`defaultBatchConfig`, `defaultBatchKey`, `ackAllOk`, `ackAll`, `ackExcept`,
+  `withFallback`, `failMessages`) and `validateBatchConfig`. Messages accumulate
+  by key with size/timeout triggers, execute with exactly-once acknowledgement
+  (one decision per retained message), and are wired end-to-end through `runApp`
+  via the `BatchingProcessor` constructor / `mkBatchProcessor` smart
+  constructor, including flush-and-ack of a pending partial batch on graceful
+  shutdown. The whole `Shibuya.Batch` module is re-exported from `Shibuya.App`.
+- `shibuya-core`: `PartitionedInOrder` with `Ahead` or `Async` is now enforced
+  for single-message processors via partition-keyed dispatch. Messages sharing
+  an `Envelope.partition` key are processed and acknowledged in arrival order,
+  distinct partitions run concurrently up to the configured bound, and messages
+  with no partition key are unconstrained.
+
+### Bug Fixes
+
+- `shibuya-core`: a handler returning `AckHalt` no longer deadlocks `waitApp` —
+  the child `done` flag is now set via `finally` on every exit path (halt,
+  cancel, failure).
+- `shibuya-core`: `IgnoreFailures` now isolates a failed processor instead of
+  tearing down the whole app — supervised children are linked only when failures
+  are meant to propagate.
+- `shibuya-core`: fixed an ingester `poll` race (now uses `waitCatch`), a
+  `runWithMetrics` drain deadlock, and the `runApp` failure path so it tears down
+  already-spawned processors.
+- `shibuya-core`: a handler exception now finalizes the message with
+  `AckRetry (RetryDelay 0)` instead of silently dropping the acknowledgement,
+  matching the batch path.
+- `shibuya-core`: batch-path hardening — consumer exceptions propagate to the
+  processor, halt isolation is enforced for buffered batches, and the keyed batch
+  scheduler is bounded and bracketed so it cannot leak or deadlock under
+  backpressure.
+- `shibuya-core`: the `AckHandle` idempotency contract is finalized and
+  documented — `finalize` is called at most once on the single-message path and
+  may be retried on the batch path, so adapters must make finalize idempotent.
+
+### Performance
+
+- `shibuya-core`: per-message metrics counters moved from `TVar` updates to
+  fetch-and-add atomic counters sampled on read, eliminating per-message STM
+  transactions on the hot path (cold-state writes for transitions, failures, and
+  batch counters are retained).
+- `shibuya-core`: the disabled-tracing path is now allocation-free (a shared
+  dummy-span CAF and hoisted constant attributes), and the batcher/scheduler
+  hot path was tightened with a bounded `maxThreads`.
 
 ### Other Changes
 
 - `shibuya-core`: corrected `Ahead` documentation. It preserves stream-yield
   order only; handler execution and acknowledgement may complete in any order.
-- `shibuya-metrics`: version bumped to track `shibuya-core` 0.8.0.0. No
-  user-visible changes to `shibuya-metrics` itself.
+- `shibuya-metrics`: removed the always-zero `shibuya_messages_dropped_total`
+  Prometheus series alongside the core dropped-metric surface. Re-released at
+  0.8.0.0 to track `shibuya-core`.
+- Documentation refreshed for the 0.8 API.
 
 ## 0.7.1.0 — 2026-06-15
 
