@@ -590,6 +590,15 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
       -- Call handler and finalizer separately. A handler exception is
       -- substituted with immediate retry so the adapter always observes a
       -- finalization decision for an ingested message.
+      --
+      -- This is a *separate* per-message 'catchAny' from the one inside
+      -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
+      -- handler+finalize, which skipped finalization when the handler threw;
+      -- splitting them is what makes "always finalize" hold. The extra
+      -- per-message exception frame costs ~126 bytes/message (measured, EP-31
+      -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
+      -- accepted as the price of the always-finalize guarantee — do not merge the
+      -- two catches back together to reclaim it.
       handlerResult <-
         catchAny
           (Right <$> handler (toMessage ingested))

@@ -29,6 +29,12 @@ finalizeRetryDelaysMicros = [10_000, 50_000, 250_000]
 
 -- | Call a message finalizer until it succeeds or the bounded retry budget is
 -- exhausted. The resolved decision is never recomputed between attempts.
+--
+-- The 'catchAny' here is a per-message exception frame distinct from the
+-- handler catch in 'processOne'; together they cost ~126 bytes/message more than
+-- 0.7.1.0's single combined catch (measured, EP-31 S3). This cost is accepted as
+-- the price of bounded finalizer retry + the always-finalize guarantee. See
+-- docs/plans/31-investigate-and-reduce-the-shared-per-message-metrics-tracing-finalize-allocation-regression.md.
 finalizeWithRetry ::
   (IOE :> es, Tracing :> es) =>
   OTel.Span ->
