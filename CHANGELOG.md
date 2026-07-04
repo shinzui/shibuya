@@ -6,6 +6,11 @@ This release bundles first-class batch processing with the review-remediation
 initiative (processor lifecycle, ordering enforcement, a pre-1.0 API cleanup,
 and hot-path performance work).
 
+Upgrading from 0.7.x? See the
+[migration guide](docs/user/migrating-to-0.8.md) — `runApp` now takes an
+`AppConfig` and handlers receive `Message` instead of `Ingested`, so most code
+needs small mechanical changes.
+
 ### Breaking Changes
 
 - `shibuya-core`: runner machinery is now internal. The runner implementation
