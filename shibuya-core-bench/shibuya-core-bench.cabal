@@ -90,3 +90,42 @@ executable standalone-test
     streamly-core ^>=0.3,
     text ^>=2.1,
     time,
+
+-- EP-29 regression guard: stresses the PRODUCTION runSupervised path (Serial /
+-- Ahead / Async, real bounded-inbox backpressure, many processor lifecycles)
+-- and fails if a nested `atomically` ever occurs on any thread. This is the
+-- counterpart to the benchmark: it proves the production runner does NOT nest,
+-- which the tasty-bench `env` thunk hazard (see Bench.Framework) does not affect.
+executable prod-stress
+  import: warnings
+  main-is: Test/ProdStress.hs
+  hs-source-dirs: bench
+  default-language: GHC2024
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N -T -A32m"
+    -O2
+
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+
+  build-depends:
+    base ^>=4.21.0.0,
+    deepseq,
+    effectful ^>=2.6,
+    nqe,
+    shibuya-core,
+    stm,
+    streamly ^>=0.11,
+    streamly-core ^>=0.3,
+    text ^>=2.1,
+    time,

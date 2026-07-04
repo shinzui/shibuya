@@ -84,19 +84,48 @@ Investigation (done — 2026-07-04, before this plan file existed):
       race window massively but is not strictly required.
 - [x] Reverted all temporary diagnostic scaffolding; the working tree is clean.
 
-Fix work (remaining):
+Fix work (done — 2026-07-04). The investigation overturned the plan's original premise
+(a production-path bug fixed by decoupling the receive). The root cause is a **benchmark-harness
+artifact** (tasty-bench `env`), and the production runner is unaffected. Milestones were
+re-scoped accordingly:
 
-- [ ] M0: Add a permanent, deterministic-enough regression test that reproduces the nested
-      `atomically` on today's tree (fails now).
-- [ ] M1: Build a minimal standalone reproducer (no `tasty`, no streamly) to positively
-      identify the outer transaction, so the fix is grounded in mechanism, not guesswork.
-- [ ] M2: Write up the confirmed streamly/STM interaction in this plan's Surprises section.
-- [ ] M3: Apply the fix (decouple the blocking inbox receive from the stream driver — see Plan
-      of Work) and prove the reproducer/test now passes.
-- [ ] M4: Add library-robustness hardening so a nested `atomically` cannot silently return
-      (assertion/guard and/or a property test over Serial/Ahead/Async).
-- [ ] M5: Re-run the full benchmark suite vs `v0.7.1.0`; confirm the crash is gone and record
-      the separately-tracked `Async n` allocation regression (see Surprises) for follow-up.
+- [x] Reproduced the crash on the current tree via the benchmark leaf (~1/25 fresh process at
+      `--stdev 100`, ~1/8 at `--stdev 1`; higher with more action-iterations). Confirmed it is a
+      low-probability per-invocation race amplified by tasty-bench.
+- [x] Built a `Shibuya.Internal.Debug.NestGuard` detector (per-thread guarded-`atomically`
+      tracking). Confirmed: inner site = the inbox receive in `inboxToStream`; the outer
+      transaction is **foreign** (not any shibuya `atomically`). (S3 re-confirmed.)
+- [x] Ruled out, by reading dependency source: streamly serial path uses **no STM**; NQE mailbox
+      is plain STM; effectful ConcUnlift is pure MVar; **no `unsafeIOToSTM`** anywhere in async /
+      unliftio / stm / tasty / effectful / nqe / streamly. Micro-experiment: `forkIO` inside a
+      transaction does **not** leak the trec to the child.
+- [x] Proved production is unaffected: `prod-stress` (new) exercises the real `runSupervised`
+      path (Serial/Ahead/Async, bounded-inbox backpressure, ~1,200 processor lifecycles) with a
+      global uncaught-exception trap — **2.4M messages, zero nesting**. Every non-tasty
+      distillation (plain orElse/retry loop 200k; streamly-driven receive 100k; a hand-built
+      replica of tasty's worker/withAsync/timeout/performGC/measure-loop) is **clean**.
+- [x] **Identified the exact mechanism** (S7): tasty-bench's `env` hands the benchmark its
+      environment as the thunk `unsafePerformIO (atomically (readTVar resourceVar))`. Forced the
+      first time (memoised), that thunk runs an STM transaction; when the first force lands inside
+      the processor's receive `atomically` (the race), the RTS throws "atomically was nested".
+- [x] Proved the mechanism by construction: (a) removing tasty `env` from the leaf → 0 crashes;
+      (b) keeping `env` but `deepseq`-forcing the value before processing → 0 crashes.
+- [x] Fixed the benchmark: `processingBenchmarks` now forces the `env` value to NF before it
+      enters shibuya's lazy STM pipeline (`runForced`). Verified 0/25 crashes at the high-crash
+      config (was ~1/8); all three processing leaves report `OK`.
+- [x] Left the production hot path **untouched** (per the confirmed mechanism + the user's
+      decision). The earlier "decouple the receive onto a dedicated reader thread" idea was tried
+      and **rejected**: a fresh reader thread still nested (it forces the same env thunk inside
+      its own receive) and the rapid fork/kill of STM-blocked threads made it strictly worse
+      (28/30, uncaught hang). See Decision Log.
+- [x] Added `prod-stress` as a permanent production regression guard.
+- [x] `cabal test shibuya-core-test` green (201 examples); `nix fmt` clean.
+
+Not done / intentionally out of scope:
+
+- [ ] M5's `Async n` allocation regression (S6) remains a **separate** follow-up, unaffected by
+      this work. Left for its own investigation.
+- [ ] Optional upstream note to tasty-bench about the `env` + `unsafePerformIO` + STM footgun.
 
 
 ## Surprises & Discoveries
@@ -271,18 +300,63 @@ with wall-time essentially unchanged. This was a deliberate correctness change i
 against 0.7.1.0, so the allocation cost went unrecorded. This is tracked here as a related
 follow-up, **not** part of the crash fix (M5).
 
-### Open Questions (to resolve in M1/M2)
+### Open Questions (resolved — see S7)
 
-1. What exactly is the outer, unguarded `atomically` on the processor thread? Candidates that
-   remain: (a) an STM operation inside `unliftio`/`async`'s `withAsync`/`waitCatch`
-   coordination composed onto the processor thread; (b) a streamly-internal transaction in the
-   concurrent channel that leaks onto the serial path via shared state; (c) a lazily-forced
-   thunk that, when evaluated inside the receive transaction, itself runs `atomically`. No
-   `unsafeIOToSTM` exists in shibuya or NQE, so a hidden IO-in-STM in a dependency is possible
-   but unconfirmed.
-2. Does `runSupervised` (Serial/Ahead/Async) crash the same way under a threaded harness? The
-   `Concurrency` benchmark uses `runSupervised` but its `io-bound` cases time out and were
-   inconclusive. M1 must test `runSupervised` directly.
+Both open questions are answered by S7. The outer transaction is candidate **(c)**: a
+lazily-forced thunk that runs `atomically` when evaluated — specifically tasty-bench's `env`
+value, `unsafePerformIO (atomically (readTVar resourceVar))`, forced inside the receive
+transaction. And `runSupervised` does **not** crash under load (`prod-stress`: 2.4M messages
+clean) — because production never constructs such a thunk.
+
+1. ~~What exactly is the outer, unguarded `atomically`?~~ → S7: tasty-bench `env`'s
+   `unsafePerformIO`/STM thunk, forced inside the receive. Not `unsafeIOToSTM` in a dependency
+   (grepped: none), not streamly (serial path has no STM), not `withAsync`/`waitCatch`.
+2. ~~Does `runSupervised` crash the same way?~~ → No. `prod-stress` drives `runSupervised`
+   directly across Serial/Ahead/Async with backpressure for 2.4M messages with zero nesting.
+
+### S7 — Root cause (CONFIRMED): tasty-bench `env` yields a thunk that runs `atomically` when forced
+
+tasty-bench's `env`/`envWithCleanup` (in `Test.Tasty.Bench`) is:
+
+```haskell
+envWithCleanup res fin f = withResource (res >>= evaluate . force) (void . fin)
+                                        (f . unsafePerformIO)
+```
+
+The continuation `f` is applied to `unsafePerformIO accessor`, where `accessor :: IO env` is
+tasty's resource getter `getResource var = atomically (readTVar var)` (in `Test.Tasty.Run`).
+So the environment value the benchmark closes over is literally the thunk
+
+```haskell
+msgs = unsafePerformIO (atomically (readTVar resourceVar))
+```
+
+which runs an STM transaction the **first time it is forced** (then memoises). In
+`runWithMetrics-100`, `msgs` flows lazily through `wrapAsIngested` → the adapter stream → the
+bounded inbox → the processor's `inboxToStream` receive. Normally the first force happens during
+setup, outside any transaction, and all is well. Occasionally — the ~1/25 race — the first force
+lands **inside** the processor's receive `atomically ((Just <$> receiveSTM inbox) orElse …)`.
+`atomically` inside `atomically` is illegal, so the RTS throws
+`Control.Concurrent.STM.atomically was nested`. This is exactly candidate (c) from the old Open
+Questions.
+
+Evidence chain (each step independent):
+
+1. **Detector**: inner site is the receive; the outer transaction is foreign (no shibuya guard
+   active on the thread). Holds for both the processor thread and, in the rejected reader-thread
+   variant, a fresh `forkIO` thread — because that thread *also* forces the thunk inside its own
+   receive.
+2. **Source read**: tasty-bench `env` = `unsafePerformIO ∘ (atomically . readTVar)` (above).
+3. **Bisection**: replace `env (setupMessages 100)` with an inlined `setupMessages 100 >>= …`
+   (no `env`, no `unsafePerformIO`/STM thunk) → **0 crashes** (was ~1/8 at `--stdev 1`).
+4. **Construction**: keep `env`, but `deepseq` the value before processing so the thunk resolves
+   outside STM → **0 crashes**.
+
+Why production is unaffected: a real adapter delivers ordinary message values. Nothing in
+`runApp`/`runSupervised`/`runWithMetrics` wraps message data in `unsafePerformIO (atomically …)`.
+Only tasty-bench's `env`, consumed lazily through shibuya's stream, creates such a thunk. tasty-
+bench's own docs warn about `env` and laziness; this is a known footgun of that combinator. The
+fix therefore belongs entirely in the benchmark, and the production hot path is left untouched.
 
 
 ## Decision Log
@@ -310,13 +384,77 @@ Record every decision made while working on the plan.
   must stay clean and buildable between sessions; the scaffolding is reconstructable from this
   plan's Concrete Steps. Date: 2026-07-04.
 
+- Decision (SUPERSEDES the original premise): This is a **benchmark-harness artifact**, not a
+  production-path bug. Fix the benchmark; leave the production hot path untouched. Rationale:
+  S7 proves the outer transaction is tasty-bench `env`'s `unsafePerformIO`/STM thunk, which
+  production never constructs; `prod-stress` shows `runSupervised` clean over 2.4M messages.
+  Date: 2026-07-04.
+
+- Decision: **Rejected** the "decouple the receive onto a dedicated reader thread" fix from the
+  original Plan of Work (M3). Rationale: with the true mechanism (a value-thunk that runs
+  `atomically` when forced), relocating the receive cannot help — a fresh reader thread forces
+  the same thunk inside its own receive and still nests. Empirically it was strictly worse:
+  28/30 crashes plus an uncaught-exception hang, because it also rapidly forks/kills
+  STM-blocked threads. The public signatures of `runSupervised`/`runWithMetrics`/
+  `runIngesterAndProcessor`/`inboxToStream`/`processUntilDrained` are all unchanged. Date:
+  2026-07-04.
+
+- Decision: Fix = force the `env` value to normal form before it enters shibuya's lazy STM
+  pipeline, in `shibuya-core-bench/bench/Bench/Framework.hs` (`runForced = \msgs -> msgs
+  \`deepseq\` runShibuyaWithMessages msgs`), with a comment citing S7. Rationale: minimal,
+  correct, and confined to the benchmark; resolves the `unsafePerformIO`/STM thunk once, outside
+  any transaction. Date: 2026-07-04.
+
+- Decision: Keep the `prod-stress` executable
+  (`shibuya-core-bench/bench/Test/ProdStress.hs`) as a permanent production regression guard,
+  rather than deleting it with the rest of the scaffolding. Rationale: it stresses the real
+  `runSupervised` path and fails loudly if a nested `atomically` ever occurs on any thread —
+  cheap insurance that the production runner stays clean. Date: 2026-07-04.
+
 
 ## Outcomes & Retrospective
 
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+**Outcome (2026-07-04).** The nested-`atomically` crash is fixed, and the root cause is fully
+understood — but not where the plan originally assumed. The plan opened on the premise that this
+was a production correctness bug on the shared `runIngesterAndProcessor` path, to be fixed by
+decoupling the blocking receive. Investigation overturned that premise:
+
+- **Root cause (S7):** tasty-bench's `env` combinator hands the benchmark its environment as the
+  thunk `unsafePerformIO (atomically (readTVar resourceVar))`. When that thunk's first force
+  races into the processor's receive transaction, `atomically` nests. It is a benchmark-harness
+  artifact of `env` + laziness, not a defect in shibuya's runtime.
+- **Production is unaffected.** `prod-stress` drives the real `runSupervised` across
+  Serial/Ahead/Async with backpressure for 2.4M messages with zero nesting; every non-tasty
+  distillation is clean. Real adapters never construct an STM-executing value thunk.
+- **Fix.** Benchmark-only: `processingBenchmarks` forces the `env` value to NF before processing.
+  0/25 crashes at the previously ~1/8 config; all leaves `OK`. Production hot path untouched;
+  no public signatures changed.
+- **Guard.** A new `prod-stress` executable is retained as a permanent regression check on the
+  production runner.
+
+**Gaps / follow-ups.**
+
+- The `Async n` allocation regression (S6) is unrelated to this crash and remains open.
+- An upstream note to tasty-bench about the `env` + `unsafePerformIO` + STM footgun is optional
+  and not yet filed.
+- The exact scheduling reason the *first* force of the shared thunk sometimes lands inside the
+  receive (rather than during setup) was not pinned to the instruction level; it is a benign
+  laziness/scheduling race, and forcing the value removes it regardless.
+
+**Lessons.**
+
+1. The original Plan of Work's fix (decouple the receive) was grounded in a wrong mechanism and
+   would not have worked — a fresh thread still forces the same thunk inside its own receive.
+   Empirically it was worse (28/30 + hang). Confirming the *mechanism* before fixing (the plan's
+   own Decision Log insisted on this) was what prevented shipping a bad fix.
+2. "Reproduces only under the benchmark harness" was a signal to interrogate the harness, not to
+   dismiss it. The controlled `env`-in/`env`-out bisection plus the `deepseq` construction test
+   turned a hunch into proof.
+3. `unsafePerformIO`-wrapped IO/STM in a value that is consumed lazily by *someone else's* STM is
+   a sharp edge; tasty-bench's `env` is a known instance.
 
 
 ## Context and Orientation

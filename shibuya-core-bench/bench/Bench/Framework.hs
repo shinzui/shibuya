@@ -52,12 +52,30 @@ processingBenchmarks =
   bgroup
     "processing"
     [ env (setupMessages 100) $ \msgs ->
-        bench "runWithMetrics-100" $ nfIO $ runShibuyaWithMessages msgs,
+        bench "runWithMetrics-100" $ nfIO $ runForced msgs,
       env (setupMessages 1000) $ \msgs ->
-        bench "runWithMetrics-1000" $ nfIO $ runShibuyaWithMessages msgs,
+        bench "runWithMetrics-1000" $ nfIO $ runForced msgs,
       env (setupMessages 10000) $ \msgs ->
-        bench "runWithMetrics-10000" $ nfIO $ runShibuyaWithMessages msgs
+        bench "runWithMetrics-10000" $ nfIO $ runForced msgs
     ]
+  where
+    -- EP-29: force the env value to normal form BEFORE it enters shibuya's
+    -- lazy, STM-driven message pipeline.
+    --
+    -- tasty-bench's 'env' hands the benchmark its environment as the thunk
+    -- @unsafePerformIO (atomically (readTVar resourceVar))@ (see
+    -- 'Test.Tasty.Bench.envWithCleanup' = @withResource ... (f . unsafePerformIO)@,
+    -- and tasty's @getResource = atomically . readTVar@). That thunk runs an STM
+    -- transaction the first time it is forced. If that first force happens to
+    -- land inside the processor's inbox-receive @atomically@ (a race), the RTS
+    -- throws "Control.Concurrent.STM.atomically was nested" and crashes the
+    -- benchmark. Forcing @msgs@ here resolves the @unsafePerformIO@/STM thunk
+    -- outside any transaction, once, before processing. This is purely a
+    -- benchmark-harness concern: real adapters never wrap message data in an
+    -- STM-executing thunk, so the production 'runWithMetrics'/'runSupervised'
+    -- path is unaffected.
+    runForced :: [BenchMessage] -> IO Int
+    runForced msgs = msgs `deepseq` runShibuyaWithMessages msgs
 
 -- | Compare shibuya overhead vs pure streamly baseline
 comparisonBenchmarks :: Benchmark
