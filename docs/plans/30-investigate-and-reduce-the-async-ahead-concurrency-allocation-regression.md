@@ -59,16 +59,18 @@ even if it requires splitting a partially completed task into two ("done" vs. "r
 This section must always reflect the actual current state of the work.
 
 - [x] M0 (from EP-29 M5): quantified the regression vs `v0.7.1.0` — see Surprises S1. (2026-07-04)
-- [ ] M1: Characterize the regression — is the extra allocation **fixed per run** or **per
-      message / per worker**? Does it scale with `n`? Attribute it to `maxThreads n`
-      specifically by toggling it in a scratch build.
-- [ ] M2: Try allocation-reducing variants that keep the hard `n`-thread bound (see Plan of
-      Work) and measure each against the `v0.7.1.0` baseline (Allocated column) and against
-      pre-change `master`.
-- [ ] M3: Decide — apply the best safe win, or accept + document. Record in Decision Log.
-- [ ] M4: If a code change is made: run the full test suite, the `prod-stress` guard
-      (`shibuya-core-bench:exe:prod-stress`), and re-benchmark to confirm the reduction and no
-      new regression / no semantic change. If accepting: add a comment at the dispatch site.
+- [x] M1: Characterized the regression with labels attached (S3) and **overturned the
+      `maxThreads` hypothesis** (S4): the regression is **not** caused by `maxThreads n`, and it
+      scales with `n` (per-worker), not per-run/per-message. (2026-07-04)
+- [x] M2: Measured five candidates via an env-selectable dispatch scaffold in one build (S5). The
+      winner is `maxBuffer (2*n)` (keeps the `n`-thread bound; async back to ~+20%, ahead *below*
+      baseline). `eager` is worse; dropping `maxThreads` does not help. (2026-07-04)
+- [x] M3: Decided — apply `maxThreads n . maxBuffer (2*n)` to both non-partitioned branches, with
+      an explanatory comment at the dispatch site. Recorded in Decision Log. (2026-07-04)
+- [x] M4: Validated — full test suite green (201/201 on rerun; the one flaky STM-blocked failure is
+      noted in S6), `prod-stress` clean (960000 processed, 0 nested-atomically), and the full
+      re-benchmark vs `v0.7.1.0` confirms the reduction (Ahead −23–39% below baseline; worst Async
+      +90%→+20%) with non-dispatch paths flat. (2026-07-04)
 
 
 ## Surprises & Discoveries
@@ -112,7 +114,95 @@ non-partitioned `Ahead`/`Async` branches (at `3344171`, ~lines 521–526):
 Per EP-26, 0.7.1.0 used `StreamP.maxBuffer n` alone. `maxBuffer n` bounds buffered *outputs*, not
 the number of in-flight worker threads, so it does **not** cap concurrent handler executions;
 `maxThreads n` does. Reverting `maxThreads n` would reclaim the allocation but reintroduce the
-concurrency-bound violation EP-26 fixed — so it is out of scope (Decision Log).
+concurrency-bound violation EP-26 fixed — so it is out of scope (Decision Log). **Note (S4): the
+measurements below prove `maxThreads n` is not actually the allocation cause — the intuition in
+this note about *why* the regression appeared turned out to be wrong.**
+
+### S3 — Labelled before/after, and how the regression scales with `n` (M1, 2026-07-04)
+
+Re-ran both regressed groups with labels attached (`--stdev 15 --timeout 60 -p '/concurrency-levels/'`).
+Default `master` config (`maxThreads n . maxBuffer n`) vs `v0.7.1.0` (`maxBuffer n`), Allocated:
+
+```text
+leaf         v0.7.1.0   master    delta
+async-2        1.40MB    1.39MB    flat
+async-5        1.18MB    1.63MB    +38%
+async-10       1.31MB    2.50MB    +90%
+async-20       1.99MB    2.96MB    +49%
+ahead-2        1.72MB    1.70MB    flat
+ahead-5        2.02MB    2.37MB    +17%
+ahead-10       3.11MB    3.14MB    flat
+ahead-20       3.72MB    3.74MB    flat
+```
+
+The regression is **per-worker / per-`n`, not per-run or per-message**: `v0.7.1.0` async allocation
+is roughly **flat in `n`** (~1.2–1.4MB; unbounded threads → all ~100 messages fork at once
+regardless of the labelled `n`), whereas `master` async allocation **grows with `n`**
+(1.39→1.63→2.50→2.96MB). The worst hit is Async; Ahead is largely protected (only `ahead-5` moved).
+Two runs of the default config agreed within ±1–2%, so Allocated is reproducible here despite the
+concurrent scheduling.
+
+### S4 — `maxThreads n` is NOT the cause; the culprit is the `maxBuffer n` dispatch throttle (M1/M2, 2026-07-04)
+
+The plan's premise (S2) was that `maxThreads n` introduced the regression. **It did not.** Attribution
+measurement via a scratch `nothreads` config (`maxBuffer n` alone — exactly what `v0.7.1.0` used,
+confirmed by reading `/tmp/wt-0710/shibuya-core/src/Shibuya/Runner/Supervised.hs:335,338`):
+
+```text
+leaf       v0.7.1.0(maxBuffer n)   master nothreads(maxBuffer n)   master default(+maxThreads n)
+async-10          1.31MB                    2.51MB                          2.50MB
+```
+
+Same streamly config (`maxBuffer n`), same streamly version in both trees (`streamly-0.11.1` /
+`streamly-core-0.3.1`, verified via `dist-newstyle/cache/plan.json`), yet `master` allocates ~+90%.
+Removing `maxThreads n` changes **nothing** (2.51 vs 2.50MB). So:
+
+1. `maxThreads n` is not the cause — adding/removing it barely moves allocation.
+2. A ~+20% *residual* regression lives in Shibuya's **shared** processing path (it is present even
+   with an unbounded output buffer — see S5 `bufbig`), i.e. code that changed between `v0.7.1.0`
+   and `master` independent of the streamly config. (See also S6: the serial/`runWithMetrics`
+   paths also regressed ~5–7%, which S1 had reported as flat.)
+3. The remaining, larger part of the async regression is the interaction of `maxBuffer n` with
+   `maxThreads n`: streamly forks a worker only when **both** the thread check and the buffer check
+   pass (`Dispatcher.hs:checkMaxThreads`/`checkMaxBuffer`). With the buffer set equal to the thread
+   count, worker dispatch is throttled and churns, allocating more as `n` grows.
+
+### S5 — Candidate matrix; `maxBuffer (2*n)` is the win (M2, 2026-07-04)
+
+Measured five candidates from a single build via an env-selectable scaffold
+(`SHIBUYA_EP30` picking the `parMapM` config). Allocated (MB), baselines for reference:
+
+```text
+candidate (keeps n-bound?)        async-2  async-5  async-10  async-20   ahead-10
+v0.7.1.0 baseline (—)               1.40     1.18     1.31      1.99       3.11
+default  maxThreads n·maxBuffer n    1.38     1.63     2.50      2.99       3.14   (shipped)
+nothreads maxBuffer n      (NO)      1.37     1.67     2.51      2.99       3.15
+buf2   maxThreads n·maxBuffer 2n     1.09     1.22     1.60      1.92       1.99   <== win
+bufbig maxThreads n·maxBuffer 1500   0.95     1.15     1.59      1.99       2.00
+eager  ...·maxBuffer n·eager True    1.49     1.81     2.68      3.25       3.29   (worse)
+```
+
+`maxBuffer (2*n)` and the default-1500 buffer are essentially equivalent (async floor ~1.6MB); a
+buffer larger than the thread count removes the dispatch throttle. `eager` makes it worse. `2*n`
+keeps a *bounded* buffer that scales with `n` and matches the pending-item limit the partitioned
+path (`runKeyedScheduler`) already uses (`max 2 (2 * max 1 n)`), so it is the principled choice.
+Net vs baseline with the fix: Async returns to ~+20% (the irreducible shared-path residual),
+Ahead drops **below** baseline (e.g. `ahead-10` 3.11→1.99MB, −36%).
+
+### S6 — Discoveries alongside the fix (2026-07-04)
+
+- **A shared-path regression S1 missed.** S1 reported non-concurrent paths flat (±1%). Re-measuring
+  vs `v0.7.1.0`, `framework-overhead.processing.runWithMetrics-*`, `handler-overhead.*`, and
+  `comparison.shibuya-framework` are up **~4–9%** (e.g. `runWithMetrics-100` 222→242KB). Streamly
+  baselines, `adapter-creation`, and `cpu-bound-serial` remain flat. This is a separate,
+  serial-path allocation increase (the same shared-code cost that produces the async residual in
+  S4/S5). It is **out of scope** for EP-30 (which targets the Async/Ahead dispatch) — flagged here
+  as a candidate follow-up.
+- **A flaky test, not a regression.** One full `cabal test shibuya-core-test` run failed
+  `Shibuya.Runner / Policy validation / accepts valid policy combinations` with
+  `thread blocked indefinitely in an STM transaction`. It passes in isolation (3/3) and on the next
+  full run (201/201), and is unrelated to buffer sizing (a processor/inbox shutdown race, the
+  family EP-29 investigated). Recorded so it is not mistaken for a change-induced failure.
 
 
 ## Decision Log
@@ -134,13 +224,53 @@ Record every decision made while working on the plan.
   crash fix (EP-29) is shipped and orthogonal; conflating a performance investigation with it
   would muddy both. Date: 2026-07-04.
 
+- Decision (M3): Apply `StreamP.maxThreads n . StreamP.maxBuffer (2 * n)` (plus `. ordered True`
+  for the Ahead branch) to both non-partitioned dispatch branches in `processUntilDrained`.
+  Rationale: measurements (S4/S5) show the regression is caused by the `maxBuffer n` output buffer
+  being equal to the thread count, which throttles streamly's worker dispatch — **not** by
+  `maxThreads n`. Enlarging the buffer to `2*n` removes the throttle while `maxThreads n` keeps the
+  hard `n`-concurrent-handler bound. `2*n` is a bounded buffer that scales with `n` and matches the
+  pending-item limit the partitioned `runKeyedScheduler` path already uses. Result: Ahead drops
+  23–39% *below* the `v0.7.1.0` baseline; the worst Async leaf goes from +90% to +20% vs baseline
+  (the residual being the separate shared-path cost of S6). `prod-stress` stays clean (960000
+  processed, 0 nested-atomically), so the bound and finalization semantics are preserved.
+  Date: 2026-07-04.
+
+- Decision (S4 correction): The plan's S2 hypothesis — that `maxThreads n` introduced the
+  regression — is **wrong** and is left in place only as a recorded, corrected assumption.
+  `maxThreads n` is retained (it is the concurrency bound), but it was never the allocation cause.
+  Date: 2026-07-04.
+
+- Decision: The ~+20% Async residual and the ~+5–7% serial-path regression (S6) are a **separate,
+  shared-code** allocation increase between `v0.7.1.0` and `master`, independent of the streamly
+  dispatch config. It is **out of scope** for EP-30 (which targets the Async/Ahead dispatch) and is
+  left as a candidate follow-up rather than chased here. Date: 2026-07-04.
+
 
 ## Outcomes & Retrospective
 
 Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
 Compare the result against the original purpose.
 
-(To be filled during and after implementation.)
+**Outcome (2026-07-04).** The plan's purpose was to determine whether the Async/Ahead allocation
+regression is inherent to bounding worker threads or a fixable inefficiency, and to apply a safe
+reduction that keeps the hard `n`-thread bound. Result: it is **fixable**. The one-line-per-branch
+change `maxBuffer n → maxBuffer (2*n)` (keeping `maxThreads n`) reduces Allocated on the regressed
+`concurrency-levels` leaves so that Ahead lands **23–39% below** the `v0.7.1.0` baseline and the
+worst Async leaf drops from **+90% to +20%** — with the `n`-thread bound intact, the full test
+suite green, and `prod-stress` reporting 0 nested-`atomically` and correct totals (960000
+processed). See the final table in S5/S6 and the dispatch-site comment in
+`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs`.
+
+**Biggest lesson / gap vs the original framing.** The plan (and EP-26/EP-29's S2/S6 notes) assumed
+`maxThreads n` caused the regression. Direct attribution (S4) disproved that: removing `maxThreads`
+leaves allocation unchanged; the amplifier was the `maxBuffer n` dispatch throttle. Two things the
+original framing missed: (1) the regression scales **per-`n`**, not per-run/per-message; (2) there
+is a **separate shared-path regression** (S6, ~+5–7% on serial `runWithMetrics`/handler-overhead
+paths, and the ~+20% Async residual) that this plan does *not* address — a good candidate for a
+follow-up EP. The `2*n` buffer choice also aligns the `parMapM` branches with the pending-item
+limit the partitioned `runKeyedScheduler` path already used, so the two dispatch paths are now
+consistent.
 
 
 ## Context and Orientation

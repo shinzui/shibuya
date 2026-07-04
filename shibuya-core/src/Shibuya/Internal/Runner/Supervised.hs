@@ -518,12 +518,21 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
         partitioned n
       (PartitionedInOrder, Async n) ->
         partitioned n
+      -- 'maxThreads n' is the hard concurrency bound (at most n handlers run at
+      -- once); do not remove it. The output buffer is set to '2 * n', not 'n':
+      -- a buffer equal to the thread count throttles streamly's worker dispatch
+      -- (a worker is only forked when both the thread AND buffer checks pass),
+      -- causing dispatch churn that allocated up to +90% on the Async
+      -- concurrency-levels benchmarks. Enlarging the buffer to 2n relieves the
+      -- churn while keeping the n-thread bound, and matches the pending-item
+      -- limit the partitioned path already uses (see 'partitioned' above). See
+      -- docs/plans/30-investigate-and-reduce-the-async-ahead-concurrency-allocation-regression.md.
       (_, Ahead n) ->
         Stream.fold Fold.drain $
-          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer n . StreamP.ordered True) processAction inboxStream
+          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer (2 * n) . StreamP.ordered True) processAction inboxStream
       (_, Async n) ->
         Stream.fold Fold.drain $
-          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer n) processAction inboxStream
+          StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer (2 * n)) processAction inboxStream
 
     -- After draining, check if we halted
     maybeHalt <- readIORef haltRef
