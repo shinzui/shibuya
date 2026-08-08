@@ -1,6 +1,6 @@
 let Schema =
-      https://raw.githubusercontent.com/shinzui/mori-schema/1f70781427426c09673d46f8e6733b7e7d0abedc/package.dhall
-        sha256:3b79aae9216456678300441ca8616b64a4b4fa520a1286dfcc418f60899d5d4a
+      https://raw.githubusercontent.com/shinzui/mori-schema/06da43590476f4ddc64386e91be9ca88a1f3c9d6/package.dhall
+        sha256:dd0c3e0094714498fe7b2562aa85998624b13198758d9160b5ea74b253491836
 
 let emptyRuntime = { deployable = False, exposesApi = False }
 
@@ -137,6 +137,15 @@ in  Schema.Project::{ project =
         , location =
             Schema.DocLocation.Url
               "https://hackage.haskell.org/package/shibuya-core"
+        }
+      ]
+    , okfBundles =
+      [ Schema.OkfBundle::{ name = "capabilities"
+        , path = "docs/capabilities"
+        , profile = Some "docs/capabilities/profile.dhall"
+        , okfVersion = "0.2"
+        , description = Some
+            "What Shibuya provides today, one concept per capability, with stable CAP-N handles, compatibility promises, and evidence"
         }
       ]
     }
