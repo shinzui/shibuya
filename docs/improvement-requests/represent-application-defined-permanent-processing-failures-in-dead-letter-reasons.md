@@ -6,7 +6,7 @@ description: >-
   without misclassifying it as poison, invalid payload, or retry exhaustion.
 timestamp: 2026-08-10T15:19:20Z
 requestId: IR-2
-status: accepted
+status: released
 origin: mori://shinzui/keiro/okf/improvement-requests/concepts/IR-9
 plan: docs/plans/32-add-application-defined-dead-letter-reasons.md
 ---
@@ -15,10 +15,12 @@ plan: docs/plans/32-add-application-defined-dead-letter-reasons.md
 
 ## Status
 
-Accepted and under implementation through
-`docs/plans/32-add-application-defined-dead-letter-reasons.md`. This is an upstream prerequisite
-for the declarative router-selection failure policy requested by
-`mori://shinzui/keiro/okf/improvement-requests/concepts/IR-9`. Release remains pending.
+Released in [`v0.9.0.0`](https://github.com/shinzui/shibuya/releases/tag/v0.9.0.0)
+through `docs/plans/32-add-application-defined-dead-letter-reasons.md`. The published packages
+are [shibuya-core 0.9.0.0](https://hackage.haskell.org/package/shibuya-core-0.9.0.0) and
+[shibuya-metrics 0.9.0.0](https://hackage.haskell.org/package/shibuya-metrics-0.9.0.0).
+This release satisfies the upstream prerequisite for the declarative router-selection failure
+policy requested by `mori://shinzui/keiro/okf/improvement-requests/concepts/IR-9`.
 
 ## Context
 

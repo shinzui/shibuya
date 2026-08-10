@@ -91,9 +91,11 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
       formatting, build, 212 tests, Haddock, both package checks, flake checks, and source
       distributions passed. Archive inspection confirmed the exact versions and
       `shibuya-core ^>=0.9.0.0` bound. (2026-08-10T18:11:58Z)
-- [ ] M5b: After final-diff approval, commit and release `shibuya-core` and
-      `shibuya-metrics` 0.9.0.0 in dependency order, create the git tag and GitHub release,
-      and mark the improvement request released.
+- [x] M5b: Commit and release `shibuya-core` and `shibuya-metrics` 0.9.0.0 in dependency
+      order, publish both documentation archives, create and push annotated tag `v0.9.0.0`,
+      create the GitHub release, verify every public page, prove the published core API from
+      an isolated downstream project, and mark the improvement request released.
+      (2026-08-10T19:49:48Z)
 
 
 ## Surprises & Discoveries
@@ -310,14 +312,19 @@ code/detail/rendering projections. Single-message traces expose the stable code 
 turning detail into an attribute or metric label, and both ordinary and batch finalizers
 preserve the complete reason. The semantic, migration, serialization, and safety contracts
 are documented, and all local release gates pass without a common-path performance
-regression. The staged release metadata names 0.9.0.0 consistently, and both inspected
+regression. The released metadata names 0.9.0.0 consistently, and both inspected
 source distributions contain the intended versions and internal dependency bound.
 
-M5b remains intentionally pending because the release commit, tag, pushes, Hackage uploads,
-and GitHub release require final-diff approval and explicit external-publication authority.
-The pre-existing I/O benchmark's inability to reach 5% precision within 120 seconds is a
-harness limitation to revisit separately; it did not prevent hard comparison of the success
-hot path.
+M5 is complete. Commit `d958a5748475a4b84075feda7a2a4f5cc7471c60` is published under the
+annotated `v0.9.0.0` tag. Hackage serves `shibuya-core-0.9.0.0`,
+`shibuya-metrics-0.9.0.0`, and both documentation archives; the GitHub release is public.
+An isolated project updated its Hackage index, resolved `shibuya-core ^>=0.9.0.0`, imported
+only `Shibuya`, and rendered an `ApplicationFailure` from the downloaded package. The source
+improvement request now records the released artifacts.
+
+The pre-existing I/O benchmark's inability to reach 5% precision within 120 seconds remains
+a harness limitation to revisit separately; it did not prevent hard comparison of the
+success hot path.
 
 
 ## Context and Orientation
@@ -1159,3 +1166,7 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
   versions, the lockstep metrics bound, dated changelogs, repeated local validation, and
   inspected source distributions. Split external publication into M5b so the final-diff
   approval gate remains explicit.
+- 2026-08-10: Completed M5b after publishing the release commit and annotated tag, both
+  Hackage packages and documentation archives, and the GitHub release. Verified all public
+  pages and compiled the new API from an isolated project using the published
+  `shibuya-core ^>=0.9.0.0` artifact; marked the improvement request released.
