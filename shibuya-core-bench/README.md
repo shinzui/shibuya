@@ -40,6 +40,7 @@ cabal bench shibuya-core-bench
 cabal bench shibuya-core-bench --benchmark-options="-p baseline"
 cabal bench shibuya-core-bench --benchmark-options="-p framework"
 cabal bench shibuya-core-bench --benchmark-options="-p handler"
+cabal bench shibuya-core-bench --benchmark-options="-p dead-letter-reason"
 
 # Run a specific sub-benchmark
 cabal bench shibuya-core-bench --benchmark-options="-p comparison"
@@ -97,6 +98,14 @@ Measures the overhead of different handler patterns:
 - **noop-handler**: Minimal handler returning `AckOk` (pure framework overhead)
 - **compute-handler**: Handlers with light/medium CPU computation
 - **io-handler**: Handlers performing IO operations (IORef updates)
+
+### Dead-Letter Reason Operations
+
+Measures application-code validation, built-in reason rendering, and
+application reason rendering. The rendering fixture reuses an already validated
+`DeadLetterCode`, matching the intended startup-validation pattern. These are
+focused current-tree measurements; only pre-existing benchmark names participate
+in a 0.8.0.1 baseline comparison.
 
 ## Memory Usage
 

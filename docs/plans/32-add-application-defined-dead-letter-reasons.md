@@ -80,10 +80,12 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
       plan and corrected finalization/metrics wording. The documentation searches found
       the new constructor, projections, trace key, accepted request status, and plan link;
       `nix fmt` and `git diff --check` succeeded. (2026-08-10T17:35:34Z)
-- [ ] M4: Run formatting, build, tests, Haddock, package checks, flake checks, the mandatory
+- [x] M4: Run formatting, build, tests, Haddock, package checks, flake checks, the mandatory
       0.8.0.1-to-current success-path benchmark comparison, and focused current-tree
       dead-letter code/rendering measurements; resolve any common-path regression and record
-      the failure-path evidence before release.
+      the failure-path evidence before release. All local gates passed. The mandatory hot
+      paths were 7% and 17% faster than 0.8.0.1; every completed broader baseline row passed
+      the 10% gate after one noisy pure-Streamly control was repeated. (2026-08-10T17:53:04Z)
 - [ ] M5: After maintainer approval, release `shibuya-core` and `shibuya-metrics`
       0.9.0.0 in dependency order, create the git tag and GitHub release, and mark the
       improvement request released.
@@ -151,6 +153,33 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
 
   M1 therefore delegates that private compatibility helper to the new canonical renderer;
   M2 will remove the helper while adding the reason-code attribute.
+
+- The requested full 0.8.0.1 benchmark baseline reached the 120-second per-test timeout on
+  the pre-existing `concurrency-modes/io-bound/100-msgs-1ms-delay/serial` precision loop.
+  All 36 rows before that point were written to CSV, but the timed-out I/O group and later
+  hot-path group had no baseline rows. The mandatory hot paths were therefore rerun in
+  isolation with identical `-fproc-alignment=64` settings:
+
+  ```text
+  serial-noop-10000: baseline 15.5 ms, current 14.3 ms, 7% faster
+  async8-noop-10000: baseline 103 ms, current 84.9 ms, 17% faster
+  ```
+
+  The completed baseline, framework, handler, and CPU-serial rows also passed the 10% gate.
+  One 14.9-microsecond pure-Streamly control initially read 13% slower; its plan-prescribed
+  3%-deviation repeat read 10.9 microseconds, 16% faster than baseline, confirming noise
+  rather than a Shibuya regression.
+
+- Focused current-tree failure-path measurements remained bounded and copied no live data:
+
+  ```text
+  validate-application-code: 232 ns, 615 B allocated, 0 B copied
+  render-poison-pill: 43.8 ns, 183 B allocated, 0 B copied
+  render-application-failure: 41.0 ns, 215 B allocated, 0 B copied
+  ```
+
+  Application rendering reused a top-level validated code, so the 232-nanosecond validation
+  cost was not charged to rendering.
 
 
 ## Decision Log
@@ -256,10 +285,31 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
   success paths. M2 still owns the structured code attribute and deletion of the helper.
   Date: 2026-08-10
 
+- Decision: When the full baseline timed out in its pre-existing I/O precision loop, retain
+  and compare every completed CSV row, then run the two mandatory `hot-path` workloads in a
+  separate baseline/current pair rather than weakening their 10% gate.
+  Rationale: The timeout produced no comparable row for the I/O workload and occurred before
+  the hot-path group. Isolating the release-critical `AckOk` workloads preserves identical
+  compiler settings and the hard threshold, while completed broader rows still detect
+  unrelated regressions. The one noisy control was repeated under the plan's stricter
+  deviation protocol.
+  Date: 2026-08-10
+
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+M1 through M4 are complete. Applications can validate stable dead-letter codes at startup,
+return application-policy failures through the public umbrella, and rely on total
+code/detail/rendering projections. Single-message traces expose the stable code without
+turning detail into an attribute or metric label, and both ordinary and batch finalizers
+preserve the complete reason. The semantic, migration, serialization, and safety contracts
+are documented, and all local release gates pass without a common-path performance
+regression.
+
+M5 remains intentionally pending because version bumps, release commits, tags, pushes,
+Hackage uploads, and the GitHub release require the explicit maintainer gate below. The
+pre-existing I/O benchmark's inability to reach 5% precision within 120 seconds is a harness
+limitation to revisit separately; it did not prevent hard comparison of the success hot path.
 
 
 ## Context and Orientation
@@ -1094,3 +1144,6 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
   batch finalizer, metric-counter, transient-retry, and complete core-suite checks passed.
 - 2026-08-10: Recorded M3 completion after adding the semantic, serialization, telemetry
   safety, migration, PVP, changelog, and accepted improvement-request documentation.
+- 2026-08-10: Recorded M4 completion, full local validation, the isolated mandatory hot-path
+  comparison, the broader completed-row comparisons, and focused failure-path allocation
+  evidence. Updated the interim outcome while leaving the gated release milestone pending.

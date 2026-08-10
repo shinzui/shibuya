@@ -31,6 +31,7 @@ benchmark shibuya-core-bench
   other-modules:
     Bench.Baseline
     Bench.Concurrency
+    Bench.DeadLetterReason
     Bench.Framework
     Bench.Handler
     Bench.HotPath

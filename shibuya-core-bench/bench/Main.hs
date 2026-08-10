@@ -2,6 +2,7 @@ module Main (main) where
 
 import Bench.Baseline qualified as Baseline
 import Bench.Concurrency qualified as Concurrency
+import Bench.DeadLetterReason qualified as DeadLetterReason
 import Bench.Framework qualified as Framework
 import Bench.Handler qualified as Handler
 import Bench.HotPath qualified as HotPath
@@ -14,5 +15,6 @@ main =
       Framework.benchmarks,
       Handler.benchmarks,
       Concurrency.benchmarks,
-      HotPath.benchmarks
+      HotPath.benchmarks,
+      DeadLetterReason.benchmarks
     ]
