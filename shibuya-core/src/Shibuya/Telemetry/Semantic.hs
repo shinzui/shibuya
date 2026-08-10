@@ -21,6 +21,7 @@ module Shibuya.Telemetry.Semantic
     attrShibuyaInflightCount,
     attrShibuyaInflightMax,
     attrShibuyaAckDecision,
+    attrShibuyaDeadLetterReasonCode,
     attrShibuyaPartition,
     attrShibuyaBatchKey,
     attrShibuyaBatchSize,
@@ -131,6 +132,14 @@ attrShibuyaInflightMax = "shibuya.inflight.max"
 -- Shibuya-specific: there is no upstream key for an explicit ack decision.
 attrShibuyaAckDecision :: Text
 attrShibuyaAckDecision = "shibuya.ack.decision"
+
+-- | The stable dead-letter reason code
+-- (@shibuya.dead_letter.reason.code@).
+--
+-- Shibuya-specific: codes are bounded, machine-queryable identifiers. The
+-- potentially high-cardinality human detail is deliberately excluded.
+attrShibuyaDeadLetterReasonCode :: Text
+attrShibuyaDeadLetterReasonCode = "shibuya.dead_letter.reason.code"
 
 -- | A generic partition identifier (@shibuya.partition@).
 --

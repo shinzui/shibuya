@@ -35,9 +35,11 @@ import Shibuya.Batch
   )
 import Shibuya.Core.Ack
   ( AckDecision (..),
+    DeadLetterCode,
     DeadLetterReason (..),
     HaltReason (..),
     RetryDelay (..),
+    mkDeadLetterCode,
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
@@ -108,6 +110,34 @@ spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
 
       -- Exactly one successful finalization despite two prior throws.
       tracked `shouldBe` [(MessageId "flaky-1", AckOk)]
+
+    it "preserves application failures in explicit and fallback decisions" $ do
+      let code = validDeadLetterCode "keiro.router.selection.recipient_overflow"
+          fallbackReason = ApplicationFailure code "fallback policy rejection"
+          explicitReason = ApplicationFailure code "explicit policy rejection"
+      (tracked, metrics) <- runEff $ runTracingNoop $ do
+        tracking <- newTrackingAck
+        batch <- buildBatch tracking 5 TriggerSize
+        let handler _info _msgs =
+              pure $
+                withFallback
+                  (AckDeadLetter fallbackReason)
+                  [ (MessageId "msg-2", AckDeadLetter explicitReason),
+                    (MessageId "msg-4", AckOk)
+                  ]
+        m <- runBatchesWithMetrics (ProcessorId "m1-application-failure") Serial handler [batch]
+        t <- getTrackedDecisions tracking
+        pure (t, m)
+
+      sort (map fst tracked) `shouldBe` expectedIds
+      lookup (MessageId "msg-1") tracked `shouldBe` Just (AckDeadLetter fallbackReason)
+      lookup (MessageId "msg-2") tracked `shouldBe` Just (AckDeadLetter explicitReason)
+      lookup (MessageId "msg-3") tracked `shouldBe` Just (AckDeadLetter fallbackReason)
+      lookup (MessageId "msg-4") tracked `shouldBe` Just AckOk
+      lookup (MessageId "msg-5") tracked `shouldBe` Just (AckDeadLetter fallbackReason)
+      metrics.batch.partialFailures `shouldBe` 1
+      metrics.stats.processed `shouldBe` 1
+      metrics.stats.failed `shouldBe` 4
 
   describe "exception fallback (M2)" $ do
     it "finalizes all 5 with AckRetry when the handler throws" $ do
@@ -321,3 +351,9 @@ testTime = UTCTime (fromGregorian 2026 1 1) 0
 
 tshow :: (Show a) => a -> Text
 tshow = Text.pack . show
+
+validDeadLetterCode :: Text -> DeadLetterCode
+validDeadLetterCode code =
+  case mkDeadLetterCode code of
+    Left err -> error $ "invalid test fixture: " <> show err
+    Right valid -> valid

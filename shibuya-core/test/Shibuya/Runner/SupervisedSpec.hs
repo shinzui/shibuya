@@ -27,7 +27,14 @@ import Shibuya.App
     stopAppGracefully,
   )
 import Shibuya.Batch.TestHarness (finalizedExactlyOnce)
-import Shibuya.Core.Ack (AckDecision (..), HaltReason (..), RetryDelay (..))
+import Shibuya.Core.Ack
+  ( AckDecision (..),
+    DeadLetterCode,
+    DeadLetterReason (..),
+    HaltReason (..),
+    RetryDelay (..),
+    mkDeadLetterCode,
+  )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
 import Shibuya.Core.Metrics
@@ -499,6 +506,29 @@ spec = do
           finalizedExactlyOnce tracked expected `shouldBe` Right ()
           metrics.stats.processed `shouldBe` 3
           metrics.stats.failed `shouldBe` 2
+
+        it "preserves an application failure through finalization" $ do
+          let code = validDeadLetterCode "keiro.router.selection.recipient_overflow"
+              reason =
+                ApplicationFailure
+                  code
+                  "selected 101 recipients; configured limit is 100"
+              decision = AckDeadLetter reason
+          (metrics, tracked) <- runEff $ runTracingNoop $ do
+            tracking <- newTrackingAck
+            let adapter = trackedListAdapter tracking [createTestEnvelope 1]
+                handler _ = pure decision
+            sp <- runWithMetrics 1 (ProcessorId "application-failure-finalize") adapter handler
+            decisions <- getTrackedDecisions tracking
+            finalMetrics <- getMetrics sp
+            pure (finalMetrics, decisions)
+
+          finalizedExactlyOnce
+            tracked
+            (Map.singleton (MessageId "msg-1") decision)
+            `shouldBe` Right ()
+          metrics.stats.processed `shouldBe` 0
+          metrics.stats.failed `shouldBe` 1
 
         it "retries transient finalizer failures on the single-message path" $ do
           (attempts, tracked) <- runEff $ runTracingNoop $ do
@@ -1123,6 +1153,12 @@ testAdapter messages =
       source = Stream.fromList messages,
       shutdown = pure ()
     }
+
+validDeadLetterCode :: Text.Text -> DeadLetterCode
+validDeadLetterCode code =
+  case mkDeadLetterCode code of
+    Left err -> error $ "invalid test fixture: " <> show err
+    Right valid -> valid
 
 testHandler :: (IOE :> es) => IORef [String] -> Handler es String
 testHandler ref ingested = do

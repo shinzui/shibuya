@@ -53,9 +53,10 @@ import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
 import Shibuya.Core.Ack
   ( AckDecision (..),
-    DeadLetterReason,
     HaltReason (..),
     RetryDelay (..),
+    deadLetterCodeText,
+    deadLetterReasonCode,
     renderDeadLetterReason,
   )
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
@@ -101,6 +102,7 @@ import Shibuya.Telemetry.Semantic
     attrMessagingOperation,
     attrMessagingSystem,
     attrShibuyaAckDecision,
+    attrShibuyaDeadLetterReasonCode,
     attrShibuyaInflightCount,
     attrShibuyaInflightMax,
     attrShibuyaPartition,
@@ -648,8 +650,12 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
             case decision' of
               AckOk -> setStatus traceSpan OTel.Ok
               AckRetry _ -> setStatus traceSpan OTel.Ok
-              AckDeadLetter reason ->
-                setStatus traceSpan $ OTel.Error $ showDeadLetterReason reason
+              AckDeadLetter reason -> do
+                addAttribute
+                  traceSpan
+                  attrShibuyaDeadLetterReasonCode
+                  (deadLetterCodeText (deadLetterReasonCode reason))
+                setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
               AckHalt reason ->
                 setStatus traceSpan $ OTel.Error $ showHaltReason reason
           Left err -> do
@@ -686,9 +692,6 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
     showAckDecision (AckRetry _) = "ack_retry"
     showAckDecision (AckDeadLetter _) = "ack_dead_letter"
     showAckDecision (AckHalt _) = "ack_halt"
-
-    showDeadLetterReason :: DeadLetterReason -> Text
-    showDeadLetterReason = renderDeadLetterReason
 
     showHaltReason :: HaltReason -> Text
     showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t

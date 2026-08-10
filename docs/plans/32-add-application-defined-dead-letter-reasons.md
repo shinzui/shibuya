@@ -70,9 +70,11 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
       code/detail projections, compatibility renderer, and public-only tests. The focused
       ack suite passed 18 examples, the public-only suite passed its example, and
       `cabal build shibuya-core` succeeded. (2026-08-10T17:27:23Z)
-- [ ] M2: Use the canonical contract in supervised tracing, emit the stable reason-code
+- [x] M2: Use the canonical contract in supervised tracing, emit the stable reason-code
       span attribute, and prove supervised and batch finalization preserve the complete
-      reason without changing acknowledgement mechanics.
+      reason without changing acknowledgement mechanics. The telemetry, supervised, and
+      batch focused suites passed 4, 30, and 8 examples respectively; the complete core
+      suite passed 212 examples with zero failures. (2026-08-10T17:31:44Z)
 - [ ] M3: Document the semantic and serialization contracts, write the 0.9 migration
       guide and unreleased changelog entries, and update the improvement request with the
       plan and corrected finalization/metrics wording.
@@ -1086,3 +1088,5 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
   chained intermediate `Text`, and branch-local telemetry work.
 - 2026-08-10: Recorded M1 completion and the compatibility decision that keeps the
   supervised renderer exhaustive between the pure-contract and telemetry milestones.
+- 2026-08-10: Recorded M2 completion after the in-memory exporter, supervised finalizer,
+  batch finalizer, metric-counter, transient-retry, and complete core-suite checks passed.

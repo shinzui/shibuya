@@ -29,28 +29,40 @@ import OpenTelemetry.Trace.Core
   ( Event (..),
     ImmutableSpan (..),
     InstrumentationLibrary (..),
+    SpanStatus (..),
     createTracerProvider,
     emptyTracerProviderOptions,
     hotAttributes,
     hotEvents,
     hotName,
+    hotStatus,
     makeTracer,
     shutdownTracerProvider,
     tracerOptions,
   )
 import OpenTelemetry.Util (appendOnlyBoundedCollectionValues)
 import Shibuya.Adapter.Mock (listAdapter)
-import Shibuya.Core.Ack (AckDecision (..))
+import Shibuya.Core.Ack
+  ( AckDecision (..),
+    DeadLetterCode,
+    DeadLetterReason (..),
+    mkDeadLetterCode,
+  )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.Supervised (runWithMetrics)
 import Shibuya.Telemetry.Effect (runTracing)
+import Shibuya.Telemetry.Semantic (attrShibuyaDeadLetterReasonCode)
 import Test.Hspec
 
 spec :: Spec
 spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
+  it "keeps the application dead-letter reason code wire key stable" $ do
+    attrShibuyaDeadLetterReasonCode
+      `shouldBe` "shibuya.dead_letter.reason.code"
+
   it "emits a process span with conventions-aligned attributes and events" $ do
     (processor, spansRef) <- inMemoryListExporter
     provider <- createTracerProvider [processor] emptyTracerProviderOptions
@@ -135,6 +147,39 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       _ ->
         expectationFailure $
           "expected exactly one span, got " <> show (length spans)
+
+  it "emits an application dead-letter code and canonical error status" $ do
+    (processor, spansRef) <- inMemoryListExporter
+    provider <- createTracerProvider [processor] emptyTracerProviderOptions
+    let tracer = mkTestTracer provider
+        code = validDeadLetterCode "keiro.router.selection.recipient_overflow"
+        detail = "selected 101 recipients; configured limit is 100"
+
+    runEff $ runTracing tracer $ do
+      let envelope = mkEnvelope (MessageId "router-1") ("hello" :: Text)
+          ingested = mkIngested envelope (AckHandle (\_ -> pure ()))
+          adapter = listAdapter [ingested]
+          handler _ = pure $ AckDeadLetter $ ApplicationFailure code detail
+          procId = ProcessorId "router-consumer"
+      _ <- runWithMetrics 1 procId adapter handler
+      pure ()
+
+    _ <- shutdownTracerProvider provider (Just 5_000_000)
+    spans <- readIORef spansRef
+    case spans of
+      [s] -> do
+        hot <- readIORef (spanHot s)
+        let attrs = getAttributeMap (hotAttributes hot)
+        attrs `shouldHaveTextAttribute` ("shibuya.ack.decision", "ack_dead_letter")
+        attrs
+          `shouldHaveTextAttribute` ( "shibuya.dead_letter.reason.code",
+                                      "keiro.router.selection.recipient_overflow"
+                                    )
+        hotStatus hot
+          `shouldBe` Error "keiro.router.selection.recipient_overflow: selected 101 recipients; configured limit is 100"
+      _ ->
+        expectationFailure $
+          "expected exactly one span, got " <> show (length spans)
   where
     mkTestTracer p =
       makeTracer
@@ -167,3 +212,9 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
         Nothing ->
           expectationFailure $
             "attribute " <> show k <> " missing; have keys " <> show (HashMap.keys attrs)
+
+validDeadLetterCode :: Text -> DeadLetterCode
+validDeadLetterCode code =
+  case mkDeadLetterCode code of
+    Left err -> error $ "invalid test fixture: " <> show err
+    Right valid -> valid
