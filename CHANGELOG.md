@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0.0 — 2026-08-10
 
 ### Breaking Changes
 
@@ -19,7 +19,7 @@
   built-in reason code as `shibuya.dead_letter.reason.code` and keep human
   detail only in the canonical error status description, not attributes or
   metrics.
-- `shibuya-metrics`: will be released at the shared 0.9.0.0 version with an
+- `shibuya-metrics`: released at the shared 0.9.0.0 version with an
   updated `shibuya-core` bound; its public API and reason-agnostic metric series
   are unchanged.
 

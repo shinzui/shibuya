@@ -1,13 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.9.0.0 — 2026-08-10
 
 ### Breaking Changes
 
 - `DeadLetterReason` gains `ApplicationFailure DeadLetterCode Text`. Exhaustive
   matches must handle the new constructor or migrate to the total
   `deadLetterReasonCode`, `deadLetterReasonDetail`, and
-  `renderDeadLetterReason` functions. Under PVP this will ship as 0.9.0.0;
+  `renderDeadLetterReason` functions. Under PVP this ships as 0.9.0.0;
   downstream `shibuya-core ^>=0.8` bounds intentionally exclude it and must be
   reviewed before widening.
 

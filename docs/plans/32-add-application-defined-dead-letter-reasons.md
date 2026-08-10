@@ -86,9 +86,14 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
       the failure-path evidence before release. All local gates passed. The mandatory hot
       paths were 7% and 17% faster than 0.8.0.1; every completed broader baseline row passed
       the 10% gate after one noisy pure-Streamly control was repeated. (2026-08-10T17:53:04Z)
-- [ ] M5: After maintainer approval, release `shibuya-core` and `shibuya-metrics`
-      0.9.0.0 in dependency order, create the git tag and GitHub release, and mark the
-      improvement request released.
+- [x] M5a: After maintainer approval, prepare the shared 0.9.0.0 release locally. Both
+      package versions, the metrics core bound, and all three dated changelogs are updated;
+      formatting, build, 212 tests, Haddock, both package checks, flake checks, and source
+      distributions passed. Archive inspection confirmed the exact versions and
+      `shibuya-core ^>=0.9.0.0` bound. (2026-08-10T18:11:58Z)
+- [ ] M5b: After final-diff approval, commit and release `shibuya-core` and
+      `shibuya-metrics` 0.9.0.0 in dependency order, create the git tag and GitHub release,
+      and mark the improvement request released.
 
 
 ## Surprises & Discoveries
@@ -298,18 +303,21 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
 
 ## Outcomes & Retrospective
 
-M1 through M4 are complete. Applications can validate stable dead-letter codes at startup,
+M1 through M4 and the local M5 release preparation are complete. Applications can validate
+stable dead-letter codes at startup,
 return application-policy failures through the public umbrella, and rely on total
 code/detail/rendering projections. Single-message traces expose the stable code without
 turning detail into an attribute or metric label, and both ordinary and batch finalizers
 preserve the complete reason. The semantic, migration, serialization, and safety contracts
 are documented, and all local release gates pass without a common-path performance
-regression.
+regression. The staged release metadata names 0.9.0.0 consistently, and both inspected
+source distributions contain the intended versions and internal dependency bound.
 
-M5 remains intentionally pending because version bumps, release commits, tags, pushes,
-Hackage uploads, and the GitHub release require the explicit maintainer gate below. The
-pre-existing I/O benchmark's inability to reach 5% precision within 120 seconds is a harness
-limitation to revisit separately; it did not prevent hard comparison of the success hot path.
+M5b remains intentionally pending because the release commit, tag, pushes, Hackage uploads,
+and GitHub release require final-diff approval and explicit external-publication authority.
+The pre-existing I/O benchmark's inability to reach 5% precision within 120 seconds is a
+harness limitation to revisit separately; it did not prevent hard comparison of the success
+hot path.
 
 
 ## Context and Orientation
@@ -1147,3 +1155,7 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
 - 2026-08-10: Recorded M4 completion, full local validation, the isolated mandatory hot-path
   comparison, the broader completed-row comparisons, and focused failure-path allocation
   evidence. Updated the interim outcome while leaving the gated release milestone pending.
+- 2026-08-10: Recorded maintainer-approved M5 release preparation: shared 0.9.0.0 package
+  versions, the lockstep metrics bound, dated changelogs, repeated local validation, and
+  inspected source distributions. Split external publication into M5b so the final-diff
+  approval gate remains explicit.
