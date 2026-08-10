@@ -64,11 +64,52 @@ pure $ AckRetry (RetryDelay 30)  -- 30 seconds
 pure $ AckDeadLetter (InvalidPayload "missing required field")
 pure $ AckDeadLetter (PoisonPill "causes crash")
 pure $ AckDeadLetter MaxRetriesExceeded
+pure $ AckDeadLetter (ApplicationFailure recipientOverflowCode "selected 101 recipients; configured limit is 100")
 
 -- Stop processing entirely (for ordered streams)
 pure $ AckHalt (HaltOrderedStream "dependency unavailable")
 pure $ AckHalt (HaltFatal "unrecoverable error")
 ```
+
+Choose the reason that truthfully describes the permanent outcome:
+
+- `InvalidPayload detail` means parsing or structural payload validation failed.
+- `PoisonPill detail` means the message is permanently unprocessable, for
+  example because processing it deterministically crashes an otherwise healthy
+  handler.
+- `MaxRetriesExceeded` means the retry budget was exhausted.
+- `ApplicationFailure code detail` means the payload is valid but a permanent
+  application rule rejects it.
+
+Application codes are stable machine-facing identifiers. Validate the finite set
+your application uses once during startup, then pass the opaque values into
+handlers. Do not call `mkDeadLetterCode` for every message:
+
+```haskell
+startRouter :: IO ()
+startRouter =
+  case mkDeadLetterCode "keiro.router.selection.recipient_overflow" of
+    Left err -> fail ("invalid dead-letter configuration: " <> unpack err)
+    Right recipientOverflowCode ->
+      runRouterApp (mkRouterHandler recipientOverflowCode)
+
+mkRouterHandler :: DeadLetterCode -> Handler es RouterMessage
+mkRouterHandler recipientOverflowCode message =
+  if selectedRecipientCount message > 100
+    then
+      pure $
+        AckDeadLetter $
+          ApplicationFailure
+            recipientOverflowCode
+            "selected 101 recipients; configured limit is 100"
+    else processRouterMessage message
+```
+
+A code contains at least two dot-separated lowercase ASCII segments, each
+matching `[a-z][a-z0-9_]*`, and is at most 128 characters. The first segment
+`shibuya` is reserved. Keep the code taxonomy small and stable. Detail is
+transported verbatim for operators, so keep it bounded and do not include
+secrets, full payloads, raw SQL, or unrestricted backend error text.
 
 ### Example: Robust Handler with Error Handling
 

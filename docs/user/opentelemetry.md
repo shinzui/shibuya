@@ -80,6 +80,9 @@ per the OpenTelemetry messaging-spans spec. The span:
     `messaging.operation.type = "process"`, `messaging.message.id`, plus
     Shibuya-specific `shibuya.inflight.count`,
     `shibuya.inflight.max`, `shibuya.ack.decision`.
+-   On `AckDeadLetter`, carries the stable reason code in
+    `shibuya.dead_letter.reason.code`. The human detail is not copied into an
+    attribute.
 -   Carries any **adapter-supplied** attributes from
     `Envelope.attributes` (see below) — for the Kafka adapter that
     means typed `messaging.kafka.destination.partition` and
@@ -92,6 +95,20 @@ per the OpenTelemetry messaging-spans spec. The span:
 
 You don't write any of that code. The handler returns an
 `AckDecision`; the framework owns the span.
+
+For a dead-letter decision, the span's `Error` status description uses
+`renderDeadLetterReason`. An application reason therefore has a status such as
+`keiro.router.selection.recipient_overflow: selected 101 recipients; configured
+limit is 100`. Treat the detail as operator-facing diagnostic text: keep it
+bounded and never include secrets, full payloads, raw SQL, or unrestricted
+backend errors.
+
+Reason codes are query labels and must remain a small, stable taxonomy. Never
+put a request ID, message ID, timestamp, database key, or any other
+occurrence-specific value in a code. Neither the code nor detail is added to
+Shibuya metrics; reason-keyed metrics would create an application-controlled
+cardinality surface. Use trace queries or structured dead-letter storage for
+reason-level investigation.
 
 
 ## `Envelope.traceContext` vs. `Envelope.attributes`
@@ -393,6 +410,10 @@ The framework always sets these on its per-message span:
 | `shibuya.inflight.count` | Int | Current in-flight count |
 | `shibuya.inflight.max` | Int | Max concurrency |
 | `shibuya.ack.decision` | Text | `"ack_ok"` / `"ack_retry"` / `"ack_dead_letter"` / `"ack_halt"` / `"error"` |
+| `shibuya.dead_letter.reason.code` | Text | Stable code from `deadLetterReasonCode` (only for `AckDeadLetter`) |
+
+The dead-letter detail appears only in the span's canonical `Error` status
+description. Code and detail are not emitted as metric labels.
 
 The Kafka adapter additionally sets, via `Envelope.attributes`:
 

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `shibuya-core`: `DeadLetterReason` gains
+  `ApplicationFailure DeadLetterCode Text`. Exhaustive matches must handle the
+  new constructor or use the total code/detail projections and canonical
+  renderer. PVP requires the shared 0.9.0.0 release; downstream
+  `shibuya-core ^>=0.8` bounds intentionally exclude it and must be reviewed.
+
+### New Features
+
+- `shibuya-core`: add opaque, validated application dead-letter codes, total
+  adapter-facing projections, and canonical rendering while retaining the
+  existing built-in strings byte-for-byte.
+- `shibuya-core`: processing spans now expose the stable application or
+  built-in reason code as `shibuya.dead_letter.reason.code` and keep human
+  detail only in the canonical error status description, not attributes or
+  metrics.
+- `shibuya-metrics`: will be released at the shared 0.9.0.0 version with an
+  updated `shibuya-core` bound; its public API and reason-agnostic metric series
+  are unchanged.
+
 ## 0.8.0.1 — 2026-07-04
 
 A patch release with internal performance work on `shibuya-core`; no API

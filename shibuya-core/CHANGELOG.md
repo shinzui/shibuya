@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `DeadLetterReason` gains `ApplicationFailure DeadLetterCode Text`. Exhaustive
+  matches must handle the new constructor or migrate to the total
+  `deadLetterReasonCode`, `deadLetterReasonDetail`, and
+  `renderDeadLetterReason` functions. Under PVP this will ship as 0.9.0.0;
+  downstream `shibuya-core ^>=0.8` bounds intentionally exclude it and must be
+  reviewed before widening.
+
+### New Features
+
+- Add opaque, startup-validated application dead-letter codes and canonical
+  code/detail projections. Existing poison, invalid-payload, and retry-exhaustion
+  render strings remain byte-for-byte unchanged.
+- Single-message processing spans now emit
+  `shibuya.dead_letter.reason.code` for dead-letter decisions and use the
+  canonical rendered reason as the error status description. Human detail is
+  not an attribute or metric label.
+
 ## 0.8.0.1 — 2026-07-04
 
 ### Other Changes

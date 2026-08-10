@@ -132,7 +132,10 @@ newtype AckHandle es = AckHandle
   }
 ```
 
-Adapter-provided callback. The framework calls `finalize` after the handler returns.
+Adapter-provided callback. The framework resolves one `AckDecision` per delivery
+after the handler returns. A transient exception from `finalize` can cause the
+framework to invoke it again with that same decision, so adapters must make
+finalization idempotent or track its phases durably.
 
 ### Lease
 
@@ -181,9 +184,38 @@ data DeadLetterReason
   = PoisonPill !Text
   | InvalidPayload !Text
   | MaxRetriesExceeded
+  | ApplicationFailure !DeadLetterCode !Text
 ```
 
-Why a message is permanently failed.
+Why a message is permanently failed. `PoisonPill` means the message itself is
+permanently unprocessable, `InvalidPayload` means parsing or structural payload
+validation failed, and `MaxRetriesExceeded` means the framework exhausted its
+retry budget. `ApplicationFailure` is for a syntactically valid message that a
+permanent application policy rejects.
+
+`DeadLetterCode` is an opaque, machine-queryable identifier. Applications create
+one with `mkDeadLetterCode :: Text -> Either Text DeadLetterCode`. A valid code is
+at most 128 ASCII characters, contains at least two dot-separated segments, and
+each segment matches `[a-z][a-z0-9_]*`. The first segment `shibuya` is reserved
+for framework codes. Validate a finite code taxonomy during application startup
+and reuse those values in handlers; do not put request IDs, message IDs,
+timestamps, or other occurrence-specific values in a code.
+
+Adapters can transport every reason without matching its constructors:
+
+```haskell
+deadLetterCodeText (deadLetterReasonCode reason) :: Text
+deadLetterReasonDetail reason                    :: Maybe Text
+renderDeadLetterReason reason                    :: Text
+```
+
+The built-in canonical strings remain `poison_pill: <detail>`,
+`invalid_payload: <detail>`, and `max_retries_exceeded`. An application failure
+renders as `<application-code>: <detail>`. An adapter with structured storage
+should persist the code and detail separately; a legacy single-text field can
+store `renderDeadLetterReason`. `Show` is for debugging and is not a wire format.
+The handler owns the semantic reason and stability of application codes. The
+adapter owns transport and must not reinterpret application vocabulary.
 
 ### HaltReason
 

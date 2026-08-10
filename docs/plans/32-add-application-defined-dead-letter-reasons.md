@@ -75,9 +75,11 @@ version; changing a public datatype requires increasing `A.B`, so the successor 
       reason without changing acknowledgement mechanics. The telemetry, supervised, and
       batch focused suites passed 4, 30, and 8 examples respectively; the complete core
       suite passed 212 examples with zero failures. (2026-08-10T17:31:44Z)
-- [ ] M3: Document the semantic and serialization contracts, write the 0.9 migration
+- [x] M3: Document the semantic and serialization contracts, write the 0.9 migration
       guide and unreleased changelog entries, and update the improvement request with the
-      plan and corrected finalization/metrics wording.
+      plan and corrected finalization/metrics wording. The documentation searches found
+      the new constructor, projections, trace key, accepted request status, and plan link;
+      `nix fmt` and `git diff --check` succeeded. (2026-08-10T17:35:34Z)
 - [ ] M4: Run formatting, build, tests, Haddock, package checks, flake checks, the mandatory
       0.8.0.1-to-current success-path benchmark comparison, and focused current-tree
       dead-letter code/rendering measurements; resolve any common-path regression and record
@@ -1090,3 +1092,5 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
   supervised renderer exhaustive between the pure-contract and telemetry milestones.
 - 2026-08-10: Recorded M2 completion after the in-memory exporter, supervised finalizer,
   batch finalizer, metric-counter, transient-retry, and complete core-suite checks passed.
+- 2026-08-10: Recorded M3 completion after adding the semantic, serialization, telemetry
+  safety, migration, PVP, changelog, and accepted improvement-request documentation.
