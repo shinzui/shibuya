@@ -10,6 +10,7 @@ import Shibuya.Core.AckSpec qualified
 import Shibuya.Core.RetrySpec qualified
 import Shibuya.Core.TypesSpec qualified
 import Shibuya.PolicySpec qualified
+import Shibuya.PublicApiSpec qualified
 import Shibuya.Runner.BatchProcessorSpec qualified
 import Shibuya.Runner.BatcherSpec qualified
 import Shibuya.Runner.PartitionOrderingSpec qualified
@@ -30,6 +31,7 @@ main = hspec $ do
   describe "Shibuya.Core.Ack" Shibuya.Core.AckSpec.spec
   describe "Shibuya.Core.Retry" Shibuya.Core.RetrySpec.spec
   describe "Shibuya.Policy" Shibuya.PolicySpec.spec
+  Shibuya.PublicApiSpec.spec
   describe "Shibuya.Runner" Shibuya.RunnerSpec.spec
   Shibuya.Runner.BatcherSpec.spec
   Shibuya.Runner.BatchProcessorSpec.spec

@@ -51,7 +51,13 @@ import OpenTelemetry.Attributes (Attribute, toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
-import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
+import Shibuya.Core.Ack
+  ( AckDecision (..),
+    DeadLetterReason,
+    HaltReason (..),
+    RetryDelay (..),
+    renderDeadLetterReason,
+  )
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
 import Shibuya.Core.Ingested (Ingested (..), toMessage)
 import Shibuya.Core.Metrics
@@ -682,9 +688,7 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
     showAckDecision (AckHalt _) = "ack_halt"
 
     showDeadLetterReason :: DeadLetterReason -> Text
-    showDeadLetterReason (PoisonPill t) = "poison_pill: " <> t
-    showDeadLetterReason (InvalidPayload t) = "invalid_payload: " <> t
-    showDeadLetterReason MaxRetriesExceeded = "max_retries_exceeded"
+    showDeadLetterReason = renderDeadLetterReason
 
     showHaltReason :: HaltReason -> Text
     showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t

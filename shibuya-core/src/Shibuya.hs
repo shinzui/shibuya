@@ -33,7 +33,13 @@ module Shibuya
     Handler,
     AckDecision (..),
     RetryDelay (..),
+    DeadLetterCode,
+    mkDeadLetterCode,
+    deadLetterCodeText,
     DeadLetterReason (..),
+    deadLetterReasonCode,
+    deadLetterReasonDetail,
+    renderDeadLetterReason,
     HaltReason (..),
     ProcessorHalt (..),
 
@@ -114,7 +120,18 @@ import Shibuya.App
     waitApp,
   )
 import Shibuya.Batch
-import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), HaltReason (..), RetryDelay (..))
+import Shibuya.Core.Ack
+  ( AckDecision (..),
+    DeadLetterCode,
+    DeadLetterReason (..),
+    HaltReason (..),
+    RetryDelay (..),
+    deadLetterCodeText,
+    deadLetterReasonCode,
+    deadLetterReasonDetail,
+    mkDeadLetterCode,
+    renderDeadLetterReason,
+  )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (ConfigError (..), HandlerError (..), PolicyError (..), RuntimeError (..))
 import Shibuya.Core.Ingested (Ingested (..), Message (..), mkIngested, toMessage)

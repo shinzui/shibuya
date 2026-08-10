@@ -2,6 +2,7 @@
 
 module Shibuya.Core.AckSpec (spec) where
 
+import Data.Text qualified as Text
 import Data.Time (secondsToNominalDiffTime)
 import Shibuya.Core.Ack
 import Test.Hspec
@@ -25,9 +26,12 @@ spec = do
       let r1 = PoisonPill "bad message"
           r2 = InvalidPayload "parse error"
           r3 = MaxRetriesExceeded
+          code = validCode "example.policy.rejected"
+          r4 = ApplicationFailure code "policy rejected"
       r1 `shouldNotBe` r2
       r2 `shouldNotBe` r3
       r1 `shouldNotBe` r3
+      r3 `shouldNotBe` r4
 
     it "PoisonPill carries message" $ do
       let r = PoisonPill "corrupt data"
@@ -40,6 +44,59 @@ spec = do
       case r of
         InvalidPayload msg -> msg `shouldBe` "JSON decode failed"
         _ -> expectationFailure "wrong constructor"
+
+    describe "mkDeadLetterCode" $ do
+      it "accepts namespaced lowercase application codes" $ do
+        fmap deadLetterCodeText (mkDeadLetterCode "keiro.router.selection.recipient_overflow")
+          `shouldBe` Right "keiro.router.selection.recipient_overflow"
+
+      it "accepts the 128-character boundary" $ do
+        let code = "a." <> Text.replicate 126 "b"
+        fmap deadLetterCodeText (mkDeadLetterCode code) `shouldBe` Right code
+
+      it "rejects each invalid grammar boundary" $ do
+        let invalidCodes =
+              [ "",
+                "unqualified",
+                "keiro.Router",
+                "keiro.router-selection",
+                "keiro..selection",
+                "1keiro.router",
+                "keiro.1router",
+                "keiro.routér",
+                "shibuya.router",
+                "a." <> Text.replicate 127 "b"
+              ]
+        mapM_ (\code -> mkDeadLetterCode code `shouldSatisfy` isLeft) invalidCodes
+
+      it "identifies the rejected code and failed rule" $ do
+        mkDeadLetterCode "Keiro.router"
+          `shouldBe` Left "invalid dead-letter code \"Keiro.router\": segment \"Keiro\" must match [a-z][a-z0-9_]*"
+
+    describe "dead-letter projections and rendering" $ do
+      it "preserves the built-in contracts exactly" $ do
+        let cases =
+              [ (PoisonPill "x", "poison_pill", Just "x", "poison_pill: x"),
+                (InvalidPayload "x", "invalid_payload", Just "x", "invalid_payload: x"),
+                (MaxRetriesExceeded, "max_retries_exceeded", Nothing, "max_retries_exceeded")
+              ]
+        mapM_
+          ( \(reason, code, detail, rendered) -> do
+              deadLetterCodeText (deadLetterReasonCode reason) `shouldBe` code
+              deadLetterReasonDetail reason `shouldBe` detail
+              renderDeadLetterReason reason `shouldBe` rendered
+          )
+          cases
+
+      it "preserves an application code and detail" $ do
+        let code = validCode "keiro.router.selection.recipient_overflow"
+            reason = ApplicationFailure code "selected 101 recipients; configured limit is 100"
+        deadLetterCodeText (deadLetterReasonCode reason)
+          `shouldBe` "keiro.router.selection.recipient_overflow"
+        deadLetterReasonDetail reason
+          `shouldBe` Just "selected 101 recipients; configured limit is 100"
+        renderDeadLetterReason reason
+          `shouldBe` "keiro.router.selection.recipient_overflow: selected 101 recipients; configured limit is 100"
 
   describe "HaltReason" $ do
     it "HaltOrderedStream carries message" $ do
@@ -88,3 +145,13 @@ spec = do
       case decision of
         AckHalt r -> r `shouldBe` reason
         _ -> expectationFailure "wrong constructor"
+
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft (Right _) = False
+
+validCode :: Text.Text -> DeadLetterCode
+validCode code =
+  case mkDeadLetterCode code of
+    Left err -> error $ "invalid test fixture: " <> show err
+    Right valid -> valid
