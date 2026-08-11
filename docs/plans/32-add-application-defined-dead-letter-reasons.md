@@ -326,6 +326,13 @@ The pre-existing I/O benchmark's inability to reach 5% precision within 120 seco
 a harness limitation to revisit separately; it did not prevent hard comparison of the
 success hot path.
 
+The downstream structured-storage handoff is also complete.  The work tracked by
+`mori://shinzui/shibuya-pgmq-adapter/plans/5-preserve-structured-dead-letter-reasons-in-pgmq-dlq-payloads`
+released `shibuya-pgmq-adapter` 0.14.0.0 under annotated tag `v0.14.0.0`.  Its production encoder
+uses the total projections from this plan and a real PostgreSQL test preserves the application
+code/detail without an adapter-owned constructor match.  This is downstream confirmation of the
+0.9 serialization boundary, not additional scope or a change to this plan's completed status.
+
 
 ## Context and Orientation
 
@@ -1170,3 +1177,6 @@ references are `mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapte
   Hackage packages and documentation archives, and the GitHub release. Verified all public
   pages and compiled the new API from an isolated project using the published
   `shibuya-core ^>=0.9.0.0` artifact; marked the improvement request released.
+- 2026-08-10: Reconciled the completed downstream PGMQ adoption.  Recorded adapter Plan 5 and
+  release 0.14.0.0 as evidence that the total code/detail projections preserve an application
+  reason through structured PostgreSQL storage without reopening this completed core plan.
