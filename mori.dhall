@@ -147,5 +147,12 @@ in  Schema.Project::{ project =
         , description = Some
             "What Shibuya provides today, one concept per capability, with stable CAP-N handles, compatibility promises, and evidence"
         }
+      , Schema.OkfBundle::{ name = "improvement-requests"
+        , path = "docs/improvement-requests"
+        , profile = Some "docs/improvement-requests/profile.dhall"
+        , okfVersion = "0.2"
+        , description = Some
+            "Proposed improvements to Shibuya APIs and behavior, with stable IR-N handles"
+        }
       ]
     }
