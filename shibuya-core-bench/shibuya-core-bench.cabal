@@ -50,7 +50,7 @@ benchmark shibuya-core-bench
   build-depends:
     base ^>=4.21.0.0,
     deepseq,
-    effectful ^>=2.6,
+    effectful >=2.6 && <2.8,
     nqe,
     shibuya-core,
     streamly ^>=0.11,
@@ -84,7 +84,7 @@ executable standalone-test
   build-depends:
     base ^>=4.21.0.0,
     deepseq,
-    effectful ^>=2.6,
+    effectful >=2.6 && <2.8,
     nqe,
     shibuya-core,
     streamly ^>=0.11,
@@ -122,7 +122,7 @@ executable prod-stress
   build-depends:
     base ^>=4.21.0.0,
     deepseq,
-    effectful ^>=2.6,
+    effectful >=2.6 && <2.8,
     nqe,
     shibuya-core,
     stm,
