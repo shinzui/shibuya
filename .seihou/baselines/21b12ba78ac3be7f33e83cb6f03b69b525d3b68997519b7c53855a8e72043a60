@@ -1,0 +1,20 @@
+dist
+dist-*
+cabal-dev
+
+.direnv
+.envrc
+
+.pre-commit-config.yaml
+
+cabal.project.local
+
+.claude/
+.config/
+.agents/
+.mina/
+
+# PostgreSQL dev database and process-compose
+db/
+.dev/
+CLAUDE.local.md
