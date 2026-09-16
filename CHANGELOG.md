@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0.1 — 2026-09-15
+
+A patch release that only widens a dependency bound; no API or behavior
+changes in either package.
+
+### Other Changes
+
+- `shibuya-core`: raise the `effectful` upper bound from `<2.7` to `<2.8` so
+  downstream packages can move to effectful 2.7. Built and tested against
+  effectful 2.7.1.0 / effectful-core 2.7.1.2 on GHC 9.12.4 with no source
+  changes. Nothing in the package uses the APIs 2.7 deprecated, renamed, or
+  removed. The lower bound stays at 2.6.1 so consumers are not forced to
+  upgrade.
+- `shibuya-metrics`: version bumped to track `shibuya-core` 0.9.0.1 with an
+  updated bound; its public API and metric series are unchanged.
+
 ## 0.9.0.0 — 2026-08-10
 
 ### Breaking Changes
