@@ -4,11 +4,18 @@ slug: remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers
 title: "Remove the idle linked master loop that deadlocks bare waitApp callers"
 kind: exec-plan
 created_at: 2026-09-16T22:33:21Z
+master_plan: "docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md"
 provenance:
   created_by:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-16T22:33:21Z
+  revisions:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-16T23:13:49Z
+      mode: "update"
+      note: "Adopted as EP-1 of master plan 5; frontmatter gains master_plan, body unchanged"
 ---
 
 # Remove the idle linked master loop that deadlocks bare waitApp callers
