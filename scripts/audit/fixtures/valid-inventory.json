@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "initiative": {
+    "masterPlan": "docs/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance.md",
+    "intention": "intention_fixture",
+    "releasedBaseline": {
+      "tag": "v0.0.0.0",
+      "commit": "1111111111111111111111111111111111111111"
+    }
+  },
+  "releaseScope": {
+    "includedComponents": ["mori://example/in-scope/packages/core"],
+    "excludedComponents": [
+      {
+        "component": "mori://example/excluded/packages/adapter",
+        "decision": {
+          "by": "fixture owner",
+          "date": "2026-09-20",
+          "reason": "Fixture component is excluded"
+        }
+      }
+    ]
+  },
+  "owners": ["docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md"],
+  "auditReviewIds": ["REV-1", "REV-12"],
+  "findings": [
+    {
+      "id": "REV-1-F1",
+      "reviewId": "REV-1",
+      "kind": "defect",
+      "severity": "P1",
+      "component": "mori://example/in-scope/packages/core",
+      "candidateScope": "in-scope",
+      "source": {
+        "path": "scripts/audit/fixtures/release-evidence.txt",
+        "reviewedSha": "1111111111111111111111111111111111111111"
+      },
+      "claim": "A fixture defect was fixed.",
+      "confirmation": "runtime",
+      "owner": "docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md",
+      "invariant": "The fixture stays fixed.",
+      "regressionTests": ["scripts/audit/fixtures/release-evidence.txt"],
+      "fixSha": "2222222222222222222222222222222222222222",
+      "evidence": [{ "path": "scripts/audit/fixtures/release-evidence.txt" }],
+      "disposition": { "status": "fixed" }
+    },
+    {
+      "id": "REV-12-F1",
+      "reviewId": "REV-12",
+      "kind": "defect",
+      "severity": "P2",
+      "component": "mori://example/excluded/packages/adapter",
+      "candidateScope": "out-of-scope",
+      "source": {
+        "path": "scripts/audit/fixtures/release-evidence.txt",
+        "reviewedSha": "3333333333333333333333333333333333333333"
+      },
+      "claim": "An excluded fixture defect remains visible.",
+      "confirmation": "source",
+      "owner": null,
+      "invariant": "The excluded fixture is never certified.",
+      "regressionTests": [],
+      "fixSha": null,
+      "evidence": [],
+      "disposition": {
+        "status": "out-of-scope",
+        "decision": {
+          "by": "fixture owner",
+          "date": "2026-09-20",
+          "reason": "Fixture component is excluded",
+          "affectedScope": "mori://example/excluded"
+        }
+      }
+    }
+  ],
+  "boundaries": [
+    {
+      "id": "fixture-core",
+      "description": "Fixture core boundary.",
+      "owner": "docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md",
+      "cases": {
+        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
+        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
+        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
+        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
+        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+      }
+    },
+    {
+      "id": "fixture-excluded",
+      "description": "Fixture excluded boundary.",
+      "owner": null,
+      "cases": {
+        "normal": { "requirement": "not-applicable", "reason": "Fixture exclusion", "evidence": [] },
+        "synchronousException": { "requirement": "not-applicable", "reason": "Fixture exclusion", "evidence": [] },
+        "cancellation": { "requirement": "not-applicable", "reason": "Fixture exclusion", "evidence": [] },
+        "timeout": { "requirement": "not-applicable", "reason": "Fixture exclusion", "evidence": [] },
+        "repeatedStop": { "requirement": "not-applicable", "reason": "Fixture exclusion", "evidence": [] }
+      }
+    }
+  ]
+}

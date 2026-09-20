@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "fixture-candidate",
+  "inventory": "scripts/audit/fixtures/valid-inventory.json",
+  "createdAt": "2026-09-20T14:00:00Z",
+  "compiler": "fixture-compiler",
+  "platform": "fixture-platform",
+  "solverPlanHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "services": [],
+  "commands": [
+    {
+      "command": "fixture-test",
+      "exitCode": 0,
+      "startedAt": "2026-09-20T14:00:00Z",
+      "finishedAt": "2026-09-20T14:00:01Z"
+    }
+  ],
+  "projects": [
+    {
+      "component": "mori://example/in-scope/packages/core",
+      "sha": "4444444444444444444444444444444444444444",
+      "clean": true,
+      "packageVersions": { "fixture-core": "1.0.0" }
+    }
+  ],
+  "evidenceRuns": [
+    {
+      "id": "fixture-run",
+      "sourceShas": {
+        "mori://example/in-scope/packages/core": "4444444444444444444444444444444444444444"
+      },
+      "solverPlanHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "command": "fixture-test",
+      "exitCode": 0,
+      "timestamp": "2026-09-20T14:00:01Z",
+      "seed": "fixture-seed",
+      "artifacts": ["scripts/audit/fixtures/release-evidence.txt"]
+    }
+  ],
+  "findingResults": [
+    {
+      "findingId": "REV-1-F1",
+      "status": "passed",
+      "evidenceRun": "fixture-run"
+    }
+  ],
+  "matrixRuns": [
+    { "boundaryId": "fixture-core", "case": "normal", "status": "passed", "evidenceRun": "fixture-run" },
+    { "boundaryId": "fixture-core", "case": "synchronousException", "status": "passed", "evidenceRun": "fixture-run" },
+    { "boundaryId": "fixture-core", "case": "cancellation", "status": "passed", "evidenceRun": "fixture-run" },
+    { "boundaryId": "fixture-core", "case": "timeout", "status": "passed", "evidenceRun": "fixture-run" },
+    { "boundaryId": "fixture-core", "case": "repeatedStop", "status": "passed", "evidenceRun": "fixture-run" }
+  ],
+  "waivers": []
+}

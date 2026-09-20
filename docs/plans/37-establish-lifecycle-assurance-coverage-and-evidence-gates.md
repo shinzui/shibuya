@@ -47,7 +47,7 @@ Make the audit measurable: every finding and every lifecycle boundary has an own
 
 
 - [x] (2026-09-20T14:09:02Z) Milestone 1: Inventory every finding and lifecycle boundary.
-- [ ] Milestone 2: Implement and test the evidence validator.
+- [x] (2026-09-20T14:16:17Z) Milestone 2: Implement and test the evidence validator.
 - [ ] Milestone 3: Document candidate manifests and execution budgets.
 
 
@@ -89,6 +89,11 @@ policy in `docs/adr/0002-require-candidate-bound-machine-checkable-release-evide
 These rules coordinate every remaining child and must remain discoverable after this plan is
 complete.
 
+2026-09-20: Store a candidate's exact source-SHA map and solver-plan hash once per evidence
+run, then let finding results and matrix cells reference that run. This keeps individual
+results small while allowing one source or dependency change to invalidate every result from
+the stale run. The validator compares the complete map, not only the project that owns a test.
+
 
 ## Outcomes & Retrospective
 
@@ -128,6 +133,29 @@ bun scripts/audit/validate-evidence.ts --release docs/audits/lifecycle-release/c
 ```
 
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
+
+Milestone 2 added a candidate-complete fixture as a positive control. The focused validation
+commands and observed results were:
+
+```bash
+bun test scripts/audit/validate-evidence.test.ts
+bun scripts/audit/validate-evidence.ts --inventory docs/audits/lifecycle-release/findings.json
+bun scripts/audit/validate-evidence.ts --release scripts/audit/fixtures/valid-release.json
+```
+
+```text
+16 pass
+0 fail
+Inventory valid: 52 findings, 15 boundaries, 70 mandatory cells, 5 exclusions.
+Release valid: 2 findings, 2 boundaries, 5 mandatory cells, 1 exclusions.
+```
+
+The sixteen tests include unknown disposition, duplicate key, missing owner, missing local
+evidence, missing fixed-finding regression, unjustified exclusion, in-scope exclusion,
+orphaned review, missing lifecycle case, open or unconfirmed safety work, missing mandatory
+matrix run, stale source SHA, stale solver plan, incomplete waiver, and excluded-component
+candidate rejection. The valid release fixture is the control that passes before its source
+SHA is changed in the stale-evidence test.
 
 
 ## Validation and Acceptance

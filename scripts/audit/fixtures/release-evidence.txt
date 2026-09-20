@@ -1,0 +1,1 @@
+Fixture artifact proving that the validator checks repository-relative evidence paths.

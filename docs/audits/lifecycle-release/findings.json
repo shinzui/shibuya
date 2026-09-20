@@ -38,6 +38,24 @@
     "docs/plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md",
     "docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md"
   ],
+  "auditReviewIds": [
+    "REV-1",
+    "REV-2",
+    "REV-3",
+    "REV-4",
+    "REV-5",
+    "REV-6",
+    "REV-7",
+    "REV-8",
+    "REV-9",
+    "REV-10",
+    "REV-11",
+    "REV-12",
+    "REV-13",
+    "REV-14",
+    "REV-15",
+    "REV-16"
+  ],
   "findings": [
     {
       "id": "REV-1-F1",
@@ -885,7 +903,7 @@
       "owner": "docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md",
       "invariant": "Finished, halted, and failed applications may drop their handles without later killing the runApp caller during forced major collections.",
       "regressionTests": ["shibuya-core/test-gc/Finished.hs"],
-      "fixSha": "f64964e",
+      "fixSha": "f64964ec4667dcdf2850937d4d7df6379ef0815a",
       "evidence": [{ "path": "docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md" }],
       "disposition": { "status": "fixed" }
     },
@@ -902,7 +920,7 @@
       "owner": "docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md",
       "invariant": "One processor failure reaches the caller exactly once while siblings still stop.",
       "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
-      "fixSha": "f64964e",
+      "fixSha": "f64964ec4667dcdf2850937d4d7df6379ef0815a",
       "evidence": [{ "path": "docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md" }],
       "disposition": { "status": "fixed" }
     },

@@ -135,7 +135,7 @@ taxonomy. Check any later item only when the owning child records its acceptance
 The standalone EP-46 tracks its own progress and is verified, not tracked, here.
 
 - [x] EP-37 M1: Inventory every finding and lifecycle boundary, including REV-16 and the out-of-scope REV-12 dispositions.
-- [ ] EP-37 M2: Implement and test the evidence validator.
+- [x] EP-37 M2: Implement and test the evidence validator.
 - [ ] EP-37 M3: Document candidate manifests and execution budgets.
 - [ ] EP-45 M1: Capture matched baseline data before remediation.
 - [ ] EP-45 M2: Extend production-runner and lifecycle performance workloads.
