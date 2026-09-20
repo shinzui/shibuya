@@ -323,21 +323,28 @@ unless drained $
 | Endpoint | Purpose | Response |
 |----------|---------|----------|
 | `GET /health/live` | Liveness probe | `{"alive": true}` |
-| `GET /health/ready` | Readiness probe | `{"ready": true, "processors": {...}, "dependencies": [...]}` |
+| `GET /health/ready` | Readiness probe | `{"ready": true, "application": "running", "processors": {...}, "dependencies": [...]}` |
 | `GET /health` | Debugging | Full status with all processor metrics |
 
 ### Readiness Criteria
 
 The `/health/ready` endpoint returns `ready: false` (HTTP 503) when:
-- Any processor is in `Failed` state
-- Any processor is stuck (processing for > stuckThreshold)
+- The application is starting, draining, stopped, or has a retained processor failure
+- Any configured processor unexpectedly disappears from the live metrics registry
+- Any processor has in-flight work without sampled progress for longer than `stuckThreshold`
 - Any registered dependency check fails
+- Any dependency check exceeds `dependencyTimeoutMicros`
+
+An intentionally configured-empty running application is ready. Liveness becomes
+false after the master is stopped; a failed processor remains visible through the
+bounded lifecycle snapshot even after its volatile metrics entry unregisters.
 
 ### Configuring Thresholds
 
 ```haskell
 let config = defaultConfig
       { livenessTimeoutMicros = 2_000_000  -- 2 second timeout
+      , dependencyTimeoutMicros = 500_000  -- per dependency check
       , stuckThreshold = 120               -- 2 minutes before "stuck"
       }
 ```

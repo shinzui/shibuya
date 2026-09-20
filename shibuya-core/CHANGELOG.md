@@ -12,6 +12,9 @@
   `ConcurrencyCapacityOverflow`. Exhaustive matches must handle the new constructors.
 - Permanent framework-owned finalization failure now throws `ProcessorFailure` with the
   failed message identity instead of being caught as graceful `ProcessorHalt`.
+- `ProcessorState.Processing` gains a sampled last-progress timestamp in addition to its
+  burst-start timestamp. Exhaustive constructor matches must accept the third field; its
+  JSON object gains the additive `lastProgress` field.
 
 ### Bug Fixes
 
@@ -28,6 +31,9 @@
   ignored failures remain observable with processor and message identity.
 - Observe batch ticker failure from the consuming stream instead of allowing an unmonitored
   ticker death to leave the batcher blocked.
+- Reset active state on the final completion, restamp every observed burst, floor duplicate
+  completions at zero in-flight, and track progress during metrics sampling without adding a
+  clock read to the handler hot path.
 
 ## 0.9.0.3 — 2026-09-20
 

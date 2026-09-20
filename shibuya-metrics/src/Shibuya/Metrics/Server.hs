@@ -95,6 +95,7 @@ httpApp config master depChecks req respond = do
       healthConfig =
         HealthConfig
           { livenessTimeoutMicros = config.livenessTimeoutMicros,
+            dependencyTimeoutMicros = config.dependencyTimeoutMicros,
             stuckThreshold = config.stuckThreshold
           }
       jsonHandler = jsonAppWithHealth healthConfig master depChecks

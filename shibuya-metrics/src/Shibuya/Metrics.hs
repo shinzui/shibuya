@@ -64,6 +64,7 @@ module Shibuya.Metrics
     DependencyStatus (..),
     LivenessStatus (..),
     ReadinessStatus (..),
+    ApplicationStatus (..),
     ProcessorHealth (..),
     HealthConfig (..),
     defaultHealthConfig,
@@ -76,7 +77,8 @@ where
 
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Health
-  ( DependencyCheck,
+  ( ApplicationStatus (..),
+    DependencyCheck,
     DependencyStatus (..),
     HealthConfig (..),
     LivenessStatus (..),

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `MetricsServerConfig` and `HealthConfig` gain `dependencyTimeoutMicros`; direct record
+  construction must choose a per-check deadline. `ReadinessStatus` gains `application`, and
+  its JSON object gains the corresponding lifecycle status field.
+- The processing-state JSON object gains `lastProgress`, paired with the new third field of
+  `shibuya-core`'s `ProcessorState.Processing` constructor.
+
 ### New Features
 
 - Export `combinedApp` so callers can mount the unified metrics WAI application on
@@ -11,6 +19,12 @@
 
 - Add `shibuya-metrics-test`, a release-gated Hspec suite covering every published
   HTTP route and WebSocket frame plus exact JSON and Prometheus golden contracts.
+
+### Bug Fixes
+
+- Base stuck detection on sampled progress instead of burst age, retain failed configured
+  processors after live metrics unregister, report stopped masters not live, and bound each
+  dependency readiness check.
 
 ## 0.9.0.3 — 2026-09-20
 

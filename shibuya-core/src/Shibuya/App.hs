@@ -87,6 +87,8 @@ import Shibuya.Internal.Runner.Master
     getAllMetricsIO,
     getProcessorMetrics,
     getProcessorMetricsIO,
+    markMasterDraining,
+    markMasterRunning,
     markProcessorDraining,
     startMaster,
     stopMaster,
@@ -212,6 +214,7 @@ runApp config namedProcessors =
           stopMaster
           ( \master -> do
               processors <- spawnProcessors master (fromIntegral config.inboxSize) namedProcessors
+              markMasterRunning master
               shutdownStarted <- liftIO $ newTVarIO False
               shutdownResult <- liftIO newEmptyTMVarIO
               pure
@@ -376,6 +379,7 @@ stopAppGracefully config appHandle =
         Right (Just drained) -> finishStopOutcome stopOutcome drained
 
     shutdownAndDrain = do
+      markMasterDraining appHandle.master
       forM_ (Map.keys appHandle.processors) $
         markProcessorDraining appHandle.master
 

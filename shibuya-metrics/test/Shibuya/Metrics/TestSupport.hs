@@ -41,7 +41,8 @@ import Shibuya.Core.Metrics
     newMetricsHandle,
   )
 import Shibuya.Internal.Runner.Master
-  ( registerProcessor,
+  ( markMasterRunning,
+    registerProcessor,
     startMaster,
     stopMaster,
   )
@@ -55,7 +56,7 @@ fixtureMetrics =
   Map.fromList
     [ (ProcessorId "failed", fixtureProcessor (Failed "boom" (at 90)) 20),
       (ProcessorId "idle", fixtureProcessor Idle 0),
-      (ProcessorId "processing", fixtureProcessor (Processing (InFlightInfo 2 4) (at 60)) 10),
+      (ProcessorId "processing", fixtureProcessor (Processing (InFlightInfo 2 4) (at 60) (at 75)) 10),
       (ProcessorId "stopped", fixtureProcessor Stopped 30)
     ]
   where
@@ -73,7 +74,10 @@ fixtureProcessor state offset =
 withMaster :: (Master -> IO a) -> IO a
 withMaster = bracket acquire release
   where
-    acquire = runEff $ startMaster IgnoreAll
+    acquire = runEff $ do
+      master <- startMaster IgnoreAll
+      markMasterRunning master
+      pure master
     release master = runEff $ stopMaster master
 
 registerIdleProcessor :: Master -> ProcessorId -> IO MetricsHandle

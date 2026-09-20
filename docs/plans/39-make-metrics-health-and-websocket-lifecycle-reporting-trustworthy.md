@@ -49,7 +49,7 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 
 - [x] Milestone 1: Characterize the published HTTP and WebSocket contract in a new test suite, before any behavior changes, and add the suite to the release gate.
-- [ ] Milestone 2: Repair activity accounting and lifecycle-aware health.
+- [x] Milestone 2: Repair activity accounting and lifecycle-aware health.
 - [ ] Milestone 3: Fix WebSocket ownership, enablement and subscriptions.
 - [ ] Milestone 4: Verify endpoint compatibility and accounting together, and retire the package's "unproven" caveat.
 
@@ -62,6 +62,10 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: The first real-server characterization run showed that cancelling Warp does not produce the advertised `goodbye` frame; the client remained blocked until the test timeout. Because Milestone 1 must not freeze an audited lifecycle defect as expected behavior, exact `goodbye` encoding/decoding is covered in `TypesSpec` and real delivery is deferred to the failing defect test and fix in Milestone 3.
 
 2026-09-20: Milestone 1 landed as `4d59034` with 28 passing examples. An isolated detached worktree at that commit changed the processing JSON field `lastActivity` to `activityAt` and the Prometheus series `shibuya_messages_received_total` to `shibuya_messages_received_count`. `cabal test shibuya-metrics --test-show-details=direct` failed both golden examples with the exact renamed fields/series; the mutation was not committed and the worktree was removed. The release skill and `CLAUDE.md` now name the suite.
+
+2026-09-20: Five Milestone 2 defect tests were applied to an isolated worktree at `682003e`; the separated-burst, sustained-progress, retained-failure, stopped-master, and hung-dependency examples all failed against the unfixed implementation. The corrected suite adds a deterministic genuinely-stuck control and an in-flight floor assertion.
+
+2026-09-20: The prescribed per-handler monotonic-clock design failed its focused performance gate. Against `682003e` under `-N1`, serial/10,000 rose from 3.987 ms and 20,567,968 allocated bytes to 5.112 ms and 24,251,596 bytes (28% slower), while async8 rose from 7.931 ms to 8.915 ms (12% slower). Moving monotonic timing to `sampleMetrics` and leaving only atomic burst/accounting operations on the handler path passed the same 5% tasty-bench gate: serial 4.153 ms/20,888,497 bytes and async8 8.336 ms/34,068,866 bytes, both reported statistically unchanged from baseline.
 
 
 ## Decision Log
@@ -78,6 +82,12 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: Export `combinedApp` from Shibuya.Metrics.Server. Rationale: the routing that honors the three enable flags and produces the not-found responses lives there, so testing it through a copy of the routing would prove nothing, and `startMetricsServer` binds the fixed configured port and reports that same number back, so a test cannot ask it for a free port. Warp's `testWithApplication` takes a WAI application and binds a free port itself. The export is additive, is also what a user needs to mount the endpoints inside an existing server, and is recorded in the changelog.
 
 2026-09-20: Add `cabal test shibuya-metrics` to the release gate in this plan. Rationale: the repository has no continuous integration and `nix flake check` checks formatting only, so the release skill's test step is the only place a suite runs routinely; without it the new suite would run once during certification and never again. The two garbage-collection fixes each added their suite to the same step. Only that step is edited here; the benchmark policy in the following step belongs to docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md.
+
+2026-09-20: Add `lastProgress` beside `lastActivity` in processing-state JSON. `lastActivity` remains the sampled burst start for compatibility; stuck detection uses `lastProgress`. The Haskell `Processing` constructor gains the corresponding third timestamp, so this is recorded as a breaking source change and an additive wire change.
+
+2026-09-20: Use sampler-side progress detection after the direct monotonic-clock design failed the 5% focused performance gate. `sampleMetrics` remembers processed, failed, in-flight, and burst-generation counters and reads the monotonic clock only when that tuple changes. A first observation establishes the progress point; a processor is stuck only after a later observation exceeds the threshold. One wedged handler remains invisible while siblings keep changing the aggregate counters, as explicitly deferred to the per-message inspection request.
+
+2026-09-20: Add `dependencyTimeoutMicros` to both health configuration records and add the application lifecycle to `ReadinessStatus`. This deliberately breaks direct record construction but leaves the default at one second per dependency. A timed-out legacy `IO DependencyStatus` cannot reveal its name before returning, so the diagnostic name is `unknown`; changing `DependencyCheck` itself would be a larger compatibility break.
 
 2026-09-19: Start before the core lifecycle plan completes. Only lifecycle-aware readiness and terminal WebSocket notifications need its retained snapshot; the test suite, activity accounting and WebSocket slot ownership do not, and the activity defect is high priority.
 

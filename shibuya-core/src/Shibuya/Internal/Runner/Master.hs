@@ -23,6 +23,9 @@ module Shibuya.Internal.Runner.Master
     getAllMetricsIO,
     getProcessorMetrics,
     getProcessorMetricsIO,
+    MasterPhase (..),
+    getMasterPhase,
+    getMasterPhaseIO,
     ProcessorLifecycle (..),
     LifecycleSnapshot,
     getLifecycleSnapshot,
@@ -31,6 +34,8 @@ module Shibuya.Internal.Runner.Master
     -- * Processor Management
     registerProcessor,
     unregisterProcessor,
+    markMasterRunning,
+    markMasterDraining,
     markProcessorDraining,
     markProcessorStopped,
     markProcessorStoppedIO,
@@ -81,9 +86,19 @@ data MasterState = MasterState
 
 data MasterRegistry = MasterRegistry
   { liveMetrics :: !(Map ProcessorId MetricsHandle),
-    lifecycles :: !LifecycleSnapshot
+    lifecycles :: !LifecycleSnapshot,
+    phase :: !MasterPhase
   }
   deriving (Generic)
+
+-- | Lifecycle phase of the master itself. Processor terminal state is retained
+-- separately in 'LifecycleSnapshot'.
+data MasterPhase
+  = MasterStarting
+  | MasterRunning
+  | MasterDraining
+  | MasterStopped
+  deriving stock (Eq, Show, Generic)
 
 -- | Internal lifecycle state retained for the configured processor set.
 data ProcessorLifecycle
@@ -128,7 +143,7 @@ startMaster strategy = liftIO $ Exception.mask_ $ do
   -- to 'acquireOwned', which then owns cleanup; there is no interruptible gap
   -- that needs an extra exception frame here.
   let sup = Process supAsync mailbox
-  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty
+  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty MasterStarting
   let propagate = case strategy of
         KillAll -> True
         IgnoreGraceful -> True
@@ -139,7 +154,11 @@ startMaster strategy = liftIO $ Exception.mask_ $ do
 -- | Stop the master and all child processors.
 -- Cancels the supervisor, which cancels all children via NQE's stopAll.
 stopMaster :: (IOE :> es) => Master -> Eff es ()
-stopMaster master = liftIO $ cancel (getProcessAsync master.state.supervisor)
+stopMaster master = liftIO $ do
+  atomically $
+    modifyTVar' master.state.registry $ \registry ->
+      registry {phase = MasterStopped}
+  cancel (getProcessAsync master.state.supervisor)
 
 -- | Get metrics for all processors.
 getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap
@@ -160,6 +179,14 @@ getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
 getProcessorMetricsIO master pid = do
   registry <- atomically $ readTVar master.state.registry
   traverse sampleMetrics (Map.lookup pid registry.liveMetrics)
+
+-- | Read the master lifecycle phase.
+getMasterPhase :: (IOE :> es) => Master -> Eff es MasterPhase
+getMasterPhase = liftIO . getMasterPhaseIO
+
+-- | IO variant for health integrations.
+getMasterPhaseIO :: Master -> IO MasterPhase
+getMasterPhaseIO master = (.phase) <$> atomically (readTVar master.state.registry)
 
 -- | Read the retained processor lifecycle snapshot.
 getLifecycleSnapshot :: (IOE :> es) => Master -> Eff es LifecycleSnapshot
@@ -188,6 +215,28 @@ unregisterProcessor master pid =
     atomically $
       modifyTVar' master.state.registry $ \registry ->
         registry {liveMetrics = Map.delete pid registry.liveMetrics}
+
+markMasterRunning :: (IOE :> es) => Master -> Eff es ()
+markMasterRunning master =
+  liftIO $
+    atomically $
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { phase = case registry.phase of
+              MasterStopped -> MasterStopped
+              _ -> MasterRunning
+          }
+
+markMasterDraining :: (IOE :> es) => Master -> Eff es ()
+markMasterDraining master =
+  liftIO $
+    atomically $
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { phase = case registry.phase of
+              MasterStopped -> MasterStopped
+              _ -> MasterDraining
+          }
 
 markProcessorDraining :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 markProcessorDraining master pid =

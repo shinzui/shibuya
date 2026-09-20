@@ -258,7 +258,8 @@ data ProcessorMetrics = ProcessorMetrics
 
 data ProcessorState
   = Idle                            -- Waiting for messages
-  | Processing !InFlightInfo !UTCTime -- (in-flight info, last activity)
+  | Processing !InFlightInfo !UTCTime !UTCTime
+      -- (in-flight info, sampled burst start, sampled last progress)
   | Failed !Text !UTCTime           -- (error message, when)
   | Stopped
 

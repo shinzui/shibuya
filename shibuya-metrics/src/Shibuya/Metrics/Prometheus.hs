@@ -94,11 +94,11 @@ escapeLabel = Text.concatMap escapeChar
 -- | Convert processor state to integer for Prometheus.
 stateToInt :: ProcessorState -> Int
 stateToInt Idle = 1
-stateToInt (Processing _ _) = 2
+stateToInt (Processing _ _ _) = 2
 stateToInt (Failed _ _) = 3
 stateToInt Stopped = 4
 
 -- | Get in-flight count from processor state.
 inFlightCount :: ProcessorState -> Int
-inFlightCount (Processing info _) = info.inFlight
+inFlightCount (Processing info _ _) = info.inFlight
 inFlightCount _ = 0

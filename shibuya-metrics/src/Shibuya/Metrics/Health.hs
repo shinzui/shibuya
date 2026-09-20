@@ -8,6 +8,7 @@ module Shibuya.Metrics.Health
   ( -- * Health Status Types
     LivenessStatus (..),
     ReadinessStatus (..),
+    ApplicationStatus (..),
     ProcessorHealth (..),
     DependencyStatus (..),
 
@@ -27,14 +28,22 @@ where
 
 import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.Text (Text)
+import Data.Text qualified as Text
 import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import Shibuya.App (Master, getAllMetricsIO)
 import Shibuya.Core.Metrics
   ( MetricsMap,
+    ProcessorId,
     ProcessorMetrics (..),
     ProcessorState (..),
+  )
+import Shibuya.Internal.Runner.Master
+  ( LifecycleSnapshot,
+    MasterPhase (..),
+    ProcessorLifecycle (..),
+    getLifecycleSnapshotIO,
+    getMasterPhaseIO,
   )
 import System.Timeout (timeout)
 
@@ -46,6 +55,8 @@ import System.Timeout (timeout)
 data HealthConfig = HealthConfig
   { -- | Timeout for liveness check (microseconds)
     livenessTimeoutMicros :: !Int,
+    -- | Timeout for each dependency check (microseconds)
+    dependencyTimeoutMicros :: !Int,
     -- | How long a processor can be in Processing state before considered stuck
     stuckThreshold :: !NominalDiffTime
   }
@@ -58,6 +69,7 @@ defaultHealthConfig :: HealthConfig
 defaultHealthConfig =
   HealthConfig
     { livenessTimeoutMicros = 1_000_000,
+      dependencyTimeoutMicros = 1_000_000,
       stuckThreshold = 60
     }
 
@@ -82,6 +94,7 @@ instance ToJSON LivenessStatus where
 -- Indicates whether the system is ready to handle traffic.
 data ReadinessStatus = ReadinessStatus
   { ready :: !Bool,
+    application :: !ApplicationStatus,
     processors :: !ProcessorHealth,
     dependencies :: ![DependencyStatus]
   }
@@ -91,9 +104,30 @@ instance ToJSON ReadinessStatus where
   toJSON status =
     object
       [ "ready" .= status.ready,
+        "application" .= status.application,
         "processors" .= status.processors,
         "dependencies" .= status.dependencies
       ]
+
+-- | Health-level application lifecycle derived from the master phase and the
+-- retained configured-processor lifecycle snapshot.
+data ApplicationStatus
+  = ConfiguredEmpty
+  | Starting
+  | Running
+  | Draining
+  | ApplicationStopped
+  | ApplicationFailed
+  deriving stock (Eq, Show)
+
+instance ToJSON ApplicationStatus where
+  toJSON = \case
+    ConfiguredEmpty -> toJSON ("configured_empty" :: Text)
+    Starting -> toJSON ("starting" :: Text)
+    Running -> toJSON ("running" :: Text)
+    Draining -> toJSON ("draining" :: Text)
+    ApplicationStopped -> toJSON ("stopped" :: Text)
+    ApplicationFailed -> toJSON ("failed" :: Text)
 
 -- | Summary of processor health across all processors.
 data ProcessorHealth = ProcessorHealth
@@ -142,9 +176,14 @@ type DependencyCheck = IO DependencyStatus
 -- This is a fast check suitable for Kubernetes liveness probes.
 checkLiveness :: HealthConfig -> Master -> IO LivenessStatus
 checkLiveness config master = do
-  -- Try to query metrics with timeout
-  result <- timeout config.livenessTimeoutMicros $ getAllMetricsIO master
-  pure $ LivenessStatus {alive = isJust result}
+  result <- timeout config.livenessTimeoutMicros $ getMasterPhaseIO master
+  pure $
+    LivenessStatus
+      { alive = case result of
+          Just MasterStopped -> False
+          Just _ -> True
+          Nothing -> False
+      }
 
 -- | Check readiness - are all processors healthy and dependencies available?
 -- This is suitable for Kubernetes readiness probes.
@@ -156,17 +195,26 @@ checkReadiness ::
 checkReadiness config master depChecks = do
   now <- getCurrentTime
   metrics <- getAllMetricsIO master
-  let procHealth = analyzeProcessorHealth config now metrics
-  depStatus <- sequence depChecks
+  lifecycles <- getLifecycleSnapshotIO master
+  masterPhase <- getMasterPhaseIO master
+  let procHealth = analyzeProcessorHealth config now metrics lifecycles
+      application = classifyApplication masterPhase lifecycles
+      allRunningVisible =
+        all
+          (\(pid, lifecycle) -> lifecycle /= LifecycleRunning || Map.member pid metrics)
+          (Map.toList lifecycles)
+  depStatus <- traverse (runDependencyCheck config) depChecks
 
   let allDepsHealthy = all (.healthy) depStatus
       noFailedProcessors = procHealth.failed == 0
       noStuckProcessors = procHealth.stuck == 0
-      isReady = allDepsHealthy && noFailedProcessors && noStuckProcessors
+      acceptsWork = application == Running || application == ConfiguredEmpty
+      isReady = acceptsWork && allRunningVisible && allDepsHealthy && noFailedProcessors && noStuckProcessors
 
   pure
     ReadinessStatus
       { ready = isReady,
+        application,
         processors = procHealth,
         dependencies = depStatus
       }
@@ -188,11 +236,15 @@ checkDetailedHealth config master depChecks = do
 --------------------------------------------------------------------------------
 
 -- | Analyze processor health from metrics.
-analyzeProcessorHealth :: HealthConfig -> UTCTime -> MetricsMap -> ProcessorHealth
-analyzeProcessorHealth config now metrics =
-  let processors = Map.elems metrics
-      total = length processors
-      (healthy, failed, stuck) = foldr (categorize config now) (0, 0, 0) processors
+analyzeProcessorHealth :: HealthConfig -> UTCTime -> MetricsMap -> LifecycleSnapshot -> ProcessorHealth
+analyzeProcessorHealth config now metrics lifecycles =
+  let processorIds = Map.keysSet metrics <> Map.keysSet lifecycles
+      total = length processorIds
+      (healthy, failed, stuck) =
+        foldr
+          (categorize config now metrics lifecycles)
+          (0, 0, 0)
+          processorIds
    in ProcessorHealth
         { total = total,
           healthy = healthy,
@@ -204,16 +256,52 @@ analyzeProcessorHealth config now metrics =
 categorize ::
   HealthConfig ->
   UTCTime ->
-  ProcessorMetrics ->
+  MetricsMap ->
+  LifecycleSnapshot ->
+  ProcessorId ->
   (Int, Int, Int) ->
   (Int, Int, Int)
-categorize config now pm (h, f, s) =
-  case pm.state of
-    Idle -> (h + 1, f, s)
-    Stopped -> (h, f, s) -- Stopped is neither healthy nor failed
-    Failed _ _ -> (h, f + 1, s)
-    Processing _ lastActivity ->
-      let timeSinceActivity = diffUTCTime now lastActivity
-       in if timeSinceActivity > config.stuckThreshold
-            then (h, f, s + 1) -- Stuck
-            else (h + 1, f, s) -- Healthy (actively processing)
+categorize config now metrics lifecycles pid counts@(h, f, s) =
+  case Map.lookup pid lifecycles of
+    Just LifecycleFailed {} -> (h, f + 1, s)
+    _ -> case Map.lookup pid metrics of
+      Nothing -> counts
+      Just pm -> case pm.state of
+        Idle -> (h + 1, f, s)
+        Stopped -> counts
+        Failed _ _ -> (h, f + 1, s)
+        Processing _ _ lastProgress ->
+          let timeSinceProgress = diffUTCTime now lastProgress
+           in if timeSinceProgress > config.stuckThreshold
+                then (h, f, s + 1)
+                else (h + 1, f, s)
+
+classifyApplication :: MasterPhase -> LifecycleSnapshot -> ApplicationStatus
+classifyApplication masterPhase lifecycles
+  | any isFailed (Map.elems lifecycles) = ApplicationFailed
+  | masterPhase == MasterStopped = ApplicationStopped
+  | masterPhase == MasterDraining || any (== LifecycleDraining) (Map.elems lifecycles) = Draining
+  | masterPhase == MasterStarting = Starting
+  | Map.null lifecycles = ConfiguredEmpty
+  | all (== LifecycleStopped) (Map.elems lifecycles) = ApplicationStopped
+  | otherwise = Running
+  where
+    isFailed LifecycleFailed {} = True
+    isFailed _ = False
+
+runDependencyCheck :: HealthConfig -> DependencyCheck -> IO DependencyStatus
+runDependencyCheck config check = do
+  result <- timeout config.dependencyTimeoutMicros check
+  pure $ case result of
+    Just status -> status
+    Nothing ->
+      DependencyStatus
+        { name = "unknown",
+          healthy = False,
+          latencyMs = Nothing,
+          errorMsg =
+            Just $
+              "Dependency check timed out after "
+                <> Text.pack (show config.dependencyTimeoutMicros)
+                <> " microseconds"
+        }

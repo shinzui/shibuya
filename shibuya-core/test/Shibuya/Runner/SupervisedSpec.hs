@@ -623,7 +623,7 @@ spec = do
               threadDelay 50000 -- 50ms - should be in the middle of processing
               metrics <- sampleMetrics sp.metrics
               case metrics.state of
-                Processing info _ -> modifyIORef' maxInFlightObserved (max info.inFlight)
+                Processing info _ _ -> modifyIORef' maxInFlightObserved (max info.inFlight)
                 _ -> pure ()
 
             liftIO $ threadDelay 600000 -- 600ms to complete
@@ -650,7 +650,7 @@ spec = do
               threadDelay 25000 -- 25ms
               metrics <- sampleMetrics sp.metrics
               case metrics.state of
-                Processing info _ -> pure $ Just info.maxConcurrency
+                Processing info _ _ -> pure $ Just info.maxConcurrency
                 _ -> pure Nothing
 
             liftIO $ threadDelay 300000

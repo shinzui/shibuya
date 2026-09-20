@@ -24,6 +24,8 @@ data MetricsServerConfig = MetricsServerConfig
     wsMaxConnections :: !Int,
     -- | Timeout for liveness check in microseconds (default: 1_000_000 = 1s)
     livenessTimeoutMicros :: !Int,
+    -- | Timeout for each dependency readiness check in microseconds (default: 1s)
+    dependencyTimeoutMicros :: !Int,
     -- | How long a processor can be in Processing state before considered stuck (default: 60s)
     stuckThreshold :: !NominalDiffTime
   }
@@ -40,5 +42,6 @@ defaultConfig =
       wsPushIntervalUs = 100_000, -- 100ms
       wsMaxConnections = 100,
       livenessTimeoutMicros = 1_000_000, -- 1 second
+      dependencyTimeoutMicros = 1_000_000, -- 1 second per dependency
       stuckThreshold = 60 -- 60 seconds
     }

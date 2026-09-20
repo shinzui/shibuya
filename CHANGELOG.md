@@ -7,12 +7,17 @@
 - `shibuya-core`: add structured duplicate-ID, invalid-concurrency, and capacity-overflow
   errors; add `ProcessorFailure` for infrastructure finalization failure; and extend
   `ShutdownConfig` with a total shutdown deadline.
+- `shibuya-core`: extend `ProcessorState.Processing` with a sampled last-progress timestamp.
+  `shibuya-metrics`: extend health configuration with a per-dependency timeout and readiness
+  results with an explicit application lifecycle status.
 
 ### Bug Fixes
 
 - `shibuya-core`: make startup, idle halt/failure wakeup, keyed worker ownership, adapter
   shutdown, and repeated/concurrent stop exception safe. Retain internal terminal lifecycle
   state after live metrics unregister so `IgnoreFailures` does not erase failures.
+- `shibuya-metrics`: make stuck detection progress-based, keep retained failures unready,
+  report stopped masters not live, and bound hung dependency checks.
 
 ### New Features
 

@@ -29,6 +29,7 @@ module Shibuya.Core.Metrics
     HotCounters (..),
     MetricsHandle (..),
     newMetricsHandle,
+    newMetricsHandleWithClock,
     sampleMetrics,
     incrementReceived,
     beginProcessing,
@@ -49,14 +50,18 @@ module Shibuya.Core.Metrics
 where
 
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
-import Control.Monad (unless, void, when)
-import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:))
+import Control.Monad (void, when)
+import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:), (.:?))
 import Data.Aeson qualified as Aeson
 import Data.Atomics.Counter (AtomicCounter, incrCounter, readCounter)
 import Data.Atomics.Counter qualified as Counter
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef, writeIORef)
 import Data.Map.Strict (Map)
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as Text
+import Data.Time.Clock (addUTCTime)
+import Data.Word (Word64)
+import GHC.Clock (getMonotonicTimeNSec)
 import Shibuya.Prelude
 
 -- | Processor identifier.
@@ -94,8 +99,8 @@ emptyInFlightInfo = InFlightInfo 0
 data ProcessorState
   = -- | Waiting for messages
     Idle
-  | -- | Currently processing (in-flight info, last activity time)
-    Processing !InFlightInfo !UTCTime
+  | -- | Currently processing (in-flight info, sampled burst start, sampled last progress)
+    Processing !InFlightInfo !UTCTime !UTCTime
   | -- | Failed with error (error message, timestamp)
     Failed !Text !UTCTime
   | -- | Processor has been stopped
@@ -104,12 +109,13 @@ data ProcessorState
 
 instance ToJSON ProcessorState where
   toJSON Idle = object ["status" Aeson..= ("idle" :: Text)]
-  toJSON (Processing info lastActivity) =
+  toJSON (Processing info lastActivity lastProgress) =
     object
       [ "status" Aeson..= ("processing" :: Text),
         "inFlight" Aeson..= info.inFlight,
         "maxConcurrency" Aeson..= info.maxConcurrency,
-        "lastActivity" Aeson..= lastActivity
+        "lastActivity" Aeson..= lastActivity,
+        "lastProgress" Aeson..= lastProgress
       ]
   toJSON (Failed err timestamp) =
     object
@@ -128,7 +134,8 @@ instance FromJSON ProcessorState where
         inFlightCount <- v .: "inFlight"
         maxConc <- v .: "maxConcurrency"
         lastActivity <- v .: "lastActivity"
-        pure $ Processing (InFlightInfo inFlightCount maxConc) lastActivity
+        lastProgress <- v .:? "lastProgress"
+        pure $ Processing (InFlightInfo inFlightCount maxConc) lastActivity (fromMaybe lastActivity lastProgress)
       "failed" -> Failed <$> v .: "error" <*> v .: "timestamp"
       "stopped" -> pure Stopped
       other -> fail $ "Unknown processor state: " <> Text.unpack other
@@ -211,7 +218,8 @@ data HotCounters = HotCounters
   { received :: !AtomicCounter,
     processed :: !AtomicCounter,
     failed :: !AtomicCounter,
-    inFlight :: !AtomicCounter
+    inFlight :: !AtomicCounter,
+    burstSequence :: !AtomicCounter
   }
 
 -- | Write-side metrics handle for one processor.
@@ -219,18 +227,33 @@ data MetricsHandle = MetricsHandle
   { hot :: !HotCounters,
     maxConcurrencyRef :: !(IORef Int),
     burstStartedRef :: !(IORef UTCTime),
+    lastProgressRef :: !(IORef Word64),
+    progressOriginNs :: !Word64,
+    progressOriginTime :: !UTCTime,
+    progressClock :: !(IO Word64),
+    lastObservedProgress :: !(IORef (Int, Int, Int, Int)),
     stateActiveRef :: !(IORef Bool),
     cold :: !(TVar ProcessorMetrics)
   }
 
 newMetricsHandle :: UTCTime -> IO MetricsHandle
-newMetricsHandle now = do
+newMetricsHandle = newMetricsHandleWithClock getMonotonicTimeNSec
+
+-- | Create a metrics handle with an injectable monotonic clock. The custom
+-- clock is intended for deterministic tests; production callers should use
+-- 'newMetricsHandle'.
+newMetricsHandleWithClock :: IO Word64 -> UTCTime -> IO MetricsHandle
+newMetricsHandleWithClock clock now = do
+  progressOriginNs <- clock
   received <- Counter.newCounter 0
   processed <- Counter.newCounter 0
   failed <- Counter.newCounter 0
   inFlight <- Counter.newCounter 0
+  burstSequence <- Counter.newCounter 0
   maxConcurrencyRef <- newIORef 1
   burstStartedRef <- newIORef now
+  lastProgressRef <- newIORef progressOriginNs
+  lastObservedProgress <- newIORef (0, 0, 0, 0)
   stateActiveRef <- newIORef False
   cold <- newTVarIO (emptyProcessorMetrics now)
   pure
@@ -240,10 +263,16 @@ newMetricsHandle now = do
             { received = received,
               processed = processed,
               failed = failed,
-              inFlight = inFlight
+              inFlight = inFlight,
+              burstSequence = burstSequence
             },
         maxConcurrencyRef = maxConcurrencyRef,
         burstStartedRef = burstStartedRef,
+        lastProgressRef = lastProgressRef,
+        progressOriginNs = progressOriginNs,
+        progressOriginTime = now,
+        progressClock = clock,
+        lastObservedProgress = lastObservedProgress,
         stateActiveRef = stateActiveRef,
         cold = cold
       }
@@ -255,8 +284,12 @@ sampleMetrics handle = do
   processed <- readCounter handle.hot.processed
   failed <- readCounter handle.hot.failed
   inFlight <- readCounter handle.hot.inFlight
+  burstSequence <- readCounter handle.hot.burstSequence
   maxConcurrency <- readIORef handle.maxConcurrencyRef
+  observeProgress handle processed failed inFlight burstSequence
   burstStartedAt <- readIORef handle.burstStartedRef
+  lastProgressNs <- readIORef handle.lastProgressRef
+  let lastProgressAt = monotonicToUTC handle lastProgressNs
   let sampledStats =
         StreamStats
           { received = received,
@@ -266,7 +299,7 @@ sampleMetrics handle = do
       sampledState = case coldSnapshot.state of
         Failed err timestamp -> Failed err timestamp
         Stopped -> Stopped
-        _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt
+        _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt lastProgressAt
         _ -> Idle
   pure coldSnapshot {state = sampledState, stats = sampledStats}
 
@@ -278,15 +311,9 @@ beginProcessing :: MetricsHandle -> Int -> IO Int
 beginProcessing handle maxConcurrency = do
   currentInflight <- incrCounter 1 handle.hot.inFlight
   when (currentInflight == 1) $ do
-    stateActive <- readIORef handle.stateActiveRef
-    unless stateActive $ do
-      now <- getCurrentTime
-      writeIORef handle.maxConcurrencyRef maxConcurrency
-      writeIORef handle.burstStartedRef now
-      writeIORef handle.stateActiveRef True
-      atomically $
-        modifyTVar' handle.cold $ \m ->
-          m {state = Processing (InFlightInfo currentInflight maxConcurrency) now}
+    Counter.incrCounter_ 1 handle.hot.burstSequence
+    writeIORef handle.maxConcurrencyRef maxConcurrency
+    writeIORef handle.stateActiveRef True
   pure currentInflight
 
 finishProcessing :: MetricsHandle -> Either Text AckDecisionMetric -> IO ()
@@ -297,7 +324,8 @@ finishProcessing handle result = do
     Right CountNeither -> pure ()
     Right (CountHalt _) -> pure ()
     Left _ -> void $ incrCounter 1 handle.hot.failed
-  void $ incrCounter (-1) handle.hot.inFlight
+  remaining <- decrementCounterFloorZero handle.hot.inFlight
+  when (remaining == 0) $ writeIORef handle.stateActiveRef False
   case result of
     Left failureText -> setFailed failureText
     Right (CountHalt reasonText) -> setFailed reasonText
@@ -349,7 +377,7 @@ recordBatchOutcomeMetrics handle trigger size handlerThrew partialInc decisions 
   when (failedDelta /= 0) $
     void $
       incrCounter failedDelta handle.hot.failed
-  void $ incrCounter (-1) handle.hot.inFlight
+  remaining <- decrementCounterFloorZero handle.hot.inFlight
   now <- getCurrentTime
   atomically $
     modifyTVar' handle.cold $ \m ->
@@ -368,7 +396,36 @@ recordBatchOutcomeMetrics handle trigger size handlerThrew partialInc decisions 
        in m {state = newState, batch = newBatch}
   case firstHalt of
     Just _ -> writeIORef handle.stateActiveRef False
-    Nothing -> pure ()
+    Nothing -> when (remaining == 0) $ writeIORef handle.stateActiveRef False
+
+observeProgress :: MetricsHandle -> Int -> Int -> Int -> Int -> IO ()
+observeProgress handle processed failed inFlight burstSequence = do
+  let current = (processed, failed, inFlight, burstSequence)
+  previous@(_, _, _, previousBurstSequence) <- readIORef handle.lastObservedProgress
+  when (current /= previous) $ do
+    progressNs <- handle.progressClock
+    atomicWriteIORef handle.lastProgressRef progressNs
+    atomicWriteIORef handle.lastObservedProgress current
+    when (inFlight > 0 && burstSequence /= previousBurstSequence) $
+      atomicWriteIORef handle.burstStartedRef (monotonicToUTC handle progressNs)
+
+monotonicToUTC :: MetricsHandle -> Word64 -> UTCTime
+monotonicToUTC handle progressNs =
+  let elapsedNs
+        | progressNs >= handle.progressOriginNs = progressNs - handle.progressOriginNs
+        | otherwise = 0
+      elapsedSeconds = fromIntegral elapsedNs / 1_000_000_000
+   in addUTCTime elapsedSeconds handle.progressOriginTime
+
+decrementCounterFloorZero :: AtomicCounter -> IO Int
+decrementCounterFloorZero counter = Counter.readCounterForCAS counter >>= go
+  where
+    go ticket
+      | Counter.peekCTicket ticket <= 0 = pure 0
+      | otherwise = do
+          let next = Counter.peekCTicket ticket - 1
+          (succeeded, current) <- Counter.casCounter counter ticket next
+          if succeeded then pure next else go current
 
 data BatchTriggerMetric
   = CountTriggerSize

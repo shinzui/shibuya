@@ -28,7 +28,7 @@ Tracks the number of handlers currently executing and the configured concurrency
 ```haskell
 data ProcessorState
   = Idle
-  | Processing !InFlightInfo !UTCTime
+  | Processing !InFlightInfo !UTCTime !UTCTime
   | Failed !Text !UTCTime
   | Stopped
 ```
@@ -36,7 +36,7 @@ data ProcessorState
 | State | Meaning |
 |-------|---------|
 | `Idle` | Waiting for next message |
-| `Processing info time` | Currently processing (tracks in-flight count and max concurrency) |
+| `Processing info burstStarted lastProgress` | Currently processing; exposes the sampled burst start and most recent sampled handler progress |
 | `Failed msg time` | Last processing failed with error |
 | `Stopped` | Processor has been stopped |
 
@@ -100,6 +100,13 @@ data ProcessorMetrics = ProcessorMetrics
 ```
 
 Combined metrics for a single processor.
+
+Progress timing is sampled when metrics are read, rather than adding a clock read
+to every handler start and finish. A changing completion, in-flight, or burst
+generation counter advances `lastProgress`; readiness reports a processor stuck
+only after a full `stuckThreshold` with no sampled change. One wedged handler is
+not detectable while sibling handlers on the same processor continue to make
+progress.
 
 ### MetricsMap
 
