@@ -1,189 +1,55 @@
-# Shibuya Project Context
+# Shibuya
 
-Shibuya is a supervised queue processing framework for Haskell, inspired by Broadway (Elixir). It provides unified queue abstraction, NQE-based supervision, backpressure, and explicit ack semantics.
+Supervised queue processing framework for Haskell, inspired by Broadway (Elixir):
+unified queue abstraction, NQE-based supervision, backpressure, explicit ack semantics.
 
-## Build Commands
-
-```bash
-cabal build all                    # Build everything
-cabal test shibuya-core            # Run lifecycle/unit and isolated GC tests
-cabal run shibuya-example          # Run example app
-nix flake check                    # Run formatting checks
-nix fmt                            # Format all files
-```
-
-## Before Committing
-
-**IMPORTANT**: Always run `nix fmt` before committing:
+## Commands
 
 ```bash
-nix fmt
-git add <files>
-git commit
+cabal build all
+cabal test shibuya-core            # both suites: shibuya-core-test, shibuya-core-gc-test
+cabal run shibuya-example
+nix fmt                            # treefmt (fourmolu); run before committing
+nix flake check                    # formatting + flake checks
+just --list                        # dev services, database recipes
 ```
 
-The pre-commit hook runs treefmt which will reject commits with formatting issues. If a commit fails due to formatting, the hook will auto-format the files - just re-stage them with `git add` and commit again.
+The pre-commit hook runs treefmt and rejects unformatted commits. If it fails it
+auto-formats — re-`git add` and commit again.
 
-## Project Structure
+## Packages
 
-```
-shibuya-core/           # Main library
-  src/Shibuya/
-    Core/               # Types, Ack, Ingested, AckHandle, Lease
-    Runner/             # Master, Supervised, Processor, Ingester, Metrics, Halt
-    Adapter/            # Mock adapter (real adapters live elsewhere)
-    App.hs              # runApp entry point
-    Handler.hs          # Handler type
-    Policy.hs           # Ordering/Concurrency policies
-    Prelude.hs          # Common imports
-  test/                 # HSpec + QuickCheck tests
+| Package | Purpose |
+|---|---|
+| `shibuya-core` | The library. `Shibuya.App` (`runApp`, `QueueProcessor`) is the public entry point. |
+| `shibuya-metrics` | Metrics sinks/exporters. |
+| `shibuya-example` | Runnable multi-processor and batch examples. |
+| `shibuya-core-bench` | Benchmarks plus `standalone-test` / `prod-stress` executables. |
 
-shibuya-example/        # Example demonstrating multi-processor setup
+Runner internals live under `Shibuya.Internal.Runner.*` (Master, Supervised,
+Batcher, KeyedScheduler, …) — exposed but not part of the stable API.
 
-docs/
-  architecture/         # MESSAGE_FLOW.md, CORE_TYPES.md, METRICS.md
-  plans/                # Development plans and design docs
-```
+## Conventions
 
-## Key Technologies
+- GHC2024 plus per-package `default-extensions` — notably `NoFieldSelectors`,
+  `OverloadedRecordDot` (`metrics.stats.processed`), and `OverloadedLabels`
+  with generic-lens (`m & #state .~ new`). Check the cabal file before adding a
+  `LANGUAGE` pragma.
+- Always name a deriving strategy (`DerivingStrategies` is on).
+- Effects are `effectful`: `(IOE :> es) => ... -> Eff es a`.
+- Fourmolu, 2-space indent, trailing commas in import/export lists.
+- Tests are HSpec + QuickCheck, mirroring source layout under `test/Shibuya/`.
 
-- **effectful** - Effect system (use `Eff es` for effect stacks)
-- **NQE** - Actor supervision (Master, Supervisor, Inbox)
-- **streamly** - Stream processing and backpressure
-- **generic-lens** - Record access via `#field` labels
+## Docs
 
-## Architecture
+- `docs/architecture/` — message flow, core types, concurrency, metrics.
+- `docs/USAGE_GUIDE.md`, `docs/HIGH_LEVEL_ARCHITECTURE.md`
+- `docs/JAEGER_LOCAL_TESTING.md` — local OTLP/Jaeger setup for tracing.
+- `docs/plans/`, `docs/masterplans/` — ExecPlans and master plans.
 
-```
-runApp → Master → [Processor A, Processor B, ...]
-                       │
-              Adapter.source (stream)
-                       │
-              Ingester (async) → Bounded Inbox → Processor → Handler
-                                                              │
-                                                         AckDecision
-```
+## Local environment
 
-- **Adapter**: Queue-specific stream source + shutdown
-- **Handler**: `Ingested es msg -> Eff es AckDecision` (pure intent)
-- **AckDecision**: AckOk | AckRetry | AckDeadLetter | AckHalt
-
-## Coding Conventions
-
-### Extensions (enabled by default)
-- `OverloadedRecordDot` - Use `.field` syntax
-- `OverloadedLabels` - Use `#field` for lens access
-- `NoFieldSelectors` - No field accessor functions generated
-- `DerivingStrategies` - Always specify deriving strategy
-
-### Formatting (Fourmolu)
-- 2-space indentation
-- Trailing commas in imports/exports
-- Run `nix flake check` to verify
-
-### Patterns
-```haskell
--- Effect constraints
-someFunction :: (IOE :> es) => Arg -> Eff es Result
-
--- Record access
-metrics.stats.processed      -- OverloadedRecordDot
-m & #state .~ newState       -- generic-lens with OverloadedLabels
-
--- Handler pattern
-myHandler :: Handler es MyMessage
-myHandler ingested = do
-  -- process ingested.envelope.payload
-  pure AckOk
-```
-
-## Testing
-
-Tests use HSpec with property-based testing via QuickCheck:
-```bash
-cabal test shibuya-core
-```
-
-Test modules mirror source structure in `test/Shibuya/`.
-
-## Important Files
-
-| File | Purpose |
-|------|---------|
-| `Shibuya/App.hs` | Public API: runApp, QueueProcessor |
-| `Shibuya/Runner/Supervised.hs` | Core processing loop with metrics |
-| `Shibuya/Runner/Master.hs` | Supervisor coordination |
-| `Shibuya/Core/Ack.hs` | AckDecision and related types |
-| `docs/plans/archive/PRIORITY_1_CRITICAL_FIXES.md` | Historical development priorities (archived) |
-
-## Local Development Environment
-
-### PostgreSQL
-
-The project uses a local PostgreSQL instance with Unix sockets (no TCP). The nix devShell sets up:
-
-```bash
-PGHOST="$PWD/db"           # Socket directory
-PGDATA="$PGHOST/db"        # Data directory
-PGDATABASE=shibuya         # Database name
-```
-
-**Connection string format:**
-```bash
-# URL-encoded Unix socket path
-DATABASE_URL="postgresql://%2FUsers%2F...%2Fshibuya%2Fdb/shibuya"
-
-# Or generate it:
-DATABASE_URL="postgresql://$(jq -rn --arg x $PWD/db '$x|@uri')/shibuya"
-```
-
-**Starting PostgreSQL:**
-```bash
-pg_ctl start -l $PGHOST/postgres.log
-```
-
-**Testing connection:**
-```bash
-psql -h $PWD/db -d shibuya -c "SELECT 1"
-```
-
-### Jaeger (Tracing)
-
-Jaeger binary location: `~/.local/bin/jaeger`
-
-**Starting Jaeger:**
-```bash
-~/.local/bin/jaeger > /tmp/jaeger.log 2>&1 &
-```
-
-**Ports:**
-- UI: http://127.0.0.1:16686
-- OTLP HTTP: http://127.0.0.1:4318 (used by hs-opentelemetry)
-
-**Environment variables for tracing:**
-```bash
-OTEL_TRACING_ENABLED=true
-OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318"
-OTEL_SERVICE_NAME="shibuya-consumer"  # or shibuya-simulator
-```
-
-**Checking traces via API:**
-```bash
-# List services
-curl -s "http://127.0.0.1:16686/api/services" | jq '.data[]'
-
-# Get traces for a service
-curl -s "http://127.0.0.1:16686/api/traces?service=shibuya-consumer&limit=5" | jq
-```
-
-## Development Status
-
-Version 0.1.0.0 — published on [Hackage](https://hackage.haskell.org/package/shibuya-core-0.1.0.0) (pre-release). Key features implemented:
-- Backpressure via bounded inbox
-- AckHalt stops processing with halt isolation
-- Metrics and introspection
-- NQE supervision
-- Serial/Ahead/Async concurrency modes
-- Policy validation enforcement (StrictInOrder requires Serial)
-- OpenTelemetry tracing integration
-- Graceful shutdown with drain timeout
+The nix devShell provisions PostgreSQL over a Unix socket (no TCP) and exports
+`PGHOST=$PWD/db`, `PGDATA`, `PGDATABASE=shibuya`, and `PG_CONNECTION_STRING`.
+Start it with `pg_ctl start -l $PGLOG`; `just create-database` / `just reset-database`
+manage the database.
