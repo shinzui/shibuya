@@ -35,7 +35,6 @@ import Control.Concurrent.STM
     atomically,
     modifyTVar',
     newTVarIO,
-    orElse,
     readTVar,
     readTVarIO,
     retry,
@@ -504,26 +503,22 @@ inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
       if stopping
         then pure Nothing
         else do
-          immediate <-
+          result <-
             atomically $ do
               empty <- mailboxEmptySTM inbox
-              if empty then pure Nothing else Just <$> receiveSTM inbox
-          result <- case immediate of
-            Just item -> pure $ Just item
-            Nothing ->
-              atomically $
-                -- Only an observed-empty inbox pays for the wake branches.
-                -- A terminal request participates in this transaction and
-                -- wakes it; the populated hot path above stays branch-free.
-                (readProcessorExitSTM stopSignal >>= maybe retry (const (pure Nothing)))
-                  `orElse` (Just <$> receiveSTM inbox)
-                  `orElse` ( do
-                               done <- readTVar streamDoneVar
-                               empty <- mailboxEmptySTM inbox
-                               if done && empty
-                                 then pure Nothing
-                                 else retry
-                           )
+              if not empty
+                then Just <$> receiveSTM inbox
+                else do
+                  -- Only an observed-empty inbox joins the wake variables to
+                  -- the transaction's read set. A new message, terminal exit,
+                  -- or source completion then reruns this same transaction.
+                  terminal <- readProcessorExitSTM stopSignal
+                  done <- readTVar streamDoneVar
+                  case terminal of
+                    Just _ -> pure Nothing
+                    Nothing
+                      | done -> pure Nothing
+                      | otherwise -> retry
           pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.

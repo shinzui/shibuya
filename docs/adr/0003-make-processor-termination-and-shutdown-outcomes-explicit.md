@@ -28,10 +28,10 @@ continues to mean a graceful handler decision. Exhausted framework-owned finaliz
 configured supervision policy. The shared stop signal stores its terminal exit in a `TVar`
 read by the same STM wait as inbox and source completion, so any terminal request wakes
 blocked intake. A companion boolean `IORef` preserves the populated-inbox fast path; terminal
-publication updates it under masking before waking the STM waiter. Intake uses a two-phase
-STM decision: a populated inbox checks and receives in one transaction without the wake
-alternatives, while an observed-empty inbox enters the combined terminal, inbox, and source
-completion wait.
+publication updates it under masking before waking the STM waiter. Intake uses one
+conditional STM decision: a populated inbox checks and receives without joining the wake
+variables to the transaction's read set, while an observed-empty inbox reads the terminal
+and source-completion variables before retrying.
 
 The internal `Master` retains one bounded lifecycle entry per configured processor:
 `LifecycleRunning`, `LifecycleDraining`, `LifecycleStopped`, or `LifecycleFailed Text
