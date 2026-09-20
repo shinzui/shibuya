@@ -73,6 +73,7 @@ import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt
   ( ProcessorExit (..),
     ProcessorSignal,
+    isProcessorStopping,
     newProcessorSignal,
     readProcessorExit,
     requestProcessorExit,
@@ -156,14 +157,14 @@ processOneBatch metricsHandle procId maxConc stopSignal handler (info, batch) = 
 
       addEvent traceSpan (mkEvent eventBatchStarted [])
 
-      alreadyHalted <- liftIO $ readProcessorExit stopSignal
+      alreadyHalted <- liftIO $ isProcessorStopping stopSignal
 
       -- Run the handler under exception isolation. On any exception, record it
       -- on the span and substitute the whole-batch retry default.
       (handlerResult, skippedAfterHalt) <-
-        case alreadyHalted of
-          Just _ -> pure (Left (), True)
-          Nothing -> do
+        if alreadyHalted
+          then pure (Left (), True)
+          else do
             result <-
               catchAny
                 (Right <$> handler info (toMessage <$> batch))

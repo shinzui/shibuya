@@ -10,14 +10,17 @@ module Shibuya.Internal.Runner.Halt
     ProcessorExit (..),
     ProcessorSignal,
     newProcessorSignal,
+    isProcessorStopping,
     readProcessorExit,
+    readProcessorExitSTM,
     requestProcessorExit,
     throwProcessorExit,
   )
 where
 
-import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
-import Control.Exception (Exception)
+import Control.Concurrent.STM (STM, TVar, atomically, modifyTVar', newTVarIO, readTVar, readTVarIO)
+import Control.Exception (Exception, mask_)
+import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Shibuya.Core.Ack (HaltReason)
 import Shibuya.Core.Types (MessageId)
 import Shibuya.Prelude
@@ -47,23 +50,40 @@ data ProcessorExit
   | ProcessorFailed !Text !(Maybe MessageId)
   deriving stock (Eq, Show, Generic)
 
-type ProcessorSignal = TVar (Maybe ProcessorExit)
+-- | A cheap hot-path stop observation paired with an STM wake source. The
+-- 'IORef' preserves the pre-existing per-item cost, while the 'TVar' is read by
+-- an empty-inbox transaction so a terminal request wakes it immediately.
+data ProcessorSignal = ProcessorSignal
+  { stopping :: !(IORef Bool),
+    terminalExit :: !(TVar (Maybe ProcessorExit))
+  }
 
 newProcessorSignal :: IO ProcessorSignal
-newProcessorSignal = newTVarIO Nothing
+newProcessorSignal = ProcessorSignal <$> newIORef False <*> newTVarIO Nothing
+
+isProcessorStopping :: ProcessorSignal -> IO Bool
+isProcessorStopping = readIORef . (.stopping)
 
 readProcessorExit :: ProcessorSignal -> IO (Maybe ProcessorExit)
-readProcessorExit = readTVarIO
+readProcessorExit = readTVarIO . (.terminalExit)
+
+readProcessorExitSTM :: ProcessorSignal -> STM (Maybe ProcessorExit)
+readProcessorExitSTM = readTVar . (.terminalExit)
 
 requestProcessorExit :: ProcessorSignal -> ProcessorExit -> IO ()
 requestProcessorExit signal requested =
-  atomically $
-    modifyTVar' signal $ \current ->
-      case (current, requested) of
-        (Just ProcessorFailed {}, _) -> current
-        (_, ProcessorFailed {}) -> Just requested
-        (Nothing, _) -> Just requested
-        (Just ProcessorHalted {}, ProcessorHalted {}) -> current
+  -- Publish the cheap stop observation before the STM wakeup. Masking prevents
+  -- cancellation from leaving only the IORef set; this path runs once per
+  -- terminal request, not once per message.
+  mask_ $ do
+    atomicWriteIORef signal.stopping True
+    atomically $
+      modifyTVar' signal.terminalExit $ \current ->
+        case (current, requested) of
+          (Just ProcessorFailed {}, _) -> current
+          (_, ProcessorFailed {}) -> Just requested
+          (Nothing, _) -> Just requested
+          (Just ProcessorHalted {}, ProcessorHalted {}) -> current
 
 throwProcessorExit :: ProcessorExit -> IO a
 throwProcessorExit (ProcessorHalted reason) = throwIO (ProcessorHalt reason)

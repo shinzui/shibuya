@@ -85,8 +85,10 @@ import Shibuya.Internal.Runner.Halt
     ProcessorFailure (..),
     ProcessorHalt (..),
     ProcessorSignal,
+    isProcessorStopping,
     newProcessorSignal,
     readProcessorExit,
+    readProcessorExitSTM,
     requestProcessorExit,
     throwProcessorExit,
   )
@@ -498,20 +500,25 @@ inboxToStream ::
 inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
   where
     step _ = do
-      result <-
-        atomically $
-          -- A stop request participates in the same transaction as intake, so
-          -- writing the signal wakes an empty-inbox waiter immediately.
-          (readTVar stopSignal >>= maybe retry (const (pure Nothing)))
-            `orElse` (Just <$> receiveSTM inbox)
-            `orElse` ( do
-                         done <- readTVar streamDoneVar
-                         empty <- mailboxEmptySTM inbox
-                         if done && empty
-                           then pure Nothing
-                           else retry
-                     )
-      pure $ fmap (,()) result
+      stopping <- isProcessorStopping stopSignal
+      if stopping
+        then pure Nothing
+        else do
+          result <-
+            atomically $
+              -- Keep receive first so the populated-inbox hot path matches the
+              -- old IORef implementation. When it blocks, the second branch
+              -- reads the terminal TVar and is woken by a stop request.
+              (Just <$> receiveSTM inbox)
+                `orElse` (readProcessorExitSTM stopSignal >>= maybe retry (const (pure Nothing)))
+                `orElse` ( do
+                             done <- readTVar streamDoneVar
+                             empty <- mailboxEmptySTM inbox
+                             if done && empty
+                               then pure Nothing
+                               else retry
+                         )
+          pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.
 -- Supports Serial, Ahead, and Async concurrency modes.

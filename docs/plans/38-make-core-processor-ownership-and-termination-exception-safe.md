@@ -65,6 +65,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: The first focused EP-45 run caught a real keyed hot-path regression before acceptance. Recurring through `restore loop` inside each masked worker transfer retained one exception-restore frame per item, reducing the hot-key workload to 25%--45% of baseline throughput. The transfer now leaves `mask_` before tail-recurring, retaining the cancellation guarantee without the frame chain. The same run exposed that spawning the supervisor with plain `async` under `mask_` made the long-lived child inherit the masked state and added about 1.5 KiB per startup cycle. `asyncWithUnmask` keeps the parent transfer masked while explicitly unmasking the supervisor; the retained lifecycle and live-metrics maps also share one STM registry cell. Quick probes returned hot-key throughput to baseline range and startup allocation from 6,645 to 5,196 bytes per cycle against a 5,004-byte baseline; the final paired rerun remains Milestone 4 evidence.
 
+2026-09-20: The next paired run passed the corrected keyed and startup allocation paths but exposed a 15%--24% serial populated-inbox regression: checking the terminal `TVar` first made every successful receive join the STM read set. `ProcessorSignal` now pairs the terminal `TVar`, which wakes blocked intake, with a boolean `IORef` for the pre-existing fast check. A populated inbox again completes its receive branch without reading the terminal `TVar`; an empty inbox reads it through `orElse` and remains wakeable. Terminal publication masks the two writes so cancellation cannot leave only the fast flag set.
+
 
 ## Decision Log
 
