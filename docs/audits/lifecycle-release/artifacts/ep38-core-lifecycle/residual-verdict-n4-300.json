@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "baselineLabel": "ep38-baseline",
+  "candidateLabel": "ep38-candidate",
+  "confidenceLevel": 0.95,
+  "resamplingSeed": 20260920,
+  "errors": [],
+  "results": [
+    {
+      "scenario": "idle-worker",
+      "metric": "allocatedBytesPerMessage",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 0.9978024666392525,
+      "lower95": 0.9951144484610367,
+      "upper95": 1.0005026825792362,
+      "threshold": 1.05,
+      "message": "allocatedBytesPerMessage adverse ratio 0.9978 (CI 0.9951..1.0005, limit 1.0500)"
+    },
+    {
+      "scenario": "idle-worker",
+      "metric": "cpuPercent",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-absolute",
+      "estimate": -0.0034600927629065245,
+      "lower95": -0.05844764449889684,
+      "upper95": 0.05265595834638576,
+      "threshold": 1,
+      "message": "cpuPercent adverse delta -0.0035 (CI -0.0584..0.0527, limit 1.0000); candidate mean 2.9791 (CI 2.9219..3.0378, max 4.0000)"
+    },
+    {
+      "scenario": "idle-worker",
+      "metric": "latencyP95Ms",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 1.0000719646082823,
+      "lower95": 0.999991868312296,
+      "upper95": 1.0001652552831086,
+      "threshold": 1.1,
+      "message": "latencyP95Ms adverse ratio 1.0001 (CI 1.0000..1.0002, limit 1.1000)"
+    },
+    {
+      "scenario": "idle-worker",
+      "metric": "latencyP99Ms",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 1.0000719646082823,
+      "lower95": 0.999991044750946,
+      "upper95": 1.000167963644806,
+      "threshold": 1.1,
+      "message": "latencyP99Ms adverse ratio 1.0001 (CI 1.0000..1.0002, limit 1.1000)"
+    },
+    {
+      "scenario": "idle-worker",
+      "metric": "maxLiveBytes",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-absolute",
+      "estimate": -216.85333333333332,
+      "lower95": -533.8039999999999,
+      "upper95": 105.53066666666652,
+      "threshold": 32768,
+      "message": "maxLiveBytes adverse delta -216.8533 (CI -533.8040..105.5307, limit 32768.0000); candidate mean 84978.1333 (CI 84750.4620..85208.8013, max 131072.0000)"
+    },
+    {
+      "scenario": "idle-worker",
+      "metric": "shutdownLatencyMs",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 0.9676145820353457,
+      "lower95": 0.8980071979184157,
+      "upper95": 1.0434753139999815,
+      "threshold": 1.1,
+      "message": "shutdownLatencyMs adverse ratio 0.9676 (CI 0.8980..1.0435, limit 1.1000)"
+    }
+  ]
+}

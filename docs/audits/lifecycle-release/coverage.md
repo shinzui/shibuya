@@ -66,6 +66,12 @@ not-applicable boundary is the excluded MessageDB adapter.
 | Kiroku persistence | EP-43 | Mandatory | Mandatory | Mandatory | Mandatory | Mandatory |
 | MessageDB persistence | None; deprecated | Not applicable | Not applicable | Not applicable | Not applicable | Not applicable |
 
+EP-38 completed all 45 mandatory cells for startup/registration through supervision at
+implementation SHA `2108292e15c2cf79e40e8ca09a74604926beaedc`. The inventory points each
+passed cell to the full core/GC run or the 100-seed schedule-repetition log, indexed by
+`docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md`. The remaining
+in-scope rows stay open for their owning children; this is not an integrated release verdict.
+
 EP-44 owns integrated certification but does not overwrite child evidence. It assembles an
 exact candidate manifest, confirms that every mandatory cell belongs to that candidate, and
 reports all exclusions, waivers, residual limitations, and unexecuted cells. EP-45 supplies

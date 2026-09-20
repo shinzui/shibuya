@@ -72,7 +72,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 |---|-------|------|-----------|-----------|--------|
 | 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
-| 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | In Progress |
+| 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Not Started |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Not Started |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Not Started |
@@ -149,7 +149,7 @@ and is verified, not tracked, here.
 - [x] EP-38 M1: Add deterministic regressions for ownership, halt, failures and policies.
 - [x] EP-38 M2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
 - [x] EP-38 M3: Make stop/failure wakeups and scheduler ownership reliable.
-- [ ] EP-38 M4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
+- [x] EP-38 M4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
 - [ ] EP-39 M1: Characterize the published HTTP and WebSocket contract in a new metrics test suite, before any behavior changes, and add it to the release gate.
 - [ ] EP-39 M2: Repair activity accounting and lifecycle-aware health.
 - [ ] EP-39 M3: Fix WebSocket ownership, enablement and subscriptions.
@@ -212,6 +212,16 @@ CPU and 131,072 live bytes, preserving the 1-point and 32,768-byte adverse-delta
 320 raw calibration samples lost no acknowledgements. They deliberately cannot serve as final
 paired evidence; pass two rebuilds this exact baseline and alternates it with the candidate.
 
+**Lifecycle observation and masking can become hot-path costs (2026-09-20 UTC, EP-38).**
+Focused paired measurements found four implementation-level regressions before acceptance: a
+recursive exception-restore frame chain in the keyed scheduler, masked supervisor and processor
+children, terminal STM reads/branches on populated inboxes, and an Effectful exception observer
+around the whole processor computation. Narrowing masked ownership transfers, restoring child
+interruptibility, keeping terminal outcome reads off the populated-inbox transaction, and
+classifying failure once at the unlifted IO boundary preserved the new lifecycle contract while
+returning every N1/N4 cell inside the original budgets. The retained diagnostic comparisons are
+part of EP-38's evidence rather than being discarded after the fixes.
+
 
 ## Decision Log
 
@@ -259,6 +269,15 @@ actionable errors and surfaces all five MessageDB exclusions. No open remediatio
 closed by this result; the ledger now makes those gaps mechanically visible to every later
 child and to final certification.
 
+EP-38 completed core lifecycle remediation at implementation SHA
+`2108292e15c2cf79e40e8ca09a74604926beaedc`. It closes its 13 fixable review-derived entries,
+retains the one accepted runtime limitation, and passes all 45 owned lifecycle-boundary cells.
+The evidence includes a red/green lifecycle probe, 236 ordinary examples, both isolated GC
+suites, eight schedule-sensitive tests at 100/100 seeds, and focused paired performance under
+N1 and N4 with no waiver or budget change. Its retained bounded lifecycle snapshot now unblocks
+EP-39's lifecycle-aware health work, and its infrastructure-failure contract unblocks EP-40 and
+EP-41 acceptance.
+
 
 ## Revision Notes
 
@@ -279,3 +298,10 @@ lifecycle load catalog, one-process JSON sampler, deterministic comparator, prec
 calibrated budgets, and 320 N1/N4 samples against the released 0.9.0.3 production code. The raw
 capture is explicitly calibration-only; final paired evidence remains EP-45 pass two after all
 five remediation children complete.
+
+2026-09-20 UTC: Completed EP-38. Added exception-safe startup, child ownership and coordinated
+shutdown; explicit configuration/capacity validation; wakeable halt and failure outcomes;
+prompt keyed/ticker failure propagation; distinct infrastructure finalization failure; and a
+bounded retained lifecycle snapshot. Updated all EP-38 findings and 45 boundary cells with
+candidate-bound raw evidence. The final focused performance union passes N1 and N4 using the
+original EP-45 budgets, so no release-owner waiver or post-observation budget change was used.

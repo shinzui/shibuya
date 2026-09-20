@@ -49,7 +49,7 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 - [x] Milestone 1: Add deterministic regressions for ownership, halt, failures and policies.
 - [x] Milestone 2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
 - [x] Milestone 3: Make stop/failure wakeups and scheduler ownership reliable.
-- [ ] Milestone 4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
+- [x] Milestone 4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
 
 
 ## Surprises & Discoveries
@@ -73,6 +73,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: After restoring interruptibility, the N4 retry path still carried a reproducible tail-latency penalty even though throughput and long-workload probes matched baseline. A controlled build without lifecycle observation removed it. The cause was `Effectful.Exception.catch` wrapping the full processor computation, which installed an unlift layer across every effect. Terminal classification now performs one `Control.Exception.try` at the already-unlifted IO child boundary and uses IO lifecycle-transition helpers. The retained snapshot and failure classification are unchanged, while a 50-pair N4 probe brought retry p95/p99 back within the 10% budget.
 
+2026-09-20: Thirty-pair shutdown measurements on sub-millisecond paths were too noisy to accept, and the N1 retry throughput confidence interval still crossed its 5% limit after 1,000 pairs even though the estimate remained inside budget. The precommitted budgets were not changed. Increasing only the unresolved cells produced passing 300-pair active/residual verdicts under N1 and N4 and a passing 2,500-pair N1 retry verdict. The tightest throughput upper bound was 1.0480 against 1.0500; the last idle-shutdown upper bound was 1.0435 against 1.1000.
+
 
 ## Decision Log
 
@@ -95,7 +97,9 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 ## Outcomes & Retrospective
 
 
-Milestones 1 through 3 are implemented. The ordinary core suite now asserts deterministic cancellation at the startup ownership-transfer barrier; duplicate and policy rejection before acquisition; idle halt across Serial, Ahead, Async, partitioned and batch paths; traced and untraced finalizer failure; supervision-specific observability; exception-safe and bounded adapter shutdown; cancellation during drain; repeated/concurrent stop; prompt keyed failure with infinite input; and ticker failure. The implementation uses a wakeable STM terminal signal, separate graceful and infrastructure exceptions, masked ownership transfers, immediate keyed failure propagation, and coordinated shutdown. Milestone 4 remains open until candidate-bound evidence, the findings ledger, repeated schedule runs, and focused EP-45 performance comparison are complete.
+All four milestones are complete at implementation SHA `2108292e15c2cf79e40e8ca09a74604926beaedc`. The ordinary core suite now asserts deterministic cancellation at the startup ownership-transfer barrier; duplicate and policy rejection before acquisition; idle halt across Serial, Ahead, Async, partitioned and batch paths; traced and untraced finalizer failure; supervision-specific observability; exception-safe and bounded adapter shutdown; cancellation during drain; repeated/concurrent stop; prompt keyed failure with infinite input; and ticker failure. The implementation uses a wakeable terminal outcome, separate graceful and infrastructure exceptions, masked ownership transfers with restored child interruptibility, immediate keyed failure propagation, coordinated shutdown, checked capacities, and a retained bounded lifecycle snapshot.
+
+The accepted evidence is indexed by `docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md`: the baseline probe reproduces the audited failures, the candidate probe demonstrates the intended outcomes, all 236 ordinary examples and both isolated GC suites pass, and eight schedule-sensitive selectors pass 100/100 recorded seeds. Focused paired performance evidence passes every measured cell under N1 and N4 without a waiver or budget change. All EP-38-owned finding records are fixed or accepted and all 45 owned lifecycle-boundary cells are passed. EP-39 may now consume `LifecycleSnapshot`; EP-40 and EP-41 may rely on infrastructure finalization being observable as failure rather than Halt.
 
 
 ## Context and Orientation
@@ -147,6 +151,22 @@ cabal test shibuya-core:shibuya-core-gc-test --offline --test-show-details=direc
 
 On the implementation tree, `cabal test shibuya-core --offline --test-show-details=failures` builds and passes the ordinary suite plus both isolated GC suites. The focused audit probe is compiled with its object directory outside the repository and now reports structured duplicate/policy rejection, successful idle halt for all strategies, both shutdown actions attempted after a synchronous failure, and prompt keyed failure. Exact candidate SHA, solver hash, repetitions, and logs are added to the EP-37 evidence artifact after the implementation commit exists.
 
+The completed candidate-bound run uses GHC 9.12.4 with `-O1` and records:
+
+```text
+cabal build all --offline
+cabal test shibuya-core --offline --test-show-details=direct
+```
+
+The first command passes for all packages. The second passes 236 ordinary examples,
+`shibuya-core-gc-test`, and `shibuya-core-gc-finished-test`. The eight schedule-sensitive
+selectors listed in the evidence index pass seeds 1 through 100. Paired performance captures
+use baseline SHA `7512b5c692af1c005392e4445cfa26a9be41f9ea`, candidate SHA
+`2108292e15c2cf79e40e8ca09a74604926beaedc`, harness SHA
+`886f5910a5f1a47b5465dce9380bce831467fe2b`, solver hash
+`47f9680ce1ad6be1220c85dfc30c850d097e20d4e97bef9d4394cbce30ec4dc4`, and pass the
+unchanged EP-45 budgets under both N1 and N4.
+
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
 
 
@@ -195,3 +215,5 @@ This plan is a soft dependency of the metrics plan above and of docs/plans/40-pr
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan against docs/reviews, IR-6, the working tree and NQE 0.6.6. That review found the REV-16 supervisor-link defects; at the project owner's direction they are fixed by the standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, so this plan only records the boundary with it and the obligation to keep its tests green. Added the modules and suites the drafted orientation omitted (Master.hs, BatchProcessor.hs, Ingester.hs, Core/Error.hs and three test files), since the batch half of the finalizer-exhaustion defect and the snapshot's home live there. Resolved three ambiguities the draft left to the implementer: the total shutdown deadline IR-6 asks for, how failure is observable under each supervision strategy, and that new error constructors are a deliberate breaking change. Separated nonpositive-concurrency rejection (Milestone 2) from overflow checks (Milestone 4), which the draft assigned to both. Recorded that this plan is now a soft rather than hard dependency of the metrics and adapter plans, noted the repository's new first ADR, and defined the terms of art the draft used without explanation.
 
 2026-09-20 UTC: Added the obligation to keep the metrics plan's golden wire fixtures in step with any encoder-visible change made here, because that plan now characterizes the metrics package's published output before anything changes it and gates releases on it.
+
+2026-09-20 UTC: Completed implementation and acceptance. Added structured configuration and policy rejection, exception-safe startup and shutdown ownership, total shutdown coordination, wakeable terminal outcomes, distinct infrastructure failure, prompt keyed and ticker failure propagation, restored child interruptibility, checked capacity arithmetic, and the retained lifecycle snapshot. Bound the red/green probes, 236-example core run, both isolated GC suites, eight 100-seed repetitions, and passing N1/N4 paired performance comparisons to the implementation SHA; updated all owned findings and 45 lifecycle-boundary cells without a waiver or budget change.

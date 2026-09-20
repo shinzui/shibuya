@@ -120,10 +120,10 @@
       "confirmation": "source",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "All acquired adapters are signalled and the supervisor is stopped even when shutdown throws or is cancelled, while the original exception is preserved.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-2-F2",
@@ -137,10 +137,10 @@
       "confirmation": "source",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Duplicate ordinary, batch, and mixed processor IDs are rejected before any startup effect.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/RunnerSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-2-C1",
@@ -151,13 +151,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-2-application-lifecycle-audit.md", "reviewedSha": "afdf42ece83e0765ed00c663801146737acff52f" },
       "claim": "Cancellation between master acquisition, child creation, and handle transfer may leak supervised resources.",
-      "confirmation": "unconfirmed",
+      "confirmation": "verified",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Startup cancellation at every ownership-transfer boundary leaves no master or child thread running.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-2-A1",
@@ -168,13 +168,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-2-application-lifecycle-audit.md", "reviewedSha": "afdf42ece83e0765ed00c663801146737acff52f" },
       "claim": "The existing timeout bounds drain after adapter shutdown returns; it is not a total shutdown deadline.",
-      "confirmation": "documented",
+      "confirmation": "verified",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "The release documents and tests the chosen total shutdown bound separately from the drain timeout.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "docs/adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-3-F1",
@@ -188,10 +188,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "All adapter shutdown actions and supervisor cleanup run despite one shutdown exception.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-3-F2",
@@ -205,10 +205,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Identity validation precedes all processor and adapter startup effects.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/RunnerSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-3-F3",
@@ -222,10 +222,10 @@
       "confirmation": "source",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Cancellation during startup cleans every acquired resource exactly once.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-4-F1",
@@ -239,10 +239,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Acknowledged halt wakes Serial, Ahead, Async, partitioned, and batch processors without requiring later source activity.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-4-F2",
@@ -256,10 +256,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Infrastructure finalization failure remains a failure under every supervision strategy and is never reported as AckHalt.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/App/LifecycleSpec.hs", "shibuya-core/test/Shibuya/Runner/BatchProcessorSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-5-F1",
@@ -273,10 +273,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "The first keyed worker failure stops intake, settles owned children, and propagates without waiting for upstream exhaustion.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/Runner/PartitionOrderingSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-5-C1",
@@ -287,13 +287,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-5-keyed-scheduler-audit.md", "reviewedSha": "851c7c9db5d47593e2bd2899802c23bb06a231f7" },
       "claim": "An unmasked interval between async allocation and worker-map insertion may leave an untracked start-gate waiter after cancellation.",
-      "confirmation": "unconfirmed",
+      "confirmation": "verified",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Worker allocation and registration transfer ownership atomically under cancellation.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/Runner/PartitionOrderingSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-6-F1",
@@ -307,10 +307,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "Nonpositive concurrency and overflowing derived capacities are rejected before startup in every processing mode.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/PolicySpec.hs", "shibuya-core/test/Shibuya/RunnerSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "scripts/audit/LifecycleProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-7-F1",
@@ -882,13 +882,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-15-batcher-lifecycle-audit.md", "reviewedSha": "851c7c9db5d47593e2bd2899802c23bb06a231f7" },
       "claim": "Ticker exceptions are not independently monitored by the output loop; no failing supported configuration was demonstrated.",
-      "confirmation": "unconfirmed",
+      "confirmation": "verified",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "invariant": "The candidate either reproduces and fixes a reachable ticker failure or records evidence that supported configurations cannot trigger it.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-core/test/Shibuya/Runner/BatcherSpec.hs"],
+      "fixSha": "28a11e00f30474232b331eaf7c65ca35f3837aae",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-16-F1",
@@ -948,11 +948,11 @@
       "description": "Configuration validation, master acquisition, processor registration, and ownership transfer.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] }
       }
     },
     {
@@ -960,11 +960,11 @@
       "description": "Source polling, bounded admission, shutdown wakeups, and leased-message replay.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -972,11 +972,11 @@
       "description": "Handler dispatch, bounded concurrency, result collection, and stop propagation.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -984,11 +984,11 @@
       "description": "Per-key serialization, pending work, worker registration, and worker failure.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -996,11 +996,11 @@
       "description": "Batch accumulation, tick/flush behavior, bounded output, and high-cardinality memory.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -1008,11 +1008,11 @@
       "description": "Retry scheduling, lease retention, exhausted retries, and shutdown of delayed work.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -1020,11 +1020,11 @@
       "description": "Ack, retry, halt, and dead-letter finalizers including exhausted infrastructure failures.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] }
       }
     },
     {
@@ -1032,11 +1032,11 @@
       "description": "Graceful drain, adapter shutdown, force-stop, cancellation, and total deadline.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] }
       }
     },
     {
@@ -1044,11 +1044,11 @@
       "description": "IgnoreFailures and StopAllOnFailure propagation, sibling cleanup, and GC-sensitive ownership.",
       "owner": "docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/cabal-test-shibuya-core.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/schedule-repetitions.log"] }
       }
     },
     {

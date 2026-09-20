@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "status": "inconclusive",
+  "baselineLabel": "ep38-baseline",
+  "candidateLabel": "ep38-candidate",
+  "confidenceLevel": 0.95,
+  "resamplingSeed": 20260920,
+  "errors": [],
+  "results": [
+    {
+      "scenario": "retry-path",
+      "metric": "allocatedBytesPerMessage",
+      "status": "pass",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 1.0156661269917258,
+      "lower95": 1.0156251058453567,
+      "upper95": 1.015706784247155,
+      "threshold": 1.05,
+      "message": "allocatedBytesPerMessage adverse ratio 1.0157 (CI 1.0156..1.0157, limit 1.0500)"
+    },
+    {
+      "scenario": "retry-path",
+      "metric": "latencyP95Ms",
+      "status": "pass",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 1.015818254290809,
+      "lower95": 1.0069860817569483,
+      "upper95": 1.024074627300172,
+      "threshold": 1.1,
+      "message": "latencyP95Ms adverse ratio 1.0158 (CI 1.0070..1.0241, limit 1.1000)"
+    },
+    {
+      "scenario": "retry-path",
+      "metric": "latencyP99Ms",
+      "status": "pass",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 1.0139286183719445,
+      "lower95": 1.0048900852685527,
+      "upper95": 1.0225130576311372,
+      "threshold": 1.1,
+      "message": "latencyP99Ms adverse ratio 1.0139 (CI 1.0049..1.0225, limit 1.1000)"
+    },
+    {
+      "scenario": "retry-path",
+      "metric": "maxLiveBytes",
+      "status": "pass",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 1.0001861307067765,
+      "lower95": 1.0001861300830797,
+      "upper95": 1.0001861313651361,
+      "threshold": 1.05,
+      "message": "maxLiveBytes adverse ratio 1.0002 (CI 1.0002..1.0002, limit 1.0500)"
+    },
+    {
+      "scenario": "retry-path",
+      "metric": "shutdownLatencyMs",
+      "status": "pass",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 0.9930175846394445,
+      "lower95": 0.9598917305112896,
+      "upper95": 1.0281155792036818,
+      "threshold": 1.1,
+      "message": "shutdownLatencyMs adverse ratio 0.9930 (CI 0.9599..1.0281, limit 1.1000)"
+    },
+    {
+      "scenario": "retry-path",
+      "metric": "throughputPerSecond",
+      "status": "inconclusive",
+      "pairCount": 1000,
+      "method": "paired-ratio",
+      "estimate": 1.029664599494567,
+      "lower95": 1.0049739993545161,
+      "upper95": 1.0545070405533639,
+      "threshold": 1.05,
+      "message": "throughputPerSecond adverse ratio 1.0297 (CI 1.0050..1.0545, limit 1.0500)"
+    }
+  ]
+}
