@@ -29,7 +29,7 @@
 
 - Base stuck detection on sampled progress instead of burst age, retain failed configured
   processors after live metrics unregister, report stopped masters not live, and bound each
-  dependency readiness check.
+  dependency readiness check while normalizing its synchronous exceptions as unhealthy.
 - Release WebSocket connection slots on every setup and connection exit, reject upgrades
   when WebSockets are disabled, support exclusions from subscribe-all, and deliver `goodbye`
   when server shutdown begins.

@@ -168,11 +168,16 @@ spec = around withMaster $ do
     it "sends goodbye when WebSocket shutdown is requested" $ \master -> do
       wsState <- newWebSocketState 1
       let app = combinedApp fastConfig master wsState []
-      Warp.testWithApplication (pure app) $ \port ->
+      Warp.testWithApplication (pure app) $ \port -> do
         WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
           _ <- receiveServer conn
           shutdownWebSockets wsState
+          shutdownWebSockets wsState
           receiveServer conn `shouldReturn` Goodbye
+        released <- timeout 1_000_000 $ atomically $ do
+          count <- readTVar wsState.connectionCount
+          check $ count == 0
+        released `shouldBe` Just ()
 
     it "reports a retained terminal failure once when a processor disappears" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "alpha")

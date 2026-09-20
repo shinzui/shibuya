@@ -1,5 +1,6 @@
 module Shibuya.Metrics.ServerSpec (spec) where
 
+import Control.Exception (throwIO)
 import Data.Aeson (decode, object, (.=))
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as LBS
@@ -76,6 +77,11 @@ spec = around withMaster $ do
 
     it "returns 503 from readiness and detailed health for an unhealthy dependency" $ \master -> do
       app <- appFor defaultConfig master [failingDependency]
+      assertResponse app "/health" status503 (Just "application/json")
+      assertResponse app "/health/ready" status503 (Just "application/json")
+
+    it "returns 503 when a dependency check throws synchronously" $ \master -> do
+      app <- appFor defaultConfig master [throwIO $ userError "database exploded"]
       assertResponse app "/health" status503 (Just "application/json")
       assertResponse app "/health/ready" status503 (Just "application/json")
 

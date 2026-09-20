@@ -20,7 +20,8 @@
   shutdown, and repeated/concurrent stop exception safe. Retain internal terminal lifecycle
   state after live metrics unregister so `IgnoreFailures` does not erase failures.
 - `shibuya-metrics`: make stuck detection progress-based, keep retained failures unready,
-  report stopped masters not live, and bound hung dependency checks.
+  report stopped masters not live, and bound hung dependency checks while normalizing their
+  synchronous exceptions as unhealthy.
 - `shibuya-metrics`: make WebSocket slot ownership exception-safe, honor the enable flag for
   upgrades, define subscribe-all exclusions, and signal active clients during shutdown.
 

@@ -26,6 +26,13 @@ module Shibuya.Metrics.Health
   )
 where
 
+import Control.Exception
+  ( SomeAsyncException,
+    SomeException,
+    displayException,
+    fromException,
+    tryJust,
+  )
 import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
@@ -166,6 +173,8 @@ instance ToJSON DependencyStatus where
       ]
 
 -- | A dependency check is an IO action that returns the dependency's status.
+-- Synchronous exceptions become an unhealthy status; asynchronous exceptions
+-- remain cancellation signals and are rethrown.
 type DependencyCheck = IO DependencyStatus
 
 --------------------------------------------------------------------------------
@@ -291,9 +300,16 @@ classifyApplication masterPhase lifecycles
 
 runDependencyCheck :: HealthConfig -> DependencyCheck -> IO DependencyStatus
 runDependencyCheck config check = do
-  result <- timeout config.dependencyTimeoutMicros check
+  result <- timeout config.dependencyTimeoutMicros $ tryJust synchronousException check
   pure $ case result of
-    Just status -> status
+    Just (Right status) -> status
+    Just (Left err) ->
+      DependencyStatus
+        { name = "unknown",
+          healthy = False,
+          latencyMs = Nothing,
+          errorMsg = Just $ Text.pack $ displayException err
+        }
     Nothing ->
       DependencyStatus
         { name = "unknown",
@@ -305,3 +321,9 @@ runDependencyCheck config check = do
                 <> Text.pack (show config.dependencyTimeoutMicros)
                 <> " microseconds"
         }
+
+synchronousException :: SomeException -> Maybe SomeException
+synchronousException exception =
+  case fromException exception :: Maybe SomeAsyncException of
+    Just _ -> Nothing
+    Nothing -> Just exception

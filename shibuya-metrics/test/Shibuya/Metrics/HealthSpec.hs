@@ -1,9 +1,11 @@
 module Shibuya.Metrics.HealthSpec (spec) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (newEmptyMVar, putMVar, takeMVar, threadDelay)
+import Control.Concurrent.Async (async, cancel, waitCatch)
 import Control.Concurrent.NQE.Supervisor (Strategy (IgnoreAll))
-import Control.Exception (bracket)
+import Control.Exception (bracket, throwIO)
 import Data.Atomics.Counter (readCounter)
+import Data.Either (isLeft)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Maybe (isJust)
 import Data.Time.Clock (addUTCTime, getCurrentTime)
@@ -179,6 +181,28 @@ spec = do
           readiness.dependencies
             `shouldBe` [DependencyStatus "unknown" False Nothing (Just "Dependency check timed out after 10000 microseconds")]
         Nothing -> fail "health check exceeded its dependency timeout"
+
+    it "normalizes a synchronous dependency exception" $ \master -> do
+      readiness <-
+        checkReadiness defaultHealthConfig master [throwIO $ userError "database exploded"]
+      readiness.ready `shouldBe` False
+      readiness.dependencies
+        `shouldBe` [DependencyStatus "unknown" False Nothing (Just "user error (database exploded)")]
+
+    it "preserves asynchronous cancellation of a dependency check" $ \master -> do
+      started <- newEmptyMVar
+      worker <- async $ checkReadiness defaultHealthConfig master [putMVar started () >> threadDelay 5_000_000 >> pure healthyDependency]
+      takeMVar started
+      cancel worker
+      waitCatch worker >>= (`shouldSatisfy` isLeft)
+
+    it "keeps repeated master stop observable and idempotent" $ \master -> do
+      runEff $ stopMaster master
+      runEff $ stopMaster master
+      checkLiveness defaultHealthConfig master `shouldReturn` LivenessStatus {alive = False}
+      readiness <- checkReadiness defaultHealthConfig master []
+      readiness.application `shouldBe` ApplicationStopped
+      readiness.ready `shouldBe` False
 
   describe "starting health" $
     it "distinguishes a starting master from a configured-empty running master" $
