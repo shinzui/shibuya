@@ -1,0 +1,82 @@
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.9.0.3 (test:shibuya-core-gc-finished-test) (additional components to build)
+ - shibuya-core-0.9.0.3 (test:shibuya-core-gc-test) (additional components to build)
+ - shibuya-core-0.9.0.3 (test:shibuya-core-test) (additional components to build)
+ - shibuya-core-bench-0.1.0.0 (exe:prod-stress) (file /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/cache/build changed)
+ - shibuya-core-bench-0.1.0.0 (bench:shibuya-core-bench) (file /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/cache/build changed)
+ - shibuya-core-bench-0.1.0.0 (exe:standalone-test) (file /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/cache/build changed)
+ - shibuya-example-0.1.0.0 (exe:shibuya-batch-example) (file /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/cache/build changed)
+ - shibuya-metrics-0.9.0.3 (lib) (file /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/cache/build changed)
+ - shibuya-example-0.1.0.0 (exe:shibuya-example) (dependency rebuilt)
+Preprocessing test suite 'shibuya-core-gc-test' for shibuya-core-0.9.0.3...
+Preprocessing test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.9.0.3...
+Building test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.9.0.3...
+Building test suite 'shibuya-core-gc-test' for shibuya-core-0.9.0.3...
+Preprocessing executable 'standalone-test' for shibuya-core-bench-0.1.0.0...
+Preprocessing benchmark 'shibuya-core-bench' for shibuya-core-bench-0.1.0.0...
+Building executable 'standalone-test' for shibuya-core-bench-0.1.0.0...
+Preprocessing executable 'prod-stress' for shibuya-core-bench-0.1.0.0...
+Building benchmark 'shibuya-core-bench' for shibuya-core-bench-0.1.0.0...
+Building executable 'prod-stress' for shibuya-core-bench-0.1.0.0...
+Preprocessing test suite 'shibuya-core-test' for shibuya-core-0.9.0.3...
+Preprocessing executable 'shibuya-batch-example' for shibuya-example-0.1.0.0...
+Building executable 'shibuya-batch-example' for shibuya-example-0.1.0.0...
+Preprocessing library for shibuya-metrics-0.9.0.3...
+Building test suite 'shibuya-core-test' for shibuya-core-0.9.0.3...
+Building library for shibuya-metrics-0.9.0.3...
+[1 of 1] Compiling Main             ( app-batch/Main.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-batch-example/build/shibuya-batch-example/shibuya-batch-example-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-batch-example/build/shibuya-batch-example/shibuya-batch-example-tmp/Main.dyn_o ) [Shibuya.App changed]
+[2 of 8] Compiling Shibuya.Metrics.Health ( src/Shibuya/Metrics/Health.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Health.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Health.dyn_o ) [Shibuya.App changed]
+[2 of 8] Compiling Bench.Concurrency ( bench/Bench/Concurrency.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Concurrency.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Concurrency.dyn_o ) [Shibuya.Internal.Runner.Master changed]
+[1 of 1] Compiling Main             ( bench/Test/ProdStress.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/prod-stress/build/prod-stress/prod-stress-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/prod-stress/build/prod-stress/prod-stress-tmp/Main.dyn_o ) [Shibuya.Internal.Runner.Master changed]
+[1 of 1] Compiling Main             ( bench/Test/StandaloneTest.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/standalone-test/build/standalone-test/standalone-test-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/standalone-test/build/standalone-test/standalone-test-tmp/Main.dyn_o ) [Shibuya.Internal.Runner.Master changed]
+bench/Test/ProdStress.hs:15:54: warning: [GHC-38856] [-Wunused-imports]
+    The import of ‘retry’
+    from module ‘Control.Concurrent.STM’ is redundant
+   |
+15 | import Control.Concurrent.STM (atomically, readTVar, retry)
+   |                                                      ^^^^^
+
+bench/Test/ProdStress.hs:53:40: warning: [GHC-18042] [-Wtype-defaults]
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraints
+        (Read a0)
+          arising from a use of ‘read’ at bench/Test/ProdStress.hs:53:40-43
+        (Num a0)
+          arising from the literal ‘200’ at bench/Test/ProdStress.hs:53:53-55
+        (Show a0)
+          arising from a use of ‘show’ at bench/Test/ProdStress.hs:65:10-13
+        (Enum a0)
+          arising from the arithmetic sequence ‘1 .. rounds’
+          at bench/Test/ProdStress.hs:73:9-21
+        (Integral a0)
+          arising from a use of ‘mod’ at bench/Test/ProdStress.hs:74:23-27
+        (Eq a0)
+          arising from the literal ‘0’ at bench/Test/ProdStress.hs:75:11
+    • In the expression: read r
+      In a case alternative: (r : _) -> read r
+      In the expression:
+        case args of
+          (r : _) -> read r
+          _ -> 200
+   |
+53 |   let rounds = case args of (r : _) -> read r; _ -> 200
+   |                                        ^^^^
+
+[3 of 8] Compiling Shibuya.Metrics.JSON ( src/Shibuya/Metrics/JSON.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/JSON.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/JSON.dyn_o ) [Shibuya.App changed]
+[4 of 8] Compiling Bench.Framework  ( bench/Bench/Framework.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Framework.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Framework.dyn_o ) [Shibuya.Internal.Runner.Supervised changed]
+[2 of 2] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-batch-example/build/shibuya-batch-example/shibuya-batch-example [Objects changed]
+[2 of 2] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/standalone-test/build/standalone-test/standalone-test [Objects changed]
+[4 of 8] Compiling Shibuya.Metrics.Prometheus ( src/Shibuya/Metrics/Prometheus.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Prometheus.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Prometheus.dyn_o ) [Shibuya.App changed]
+[2 of 2] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/prod-stress/build/prod-stress/prod-stress [Objects changed]
+[5 of 8] Compiling Bench.Handler    ( bench/Bench/Handler.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Handler.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Handler.dyn_o ) [Shibuya.Internal.Runner.Supervised changed]
+[6 of 8] Compiling Shibuya.Metrics.WebSocket ( src/Shibuya/Metrics/WebSocket.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/WebSocket.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/WebSocket.dyn_o ) [Shibuya.App changed]
+[6 of 8] Compiling Bench.HotPath    ( bench/Bench/HotPath.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/HotPath.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/HotPath.dyn_o ) [Shibuya.Internal.Runner.Master changed]
+[7 of 8] Compiling Bench.Lifecycle  ( bench/Bench/Lifecycle.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Lifecycle.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Bench/Lifecycle.dyn_o ) [Shibuya.Internal.Runner.Master changed]
+[7 of 8] Compiling Shibuya.Metrics.Server ( src/Shibuya/Metrics/Server.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Server.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics/Server.dyn_o ) [Shibuya.App changed]
+[8 of 8] Compiling Shibuya.Metrics  ( src/Shibuya/Metrics.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/build/Shibuya/Metrics.dyn_o ) [Shibuya.Metrics.Server changed]
+[8 of 8] Compiling Main             ( bench/Main.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench-tmp/Main.dyn_o ) [Bench.Concurrency changed]
+Preprocessing executable 'shibuya-example' for shibuya-example-0.1.0.0...
+Building executable 'shibuya-example' for shibuya-example-0.1.0.0...
+[1 of 1] Compiling Main             ( app/Main.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-example/build/shibuya-example/shibuya-example-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-example/build/shibuya-example/shibuya-example-tmp/Main.dyn_o ) [Shibuya.App changed]
+[9 of 9] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/b/shibuya-core-bench/build/shibuya-core-bench/shibuya-core-bench [Objects changed]
+[2 of 2] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-example-0.1.0.0/x/shibuya-example/build/shibuya-example/shibuya-example [Objects changed]

@@ -1,0 +1,368 @@
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.9.0.3 (test:shibuya-core-gc-finished-test) (ephemeral targets)
+ - shibuya-core-0.9.0.3 (test:shibuya-core-gc-test) (ephemeral targets)
+ - shibuya-core-0.9.0.3 (test:shibuya-core-test) (ephemeral targets)
+Preprocessing test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.9.0.3...
+Building test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.9.0.3...
+Preprocessing test suite 'shibuya-core-test' for shibuya-core-0.9.0.3...
+Preprocessing test suite 'shibuya-core-gc-test' for shibuya-core-0.9.0.3...
+Building test suite 'shibuya-core-gc-test' for shibuya-core-0.9.0.3...
+Building test suite 'shibuya-core-test' for shibuya-core-0.9.0.3...
+Running 1 test suites...
+Test suite shibuya-core-gc-test: RUNNING...
+Running 1 test suites...
+Test suite shibuya-core-gc-finished-test: RUNNING...
+Running 1 test suites...
+Test suite shibuya-core-test: RUNNING...
+
+Shibuya.App.Batch
+  runApp with a BatchingProcessor
+    rejects a batch config with size 0 (AppBatchConfigError) [✔]
+    rejects PartitionedInOrder with concurrent batching [✔]
+    processes all messages in batches and acks each exactly once [✔]
+    flushes a pending partial batch on graceful shutdown [✔]
+Shibuya.App lifecycle
+  cleans an acquired startup owner when cancellation lands at the transfer barrier [✔]
+  waitApp returns after a handler halts [✔]
+  stopAppGracefully returns True promptly after halt [✔]
+  cancellation sets done [✔]
+  waitApp returns after a batch handler halts [✔]
+  halt wakes idle intake in every queue strategy and batch mode [✔]
+PASS: bare waitApp survives major collections
+Test suite shibuya-core-gc-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/t/shibuya-core-gc-test/test/shibuya-core-0.9.0.3-shibuya-core-gc-test.log
+1 of 1 test suites (1 of 1 test cases) passed.
+  IgnoreFailures retains finalizer failure and message identity after waitApp [✔]
+  retains finalizer failure with tracing enabled [✔]
+  StopAllOnFailure delivers exhausted finalization exactly once [✔]
+  attempts every adapter shutdown and stops all children when one throws [✔]
+  bounds a never-returning adapter shutdown with the total deadline [✔]
+  runs adapter shutdown once for concurrent and repeated stop calls [✔]
+  stops the master when the shutdown caller is cancelled during drain [✔]
+  graceful completion under StopAllOnFailure does not kill siblings [✔]
+  halt under StopAllOnFailure does not kill siblings [✔]
+  failure under StopAllOnFailure kills siblings and propagates [✔]
+  StopAllOnFailure delivers one processor failure to the caller exactly once [✔]
+  StopAllOnFailure delivers one failure exactly once while cancelling busy siblings [✔]
+  IgnoreFailures isolates a failing processor [✔]
+Shibuya.Batch reliability
+  successful-finalization property
+    finalizes every normal-path message once with the intended decision [✔]
+      +++ OK, passed 50 tests.
+  finalizedExactlyOnce checker (non-vacuity)
+    accepts a complete, once-each tracked list regardless of order [✔]
+    rejects a double-finalized message [✔]
+    rejects a missing finalization [✔]
+    rejects an unexpected finalization [✔]
+    rejects a finalization with the wrong decision [✔]
+  scenarios
+PASS [finite source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [finite source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [failed source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [serial, concurrent and batch processors together, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful
+Test suite shibuya-core-gc-finished-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/t/shibuya-core-gc-finished-test/test/shibuya-core-0.9.0.3-shibuya-core-gc-finished-test.log
+1 of 1 test suites (1 of 1 test cases) passed.
+    flushes a partial batch on timeout [✔]
+    acks a partial-failure batch: exactly the failed messages dead-letter [✔]
+    on batch-handler exception, every message retries and the app survives [✔]
+    propagates a throwing batchKey as processor failure without double finalizing [✔]
+    retries a transient finalizer failure and records one success [✔]
+    exhausts permanent finalizer failures and halts loudly with the failed MessageId [✔]
+    halt in one batch finalizes that batch, halts its processor, and spares others [✔]
+    flushes a pending partial batch on graceful shutdown [✔]
+    accumulates independent per-key batches and acks all exactly once [✔]
+    preserves per-key FIFO while allowing cross-key concurrency [✔]
+    under a tiny inbox and a slow handler, loses no messages (backpressure liveness; see limitation) [✔]
+    bounds upstream pulls while keyed batch handlers are blocked [✔]
+    does not finalize additional messages after forced shutdown returns [✔]
+Shibuya.Batch
+  defaultBatchConfig
+    has size 100 and 1s timeout [✔]
+    routes every message to the default key [✔]
+  validateBatchConfig
+    accepts the default config [✔]
+    rejects size 0 [✔]
+    rejects non-positive timeout [✔]
+    rejects non-positive tick interval [✔]
+  BatchAck smart constructors
+    ackAllOk falls back to AckOk with no overrides [✔]
+    ackAll sets the fallback for everything [✔]
+    ackExcept keeps AckOk fallback and records overrides [✔]
+    failMessages dead-letters the listed ids [✔]
+    withFallback uses the given fallback [✔]
+Shibuya.Core.Types
+  MessageId
+    supports Eq [✔]
+    supports Ord for Map keys [✔]
+    supports IsString for OverloadedStrings [✔]
+  Attempt
+    supports Eq [✔]
+    supports Ord for sequencing retries [✔]
+    supports Num so retries can be incremented [✔]
+    Bounded reflects the underlying Word [✔]
+  Cursor
+    CursorInt compares numerically [✔]
+    CursorText compares lexicographically [✔]
+    CursorInt comes before CursorText in Ord [✔]
+  Envelope
+    Functor: fmap id == id [✔]
+    Functor: fmap (f . g) == fmap f . fmap g [✔]
+    preserves all fields through fmap [✔]
+    preserves attempt through fmap [✔]
+    preserves headers through fmap [✔]
+    mkEnvelope defaults optional metadata [✔]
+    defaults headers to Nothing in the test helper [✔]
+Shibuya.Core.Ack
+  RetryDelay
+    wraps NominalDiffTime [✔]
+    supports Eq [✔]
+  DeadLetterReason
+    distinguishes all constructors [✔]
+    PoisonPill carries message [✔]
+    InvalidPayload carries message [✔]
+    mkDeadLetterCode
+      accepts namespaced lowercase application codes [✔]
+      accepts the 128-character boundary [✔]
+      rejects each invalid grammar boundary [✔]
+      identifies the rejected code and failed rule [✔]
+    dead-letter projections and rendering
+      preserves the built-in contracts exactly [✔]
+      preserves an application code and detail [✔]
+  HaltReason
+    HaltOrderedStream carries message [✔]
+    HaltFatal carries message [✔]
+  AckDecision
+    distinguishes all constructors [✔]
+    AckOk equals AckOk [✔]
+    AckRetry carries delay [✔]
+    AckDeadLetter carries reason [✔]
+    AckHalt carries reason [✔]
+Shibuya.Core.Retry
+  exponentialBackoffPure
+    NoJitter
+      delay = base at attempt 0 [✔]
+      delay doubles each attempt [✔]
+      delay clamps to maxDelay [✔]
+      ignores the jitter sample [✔]
+    FullJitter
+      delay at sample 0 is 0 [✔]
+      delay at sample ~1 approaches baseExp [✔]
+      delay never exceeds the clamped baseExp [✔]
+        +++ OK, passed 100 tests.
+    EqualJitter
+      delay at sample 0 is half the baseExp [✔]
+      delay at sample ~1 approaches the full baseExp [✔]
+      delay is in [baseExp/2, baseExp] [✔]
+        +++ OK, passed 100 tests.
+    Attempt 0
+      with NoJitter equals base [✔]
+      with FullJitter is in [0, base) [✔]
+        +++ OK, passed 100 tests.
+  retryWithBackoff
+    produces AckRetry when attempt is set [✔]
+    produces AckRetry when attempt is Nothing (treats as Attempt 0) [✔]
+  exponentialBackoff (effectful)
+    samples a delay in [0, baseExp] for FullJitter [✔]
+Shibuya.Policy
+  OrderingPolicy
+    all constructors are distinguishable [✔]
+  Concurrency
+    all constructors are distinguishable [✔]
+    Ahead preserves Int value [✔]
+    Async preserves Int value [✔]
+  validatePolicy
+    StrictInOrder
+      allows Serial [✔]
+      rejects Ahead [✔]
+      rejects Async [✔]
+    PartitionedInOrder
+      allows Serial [✔]
+      allows Ahead [✔]
+      allows Async [✔]
+    Unordered
+      allows Serial [✔]
+      allows Ahead [✔]
+      allows Async [✔]
+    resource bounds
+      rejects nonpositive Ahead 0 [✔]
+      rejects nonpositive Async 0 [✔]
+      rejects negative Ahead (-1) [✔]
+      rejects negative Async (-1) [✔]
+      rejects derived-capacity overflow for Ahead 4611686018427387904 [✔]
+      rejects derived-capacity overflow for Async 4611686018427387904 [✔]
+    validatePolicy matrix
+      StrictInOrder + Serial [✔]
+      StrictInOrder + Ahead 4 [✔]
+      StrictInOrder + Async 4 [✔]
+      PartitionedInOrder + Serial [✔]
+      PartitionedInOrder + Ahead 4 [✔]
+      PartitionedInOrder + Async 4 [✔]
+      Unordered + Serial [✔]
+      Unordered + Ahead 4 [✔]
+      Unordered + Async 4 [✔]
+Shibuya.PublicApi
+  constructs and projects an application-defined dead-letter reason [✔]
+Shibuya.Runner
+  runApp
+    rejects inboxSize 0 before starting processors [✔]
+    rejects negative inboxSize before Natural conversion [✔]
+    processor identity validation
+      rejects duplicate ordinary processor IDs before adapter acquisition [✔]
+      rejects duplicate batch processor IDs before adapter acquisition [✔]
+      rejects duplicate mixed processor IDs before adapter acquisition [✔]
+    processes messages from mock adapter [✔]
+    calls finalize for each message [✔]
+    returns AppHandle for multiple processors [✔]
+  Policy validation
+    rejects nonpositive and overflowing concurrency before adapter acquisition [✔]
+    rejects StrictInOrder with Async [✔]
+    rejects StrictInOrder with Ahead [✔]
+    accepts valid policy combinations [✔]
+  mkProcessor
+    creates processor with Unordered ordering [✔]
+    creates processor with Serial concurrency [✔]
+Shibuya.Internal.Runner.Batcher
+  pure core (deterministic, no threads)
+    emits a size-triggered batch of exactly batchSize [✔]
+    keeps different keys in independent groups [✔]
+    flushes a partial group at end of input with TriggerFlush [✔]
+    emits a timeout batch once batchTimeout has elapsed [✔]
+    does not emit on a tick before the timeout has elapsed [✔]
+    copies the first message's partition into BatchInfo [✔]
+  message conservation (property)
+    every input message appears in exactly one emitted batch [✔]
+      +++ OK, passed 100 tests.
+    within each emitted batch, cursors are strictly ascending (per-key FIFO) [✔]
+      +++ OK, passed 100 tests.
+    every TriggerSize batch has size == batchSize [✔]
+      +++ OK, passed 100 tests.
+  IO engine runBatcher
+    conserves messages over a finite stream [✔]
+    emits full size-3 batches for a single key [✔]
+    emits a timeout batch on a slow stream before it ends [✔]
+    propagates ticker failure while input remains idle [✔]
+Shibuya.Internal.Runner.BatchProcessor
+  decision resolution and finalization (M1)
+    finalizes each of 5 messages successfully with per-message decisions [✔]
+    retries a transient finalizer failure and records one successful finalization [✔]
+    preserves application failures in explicit and fallback decisions [✔]
+  exception fallback (M2)
+    finalizes all 5 with AckRetry when the handler throws [✔]
+  halt (M2)
+    finalizes all 5, sets halt, and the driver throws ProcessorHalt [✔]
+    skips already-ready batches after halt and finalizes them with retry [✔]
+  finalizer failure (M2)
+    exhausts retries, names the failed MessageId, and still attempts the rest [✔]
+  keyed concurrency (M2)
+    does not overlap batches with the same BatchKey under Async [✔]
+Shibuya.Runner.PartitionOrdering
+  finalizes each partition in arrival order and exactly once [✔]
+    +++ OK, passed 30 tests.
+  respects the global concurrency bound [✔]
+  does not let a slow partition block fast partitions [✔]
+  propagates a keyed worker failure without waiting for infinite input [✔]
+Shibuya.Internal.Runner.Master
+  starts and stops cleanly [✔]
+  returns empty metrics initially [✔]
+  metrics queries return after stopMaster [✔]
+Shibuya.Internal.Runner.Supervised
+  restores interruptibility inside a supervised child [✔]
+  runWithMetrics
+    processes messages and tracks metrics [✔]
+    tracks failed messages [✔]
+    marks processor as done when stream exhausted [✔]
+    completes when the stream is longer than the inbox [✔]
+  AckHalt behavior
+    stops processing when handler returns AckHalt [✔]
+    updates metrics to halted state on AckHalt [✔]
+    halt in one supervised processor doesn't affect others [✔]
+  Concurrency modes
+    Ahead mode
+      processes all messages successfully [✔]
+      respects maxBuffer limit [✔]
+    Async mode
+      processes all messages concurrently [✔]
+      respects concurrency limit [✔]
+    Halt with concurrency
+      waits for in-flight to complete before halting [✔]
+      stops reading new messages after halt decision [✔]
+    Error handling
+      handler exception doesn't affect other in-flight handlers [✔]
+      finalizes throwing handlers with immediate retry [✔]
+      preserves an application failure through finalization [✔]
+      retries transient finalizer failures on the single-message path [✔]
+      halts loudly when finalizer retry is exhausted [✔]
+    Metrics tracking
+      tracks in-flight count during concurrent processing [✔]
+      reports correct maxConcurrency in metrics [✔]
+    Ahead mode ordering
+      completes handlers and emits results in input order [✔]
+  Robustness
+    Adapter source exceptions
+      drains already-ingested messages, marks Failed, and propagates the ingester exception under IgnoreGraceful [✔]
+      drains already-ingested messages and marks Failed without propagating under IgnoreAll [✔]
+      never drops an ingester failure (repeated) [✔]
+    Rapid start/stop cycles
+      handles rapid start/stop without resource leaks [✔]
+      handles concurrent start/stop cycles [✔]
+    IgnoreGraceful supervision strategy (StopAllOnFailure)
+      stops all processors when adapter source fails with IgnoreGraceful strategy [✔]
+    Multiple concurrent halts
+      handles multiple handlers returning AckHalt simultaneously [✔]
+    Stability under load
+      processes many messages without issues [✔]
+      handles mixed success and failure under load [✔]
+Graceful Shutdown
+  stopAppGracefully
+    drains in-flight messages before stopping [✔]
+    respects timeout when processors are slow [✔]
+    returns True when all processors finish quickly [✔]
+Shibuya.Telemetry.Effect
+  runTracingNoop
+    executes actions and returns result [✔]
+    executes nested withSpan without error [✔]
+    executes withSpan' and provides span handle [✔]
+    reports tracing as disabled [✔]
+    provides a tracer (noop) [✔]
+    handles exceptions in actions correctly [✔]
+    works with effectful actions [✔]
+  Span operations (noop mode)
+    addAttribute is a no-op [✔]
+    addEvent is a no-op [✔]
+    setStatus is a no-op [✔]
+Shibuya.Telemetry.Propagation
+  extractTraceContext
+    extracts valid W3C traceparent header [✔]
+    extracts traceparent with tracestate [✔]
+    returns Nothing for missing traceparent [✔]
+    returns Nothing for invalid traceparent format [✔]
+    rejects traceparent with non-standard version [✔]
+    rejects traceparent with all-zero trace ID [✔]
+    rejects traceparent with all-zero span ID [✔]
+    handles unsampled trace flag (00) [✔]
+    handles sampled trace flag (01) [✔]
+    ignores case-sensitivity of header names [✔]
+    extracts only traceparent when tracestate is malformed [✔]
+  currentTraceHeaders
+    returns Nothing when tracing is disabled [✔]
+    returns Nothing outside any active span [✔]
+    returns headers carrying the active span's traceparent [✔]
+Shibuya.Telemetry.Semantic (wire-format)
+  keeps the application dead-letter reason code wire key stable [✔]
+  emits a process span with conventions-aligned attributes and events [✔]
+  applies envelope.attributes onto the framework span (P0 fix, plan 9 F1/F2) [✔]
+  emits an application dead-letter code and canonical error status [✔]
+
+Finished in 20.5790 seconds
+236 examples, 0 failures
+Test suite shibuya-core-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.9.0.3/t/shibuya-core-test/test/shibuya-core-0.9.0.3-shibuya-core-test.log
+1 of 1 test suites (1 of 1 test cases) passed.
