@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Core plan becomes a soft dependency gating only exhausted-finalization visibility; record core 0.9 bound handling; define DLQ."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T23:20:00Z
+      mode: "implement"
+      note: "Begin implementation after EP-40 completion; resolve the adapter, pgmq-hs, and Hasql sources through Mori before changing transactional finalization."
 ---
 
 # Verify PGMQ acknowledgement and dead-letter recovery under faults
@@ -49,7 +54,10 @@ Demonstrate that PGMQ acknowledgements remain recoverable under database faults 
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-20: Implementation begins from the reviewed adapter owner
+`mori://shinzui/shibuya-pgmq-adapter`. Mori resolves the relevant database APIs to
+`mori://shinzui/pgmq-hs` and `mori://hasql/hasql`; those local sources are the API source of
+truth for the transaction and fault-fixture work.
 
 
 ## Decision Log
@@ -126,3 +134,6 @@ Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-eviden
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. The core lifecycle plan changed from a hard to a soft dependency, since the ambiguous-commit dead-letter defect is internal to the adapter and only the visibility of exhausted finalization failure needs the core plan's Milestone 3. Recorded the adapter's 0.9-series bound on shibuya-core and how to build against a major-version candidate. Defined DLQ, recorded that the review's source claims were re-verified against the adapter's unchanged HEAD, and noted the Shibuya repository's new first ADR.
+
+2026-09-20 UTC: Started EP-41 after EP-40 completed. Resolved the owning adapter and its
+PGMQ/Hasql dependencies through Mori before inspecting or changing the transactional API.
