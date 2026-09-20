@@ -38,6 +38,11 @@ provenance:
       at: 2026-09-20T03:02:02Z
       verdict: "approved"
       note: "Refreshed plan resolves review findings; isolated regression reproduces the crash, retention control and existing suite pass, release gate includes both suites, and RS2 remains out of scope. Library fix pending."
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:45:51Z
+      verdict: "comments"
+      note: "Fix is correct and minimal for an idle app with a live child; REV-16 reproduces that the remaining NQE supervisor link still kills callers of finished apps during GC and double-delivers failures; remediation is standalone plan 46."
 ---
 
 # Remove the idle linked master loop that deadlocks bare waitApp callers
