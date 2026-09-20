@@ -50,7 +50,7 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 - [x] Milestone 1: Characterize the published HTTP and WebSocket contract in a new test suite, before any behavior changes, and add the suite to the release gate.
 - [x] Milestone 2: Repair activity accounting and lifecycle-aware health.
-- [ ] Milestone 3: Fix WebSocket ownership, enablement and subscriptions.
+- [x] Milestone 3: Fix WebSocket ownership, enablement and subscriptions.
 - [ ] Milestone 4: Verify endpoint compatibility and accounting together, and retire the package's "unproven" caveat.
 
 
@@ -68,6 +68,10 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: The prescribed per-handler monotonic-clock design failed its focused performance gate. Against `682003e` under `-N1`, serial/10,000 rose from 3.987 ms and 20,567,968 allocated bytes to 5.112 ms and 24,251,596 bytes (28% slower), while async8 rose from 7.931 ms to 8.915 ms (12% slower). Moving monotonic timing to `sampleMetrics` and leaving only atomic burst/accounting operations on the handler path passed the same 5% tasty-bench gate: serial 4.153 ms/20,888,497 bytes and async8 8.336 ms/34,068,866 bytes, both reported statistically unchanged from baseline.
 
 2026-09-20: Milestone 2 landed as `82a8e90f02b5c52a291a4655ee34c604d8fdb2e9`. Its raw focused baseline, rejected direct-clock candidate, accepted sampler candidate, machine identity, solver hash, and commands are retained under `docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/`.
+
+2026-09-20: Three WebSocket defect tests were applied to an isolated worktree at `98bbede`: a disabled upgrade was still accepted, unsubscribe from subscribe-all still emitted the excluded processor, and an ordinary peer disconnect let `ConnectionClosed` escape cleanup. All three failed in one 11-example run with seed `719269874`. A separate injected initial-snapshot failure at the same baseline left `connectionCount` nonzero for the full one-second STM barrier (`expected Just (), got Nothing`, seed `1370922219`).
+
+2026-09-20: Milestone 3 landed as `75d99fc49ac84509fe41f91f52bd4167487fda5d`. The connection slot is now bracketed across acceptance, initial sampling, and structurally raced sender/receiver loops; normal peer closure no longer escapes the WAI application. Upgrade routing honors `enableWebSocket`; subscribe-all retains explicit exclusions; server shutdown wakes senders through STM and delivers `goodbye`; and a removed visible processor emits one retained `terminal` outcome without accumulating a second history. The full metrics suite passed 44 examples and `cabal build all` succeeded.
 
 
 ## Decision Log
@@ -90,6 +94,12 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: Use sampler-side progress detection after the direct monotonic-clock design failed the 5% focused performance gate. `sampleMetrics` remembers processed, failed, in-flight, and burst-generation counters and reads the monotonic clock only when that tuple changes. A first observation establishes the progress point; a processor is stuck only after a later observation exceeds the threshold. One wedged handler remains invisible while siblings keep changing the aggregate counters, as explicitly deferred to the per-message inspection request.
 
 2026-09-20: Add `dependencyTimeoutMicros` to both health configuration records and add the application lifecycle to `ReadinessStatus`. This deliberately breaks direct record construction but leaves the default at one second per dependency. A timed-out legacy `IO DependencyStatus` cannot reveal its name before returning, so the diagnostic name is `unknown`; changing `DependencyCheck` itself would be a larger compatibility break.
+
+2026-09-20: Represent subscriptions as `AllProcessors excluded` or `SelectedProcessors included`. `subscribe_all` clears exclusions, a selective `subscribe` enters or extends selected mode, and `unsubscribe` adds exclusions in all mode or removes inclusions in selected mode. This preserves the useful existing selective-subscribe behavior while making the previously acknowledged no-op impossible.
+
+2026-09-20: Add the `terminal` server frame as an intentional additive wire change and a breaking source change to the exported `ServerMessage` sum. It reports `stopped`, or `failed` with error and optional message ID, only when a processor previously visible to that connection leaves live metrics with a retained terminal lifecycle. The last-visible metrics map is both delta state and the finite notification ledger, so each removal is sent once and no unbounded terminal history is introduced. The durable rationale is in `docs/adr/0004-make-websocket-lifecycle-and-terminal-delivery-explicit.md`.
+
+2026-09-20: Deliver shutdown through the shared WebSocket state rather than a network send in cleanup. Sender loops wait in STM on either the push interval or a one-way shutdown flag, send `goodbye` when shutdown wins, and then finish; the slot-release finalizer performs only local STM bookkeeping and therefore cannot be skipped by a failed close or goodbye send.
 
 2026-09-19: Start before the core lifecycle plan completes. Only lifecycle-aware readiness and terminal WebSocket notifications need its retained snapshot; the test suite, activity accounting and WebSocket slot ownership do not, and the activity defect is high priority.
 
