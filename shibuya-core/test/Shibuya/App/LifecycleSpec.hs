@@ -5,7 +5,9 @@ module Shibuya.App.LifecycleSpec (spec) where
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (readTVarIO)
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Control.Exception (SomeException, mask, try)
+import Control.Monad (join, void)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
@@ -197,6 +199,10 @@ spec = describe "Shibuya.App lifecycle" $ do
     countB <- readIORef countBRef
     countB `shouldSatisfy` (< 50)
 
+  it "StopAllOnFailure delivers one processor failure to the caller exactly once" $ do
+    result <- UIO.timeout 10_000_000 $ UIO.withAsync countLinkedDeliveries UIO.wait
+    result `shouldBe` Just 1
+
   it "IgnoreFailures isolates a failing processor" $ do
     countBRef <- newIORef (0 :: Int)
 
@@ -242,6 +248,40 @@ runAppOrFail strategy inboxSize processors = do
   case result of
     Left err -> liftIO $ expectationFailure ("runApp failed: " <> show err) >> error "unreachable"
     Right app -> pure app
+
+-- | Run one failing processor under 'StopAllOnFailure' on the calling thread and
+-- count the linked-thread exceptions that thread receives.
+--
+-- The deliveries are asynchronous exceptions, so one that lands between two
+-- handlers escapes both. Everything therefore runs under 'mask' and waits only
+-- inside 'restore', wrapped in base's 'try' (UnliftIO's deliberately ignores
+-- asynchronous exceptions): none can arrive between iterations, and the count is
+-- exact. The handle is retained until the end so garbage collection plays no part.
+countLinkedDeliveries :: IO Int
+countLinkedDeliveries =
+  mask $ \restore -> do
+    stopRef <- newIORef (pure ())
+    started <-
+      try @SomeException $
+        restore $
+          runEff $
+            runTracingNoop $ do
+              let failing = mkProcessor (failingAfterAdapter 0 "single-delivery failure") (\_ -> pure AckOk)
+              app <- runAppOrFail StopAllOnFailure 10 [(ProcessorId "single-delivery", failing)]
+              liftIO $
+                writeIORef stopRef $
+                  runEff $
+                    runTracingNoop $
+                      void (stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app)
+    let countUntilQuiet :: Int -> IO Int
+        countUntilQuiet n = do
+          window <- try @SomeException (restore (threadDelay 300_000))
+          case window of
+            Left _ -> countUntilQuiet (n + 1)
+            Right () -> pure n
+    deliveries <- countUntilQuiet (either (const 1) (const 0) started)
+    join (readIORef stopRef)
+    pure deliveries
 
 processorMetrics ::
   (IOE :> es) =>

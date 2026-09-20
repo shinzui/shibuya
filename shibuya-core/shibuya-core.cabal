@@ -170,3 +170,21 @@ test-suite shibuya-core-gc-test
     shibuya-core,
     streamly-core,
     unliftio,
+
+test-suite shibuya-core-gc-finished-test
+  import: warnings
+  default-language: GHC2024
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test-gc
+  main-is: Finished.hs
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N2
+
+  build-depends:
+    base ^>=4.21.0.0,
+    effectful,
+    shibuya-core,
+    streamly-core,
+    unliftio,

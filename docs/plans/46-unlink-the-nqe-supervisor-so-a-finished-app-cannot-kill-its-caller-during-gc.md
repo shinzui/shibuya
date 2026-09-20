@@ -10,6 +10,12 @@ provenance:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-20T04:36:50Z
+  revisions:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T05:10:35Z
+      mode: "implement"
+      note: "Implement Milestones 1-3 and prepare the patch release for owner approval"
 ---
 
 # Unlink the NQE supervisor so a finished app cannot kill its caller during GC
@@ -58,7 +64,7 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Reproduce both defects against the 0.9.0.2 library with diagnostic probes and record them as REV-16.
 - [x] (2026-09-20 UTC) Prototype the unlinked supervisor in an isolated worktree: the probe survives 18 of 18 runs and both existing core suites pass with 212 examples and zero failures.
 - [x] (2026-09-20 UTC) Confirm that the exact regression source in Milestone 1 compiles under `-Wall` and fails on all three scenarios against the unfixed library.
-- [ ] Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason.
+- [x] (2026-09-20 UTC) Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason. Observed on the unfixed library: three `FAIL` lines from `shibuya-core-gc-finished-test`, `expected: Just 1 but got: Just 2` as the only failure among 213 Hspec examples, and `shibuya-core-gc-test` still passing.
 - [ ] Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass.
 - [ ] Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix.
 - [ ] Milestone 4: Prepare and validate the patch release; publish only after the owner approves the version and changelog.
