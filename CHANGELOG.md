@@ -10,6 +10,9 @@
 - `shibuya-core`: extend `ProcessorState.Processing` with a sampled last-progress timestamp.
   `shibuya-metrics`: extend health configuration with a per-dependency timeout and readiness
   results with an explicit application lifecycle status.
+- `shibuya-metrics`: add `ServerMessage.ProcessorTerminal` and
+  `ProcessorTerminalStatus`, and extend the public `WebSocketState` record with shutdown
+  state.
 
 ### Bug Fixes
 
@@ -18,12 +21,16 @@
   state after live metrics unregister so `IgnoreFailures` does not erase failures.
 - `shibuya-metrics`: make stuck detection progress-based, keep retained failures unready,
   report stopped masters not live, and bound hung dependency checks.
+- `shibuya-metrics`: make WebSocket slot ownership exception-safe, honor the enable flag for
+  upgrades, define subscribe-all exclusions, and signal active clients during shutdown.
 
 ### New Features
 
 - `shibuya-metrics`: export `combinedApp` so applications and tests can mount the
   unified JSON, Prometheus, health, and WebSocket WAI application on an externally
   managed server.
+- `shibuya-metrics`: emit an additive terminal WebSocket frame when a visible processor is
+  removed with a retained stopped or failed lifecycle outcome.
 
 ### Other Changes
 

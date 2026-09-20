@@ -16,7 +16,7 @@ module Shibuya.Metrics.Server
 where
 
 import Control.Concurrent.Async (async, cancel)
-import Control.Exception (bracket)
+import Control.Exception (bracket, finally)
 import Data.Aeson (encode, object, (.=))
 import Data.Text (Text)
 import Network.HTTP.Types (hContentType, status404)
@@ -30,7 +30,7 @@ import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
 import Shibuya.Metrics.Prometheus (prometheusApp)
 import Shibuya.Metrics.Types (MetricsServer (..))
-import Shibuya.Metrics.WebSocket (WebSocketState, newWebSocketState, websocketApp)
+import Shibuya.Metrics.WebSocket (WebSocketState, newWebSocketState, shutdownWebSockets, websocketApp)
 
 -- | Start the metrics server without dependency checks.
 -- Returns a handle that can be used to stop the server.
@@ -52,7 +52,7 @@ startMetricsServerWithDeps config master depChecks = do
           Warp.setHost
             "*"
             Warp.defaultSettings
-  serverAsync <- async $ Warp.runSettings settings app
+  serverAsync <- async $ Warp.runSettings settings app `finally` shutdownWebSockets wsState
   pure
     MetricsServer
       { serverThread = serverAsync,
@@ -82,11 +82,15 @@ combinedApp ::
   [DependencyCheck] ->
   Application
 combinedApp config master wsState depChecks =
-  -- Handle WebSocket upgrade first
-  WaiWS.websocketsOr
-    WS.defaultConnectionOptions
-    (websocketApp config master wsState)
-    (httpApp config master depChecks)
+  if config.enableWebSocket
+    then
+      WaiWS.websocketsOr
+        WS.defaultConnectionOptions
+        (websocketApp config master wsState)
+        fallback
+    else fallback
+  where
+    fallback = httpApp config master depChecks
 
 -- | HTTP application routing based on path.
 httpApp :: MetricsServerConfig -> Master -> [DependencyCheck] -> Application

@@ -2,10 +2,13 @@ module Shibuya.Metrics.WebSocketSpec (spec) where
 
 import Control.Concurrent (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Async (async, wait)
-import Control.Exception (SomeException)
+import Control.Concurrent.STM (atomically, check, readTVar)
+import Control.Exception (SomeException, throwIO, try)
 import Data.Aeson (eitherDecode, encode)
 import Data.ByteString.Lazy (ByteString)
+import Data.IORef (atomicModifyIORef', newIORef)
 import Data.Map.Strict qualified as Map
+import Effectful (runEff)
 import Network.Wai.Handler.Warp qualified as Warp
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master, getAllMetricsIO)
@@ -14,16 +17,28 @@ import Shibuya.Core.Metrics
     ProcessorId (..),
     ProcessorMetrics (..),
     StreamStats (..),
+    beginProcessing,
     incrementReceived,
+    newMetricsHandleWithClock,
   )
+import Shibuya.Internal.Runner.Master (markProcessorFailedIO, registerProcessor, unregisterProcessor)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Server (combinedApp)
 import Shibuya.Metrics.TestSupport
-  ( registerIdleProcessor,
+  ( fixedTime,
+    registerIdleProcessor,
     withMaster,
   )
-import Shibuya.Metrics.Types (ClientMessage (..), ServerMessage (..))
-import Shibuya.Metrics.WebSocket (newWebSocketState)
+import Shibuya.Metrics.Types
+  ( ClientMessage (..),
+    ProcessorTerminalStatus (..),
+    ServerMessage (..),
+  )
+import Shibuya.Metrics.WebSocket
+  ( WebSocketState (..),
+    newWebSocketState,
+    shutdownWebSockets,
+  )
 import System.Timeout (timeout)
 import Test.Hspec
   ( Spec,
@@ -99,6 +114,78 @@ spec = around withMaster $ do
           `shouldThrow` (anyException :: SomeException -> Bool)
         putMVar release ()
         wait first
+
+    it "rejects WebSocket upgrades when disabled" $ \master ->
+      withServer defaultConfig {enableWebSocket = False} master $ \port ->
+        (WS.runClient "127.0.0.1" port "/ws" $ \conn -> receiveServer conn)
+          `shouldThrow` (anyException :: SomeException -> Bool)
+
+    it "excludes processors unsubscribed from subscribe-all" $ \master -> do
+      alpha <- registerIdleProcessor master (ProcessorId "alpha")
+      beta <- registerIdleProcessor master (ProcessorId "beta")
+      withServer fastConfig master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "alpha"]
+          incrementReceived alpha
+          incrementReceived beta
+          receiveServer conn >>= \case
+            ProcessorUpdate pid _ -> pid `shouldBe` ProcessorId "beta"
+            other -> expectationFailure $ "expected beta update, got " <> show other
+
+    it "restores a slot after a peer disconnects" $ \master -> do
+      wsState <- newWebSocketState 1
+      let app = combinedApp fastConfig master wsState []
+      Warp.testWithApplication (pure app) $ \port -> do
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          pure ()
+        released <- timeout 1_000_000 $ atomically $ do
+          count <- readTVar wsState.connectionCount
+          check $ count == 0
+        released `shouldBe` Just ()
+
+    it "restores a slot when initial snapshot generation fails" $ \master -> do
+      clockCalls <- newIORef (0 :: Int)
+      let failingClock = do
+            call <- atomicModifyIORef' clockCalls $ \count -> (count + 1, count)
+            if call == 0 then pure 0 else throwIO $ userError "snapshot failed"
+      handle <- newMetricsHandleWithClock failingClock fixedTime
+      _ <- beginProcessing handle 1
+      runEff $ registerProcessor master (ProcessorId "broken") handle
+      wsState <- newWebSocketState 1
+      let app = combinedApp fastConfig master wsState []
+          quietSettings = Warp.setOnException (\_ _ -> pure ()) Warp.defaultSettings
+      Warp.withApplicationSettings quietSettings (pure app) $ \port -> do
+        _ <-
+          try (WS.runClient "127.0.0.1" port "/ws" receiveServer) ::
+            IO (Either SomeException ServerMessage)
+        released <- timeout 1_000_000 $ atomically $ do
+          count <- readTVar wsState.connectionCount
+          check $ count == 0
+        released `shouldBe` Just ()
+
+    it "sends goodbye when WebSocket shutdown is requested" $ \master -> do
+      wsState <- newWebSocketState 1
+      let app = combinedApp fastConfig master wsState []
+      Warp.testWithApplication (pure app) $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          shutdownWebSockets wsState
+          receiveServer conn `shouldReturn` Goodbye
+
+    it "reports a retained terminal failure once when a processor disappears" $ \master -> do
+      _ <- registerIdleProcessor master (ProcessorId "alpha")
+      withServer fastConfig master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          markProcessorFailedIO master (ProcessorId "alpha") "boom" (Just "message-1")
+          runEff $ unregisterProcessor master (ProcessorId "alpha")
+          receiveServer conn
+            `shouldReturn` ProcessorTerminal
+              (ProcessorId "alpha")
+              (TerminalFailed "boom" (Just "message-1"))
+          timeout 50_000 (receiveServer conn) `shouldReturn` Nothing
 
 fastConfig :: MetricsServerConfig
 fastConfig = defaultConfig {wsPushIntervalUs = 10_000}

@@ -4,7 +4,11 @@ import Data.Aeson (FromJSON, ToJSON, Value, eitherDecode, encode, object, toJSON
 import Data.Map.Strict qualified as Map
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Metrics.TestSupport (fixtureMetrics)
-import Shibuya.Metrics.Types (ClientMessage (..), ServerMessage (..))
+import Shibuya.Metrics.Types
+  ( ClientMessage (..),
+    ProcessorTerminalStatus (..),
+    ServerMessage (..),
+  )
 import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 spec :: Spec
@@ -32,6 +36,21 @@ spec = do
           "metrics" .= processing
         ]
     messageCase Pong $ object ["type" .= ("pong" :: String)]
+    messageCase (ProcessorTerminal (ProcessorId "alpha") TerminalStopped) $
+      object
+        [ "type" .= ("terminal" :: String),
+          "processor" .= ("alpha" :: String),
+          "status" .= ("stopped" :: String)
+        ]
+    messageCase
+      (ProcessorTerminal (ProcessorId "alpha") (TerminalFailed "boom" (Just "message-1")))
+      $ object
+        [ "type" .= ("terminal" :: String),
+          "processor" .= ("alpha" :: String),
+          "status" .= ("failed" :: String),
+          "error" .= ("boom" :: String),
+          "messageId" .= (Just "message-1" :: Maybe String)
+        ]
     messageCase Goodbye $ object ["type" .= ("goodbye" :: String)]
 
     it "rejects an unknown server message tag" $

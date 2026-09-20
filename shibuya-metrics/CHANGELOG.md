@@ -9,11 +9,16 @@
   its JSON object gains the corresponding lifecycle status field.
 - The processing-state JSON object gains `lastProgress`, paired with the new third field of
   `shibuya-core`'s `ProcessorState.Processing` constructor.
+- `ServerMessage` gains `ProcessorTerminal`, with the new public
+  `ProcessorTerminalStatus` type, and the exposed `WebSocketState` record gains a shutdown
+  cell. Exhaustive matches and direct record construction must handle these additions.
 
 ### New Features
 
 - Export `combinedApp` so callers can mount the unified metrics WAI application on
   an externally managed server.
+- Send an additive `terminal` WebSocket frame when a formerly visible processor leaves the
+  live registry in a retained stopped or failed state.
 
 ### Other Changes
 
@@ -25,6 +30,9 @@
 - Base stuck detection on sampled progress instead of burst age, retain failed configured
   processors after live metrics unregister, report stopped masters not live, and bound each
   dependency readiness check.
+- Release WebSocket connection slots on every setup and connection exit, reject upgrades
+  when WebSockets are disabled, support exclusions from subscribe-all, and deliver `goodbye`
+  when server shutdown begins.
 
 ## 0.9.0.3 — 2026-09-20
 

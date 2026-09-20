@@ -43,6 +43,7 @@
 --
 -- * @{"type": "snapshot", "metrics": {...}}@ - Full metrics snapshot
 -- * @{"type": "update", "processor": "id", "metrics": {...}}@ - Single processor update
+-- * @{"type": "terminal", "processor": "id", "status": "stopped"}@ - Processor left the live registry
 -- * @{"type": "pong"}@ - Response to ping
 -- * @{"type": "goodbye"}@ - Server shutting down
 module Shibuya.Metrics
@@ -71,6 +72,7 @@ module Shibuya.Metrics
 
     -- * WebSocket Protocol Types
     ClientMessage (..),
+    ProcessorTerminalStatus (..),
     ServerMessage (..),
   )
 where
@@ -87,4 +89,4 @@ import Shibuya.Metrics.Health
     defaultHealthConfig,
   )
 import Shibuya.Metrics.Server (startMetricsServer, startMetricsServerWithDeps, stopMetricsServer, withMetricsServer)
-import Shibuya.Metrics.Types (ClientMessage (..), MetricsServer (..), ServerMessage (..))
+import Shibuya.Metrics.Types (ClientMessage (..), MetricsServer (..), ProcessorTerminalStatus (..), ServerMessage (..))

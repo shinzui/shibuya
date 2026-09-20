@@ -2,6 +2,7 @@
 module Shibuya.Metrics.Types
   ( -- * WebSocket Protocol
     ClientMessage (..),
+    ProcessorTerminalStatus (..),
     ServerMessage (..),
 
     -- * Server Handle
@@ -16,6 +17,7 @@ import Data.Aeson
     object,
     withObject,
     (.:),
+    (.:?),
     (.=),
   )
 import Data.Text (Text)
@@ -64,8 +66,16 @@ data ServerMessage
     ProcessorUpdate !ProcessorId !ProcessorMetrics
   | -- | Pong response to ping
     Pong
+  | -- | A formerly visible processor reached a retained terminal state
+    ProcessorTerminal !ProcessorId !ProcessorTerminalStatus
   | -- | Server is shutting down
     Goodbye
+  deriving stock (Eq, Show, Generic)
+
+-- | Retained terminal state sent when a processor leaves the live registry.
+data ProcessorTerminalStatus
+  = TerminalStopped
+  | TerminalFailed !Text !(Maybe Text)
   deriving stock (Eq, Show, Generic)
 
 instance ToJSON ServerMessage where
@@ -74,6 +84,20 @@ instance ToJSON ServerMessage where
   toJSON (ProcessorUpdate pid pm) =
     object ["type" .= ("update" :: Text), "processor" .= pid, "metrics" .= pm]
   toJSON Pong = object ["type" .= ("pong" :: Text)]
+  toJSON (ProcessorTerminal pid TerminalStopped) =
+    object
+      [ "type" .= ("terminal" :: Text),
+        "processor" .= pid,
+        "status" .= ("stopped" :: Text)
+      ]
+  toJSON (ProcessorTerminal pid (TerminalFailed failure messageId)) =
+    object
+      [ "type" .= ("terminal" :: Text),
+        "processor" .= pid,
+        "status" .= ("failed" :: Text),
+        "error" .= failure,
+        "messageId" .= messageId
+      ]
   toJSON Goodbye = object ["type" .= ("goodbye" :: Text)]
 
 instance FromJSON ServerMessage where
@@ -83,6 +107,14 @@ instance FromJSON ServerMessage where
       "snapshot" -> MetricsSnapshot <$> v .: "metrics"
       "update" -> ProcessorUpdate <$> v .: "processor" <*> v .: "metrics"
       "pong" -> pure Pong
+      "terminal" -> do
+        pid <- v .: "processor"
+        status <- v .: "status"
+        terminal <- case status :: Text of
+          "stopped" -> pure TerminalStopped
+          "failed" -> TerminalFailed <$> v .: "error" <*> v .:? "messageId"
+          other -> fail $ "Unknown terminal status: " <> Text.unpack other
+        pure $ ProcessorTerminal pid terminal
       "goodbye" -> pure Goodbye
       other -> fail $ "Unknown message type: " <> Text.unpack other
 
