@@ -48,7 +48,7 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 ## Progress
 
 
-- [ ] Milestone 1: Characterize the published HTTP and WebSocket contract in a new test suite, before any behavior changes, and add the suite to the release gate.
+- [x] Milestone 1: Characterize the published HTTP and WebSocket contract in a new test suite, before any behavior changes, and add the suite to the release gate.
 - [ ] Milestone 2: Repair activity accounting and lifecycle-aware health.
 - [ ] Milestone 3: Fix WebSocket ownership, enablement and subscriptions.
 - [ ] Milestone 4: Verify endpoint compatibility and accounting together, and retire the package's "unproven" caveat.
@@ -60,6 +60,8 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: Implementation starts after EP-38 completed, so both soft-gated items are available immediately: lifecycle-aware health and terminal WebSocket notification can consume the retained bounded `LifecycleSnapshot` without a second pause.
 
 2026-09-20: The first real-server characterization run showed that cancelling Warp does not produce the advertised `goodbye` frame; the client remained blocked until the test timeout. Because Milestone 1 must not freeze an audited lifecycle defect as expected behavior, exact `goodbye` encoding/decoding is covered in `TypesSpec` and real delivery is deferred to the failing defect test and fix in Milestone 3.
+
+2026-09-20: Milestone 1 landed as `4d59034` with 28 passing examples. An isolated detached worktree at that commit changed the processing JSON field `lastActivity` to `activityAt` and the Prometheus series `shibuya_messages_received_total` to `shibuya_messages_received_count`. `cabal test shibuya-metrics --test-show-details=direct` failed both golden examples with the exact renamed fields/series; the mutation was not committed and the worktree was removed. The release skill and `CLAUDE.md` now name the suite.
 
 
 ## Decision Log
@@ -136,6 +138,22 @@ cabal test shibuya-core --test-show-details=failures
 cabal test shibuya-metrics --test-show-details=direct
 git diff <milestone-1-commit> -- shibuya-metrics/test/golden/
 ```
+
+Milestone 1 baseline and mutation commands used commit `4d59034`:
+
+```bash
+cabal test shibuya-metrics --test-show-details=direct
+git worktree add --detach /tmp/shibuya-ep39-mutation 4d59034
+# In the isolated worktree only: rename lastActivity to activityAt and
+# shibuya_messages_received_total to shibuya_messages_received_count.
+cabal test shibuya-metrics --test-show-details=direct
+git worktree remove --force /tmp/shibuya-ep39-mutation
+```
+
+The unmodified run passed 28 examples. The mutated run failed the JSON and
+Prometheus golden examples (and downstream processing-state round trips because
+only the encoder was deliberately changed), proving both fixtures are sensitive
+to the wire names they guard.
 
 The metrics package depends on `warp`, which the offline package store on the planning machine did not contain, so `--offline` fails for this package there; run these without it, or fetch once first. The core command runs three suites, including the two process-isolated garbage-collection suites.
 
