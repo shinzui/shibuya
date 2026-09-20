@@ -1,0 +1,115 @@
+---
+id: 45
+slug: guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions
+title: "Guard lifecycle fixes against throughput latency and memory regressions"
+kind: exec-plan
+created_at: 2026-09-20T04:11:26Z
+intention: "intention_01m2yfmkqxeg9sc0wfmcp4w9fe"
+master_plan: "docs/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance.md"
+provenance:
+  created_by:
+    model: "gpt-6-astra"
+    harness: "codex-cli"
+    at: 2026-09-20T04:11:26Z
+---
+
+# Guard lifecycle fixes against throughput latency and memory regressions
+
+This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
+Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
+If durable project context changes, update or create ADRs in docs/adr/ in the same change.
+
+
+## Purpose / Big Picture
+
+
+Catch performance regressions before release using reproducible baseline/candidate comparisons across the actual production runner, metrics, and adapters. A correctness fix is not cleared solely because it passes functional tests.
+
+
+## Progress
+
+
+- [ ] Milestone 1: Capture matched baseline data before remediation.
+- [ ] Milestone 2: Extend production-runner and lifecycle performance workloads.
+- [ ] Milestone 3: Implement and test the statistical performance comparator.
+- [ ] Milestone 4: Measure fixed adapters and candidate soaks.
+- [ ] Milestone 5: Publish raw data and the candidate-bound performance verdict.
+
+
+## Surprises & Discoveries
+
+
+None yet; implementation has not started.
+
+
+## Decision Log
+
+
+2026-09-19: Performance evidence is a mandatory release gate with controlled paired comparisons; inconclusive results cannot be reported as no regression.
+
+
+## Outcomes & Retrospective
+
+
+To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+
+
+## Context and Orientation
+
+
+The existing harness is shibuya-core-bench/bench/Main.hs with Bench/HotPath.hs, Framework.hs, Concurrency.hs, Baseline.hs, Handler.hs and DeadLetterReason.hs under that directory. shibuya-core-bench/bench/Test/ProdStress.hs exercises the production runner; some existing finite-stream helpers instead size their inbox to the whole input and cannot demonstrate bounded-backpressure behavior. shibuya-core-bench/README.md documents CSV baselines and allocation reporting. Existing docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md owns dependency-bound policy and release-skill changes. This plan adds broader lifecycle performance assurance, without duplicating that ownership.
+
+The baseline is the committed source audit in docs/lifecycle-audit-progress.md and docs/reviews/, not a completed fault-injection campaign. Source inspection, diagnostic reproduction, fixed code, and release verification are separate evidence levels. A finalizer is the adapter operation that acknowledges, retries, or dead-letters a handled delivery. At-least-once delivery allows replay after interruption; it does not permit silently skipping unresolved work. A timeout in a test is a failure bound, not evidence that production cleanup succeeded.
+
+No local docs/adr corpus existed when this plan was drafted. Before introducing durable interfaces, follow .agents/skills/exec-plan/ADR.md and record the decision using the then-current repository convention. Locate dependency sources with Mori before choosing APIs. Verify registry releases and upstream tags before changing dependency bounds. Registration-service-v2 is excluded.
+
+
+## Plan of Work
+
+
+Milestone 1 freezes a baseline before remediation. Record the latest released source verified against tags/registry and the pre-remediation audit source separately; do not call a local version bump a published release. Build baseline and candidate with identical compiler, optimization, RTS flags, package solution, service versions and machine settings. Compare dependency-only changes separately on identical source. Port new harness-only scenarios to isolated baseline worktrees where needed, preserving measured production code and recording the patch hash. Record unsupported or hanging baseline scenarios as correctness failures, not infinitely good/poor performance. Pin fixture sizes, seeds, message payloads, key distributions and service resources. Capture baseline data before accepting hot-path fixes, even though the final candidate comparison comes later.
+
+Milestone 2 adds Bench/Lifecycle.hs and a production load executable under shibuya-core-bench/bench/Test/, wired in shibuya-core-bench/shibuya-core-bench.cabal. Cover Serial, Ahead, Async, partitioned hot-key/uniform-key/high-cardinality workloads, small/full inboxes, size/time batching, idle workers, repeated startup/shutdown, retry and DLQ paths, metrics disabled/enabled, health polling, and WebSocket subscriber churn. Measure messages/second, end-to-end p50/p95/p99 latency, allocated bytes/message, live heap/RSS, GC time, idle CPU and shutdown latency. Use fixed-rate arrivals below and near measured saturation and timestamp from scheduled arrival so queueing delay is not hidden. Do not equate benchmark-operation runtime with message p99. Count completed/acknowledged work to reject benchmarks that get faster by dropping messages. New executables expose documented machine-readable output and bounded runs.
+
+Milestone 3 adds scripts/audit/compare-performance.ts with fixtures and Bun tests. Use at least ten alternating baseline/candidate measured runs after warmup on a quiet fixed machine, paired by workload and RTS configuration (-N1 and a fixed multicore count such as -N4). Report paired ratios and 95% confidence intervals using a documented reproducible resampling seed. Default release budgets are at most 5% throughput loss, 10% p95/p99 or shutdown-latency increase, and 5% allocation/live-memory increase per matched scenario. A confidence interval whose adverse upper bound exceeds the budget cannot pass: overlapping/too-wide intervals are inconclusive and require more samples or a less noisy runner, not a waiver. Establish absolute idle CPU and idle-memory budgets from baseline repeatability before measuring the candidate; near-zero denominators require absolute deltas. Zero sustained memory growth after warmup at a fixed bounded workload and no busy-spin are mandatory regardless of percentage comparisons. Preserve any stricter existing project budgets. Record these initial policy choices in the evidence manifest; changing them after a failed run requires a named human release-owner decision with rationale.
+
+Milestone 4 measures adapters against their live ephemeral services using fixtures owned by their remediation plans. Separate broker/database bottlenecks from core overhead with both mock/no-op and real-service runs; run at baseline sustainable load as well as saturation. Include a 30-minute steady-state/stop-restart soak, record queue depth and backlog, and fit retained-memory trend after warmup. Performance harness development and baseline capture can proceed alongside remediation; final measurements require the integrated candidate SHAs. Each fix touching hot paths must supply a focused before/after measurement before acceptance, followed by the full matrix here. If a regression appears, profile the affected path, fix it and rerun correctness tests as well as benchmarks. Do not restore an unsafe implementation to meet a budget.
+
+Milestone 5 publishes matched raw data, summaries, machine metadata and a machine-readable verdict consumed by the release validator. Run the gate for all lifecycle and runtime-dependency changes regardless of patch/minor version. Coordinate any release-skill edit through the existing dependency-bound plan's owner. Keep noisy shared-runner smoke tests distinct from controlled release measurements.
+
+
+## Concrete Steps
+
+
+Run local commands from the Shibuya repository root unless the command block explicitly directs a change to a Mori-resolved project. New validator and comparator commands become available when their owning milestones implement them. Use the repository development shell if the compiler or services are missing; an unavailable dependency in offline mode requires an approved fetch, not removal of the test.
+
+```bash
+cabal bench shibuya-core-bench --benchmark-options="--stdev 5 --timeout 300 --csv baseline.csv"
+cabal run shibuya-core-bench:prod-stress
+# In a matched candidate worktree, after capturing the baseline:
+cabal bench shibuya-core-bench --benchmark-options="--stdev 5 --timeout 300 --csv candidate.csv"
+bun test scripts/audit/compare-performance.test.ts
+bun scripts/audit/compare-performance.ts --baseline baseline.json --candidate candidate.json --budgets docs/audits/lifecycle-release/performance-budgets.json
+```
+
+Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
+
+
+## Validation and Acceptance
+
+
+All mandatory workloads have matched evidence and satisfy both statistical and absolute budgets. The comparator rejects synthetic throughput, tail-latency, allocation and memory regressions, missing scenarios, different environments and inconclusive data. Candidate soaks have no sustained retained-memory growth, orphan workers or idle busy-spin. Raw data supports every verdict; aggregate improvements cannot hide an individual critical-path regression.
+
+Use STM barriers or injected hooks to control interleavings; sleeps alone do not prove ordering. Assert terminal outcomes and resource ownership, not just logs. For every reproduced defect, record a failing regression against the affected implementation and a passing run against the fix; use an isolated worktree or mutation, never overwrite the working tree. Keep source-only suspicions labeled unconfirmed until reproduced or disproved. Record exact source SHAs, dependency solution, compiler, commands, random seeds, and logs in the EP-37 evidence format. Passing tests with a skipped service-dependent suite do not count as integration evidence.
+
+
+## Idempotence and Recovery
+
+
+Work on the current branch, preserve unrelated edits, and commit small conventional changes with MasterPlan, ExecPlan, and Intention trailers from this plan's frontmatter. Repeating unit tests and validation is safe. Use uniquely named ephemeral broker/database resources, never production endpoints or shared database reset commands. Bracket fixture cleanup and retain failed-run logs before deleting only identified fixture resources. Revert an identified implementation commit only with authorization; do not reset the checkout. Missing services or unavailable dependencies remain explicit blockers, not passes.
+
+
+## Interfaces and Dependencies
+
+
+Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md. Soft dependencies: docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md through docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md for final measurements, not initial baseline work. This plan owns benchmark code, performance scenario definitions, budgets and comparator; adapter plans own their service fixtures. It produces the performance verdict required by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md. The JSON comparator inputs and CLI are new interfaces, to be specified and tested here; CSV alone does not contain latency distributions. EP-37 owns evidence schema and receives additive performance fields. No package release or benchmark-policy weakening is authorized.
