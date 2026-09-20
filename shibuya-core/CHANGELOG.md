@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0.2 — 2026-09-19
+
+### Bug Fixes
+
+- Remove the unused linked master mailbox actor. Its inbox had no senders, so
+  a caller that started an idle application and retained only `waitApp` could
+  receive `ExceptionInLinkedThread ... thread blocked indefinitely in an STM
+  transaction` during major garbage collection. `Master` now owns only the
+  NQE supervisor and metrics registry; processor supervision, failure
+  propagation, metrics access, and explicit shutdown behavior are unchanged.
+
+### Other Changes
+
+- Add a process-isolated garbage-collection regression that exercises bare
+  `runApp`/`waitApp` liveness under the normal optimized test profile.
+
 ## 0.9.0.1 — 2026-09-15
 
 ### Other Changes

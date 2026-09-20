@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0.2 — 2026-09-19
+
+Version bumped to track `shibuya-core` 0.9.0.2. The core dependency bound is
+updated to `^>=0.9.0.2`; no user-visible changes to `shibuya-metrics` itself.
+
 ## 0.9.0.1 — 2026-09-15
 
 Version bumped to track `shibuya-core` 0.9.0.1. The core dependency bound is

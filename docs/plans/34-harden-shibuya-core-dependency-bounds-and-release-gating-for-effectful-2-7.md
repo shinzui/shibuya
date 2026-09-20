@@ -4,12 +4,19 @@ slug: harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7
 title: "Harden shibuya-core dependency bounds and release gating for effectful 2.7"
 kind: exec-plan
 created_at: 2026-09-16T23:04:43Z
+intention: intention_01m2ycc3fxedxtw5339e0efzy1
 master_plan: "docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md"
 provenance:
   created_by:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-16T23:04:43Z
+  revisions:
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:15:22Z
+      mode: "update"
+      note: "Defer bound hardening to the release after EP-1 and inherit the active intention"
 ---
 
 # Harden shibuya-core dependency bounds and release gating for effectful 2.7
@@ -40,10 +47,10 @@ dependency versions on one tree; and this plan holds the measured comparison of 
 measurement, recorded below, is that effectful 2.7.1 is at parity or better on every leaf, and
 roughly twice as fast on the `Async` hot path.
 
-This plan does not cut a release. Its changes ride the 0.9.1.0 release that
-`docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md` cuts
-at its Milestone 4, and its changelog lines go under the unreleased heading that plan turns
-into the 0.9.1.0 section.
+Plan 33 ships its urgent runtime fix alone as 0.9.0.2. This plan therefore owns the following
+core/metrics patch release, provisionally 0.9.0.3, after the bound, benchmark-policy, and
+evidence milestones are complete. Recheck Hackage and upstream tags before release; if another
+version is published first, use the next free patch and synchronize the parent and consumers.
 
 
 ## Progress
@@ -51,6 +58,7 @@ into the 0.9.1.0 section.
 - [ ] Milestone 1: `effectful-core` exclusion bound in shibuya-core, shibuya-example, and shibuya-core-bench; three dry-run solves recorded.
 - [ ] Milestone 2: release skill gates runtime-dependency changes on the benchmark regardless of bump level and documents the one-tree comparison procedure.
 - [ ] Milestone 3: benchmark evidence for the 0.9.0.1 swap recorded in this plan, including the 2.7.1.0 measurement.
+- [ ] Milestone 4: release shibuya-core and shibuya-metrics with the hardened bounds, provisionally as 0.9.0.3.
 
 
 ## Surprises & Discoveries
@@ -139,10 +147,17 @@ into the 0.9.1.0 section.
   the dependency's effect.
   Date: 2026-09-16
 
-- Decision: No source change and no release from this plan.
+- Decision: No Haskell source change is required.
   Rationale: The measurements show effectful 2.7.1 is at parity or better; the hazard is what
-  the bounds admit, not what was shipped. The bound and skill edits ride plan 33's 0.9.1.0.
+  the bounds admit, not what was shipped.
   Date: 2026-09-16
+
+- Decision: Cut the dependency-bound work as the patch release after 0.9.0.2, provisionally
+  0.9.0.3.
+  Rationale: Plan 33's crash fix is ready while this plan has not started. Shipping 0.9.0.2
+  immediately avoids holding a runtime fix for independent dependency-policy work; this plan's
+  updated release gate then applies to its own bound-changing patch.
+  Date: 2026-09-20 UTC
 
 
 ## Outcomes & Retrospective
@@ -223,7 +238,7 @@ Edit the six dependency lines so that each package depends on `effectful-core` w
 exclusion range instead of on `effectful`. Because the imported modules are the same, no
 Haskell source changes. Then prove the bound with three dry-run solves and record them. Add a
 changelog entry under an `## Unreleased` heading at the top of `shibuya-core/CHANGELOG.md`
-(plan 33's release milestone renames it to `## 0.9.1.0 — <date>`). At the end of this
+(Milestone 4 renames it to `## 0.9.0.3 — <date>` if that remains the next free version). At the end of this
 milestone the library, tests, examples, and benchmarks build unchanged, the solver rejects
 effectful-core 2.7.1.0, and `cabal check` in `shibuya-core/` still passes.
 
@@ -247,6 +262,14 @@ Copy the 2.7.1.0 result from the review's raw log into Surprises & Discoveries b
 milestone is complete when this plan states, with numbers, how effectful-core 2.7.1.0 compares
 with 2.6.1.0 on the same subset, so the exclusion is justified by a measurement on this
 framework and not only by the upstream changelog.
+
+### Milestone 4: coordinated core and metrics release
+
+Run the repository release skill after the first three milestones are complete. Recheck live
+Hackage versions and upstream tags, choose the next free patch (provisionally 0.9.0.3), rename
+the unreleased changelog sections, bump both package versions and the metrics core bound, and
+apply the skill's full build, test, benchmark, package, publication, and GitHub-release gates.
+This bound-changing patch must run the benchmark procedure introduced by Milestone 2.
 
 
 ## Concrete Steps
@@ -283,7 +306,7 @@ build and the suite:
 
 ```bash
 nix develop -c cabal build all
-nix develop -c cabal test shibuya-core-test
+nix develop -c cabal test shibuya-core
 (cd shibuya-core && nix develop -c cabal check)
 ```
 
@@ -364,14 +387,24 @@ reproduce with the Milestone 2 commands using `<pkg>=effectful-core`, `<old>=2.6
 Expected shape, from the review: `same as baseline` on the serial leaves, since nothing in
 shibuya-core is dynamically dispatched.
 
+### Milestone 4 steps
+
+Invoke `agents/skills/release/SKILL.md` for a patch release. Present the concrete version and
+changelog diff for confirmation before the release commit. Include both core suites and the
+dependency-bound benchmark comparison, publish core before metrics, and record the resulting
+tag and Hackage URLs in Outcomes & Retrospective. Every release commit carries this plan's
+`ExecPlan:`, the parent `MasterPlan:`, and the active `Intention:` trailer.
+
 
 ## Validation and Acceptance
 
 Milestone 1 is accepted when the three dry-run solves behave as described, `cabal build all`
-and `cabal test shibuya-core-test` pass, and `cabal check` passes. Milestone 2 is accepted when
+and both suites selected by `cabal test shibuya-core` pass, and `cabal check` passes. Milestone 2 is accepted when
 `agents/skills/release/SKILL.md` contains the new step 5 text and the updated note, and reading
 it end to end gives one consistent rule. Milestone 3 is accepted when this plan's Surprises &
 Discoveries holds the 2.7.1.0 numbers with the command that produced them.
+Milestone 4 is accepted when both packages are published at the reviewed patch version, their
+Hackage pages and the matching upstream tag exist, and the GitHub release links both packages.
 
 
 ## Idempotence and Recovery
@@ -394,6 +427,13 @@ shibuya-core-bench  all three:  effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 &
 ```
 
 The adapters copy the same expression in
-`docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-1.md` and
+`docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md` and
 `docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md`;
 if this range changes, change it there in the same commit.
+
+
+## Revision Notes
+
+2026-09-20 UTC: Split release ownership after plan 33 selected the PVP patch 0.9.0.2 for its
+urgent runtime fix. This plan now owns the following bound-changing core/metrics patch,
+provisionally 0.9.0.3, and applies its new benchmark gate to that release.

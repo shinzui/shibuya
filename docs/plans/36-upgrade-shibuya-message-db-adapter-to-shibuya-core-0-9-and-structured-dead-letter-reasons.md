@@ -4,12 +4,19 @@ slug: upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead
 title: "Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons"
 kind: exec-plan
 created_at: 2026-09-16T23:04:43Z
+intention: intention_01m2ycc3fxedxtw5339e0efzy1
 master_plan: "docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md"
 provenance:
   created_by:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-16T23:04:43Z
+  revisions:
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:15:22Z
+      mode: "update"
+      note: "Align the core target with 0.9.0.2 and inherit the active intention"
 ---
 
 # Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons
@@ -29,7 +36,7 @@ renderer is an exhaustive match over the three dead-letter reasons that existed 
 the bound were simply widened, the first message an application dead-letters with the 0.9
 `ApplicationFailure` reason would crash the finalizer with an incomplete-pattern error.
 
-After this plan the adapter builds against shibuya-core 0.9 (0.9.1.0 once
+After this plan the adapter builds against shibuya-core 0.9 (0.9.0.2 once
 `docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md` has
 released it, 0.9.0.1 otherwise), its test suite passes against a real PostgreSQL, a message
 dead-lettered with `ApplicationFailure` lands in the dead-letter stream with its code and
@@ -70,6 +77,11 @@ implementation. Provide concise evidence.
 - Decision: Version 0.2.0.0, git tag only.
   Rationale: The dependency major bump changes the types the adapter exposes to callers through shibuya-core, which is a breaking change under the PVP. The package is not on Hackage (`cabal info shibuya-message-db-adapter` finds nothing) and has no tags today, so the release is a tag on `master`; publishing to Hackage is the maintainer's separate decision.
   Date: 2026-09-16
+
+- Decision: Target shibuya-core `>=0.9.0.2 && <0.10` for the final release.
+  Rationale: Plan 33's internal-only liveness fix is a PVP patch and ships alone as 0.9.0.2;
+  this adapter can consume that fix without waiting for plan 34's dependency-bound release.
+  Date: 2026-09-20 UTC
 
 
 ## Outcomes & Retrospective
@@ -186,8 +198,8 @@ lists no ADR bundle.
 ### Milestone 1: compile against shibuya-core 0.9
 
 Raise the bounds and make the code compile. In the library cabal file set `shibuya-core
->=0.9.1 && <0.10` (or `>=0.9.0.1 && <0.10` if 0.9.1.0 is not yet published; note which in the
-Decision Log), apply the effectful bound expression to lines 63 to 64, and add
+>=0.9.0.2 && <0.10` (or `>=0.9.0.1 && <0.10` only if plan 33's release is not yet published;
+note which in the Decision Log), apply the effectful bound expression to lines 63 to 64, and add
 `-Werror=incomplete-patterns` to the `common warnings` stanza with a comment explaining that
 the adapter translates a dependency-owned sum type and must fail the build, not the first
 message, when upstream adds a constructor. Mirror the `shibuya-core` bound in the jitsurei
@@ -342,7 +354,7 @@ pushed, `git tag -d v0.2.0.0` and re-tag; never move a pushed tag.
 Bounds at the end of Milestone 1, in `shibuya-message-db-adapter/shibuya-message-db-adapter.cabal`:
 
 ```text
-shibuya-core     >=0.9.1 && <0.10
+shibuya-core     >=0.9.0.2 && <0.10
 effectful        >=2.6.1 && <2.8
 effectful-core   (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8)
 ```
@@ -366,3 +378,10 @@ buildDlqMetadata :: Mdb.Message -> DeadLetterReason -> UTCTime -> Mdb.MessageMet
 
 with `buildDlqMetadata` producing the keys `correlation`, `causation`, `originalStream`,
 `deadLetterReason`, `deadLetterReasonCode`, `deadLetterReasonDetail`, and `deadLetteredAt`.
+
+
+## Revision Notes
+
+2026-09-20 UTC: Replaced the provisional 0.9.1.0 dependency target with the selected
+shibuya-core 0.9.0.2 patch release and recorded why this adapter need not wait for the later
+dependency-bound hardening release.

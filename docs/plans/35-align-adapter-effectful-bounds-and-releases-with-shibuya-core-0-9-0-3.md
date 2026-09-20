@@ -1,18 +1,30 @@
 ---
 id: 35
-slug: align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-1
-title: "Align adapter effectful bounds and releases with shibuya-core 0.9.1"
+slug: align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3
+title: "Align adapter effectful bounds and releases with shibuya-core 0.9.0.3"
 kind: exec-plan
 created_at: 2026-09-16T23:04:43Z
+intention: intention_01m2ycc3fxedxtw5339e0efzy1
 master_plan: "docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md"
 provenance:
   created_by:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-16T23:04:43Z
+  revisions:
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:15:22Z
+      mode: "update"
+      note: "Align adapter verification with shibuya-core 0.9.0.2 and inherit the active intention"
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:19:36Z
+      mode: "update"
+      note: "Correct the adapter verification target to the post-EP-2 patch 0.9.0.3"
 ---
 
-# Align adapter effectful bounds and releases with shibuya-core 0.9.1
+# Align adapter effectful bounds and releases with shibuya-core 0.9.0.3
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
@@ -35,6 +47,10 @@ and is rejected by the solver with `--constraint='effectful-core==2.7.1.0'`.
 The bound expression is owned by
 `docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`
 and is copied here verbatim; if that plan changes it, change it here in the same way.
+
+The target core release is 0.9.0.3: plan 33 ships the urgent master-loop fix alone as
+0.9.0.2, and plan 34 owns the following patch release containing the shared dependency
+bounds and benchmark policy that this adapter work consumes.
 
 
 ## Progress
@@ -234,7 +250,7 @@ nix develop -c cabal test --enable-tests all --constraint='effectful-core==2.7.1
 Expected: the suite reports `0 failures`. Format with `just fmt`, commit with a Conventional
 Commits message such as `build(deps): accept effectful-core 2.7.1.1 and later`, carrying the
 trailers `MasterPlan: docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md`
-and `ExecPlan: docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-1.md`
+and `ExecPlan: docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md`
 (both paths are in the shibuya repository, which is where this plan lives), and run that
 repository's release skill for a patch release.
 
@@ -296,7 +312,7 @@ build-type:    Simple
 library
   build-depends:
     base,
-    shibuya-core ^>=0.9.1,
+    shibuya-core ^>=0.9.0.3,
     shibuya-pgmq-adapter ^>=0.16.0.1,
     shibuya-kafka-adapter ^>=0.9.0.2
 CABAL
@@ -308,8 +324,8 @@ cabal build --dry-run --constraint='effectful-core==2.7.1.0'
 
 Expected: the first two commands print a plan; the third ends with a solver rejection that
 names at least one of the three packages and `effectful-core-2.7.1.0`. Paste the three tails
-into this plan under Outcomes & Retrospective. If shibuya-core 0.9.1.0 is not yet on Hackage,
-substitute `^>=0.9.0.1` and note it.
+into this plan under Outcomes & Retrospective. If shibuya-core 0.9.0.3 is not yet on Hackage,
+substitute `^>=0.9.0.2` and note it.
 
 
 ## Validation and Acceptance
@@ -345,3 +361,10 @@ effectful >=2.6.1 && <2.8
 ```
 
 Both are owned by `docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`.
+
+
+## Revision Notes
+
+2026-09-20 UTC: Retargeted adapter verification from the provisional combined 0.9.1.0
+release to shibuya-core 0.9.0.3. Plan 33 now ships the urgent runtime fix alone as 0.9.0.2;
+plan 34 owns the following dependency-bound patch.

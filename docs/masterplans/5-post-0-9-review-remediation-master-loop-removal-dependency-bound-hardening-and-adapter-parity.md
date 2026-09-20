@@ -4,6 +4,7 @@ slug: post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening
 title: "Post-0.9 review remediation: master loop removal, dependency bound hardening, and adapter parity"
 kind: master-plan
 created_at: 2026-09-16T23:04:43Z
+intention: intention_01m2ycc3fxedxtw5339e0efzy1
 provenance:
   created_by:
     model: "claude-fable-5-1"
@@ -15,6 +16,11 @@ provenance:
       at: 2026-09-20T03:01:18Z
       mode: "update"
       note: "Synchronize EP-33 regression milestone, both-suite release gate, provisional version target, and unchanged MLS-only consumer scope."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:15:22Z
+      mode: "update"
+      note: "Synchronize EP-1 patch release target and active intention"
 ---
 
 # Post-0.9 review remediation: master loop removal, dependency bound hardening, and adapter parity
@@ -42,11 +48,12 @@ during the review shows effectful 2.7.1 at parity with 2.6.1 (the numbers are re
 
 Four things do need fixing, and this MasterPlan coordinates them.
 
-First, a bare `runApp` followed by `waitApp` still crashes at the first major garbage collection
-with `ExceptionInLinkedThread ... thread blocked indefinitely in an STM transaction`, because the
-master starts a linked actor loop that nothing ever sends to. This is not a regression of the
-0.9 releases; commit `f364183` first shipped it in 0.8.0.0, but it is the most serious open defect in the cohort and it is
-already diagnosed and planned in
+First, before EP-1, a bare `runApp` followed by `waitApp` crashed at the first major garbage
+collection with `ExceptionInLinkedThread ... thread blocked indefinitely in an STM transaction`,
+because the master started a linked actor loop that nothing ever sent to. This was not a
+regression of the 0.9 releases; commit `f364183` first shipped it in 0.8.0.0. EP-1 has now
+removed that actor and made the dedicated regression and existing core suite pass; its release
+and consumer follow-up remain in
 `docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md`.
 That plan becomes a child of this initiative rather than being duplicated.
 
@@ -125,9 +132,9 @@ a first ADR, recorded in the Decision Log below and revisited at completion.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | EP-2 | In Progress (regression added; fix pending) |
+| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | In Progress (fix and docs complete; 0.9.0.2 release pending) |
 | 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | Not Started |
-| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.1 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-1.md | None | EP-1, EP-2 | Not Started |
+| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | Not Started |
 | 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled; parenthetical notes describe the current milestone.
@@ -139,35 +146,29 @@ Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3
 No child plan is blocked at the compiler level by another, so there are no hard dependencies.
 The ordering constraints are about releases.
 
-Phase 1 is the core. EP-2 goes first and changes only cabal bounds, the changelog's unreleased
-section, and the release skill; it must not cut a release. EP-1 then removes the master loop
-and, at its release milestone, cuts shibuya-core and shibuya-metrics 0.9.1.0 carrying both
-changes. EP-1's soft dependency on EP-2 exists only so that one release, not two, reaches
-Hackage; if EP-2 is delayed, EP-1 may release alone and EP-2 then ships as 0.9.1.1.
+Phase 1 is the core in two patch releases. EP-1 removes the master loop and cuts
+shibuya-core/shibuya-metrics 0.9.0.2. EP-2 then changes the dependency bounds and release skill,
+runs the bound-sensitive benchmark gate it introduces, and owns the following patch release,
+provisionally 0.9.0.3. Neither plan has a compiler dependency on the other; the release ordering
+keeps consumers able to identify which patch contains the urgent runtime fix.
 
-The 0.9.1.0 and 0.9.1.1 numbers above are provisional coordination targets, not
-reserved versions. EP-33's refresh requires checking the full release diff against
-the installed release skill and live Hackage/upstream tags before selecting the
-actual version. If it differs, synchronize this parent and plans 34–36 before
-their release steps; do not force a minor bump solely because it appears here.
+The 0.9.0.2 target was selected after the release diff, live Hackage versions, and upstream
+tags were checked on 2026-09-20. The 0.9.0.3 target remains provisional: EP-2 must select the
+next free patch at its own release time and resynchronize consumers if another release appears.
 
-Phase 2 is the adapters and can run EP-3 and EP-4 in parallel once 0.9.1.0 is on Hackage.
-EP-3's soft dependency on EP-1 and EP-2 is that each adapter release should be verified against
-0.9.1.0 (so the master-loop fix is what its tests exercise) and must copy EP-2's bound
-expression verbatim. EP-4's soft dependency on EP-1 is the same verification preference; it can
-be developed against 0.9.0.1, which is already on Hackage, and only its final bound and
-verification step want 0.9.1.0.
+Phase 2 is the adapters. EP-3 can be developed independently but should release after EP-2 and
+verify against 0.9.0.3 so its copied effectful-core bound is exercised with the owning core
+release. EP-4 can proceed after EP-1 and target 0.9.0.2; it need not wait for the independent
+dependency-bound work.
 
 
 ## Integration Points
 
-The shibuya-core version, `shibuya-core/shibuya-core.cabal`, and the unreleased section of
-`shibuya-core/CHANGELOG.md` are touched by EP-1 and EP-2. EP-1 owns the version bump to
-0.9.1.0, the `shibuya-metrics` tracking bump, and the release; EP-2 adds its bound change and
-its changelog lines under the same unreleased heading without touching the version. If the
-release skill decides EP-1's diff warrants 0.10.0.0 rather than 0.9.1.0 (plan 33 records that
-possibility), EP-3 must bump the adapters' `shibuya-core` bounds accordingly and EP-4 must
-target the same version.
+The shibuya-core version, `shibuya-core/shibuya-core.cabal`, and changelog are touched by EP-1
+and EP-2 in sequence. EP-1 owns 0.9.0.2, the matching `shibuya-metrics` tracking bump, and its
+release. EP-2 begins from that published baseline, adds the bound and release-policy changes,
+and owns the following patch, provisionally 0.9.0.3. EP-3 consumes EP-2's released core; EP-4
+may target EP-1's 0.9.0.2 because its API migration does not depend on the bound work.
 
 The effectful-core bound expression is defined by EP-2 and consumed verbatim by EP-3 (pgmq,
 Kafka, and kiroku adapters) and EP-4 (message-db adapter). It is written once, in EP-2's
@@ -176,9 +177,9 @@ with the matching `effectful >=2.6.1 && <2.8` where a package depends on the umb
 Any later change to that range is made in EP-2 first and propagated.
 
 The release skill's benchmark gate, `.agents/skills/release/SKILL.md` step 5, is changed by
-EP-2 and is then binding on EP-1's release (which is a minor release and would have been gated
-anyway) and, by the same rule copied into their own release skills where they have one, on the
-adapter releases in EP-3.
+EP-2 and applies to EP-2's own bound-changing patch. EP-1's source-only patch uses the current
+skill and requires no benchmark. Adapter releases in EP-3 copy the updated policy where their
+repositories have release skills.
 
 EP-1 adds `shibuya-core-gc-test` as a separate test process and updates the release
 skill's core validation command to `cabal test shibuya-core`, selecting both core
@@ -199,9 +200,9 @@ dependency bump is benchmark-gated regardless of PVP bump level.
 - [ ] EP-2: release skill gates runtime-dependency bumps on the benchmark regardless of bump level
 - [ ] EP-2: 2.6.1-versus-2.7.1 and 2.7.1.0-versus-2.7.1.2 benchmark evidence recorded in the plan
 - [x] (2026-09-20 UTC) EP-1: dedicated garbage-collection regression test compiles and fails with the linked STM exception on 0.9.0.1
-- [ ] EP-1: master loop, mailbox, and `MasterMessage` removed; suite green
-- [ ] EP-1: documentation no longer describes the master as an actor
-- [ ] EP-1: shibuya-core and shibuya-metrics 0.9.1.0 released with EP-2's changes
+- [x] (2026-09-20 UTC) EP-1: master loop, mailbox, and `MasterMessage` removed; suite green
+- [x] (2026-09-20 UTC) EP-1: documentation no longer describes the master as an actor
+- [ ] EP-1: shibuya-core and shibuya-metrics 0.9.0.2 released with the runtime fix
 - [ ] EP-1: `mls-service-v2` single-processor subcommands run past the crash point
 - [ ] EP-3: shibuya-pgmq-adapter bound widened and released
 - [ ] EP-3: shibuya-kafka-adapter bound tightened and released
@@ -220,8 +221,14 @@ interactions between child plans. Provide concise evidence.
 - 2026-09-20 UTC: EP-33's regression is now `shibuya-core/test-gc/Main.hs`, in a
   dedicated Cabal test executable. Weak-pointer cleanup could lose its target and
   leak threads into later tests; process isolation avoids retaining the handle to
-  clean up. Normal core/release checks must select both test suites. The library
-  fix is still pending, so the new test is intentionally failing.
+  clean up. Normal core/release checks must select both test suites. Removing only
+  the idle master actor makes the test pass repeatedly, and the complete 212-example
+  core suite remains green.
+
+- 2026-09-20 UTC: Live Hackage metadata and upstream tags still stop at 0.9.0.1. EP-1's
+  diff changes only an expressly unstable internal representation and fixes runtime behavior,
+  so the release skill selects patch 0.9.0.2. EP-2 had not started; it now owns the following
+  patch instead of delaying the crash fix.
 
 - 2026-09-16: The review that produced this plan benchmarked the current tree under effectful
   2.6.1.0 and under effectful 2.7.1.0 with effectful-core 2.7.1.2 (the pair the 0.9.0.1 bound
@@ -267,6 +274,14 @@ interactions between child plans. Provide concise evidence.
   EP-2 is a bound and a process change; it has no reason to reach Hackage ahead of the crash fix.
   Date: 2026-09-16
 
+- Decision: Supersede the combined 0.9.1.0 release with sequential patches: EP-1 at 0.9.0.2
+  and EP-2 provisionally at 0.9.0.3.
+  Rationale: EP-1 is complete and is the initiative's most serious runtime defect, while EP-2
+  remains unstarted and independent. The release skill classifies the opaque-public/internal-
+  representation fix as a patch. EP-2's later bound-changing patch will exercise the benchmark
+  gate that EP-2 introduces.
+  Date: 2026-09-20 UTC
+
 - Decision: Put the effectful-core exclusion in every package's own bounds rather than only in
   shibuya-core or only in `cabal.project` constraints.
   Rationale: Project-level constraints do not reach consumers. shibuya-core's `effectful` bound
@@ -297,6 +312,12 @@ interactions between child plans. Provide concise evidence.
   supply one. Add `intention:` to the frontmatter of each plan if one is assigned later.
   Date: 2026-09-16
 
+- Decision: Link the initiative and affected child plans to
+  `intention_01m2ycc3fxedxtw5339e0efzy1`.
+  Rationale: The user created this intention when implementation of EP-1 began; it supersedes
+  the creation-time absence recorded above.
+  Date: 2026-09-20 UTC
+
 
 ## Outcomes & Retrospective
 
@@ -305,9 +326,16 @@ Compare the result against the original vision. Before marking the MasterPlan co
 distill durable project context from this MasterPlan and its child ExecPlans into
 docs/adr/. Keep task-local execution and coordination details here.
 
-(To be filled during and after implementation.)
+EP-1's code and documentation milestones are complete. The idle actor is removed, the
+process-isolated GC regression passes repeatedly, the pre-fix tree reproduces the crash, and
+the complete core build/test/flake gates pass. Release 0.9.0.2 and its MLS consumer follow-up
+remain before EP-1 is complete; EP-2 through EP-4 remain separate initiative work.
 
 Revision 2026-09-20 UTC: Synchronize EP-33's confirmed regression history, completed
 failing-test milestone, isolated-test/release gate, and provisional release-version
 coordination. The core fix and all publication/consumer milestones remain pending;
 the user-confirmed consumer scope remains MLS only.
+
+Revision 2026-09-20 UTC: Linked the user-created intention, recorded EP-1's completed code and
+documentation milestones, and replaced the provisional combined 0.9.1.0 release with EP-1
+patch 0.9.0.2 followed by EP-2's provisional 0.9.0.3. Cascaded the targets to plans 34–36.

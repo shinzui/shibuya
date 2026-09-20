@@ -121,7 +121,7 @@ the complete app under GC after removing only the redundant master actor.
 [core](https://hackage.haskell.org/package/shibuya-core.json) and
 [metrics](https://hackage.haskell.org/package/shibuya-metrics.json), plus
 `git ls-remote --tags origin 'v0.*'`, all list 0.9.0.1 as the latest release.
-Recheck at release time; the plan's provisional 0.9.1.0 must not overwrite an existing release.
+The 2026-09-20 release recheck returned the same result, leaving 0.9.0.2 free.
 
 The new test compiled under GHC 9.12.4 with Cabal's normal `-O1` library/test profile and
 failed as required:
@@ -154,6 +154,12 @@ already describe `Master` as the owner of the supervisor and metrics map. The st
 descriptions were confined to the explicitly historical design/incident documents and the
 processor-pause proposal; those now label their actor snippets as historical.
 
+**The 0.9.0.2 candidate passes every pre-publication gate.** `cabal build all`, both suites
+selected by `cabal test shibuya-core`, `nix fmt`, `nix flake check`, and `cabal check` for both
+packages passed after the version and changelog edits. Cabal also produced source and Hackage
+documentation tarballs for core and metrics at 0.9.0.2. Haddock emitted only the repository's
+existing missing-link and coverage warnings; generation succeeded for both packages.
+
 
 ## Decision Log
 
@@ -171,6 +177,13 @@ processor-pause proposal; those now label their actor snippets as historical.
   classifies internal-only fixes as patch changes; inspect the complete release diff and
   unstable-module policy before choosing the actual version. Reconcile the parent and
   dependent plans if the final choice differs.
+- Decision (2026-09-20 UTC, supersedes the provisional 0.9.1.0 target): Release this
+  internal-only fix as PVP patch 0.9.0.2 without plan 34's unstarted dependency work.
+  Rationale: The public `Master` remains opaque and every public signature is unchanged;
+  although its expressly unstable internal module is exposed, its no-PVP-guarantee contract
+  permits representation changes in a patch. Holding the runtime fix for independent bound
+  hardening would delay the most serious defect in the initiative. Plan 34 owns the following
+  patch release, provisionally 0.9.0.3.
 - Decision (2026-09-20 UTC): The user's clarification excludes
   `mori://tan/registration-service-v2` from follow-up. The initial review provenance's
   suggestion to add that consumer is superseded by this explicit scope decision.
@@ -193,7 +206,9 @@ expected linked STM exception. `cabal check` reported no warnings or errors. `ni
 and explicit Fourmolu formatting of the new file completed, and `git diff --check` passed.
 Current-tree validation after the documentation update passed `cabal build all`, both suites
 selected by `cabal test shibuya-core --test-show-details=failures`, `nix fmt`, and
-`nix flake check`. Release publication and downstream verification remain implementation work.
+`nix flake check`. The prepared 0.9.0.2 candidate repeated those gates, passed `cabal check`
+for both packages, and produced both source distributions and Hackage documentation tarballs.
+Release approval/publication and downstream verification remain implementation work.
 
 
 ## Context and Orientation
@@ -289,22 +304,19 @@ the valid reason to stop apps: supervisors and children must not outlive their t
 Acceptance is accurate present-tense documentation, both core suites in normal/release
 commands, formatting, and the existing flake checks. Do not rewrite unrelated archived plans.
 
-### Milestone 4: Coordinated release
+### Milestone 4: Core and metrics patch release
 
-This plan is EP-1 in master plan 5. Its release has a soft dependency on
-`docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`:
-prefer one core/metrics release carrying both changes; if that plan is delayed, the parent's
-existing policy allows this crash fix to ship independently. Do not implement EP-34 silently
-as part of this fix. Inspect its actual progress and record what this release includes.
+This plan is EP-1 in master plan 5. Plan 34 remains unstarted, so this release follows the
+parent's independent-release path and includes only the crash fix, regression, and related
+documentation. Plan 34 owns the following dependency-bound patch.
 
 Use `.agents/skills/release/SKILL.md`, which resolves through the installed skill symlink
 to the tracked `agents/skills/release/SKILL.md`; both paths are valid in this checkout.
 Its version and changelog review precedes release commits, tags, and publication; prepare
-the concrete diff first. The provisional cohort target is 0.9.1.0, not a reservation or a
-substitute for release-time PVP analysis. The internal module explicitly disclaims PVP
-stability but is still listed in Cabal's exposed modules; describe this tradeoff in the release
-decision. If the chosen version changes, synchronize master plan 5 and the release assumptions
-in plans 34–36 before their work proceeds.
+the concrete diff first. Live Hackage metadata and upstream tags both stop at 0.9.0.1, so the
+reviewed patch target is 0.9.0.2. The internal module explicitly disclaims PVP stability but
+is still listed in Cabal's exposed modules; the Decision Log records why a patch is appropriate.
+Master plan 5 and plans 34–36 are synchronized before release.
 
 Update both package cabal versions, the metrics dependency bounds, the root changelog, and
 both package changelogs. Recheck Hackage and upstream tags before choosing a free version.
@@ -459,10 +471,10 @@ process terminates its own threads. Its observer signals success only after forc
 an outer timeout is failure. This avoids both accidental handle retention and weak-pointer
 cleanup leaks. The regular suite continues to test production shutdown.
 
-Keep the deliberately failing test while Milestone 2 is pending and report that state clearly;
-do not publish a release with a failing suite. Source changes are reversible with scoped
-patches or commits. Preserve unrelated work. Consumer pin updates remain in their own
-repository. Release retries follow the release skill; never overwrite an existing version.
+Keep the regression green through the release gates; do not publish a release with a failing
+suite. Source changes are reversible with scoped patches or commits. Preserve unrelated work.
+Consumer pin updates remain in their own repository. Release retries follow the release skill;
+never overwrite an existing version.
 
 The old release/consumer commands were instructions for later milestones, not evidence that
 those actions had already happened.
@@ -480,9 +492,9 @@ flag. `MasterMessage`, `Master.handle`, and `Master.inbox` disappear from the un
 internal module. Public `runApp`, `waitApp`, `stopApp`, `stopAppGracefully`,
 `getAppMaster`, and all metrics-reader signatures stay unchanged.
 
-Release coordination is soft, not a compiler dependency: plan 34 owns dependency-bound and
-benchmark-policy hardening, this plan owns the crash fix and coordinated release, and plans
-35–36 consume the actual chosen core version.
+Release coordination is soft, not a compiler dependency: this plan owns patch 0.9.0.2 with
+the crash fix, plan 34 owns dependency-bound and benchmark-policy hardening plus the following
+patch, plan 35 consumes that later bound release, and plan 36 can consume 0.9.0.2 directly.
 
 
 ## Revision Notes
@@ -502,3 +514,13 @@ documentation, release, and MLS consumer follow-up remain.
 snippets and the pause protocol proposal explicitly, corrected lifecycle-test cleanup comments,
 and passed the full build, both core suites, formatting, and flake checks. Milestone 3 is
 complete; release and MLS consumer follow-up remain.
+
+2026-09-20 UTC: Selected PVP patch 0.9.0.2 after live Hackage/tag verification, prepared both
+package versions, bounds, and changelogs, and synchronized master plan 5 plus plans 34–36.
+Plan 34 remains separate and provisionally owns 0.9.0.3. Release approval, publication, and
+MLS verification remain.
+
+2026-09-20 UTC: Validated the concrete 0.9.0.2 candidate with the full build, both core suites,
+formatting and flake checks, per-package `cabal check`, source distributions, and Hackage
+documentation tarballs. The release commit, tag, push, and uploads await the release skill's
+required version/changelog confirmation.

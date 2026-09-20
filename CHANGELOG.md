@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.0.2 — 2026-09-19
+
+A patch release that fixes a liveness failure in `shibuya-core`; public APIs
+and dependency bounds are unchanged.
+
+### Bug Fixes
+
+- `shibuya-core`: remove an unused linked master mailbox actor whose inbox had
+  no senders. A caller that started an idle application and retained only
+  `waitApp` could otherwise receive `ExceptionInLinkedThread ... thread blocked
+  indefinitely in an STM transaction` during major garbage collection. The
+  NQE supervisor, metrics registry, processor failure propagation, and explicit
+  shutdown behavior remain unchanged.
+
+### Other Changes
+
+- `shibuya-core`: add a process-isolated garbage-collection regression that
+  exercises bare `runApp`/`waitApp` liveness under the normal optimized test
+  profile.
+- `shibuya-metrics`: version bumped to track `shibuya-core` 0.9.0.2 with an
+  updated bound; its public API and metric series are unchanged.
+
 ## 0.9.0.1 — 2026-09-15
 
 A patch release that only widens a dependency bound; no API or behavior
