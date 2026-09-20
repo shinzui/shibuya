@@ -154,5 +154,12 @@ in  Schema.Project::{ project =
         , description = Some
             "Proposed improvements to Shibuya APIs and behavior, with stable IR-N handles"
         }
+      , Schema.OkfBundle::{ name = "reviews"
+        , path = "docs/reviews"
+        , profile = Some "docs/reviews/profile.dhall"
+        , okfVersion = "0.2"
+        , description = Some
+            "Commit-specific examination records with stable REV-N handles, explicit coverage, findings, and audit limits"
+        }
       ]
     }
