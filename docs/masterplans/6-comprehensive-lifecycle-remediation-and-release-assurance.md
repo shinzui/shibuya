@@ -73,7 +73,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
-| 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Not Started |
+| 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | In Progress |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Not Started |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Not Started |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
@@ -305,3 +305,8 @@ prompt keyed/ticker failure propagation; distinct infrastructure finalization fa
 bounded retained lifecycle snapshot. Updated all EP-38 findings and 45 boundary cells with
 candidate-bound raw evidence. The final focused performance union passes N1 and N4 using the
 original EP-45 budgets, so no release-owner waiver or post-observation budget change was used.
+
+2026-09-20 UTC: Started EP-39 as the next eligible child. EP-45 remains paused by its explicit
+two-pass protocol. EP-38's completed snapshot removes both of EP-39's soft-gated waits, so the
+child can implement characterization, activity/health, WebSocket ownership, and final endpoint
+verification in sequence.

@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Progress-based stuck detection with sustained-throughput acceptance; core plan becomes a soft dependency with two gated items."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T18:30:00Z
+      mode: "implement"
+      note: "Begin implementation after EP-38 completed the retained lifecycle snapshot and focused performance acceptance."
 ---
 
 # Make metrics health and WebSocket lifecycle reporting trustworthy
@@ -52,7 +57,7 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-20: Implementation starts after EP-38 completed, so both soft-gated items are available immediately: lifecycle-aware health and terminal WebSocket notification can consume the retained bounded `LifecycleSnapshot` without a second pause.
 
 
 ## Decision Log
