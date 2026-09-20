@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Core plan becomes a soft dependency gating only terminal-ack visibility; record core 0.9 bound handling."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T20:15:00Z
+      mode: "implement"
+      note: "Begin implementation after EP-39 completion; resolve adapter and Kafka dependencies through Mori before changing acknowledgement state."
 ---
 
 # Prevent Kafka acknowledgements from skipping unresolved deliveries
@@ -49,7 +54,12 @@ Prevent Kafka commits from crossing unresolved deliveries, and surface acknowled
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-20: Implementation starts from the unchanged reviewed adapter SHA
+`6c0cd3fc840c9f5ba48558ca94c7d826a3da6c9f`. Mori resolves the owner as
+`mori://shinzui/shibuya-kafka-adapter`, with `mori://shinzui/kafka-effectful` and
+`mori://haskell-works/hw-kafka-client` as the relevant consumer API sources. The adapter
+checkout is clean and the core finalizer-failure contract needed for terminal acceptance is
+already complete, so no soft-gated work remains.
 
 
 ## Decision Log
@@ -127,3 +137,7 @@ Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-eviden
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. The core lifecycle plan changed from a hard to a soft dependency: the retry-barrier defect, which can commit past an unresolved offset, needs nothing from core, so only the acceptance that a terminal acknowledgement failure is visible to the application is gated, on the core plan's Milestone 3. Recorded that the adapter pins shibuya-core to the 0.9 series and how to build against a major-version candidate without committing a relaxed bound. Recorded that the review's source claims were re-verified against the adapter's unchanged HEAD, and noted the Shibuya repository's new first ADR.
+
+2026-09-20 UTC: Started EP-40 after EP-39 completed. Resolved the clean adapter checkout and
+its Kafka dependencies through Mori, confirmed the reviewed baseline SHA, and confirmed that
+EP-38's terminal finalizer-failure contract is available for end-to-end acceptance.
