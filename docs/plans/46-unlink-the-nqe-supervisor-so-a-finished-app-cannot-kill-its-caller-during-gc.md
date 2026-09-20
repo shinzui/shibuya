@@ -65,7 +65,7 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Prototype the unlinked supervisor in an isolated worktree: the probe survives 18 of 18 runs and both existing core suites pass with 212 examples and zero failures.
 - [x] (2026-09-20 UTC) Confirm that the exact regression source in Milestone 1 compiles under `-Wall` and fails on all three scenarios against the unfixed library.
 - [x] (2026-09-20 UTC) Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason. Observed on the unfixed library: three `FAIL` lines from `shibuya-core-gc-finished-test`, `expected: Just 1 but got: Just 2` as the only failure among 213 Hspec examples, and `shibuya-core-gc-test` still passing.
-- [ ] Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass.
+- [x] (2026-09-20 UTC) Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass. All three suites pass with 213 Hspec examples and zero failures, the finished-application suite passed three consecutive runs, and both diagnostic probes confirm the change on the fixed library.
 - [ ] Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix.
 - [ ] Milestone 4: Prepare and validate the patch release; publish only after the owner approves the version and changelog.
 
@@ -125,6 +125,33 @@ in all 18 runs across the six cells, and `cabal test shibuya-core --offline` pas
 existing suites, including "failure under StopAllOnFailure kills siblings and propagates".
 The single-delivery result after the fix follows from the construction, because the child's
 link is then the only one left, but it was not measured in the prototype; Milestone 2 measures it.
+
+**The fix delivers exactly what the prototype predicted, and the single delivery is now measured.**
+With `startMaster` assembling the `Process` from `newMailbox` and an unlinked async, run against
+the fixed library:
+
+```text
+213 examples, 0 failures
+Test suite shibuya-core-gc-test: PASS
+Test suite shibuya-core-gc-finished-test: PASS
+Test suite shibuya-core-test: PASS
+```
+
+The finished-application suite printed its three `PASS` lines on three consecutive runs.
+`scripts/audit/ChildlessSupervisorProbe.hs` reported `caller survived` in all 18 runs across its
+six cells, and `scripts/audit/LinkedFailureDeliveryProbe.hs`, which counted two deliveries and
+twice died of the second one before the fix, reported `RESULT deliveries=1` on three of three
+runs with no uncaught exception. The existing case "failure under StopAllOnFailure kills
+siblings and propagates" still passes, so the per-processor links alone carry failure
+propagation and sibling shutdown.
+
+The failing-first evidence for Milestone 1 was taken in the working tree whose content is
+exactly commit `afa8889`, immediately before the fix was written, so a separate worktree run
+of that commit would repeat the same observation and was not performed.
+
+**`cabal build all --offline` cannot build the metrics package here.** The local store lacks
+`warp`, so the offline solver refuses. Plain `cabal build all`, which is what Concrete Steps
+prescribes, works; only the core package builds and tests offline.
 
 **An offline build in a fresh worktree needs the git dependency copied in.** `cabal.project`
 takes hs-opentelemetry from a git repository, which Cabal checks out under

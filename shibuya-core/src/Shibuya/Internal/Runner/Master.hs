@@ -30,7 +30,7 @@ module Shibuya.Internal.Runner.Master
   )
 where
 
-import Control.Concurrent.NQE.Process (Process (..))
+import Control.Concurrent.NQE.Process (Process (..), newMailbox)
 import Control.Concurrent.NQE.Supervisor (Strategy (..), Supervisor)
 import Control.Concurrent.NQE.Supervisor qualified as Supervisor
 import Control.Concurrent.STM
@@ -51,7 +51,7 @@ import Shibuya.Core.Metrics
     sampleMetrics,
   )
 import Shibuya.Prelude
-import UnliftIO (cancel)
+import UnliftIO (async, cancel)
 
 -- | Master state held in TVars.
 data MasterState = MasterState
@@ -76,10 +76,20 @@ newtype Master = Master
 -- | Start the master process.
 -- Returns a handle for accessing shared application state.
 -- The caller is responsible for calling stopMaster when done.
+--
+-- The supervisor is deliberately not linked to the calling thread, which is why
+-- this assembles the 'Process' itself instead of using 'Supervisor.supervisor':
+-- NQE's @process@ always links. With no children left the supervisor can only be
+-- woken through its mailbox, and the mailbox is reachable solely through this
+-- handle, so a link would turn a dropped handle into an 'ExceptionInLinkedThread'
+-- in the caller at the next major garbage collection. Unlinked, such a supervisor
+-- is simply collected. Processor failures still reach the caller, exactly once,
+-- through the per-processor links installed when 'propagateFailures' is set.
 startMaster :: (IOE :> es) => Strategy -> Eff es Master
 startMaster strategy = liftIO $ do
-  -- Create supervisor
-  sup <- Supervisor.supervisor strategy
+  (inbox, mailbox) <- newMailbox
+  supAsync <- async (Supervisor.supervisorProcess strategy inbox)
+  let sup = Process supAsync mailbox
 
   metricsMapVar <- newTVarIO Map.empty
   let propagate = case strategy of
