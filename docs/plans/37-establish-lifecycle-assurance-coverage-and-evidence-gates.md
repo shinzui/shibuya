@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Inventory through REV-16 with external owner EP-46; out-of-scope disposition and validator rules for the excluded MessageDB adapter."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T14:09:29Z
+      mode: "implement"
+      note: "Implemented the lifecycle evidence inventory, coverage taxonomy, and validator contract"
 ---
 
 # Establish lifecycle assurance coverage and evidence gates
@@ -41,7 +46,7 @@ Make the audit measurable: every finding and every lifecycle boundary has an own
 ## Progress
 
 
-- [ ] Milestone 1: Inventory every finding and lifecycle boundary.
+- [x] (2026-09-20T14:09:02Z) Milestone 1: Inventory every finding and lifecycle boundary.
 - [ ] Milestone 2: Implement and test the evidence validator.
 - [ ] Milestone 3: Document candidate manifests and execution budgets.
 
@@ -49,7 +54,17 @@ Make the audit measurable: every finding and every lifecycle boundary has an own
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+The sixteen reviews contain 52 independently attributable records once confirmed defects,
+source concerns, limitations, assumptions, and positive verification are preserved rather
+than collapsing repeated observations of the same underlying problem. The inventory therefore
+uses review-derived stable keys and lets multiple entries converge on one owner and invariant.
+This keeps REV-2's source finding distinct from REV-3's runtime confirmation and keeps the
+narrow REV-14 approval from masking REV-16's separate childless-supervisor state.
+
+The five REV-12 records cannot be treated as accepted risk: the entire MessageDB component is
+outside the candidate. They use `out-of-scope`, have no remediation owner, retain the project
+owner's dated decision, and leave all five MessageDB persistence matrix cases explicitly
+not applicable. Release validation must still print them as uncertified scope.
 
 
 ## Decision Log
@@ -58,6 +73,21 @@ None yet; implementation has not started.
 2026-09-19: Keep historical audit records immutable as evidence and add a separate candidate-specific closure ledger.
 
 2026-09-19: Give excluded findings their own disposition instead of dropping them from the inventory. The project owner excluded the deprecated MessageDB adapter from the initiative, so the REV-12 findings will not be fixed, but a ledger that silently omitted them would make the release look cleaner than it is. An out-of-scope disposition records the human decision and forces the final verdict to name the uncertified component.
+
+2026-09-20: Use a single schema-versioned JSON document for findings, scope, owners, and the
+lifecycle boundary matrix. The release validator needs to check owner membership, local
+evidence paths, candidate inclusion, and matrix completeness together; splitting those facts
+across unrelated files would permit drift. Human-readable semantics stay in `coverage.md`.
+
+2026-09-20: Preserve independently authored review claims under review-derived IDs instead of
+deduplicating them. Source confirmation and runtime reproduction have different evidentiary
+weight, and a later positive verification can have a narrower state space than a subsequent
+defect. Owners close every applicable entry, even when several entries share one fix.
+
+2026-09-20: Record the candidate-bound evidence, exclusion, waiver, and predeclared-budget
+policy in `docs/adr/0002-require-candidate-bound-machine-checkable-release-evidence.md`.
+These rules coordinate every remaining child and must remain discoverable after this plan is
+complete.
 
 
 ## Outcomes & Retrospective

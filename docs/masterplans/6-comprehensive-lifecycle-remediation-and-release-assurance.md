@@ -22,6 +22,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Cancel EP-42 (MessageDB deprecated); EP-38 becomes a soft dependency gating named acceptance; two-pass EP-45; adapter core-bound, Master.hs and changelog integration points; Progress checklist; REV-16 routed to standalone EP-46."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T14:01:52Z
+      mode: "implement"
+      note: "Started EP-37 evidence-gate implementation and coordination"
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -60,7 +65,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Not Started |
+| 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | In Progress |
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | Not Started |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Not Started |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Not Started |
@@ -125,9 +130,11 @@ Status is visible in this registry and each child's Progress. During implementat
 ## Progress
 
 
-No implementation milestone has been completed. Check an item only when the owning child records its acceptance evidence. The standalone EP-46 tracks its own progress and is verified, not tracked, here.
+EP-37 Milestone 1 has established the complete review inventory and lifecycle boundary
+taxonomy. Check any later item only when the owning child records its acceptance evidence.
+The standalone EP-46 tracks its own progress and is verified, not tracked, here.
 
-- [ ] EP-37 M1: Inventory every finding and lifecycle boundary, including REV-16 and the out-of-scope REV-12 dispositions.
+- [x] EP-37 M1: Inventory every finding and lifecycle boundary, including REV-16 and the out-of-scope REV-12 dispositions.
 - [ ] EP-37 M2: Implement and test the evidence validator.
 - [ ] EP-37 M3: Document candidate manifests and execution budgets.
 - [ ] EP-45 M1: Capture matched baseline data before remediation.
@@ -176,6 +183,14 @@ The EP-33 regression did not catch it because its one idle child keeps the super
 **The drafted activity-accounting fix would have kept a false-unready path open.** shibuya-metrics/src/Shibuya/Metrics/Health.hs calls a processor stuck when it is in the Processing state and the burst start is older than the threshold. EP-39 originally prescribed only resetting the burst start on a zero-to-one in-flight transition. Under sustained load with concurrency above one, in-flight work never returns to zero, so a healthy busy worker would still be reported stuck after the 60-second default. REV-7 and IR-6 item 8 both warn about exactly this. EP-39 now bases stuck detection on absence of progress and requires a sustained-throughput test.
 
 **Adapters pin core to 0.9.** The three in-scope adapters will not solve against a major-version candidate core. This is now an integration point with a single owner per bound and a verification step in EP-44 Milestone 1.
+
+**The evidence ledger has 52 records rather than one row per headline defect (2026-09-20
+UTC, EP-37 Milestone 1).** Preserving every review's findings, source concerns, limitations,
+assumptions, and positive verification keeps source evidence distinct from later runtime
+confirmation and prevents narrow approvals from erasing untested states. Downstream children
+must update every applicable review-derived key they close, even when one regression or fix
+satisfies several entries. The 15 lifecycle boundaries contribute 70 mandatory in-scope
+matrix cells plus five explicit MessageDB exclusions.
 
 
 ## Decision Log
