@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- `shibuya-core`: start the NQE supervisor without linking it to the thread that called `runApp`.
+  NQE links every process it starts, and a supervisor with no children left can
+  only be woken through a mailbox reachable solely through the application handle.
+  A caller whose processors had all finished, halted or failed, and which dropped
+  the handle and kept running, was therefore killed at the next major garbage
+  collection by `ExceptionInLinkedThread ... thread blocked indefinitely in an STM
+  transaction`. Such a supervisor is now simply collected.
+- `shibuya-core`: deliver a processor failure to the caller exactly once under `StopAllOnFailure`.
+  The supervisor's link re-delivered the failure that the processor's own link had
+  already delivered, so a caller that handled the first `ExceptionInLinkedThread`
+  could be killed by a second one moments later. Sibling shutdown and propagation
+  are unchanged; they never depended on the supervisor's link.
+
+### Other Changes
+
+- `shibuya-core`: add a second process-isolated garbage-collection regression,
+  `shibuya-core-gc-finished-test`, covering an application that has finished and
+  whose handle has been dropped, and a lifecycle test asserting a single failure
+  delivery. `cabal test shibuya-core` now runs three suites.
+
 ## 0.9.0.2 — 2026-09-19
 
 A patch release that fixes a liveness failure in `shibuya-core`; public APIs

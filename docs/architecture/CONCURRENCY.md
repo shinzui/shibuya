@@ -49,23 +49,37 @@ Shibuya's concurrency is built on three distinct layers:
 |---------|-------------|
 | Thread spawning | `addChild` spawns supervised async threads |
 | Supervision strategies | `IgnoreAll`, `IgnoreGraceful` control failure behavior |
-| Process linking | `link` propagates exceptions to parent |
+| Process linking | `link` propagates a processor's exception to the `runApp` caller when the strategy propagates failures; the supervisor thread itself is deliberately not linked |
 | Bounded inboxes | `newBoundedInbox` creates bounded channels |
 | Message passing | `send`/`receive` for typed communication |
 
 **Shibuya's use of NQE:**
 
 ```haskell
--- Master creates a supervisor for all processors
-startMaster :: SupervisionStrategy -> Eff es Master
+-- Master runs NQE's supervisor loop for all processors. It assembles the
+-- Process itself rather than calling Supervisor.supervisor, because NQE's
+-- `process` always links the new thread to its creator (see below).
+startMaster :: Strategy -> Eff es Master
 startMaster strategy = liftIO $ do
-  sup <- Supervisor.supervisor (toNQEStrategy strategy)
+  (inbox, mailbox) <- newMailbox
+  supAsync <- async (Supervisor.supervisorProcess strategy inbox)
+  let sup = Process supAsync mailbox
   -- ...
 
 -- Each processor runs as a supervised child
 supervisedChild <- addChild master.state.supervisor $
   runIngesterAndProcessor metricsVar doneVar inboxSize adapter handler
 ```
+
+**Why the supervisor is not linked.** A supervisor with no children left can only
+be woken through its mailbox, and the mailbox is reachable solely through the
+application handle. If it were linked, a caller that dropped the handle of a
+finished application would receive `ExceptionInLinkedThread` at the next major
+garbage collection, when the runtime finds the supervisor blocked forever. Unlinked,
+such a supervisor is simply collected. Processor failures do not depend on that
+link: `Supervised` links each processor to the caller when the strategy propagates
+failures, so one failure is delivered exactly once. See
+[ADR 0001](../adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md).
 
 **NQE does NOT handle:**
 - What happens inside each processor (that's Shibuya's domain)

@@ -66,7 +66,7 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Confirm that the exact regression source in Milestone 1 compiles under `-Wall` and fails on all three scenarios against the unfixed library.
 - [x] (2026-09-20 UTC) Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason. Observed on the unfixed library: three `FAIL` lines from `shibuya-core-gc-finished-test`, `expected: Just 1 but got: Just 2` as the only failure among 213 Hspec examples, and `shibuya-core-gc-test` still passing.
 - [x] (2026-09-20 UTC) Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass. All three suites pass with 213 Hspec examples and zero failures, the finished-application suite passed three consecutive runs, and both diagnostic probes confirm the change on the fixed library.
-- [ ] Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix.
+- [x] (2026-09-20 UTC) Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix. `CLAUDE.md`, the release skill and `docs/architecture/CONCURRENCY.md` updated; ADR 0001 amended; unreleased entries added to the root and core changelogs; `nix fmt`, `nix flake check` and all three core suites pass. `docs/HIGH_LEVEL_ARCHITECTURE.md` and `docs/architecture/RUNNER_BUG_FIXES.md` contained no present-tense claim of a linked supervisor and were left unchanged.
 - [ ] Milestone 4: Prepare and validate the patch release; publish only after the owner approves the version and changelog.
 
 

@@ -102,9 +102,12 @@ Show the user ALL changes (version bumps, dependency bounds, changelog entries) 
 
 - Run `nix fmt` to ensure code is properly formatted.
 - Run `cabal build all` to verify cabal build succeeds.
-- Run `cabal test shibuya-core` to run both `shibuya-core-test` and
-  `shibuya-core-gc-test` before publishing. The isolated GC regression must pass;
-  running only the Hspec suite misses bare `waitApp` liveness failures.
+- Run `cabal test shibuya-core` to run `shibuya-core-test`, `shibuya-core-gc-test`
+  and `shibuya-core-gc-finished-test` before publishing. Both isolated GC
+  regressions must pass; running only the Hspec suite misses them. The first
+  guards a caller blocked in bare `waitApp` on an idle application; the second
+  guards a caller that keeps running after its application has finished and its
+  handle has been dropped.
 - Run `nix flake check` to verify treefmt and pre-commit checks pass.
   - The flake currently exposes only `checks` / `devShells` / `formatter` (no `packages.default`), so `nix flake check` is the appropriate gate; `nix build` will fail with "does not provide attribute packages.<system>.default".
   - Note: newly created files must be `git add`-ed before nix evaluation will see them, since nix uses the git tree.
