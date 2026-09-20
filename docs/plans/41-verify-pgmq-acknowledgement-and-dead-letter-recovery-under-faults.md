@@ -25,9 +25,14 @@ provenance:
       note: "Core plan becomes a soft dependency gating only exhausted-finalization visibility; record core 0.9 bound handling; define DLQ."
     - model: "gpt-6-astra"
       harness: "codex-cli"
-      at: 2026-09-20T23:20:00Z
+      at: 2026-09-20T19:20:00Z
       mode: "implement"
       note: "Begin implementation after EP-40 completion; resolve the adapter, pgmq-hs, and Hasql sources through Mori before changing transactional finalization."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T21:08:00Z
+      mode: "implement"
+      note: "Complete durable source-row claiming, exception-safe acknowledgement ownership, visible terminal failures, ephemeral PostgreSQL recovery evidence, strict capability validation, and focused performance comparison."
 ---
 
 # Verify PGMQ acknowledgement and dead-letter recovery under faults
@@ -46,9 +51,9 @@ Demonstrate that PGMQ acknowledgements remain recoverable under database faults 
 ## Progress
 
 
-- [ ] Milestone 1: Reproduce ambiguous commits and finalizer fault paths.
-- [ ] Milestone 2: Implement durable idempotent DLQ movement.
-- [ ] Milestone 3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
+- [x] (2026-09-20 20:18Z) Milestone 1: Reproduce ambiguous commits and finalizer fault paths.
+- [x] (2026-09-20 20:31Z) Milestone 2: Implement durable idempotent DLQ movement.
+- [x] (2026-09-20 21:08Z) Milestone 3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
 
 
 ## Surprises & Discoveries
@@ -59,17 +64,71 @@ Demonstrate that PGMQ acknowledgements remain recoverable under database faults 
 `mori://shinzui/pgmq-hs` and `mori://hasql/hasql`; those local sources are the API source of
 truth for the transaction and fault-fixture work.
 
+2026-09-20: The unchanged reviewed implementation fails the promoted ambiguous-confirmation
+regression. Finalizing the same durable delivery through a fresh handle creates two DLQ rows
+because the old transaction sends before deleting and ignores the delete result. The isolated
+worktree failure, seed `12880255`, is retained in
+`docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/baseline-red.log`.
+
+2026-09-20: PGMQ's verified delete statement returns a Boolean inside the existing Hasql
+transaction. Deleting first and sending only when it is `True` provides the durable claim: send
+failure rolls the delete back, while retry after an ambiguous successful commit observes
+`False` and emits nothing. No schema migration or deduplication table is needed.
+
+2026-09-20: Catching only `Error PgmqRuntimeError` at automatic-DLQ call sites kept exhausted
+failures inside the adapter effect boundary. A public synchronous
+`PgmqAcknowledgementException`, thrown after `onAckFailure`, reaches EP-38's finalizer observer
+and leaves the processor in `LifecycleFailed` even after ingestion has ended.
+
+2026-09-20: Strict capability validation initially failed because every PGMQ capability record
+lacked recommended review provenance. After reviewing all six current records, adding the same
+model-review metadata used by the Kafka catalog produced a strict profile/log pass.
+
 
 ## Decision Log
 
 
 2026-09-19: Require durable idempotence for DLQ movement while retaining at-least-once processing and documented lease-expiry replay.
 
+2026-09-20: Claim the source row before producing the DLQ copy in the same `ReadCommitted`
+transaction. Condition the send on the Boolean delete result and rely on transaction rollback
+for send failure. The detailed rationale is recorded in
+`mori://shinzui/shibuya-pgmq-adapter` at
+`docs/adr/0001-idempotent-dead-letter-moves.md`; an artifact-level ADR URI is not registered.
+
+2026-09-20: Serialize each acknowledgement handle with exception-safe ownership, mark it
+complete only after success, and leave failure or cancellation retryable. Preserve the durable
+source-row claim as the cross-handle/crash safety mechanism; the in-memory lock is not the
+idempotency boundary.
+
+2026-09-20: Surface exhausted acknowledgement operations as public synchronous exceptions
+after invoking `onAckFailure`. Automatic DLQ success hooks run only after a durable move;
+failure is both hooked and rethrown. This consumes EP-38's completed failure contract rather
+than parking an error for a future source read.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+Completed at adapter implementation SHA `130b2502a9eaaa2d6f7f927baf9235510297a9f8`
+and final evidence candidate SHA `fe26ce9064999f6b4e373a6a283139c6f68a5971`.
+The reviewed baseline fails the discarded-confirmation regression with two durable DLQ rows;
+the candidate's delete-first conditional send converges on one row across fresh handles and
+concurrent callers. Failed moves preserve the source, cancellation leaves the handle retryable,
+automatic and ordinary exhaustion stay visible, and the exact candidate core retains the
+failure as `LifecycleFailed`.
+
+The final suite passes 177 examples against PostgreSQL 17.11, including renewal outage,
+lease-expiry redelivery of the same identity after database restart, bounded loss-free prefetch
+shutdown, and repeated graceful stop. All five PGMQ persistence matrix cells are passed. The
+adapter library, example and endurance executable build together; Haddock, Nix, Mori, and the
+strict six-concept capability catalog pass.
+
+Ten alternating baseline/candidate runs of the unchanged live AckOk workload measured a mean
+paired latency change of +2.009%, with a 95% bootstrap interval of +0.039% to +4.214%, inside
+EP-45's 10% focused latency budget. This is child-plan evidence, not EP-45's final integrated
+performance verdict. The capability contract and ADR explicitly retain at-least-once delivery
+and do not promise exactly-once handler side effects.
 
 
 ## Context and Orientation
@@ -109,6 +168,26 @@ cabal test shibuya-pgmq-adapter --test-show-details=direct
 
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
 
+The accepted implementation used the following commands in the Mori-resolved adapter checkout
+with ignored local package entries for the exact candidate core and metrics:
+
+```bash
+cabal test shibuya-pgmq-adapter-test --enable-tests --test-show-details=direct
+cabal build all
+cabal haddock shibuya-pgmq-adapter
+nix fmt
+nix flake check
+mori validate
+okf validate docs/capabilities --strict --profile docs/capabilities/profile.dhall --profile-enforce --log-enforce
+okf graph docs/capabilities
+```
+
+The suite passes 177 examples with PostgreSQL started per test by `ephemeral-pg`. Focused
+performance alternated baseline and candidate test binaries for ten pairs of `AckOk is
+idempotent after a successful finalize`; raw samples, identities, and the deterministic
+bootstrap result are retained under
+`docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/`.
+
 
 ## Validation and Acceptance
 
@@ -137,3 +216,10 @@ Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-eviden
 
 2026-09-20 UTC: Started EP-41 after EP-40 completed. Resolved the owning adapter and its
 PGMQ/Hasql dependencies through Mori before inspecting or changing the transactional API.
+
+2026-09-20 UTC: Completed EP-41. Reproduced the duplicate DLQ move at the reviewed baseline;
+implemented a delete-first transactional claim, exception-safe per-handle serialization, and
+typed terminal failure; verified rollback, cancellation, renewal outage, automatic failure,
+core lifecycle visibility, restart redelivery, loss-free prefetch shutdown, and repeated stop
+against ephemeral PostgreSQL; recorded the adapter ADR and capability contract; passed strict
+repository gates and focused paired performance without a waiver or budget change.

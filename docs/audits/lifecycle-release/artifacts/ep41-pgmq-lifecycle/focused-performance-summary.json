@@ -1,0 +1,17 @@
+{
+  "workload": "AckOk is idempotent after a successful finalize",
+  "runsPerVariant": 10,
+  "ordering": "alternating, pair order reversed on even pairs",
+  "bootstrap": {
+    "resamples": 100000,
+    "seed": 410041,
+    "statistic": "mean paired candidate/baseline elapsed-time ratio"
+  },
+  "baselineMeanSeconds": 4.2431058416,
+  "candidateMeanSeconds": 4.3260392584,
+  "meanPairedRatio": 1.020090454710489,
+  "latencyChangePercent": 2.0090454710489,
+  "latencyChangeCi95Percent": [0.0386887425, 4.213518955],
+  "budgetPercent": 10.0,
+  "verdict": "pass"
+}

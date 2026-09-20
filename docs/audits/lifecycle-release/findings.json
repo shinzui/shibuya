@@ -582,13 +582,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-11-pgmq-lifecycle-audit.md", "reviewedSha": "392f7545af32ef893c24139fd194d16ec1172f75" },
       "claim": "An ambiguous successful PostgreSQL commit followed by a retryable client error can duplicate a DLQ copy.",
-      "confirmation": "unconfirmed",
+      "confirmation": "runtime",
       "owner": "docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md",
       "invariant": "DLQ movement is durably idempotent across lost commit confirmation and retry.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter", "path": "test/Shibuya/Adapter/Pgmq/ChaosSpec.hs" }],
+      "fixSha": "130b2502a9eaaa2d6f7f927baf9235510297a9f8",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-11-A1",
@@ -599,13 +599,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-11-pgmq-lifecycle-audit.md", "reviewedSha": "392f7545af32ef893c24139fd194d16ec1172f75" },
       "claim": "Prefetched deliveries may remain invisible until visibility timeout after shutdown; this is delayed redelivery, not deletion.",
-      "confirmation": "documented",
+      "confirmation": "runtime",
       "owner": "docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md",
       "invariant": "Restart tests observe eventual redelivery within the declared visibility bound.",
-      "regressionTests": [],
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter", "path": "test/Shibuya/Adapter/Pgmq/ChaosSpec.hs" }],
       "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/README.md" }],
+      "disposition": { "status": "accepted", "rationale": "Ephemeral PostgreSQL restart preserves the same durable message identity, which becomes readable after the configured visibility lease expires; delayed availability remains the documented at-least-once contract." }
     },
     {
       "id": "REV-11-A2",
@@ -616,13 +616,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-11-pgmq-lifecycle-audit.md", "reviewedSha": "392f7545af32ef893c24139fd194d16ec1172f75" },
       "claim": "A single AckHandle is not internally serialized, while core is assumed to finalize each delivery sequentially.",
-      "confirmation": "documented",
+      "confirmation": "runtime",
       "owner": "docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md",
       "invariant": "The adapter either enforces or explicitly tests and documents the sequential finalization precondition.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "accepted", "rationale": "No core-triggered concurrent finalization was established." }
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter", "path": "test/Shibuya/Adapter/Pgmq/ChaosSpec.hs" }],
+      "fixSha": "130b2502a9eaaa2d6f7f927baf9235510297a9f8",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-11-A3",
@@ -633,13 +633,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-11-pgmq-lifecycle-audit.md", "reviewedSha": "392f7545af32ef893c24139fd194d16ec1172f75" },
       "claim": "Automatic dead-letter failure is reported only through a callback whose default does nothing, while the source message remains replayable.",
-      "confirmation": "documented",
+      "confirmation": "runtime",
       "owner": "docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md",
       "invariant": "Failure visibility and eventual source-message recovery are both exercised under the configured callback policy.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter", "path": "test/Shibuya/Adapter/Pgmq/ChaosSpec.hs" }],
+      "fixSha": "130b2502a9eaaa2d6f7f927baf9235510297a9f8",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-12-F1",
@@ -1098,11 +1098,11 @@
       "description": "Visibility leases, transactional DLQ movement, ambiguous commits, outage recovery, and restart.",
       "owner": "docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/candidate-full.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/candidate-full.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/candidate-full.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/candidate-full.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/candidate-full.log"] }
       }
     },
     {

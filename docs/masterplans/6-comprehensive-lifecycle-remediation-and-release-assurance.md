@@ -34,9 +34,14 @@ provenance:
       note: "Started EP-45 performance baseline, workload, and comparator implementation"
     - model: "gpt-6-astra"
       harness: "codex-cli"
-      at: 2026-09-20T23:10:00Z
+      at: 2026-09-20T19:10:00Z
       mode: "implement"
       note: "Completed EP-40 Kafka acknowledgement remediation and evidence; advance to EP-41."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T21:08:00Z
+      mode: "implement"
+      note: "Completed EP-41 PGMQ acknowledgement and durable dead-letter recovery remediation; advance to EP-43."
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -80,7 +85,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Complete |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Complete |
-| 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | In Progress |
+| 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Complete |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
 | 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | Not Started |
 | 44 | Certify the integrated lifecycle release candidate | [EP-44](../plans/44-certify-the-integrated-lifecycle-release-candidate.md) | EP-37, EP-38, EP-39, EP-40, EP-41, EP-43, EP-45; existing standalone EP-46; existing EP-34 and EP-35 compatibility gates | None | Not Started |
@@ -162,9 +167,9 @@ and is verified, not tracked, here.
 - [x] EP-40 M1: Reproduce Kafka acknowledgement interleavings with a reference model.
 - [x] EP-40 M2: Fix unresolved-delivery tracking and terminal failure propagation.
 - [x] EP-40 M3: Verify recovery and reassignment against a live ephemeral broker.
-- [ ] EP-41 M1: Reproduce ambiguous commits and finalizer fault paths.
-- [ ] EP-41 M2: Implement durable idempotent DLQ movement.
-- [ ] EP-41 M3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
+- [x] EP-41 M1: Reproduce ambiguous commits and finalizer fault paths.
+- [x] EP-41 M2: Implement durable idempotent DLQ movement.
+- [x] EP-41 M3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
 - [ ] EP-43 M1: Reproduce member acquisition and cleanup ownership gaps.
 - [ ] EP-43 M2: Implement exception-safe group ownership transfer.
 - [ ] EP-43 M3: Verify acknowledgement and checkpoint recovery with the real store.
@@ -250,6 +255,19 @@ Cabal, live-broker, and strict OKF checks pass, but the Nix package output does 
 preserved as an EP-44 candidate-build obligation rather than silently omitted or conflated with
 the acknowledgement fix.
 
+**PGMQ dead-letter idempotence can use the source row as the durable claim (2026-09-20 UTC,
+EP-41).** The dependency's delete statement already returns whether it removed the source row.
+Deleting first and conditionally sending in the same transaction avoids a new schema or
+deduplication table: rollback restores the row on send failure, and retry after a lost commit
+response observes that the row is absent. A per-handle exception-safe lock still matters for
+concurrent and cancelled callbacks, but it is deliberately not the crash-safety boundary.
+
+**Adapter-local error effects do not cross core's finalizer observer (2026-09-20 UTC,
+EP-41).** As in Kafka, an exhausted acknowledgement must become a typed synchronous exception
+after the adapter failure hook runs. The candidate proves that ordinary and automatic DLQ
+failure preserve the source and produce EP-38's retained `LifecycleFailed` outcome after the
+source has ended.
+
 
 ## Decision Log
 
@@ -287,6 +305,13 @@ generations; terminal ack exhaustion is a processor failure. Serial processing a
 of a DLQ producer remain explicit adapter limits. The focused live AckRetry comparison passes,
 while EP-45 retains ownership of the final adapter matrix and soak.
 
+2026-09-20: Accept EP-41's PGMQ delete-first transactional claim at adapter implementation SHA
+`130b2502a9eaaa2d6f7f927baf9235510297a9f8`. A DLQ send occurs only when deletion claims the
+source row; rollback keeps failed moves recoverable and retry after ambiguous commit emits no
+second copy. Exception-safe per-handle ownership and typed terminal failure cover concurrency,
+cancellation, and core lifecycle visibility. At-least-once delivery and lease-expiry replay
+remain explicit; exactly-once application side effects are not claimed.
+
 2026-09-20: Accept EP-45's 0.9.0.3 N1/N4 capture as pre-remediation calibration and pause the
 plan after Milestone 3. The capture fixes the absolute idle budgets before candidate observation
 but is marked ineligible for final paired comparison, because a candidate did not yet exist to
@@ -320,6 +345,21 @@ release-gated suite covers every published route, exact JSON and Prometheus outp
 and real sockets; final verification also passed 236 core examples and both GC suites. Focused
 activity and socket comparisons stayed inside the inherited 5% budget without a waiver. The
 remaining IR-5 CORS/Origin and broader convention work stays explicitly outside this initiative.
+
+EP-40 completed Kafka persistence remediation at implementation SHA
+`554c969b1d95842628d0483f7ae6331c87249a84`. It closes the two confirmed defects, validates
+the documented assumptions, and passes all five Kafka persistence cells with 53 deterministic
+and live-broker tests. Its focused live AckRetry latency interval remains inside the 10% budget.
+The pre-existing broken Nix default-package output stays visible for EP-44 rather than being
+treated as an acknowledgement failure or a pass.
+
+EP-41 completed PGMQ persistence remediation at implementation SHA
+`130b2502a9eaaa2d6f7f927baf9235510297a9f8` and final evidence SHA
+`fe26ce9064999f6b4e373a6a283139c6f68a5971`. It closes the ambiguous-commit, concurrency,
+and automatic-failure entries, runtime-verifies lease-expiry replay, and passes all five PGMQ
+persistence cells with 177 examples against ephemeral PostgreSQL. The focused live AckOk
+latency interval is +0.039% to +4.214%, inside the inherited 10% budget. EP-43 is now the only
+unfinished Phase B remediation child; EP-45 remains paused until it completes.
 
 
 ## Revision Notes
@@ -365,3 +405,10 @@ eligible unstarted child while EP-45 remains paused.
 2026-09-20 UTC: Started EP-40 at the unchanged reviewed Kafka adapter baseline. Its core soft
 gate is already satisfied by EP-38, and EP-45 remains paused until all remediation children are
 complete.
+
+2026-09-20 UTC: Completed EP-40 and EP-41. Kafka now preserves the earliest unresolved
+delivery and fences assignment generations with live-broker evidence. PGMQ now claims the
+source row before conditional DLQ send and surfaces terminal finalizer failure with ephemeral
+PostgreSQL red/green, restart, cancellation, repeated-stop, and performance evidence. Their
+ledger entries and all ten adapter persistence cells are closed. EP-43 is the next eligible
+child; EP-45 remains paused by its two-pass protocol.
