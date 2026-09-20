@@ -78,6 +78,31 @@ function requireLocalPath(errors: string[], root: string, label: string, value: 
   if (error) errors.push(`${label}: ${path} ${error}`);
 }
 
+function requireRegressionTest(
+  errors: string[],
+  root: string,
+  label: string,
+  value: unknown,
+): void {
+  if (typeof value === "string") {
+    requireLocalPath(errors, root, label, value);
+    return;
+  }
+
+  const external = record(value);
+  const uri = string(external?.uri);
+  const path = string(external?.path);
+  if (!uri?.startsWith("mori://") || !path) {
+    errors.push(`${label}: expected a local path or { uri: canonical mori:// URI, path: project-relative path }`);
+    return;
+  }
+  if (isAbsolute(path)) {
+    errors.push(`${label}.path: ${path} must be project-relative`);
+  } else if (path.split(/[\\/]/).includes("..")) {
+    errors.push(`${label}.path: ${path} escapes the external project root`);
+  }
+}
+
 function completeDecision(value: unknown): boolean {
   const decision = record(value);
   return Boolean(
@@ -199,9 +224,9 @@ export function validateInventory(value: unknown, options: ValidationOptions = {
     if (owner && !ownerSet.has(owner)) errors.push(`${label}: owner is not declared in owners: ${owner}`);
     if (status !== "out-of-scope" && !owner) errors.push(`${label}: missing owner`);
 
-    const regressionTests = strings(finding.regressionTests);
-    regressionTests.forEach((path, testIndex) =>
-      requireLocalPath(errors, root, `${label}.regressionTests[${testIndex}]`, path),
+    const regressionTests = array(finding.regressionTests);
+    regressionTests.forEach((test, testIndex) =>
+      requireRegressionTest(errors, root, `${label}.regressionTests[${testIndex}]`, test),
     );
     array(finding.evidence).forEach((evidenceValue, evidenceIndex) => {
       const evidence = record(evidenceValue);

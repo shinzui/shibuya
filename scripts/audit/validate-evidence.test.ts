@@ -68,6 +68,31 @@ describe("inventory validation", () => {
     );
   });
 
+  test("accepts canonical external regression test references", () => {
+    const inventory = inventoryFixture();
+    inventory.findings[0].regressionTests = [
+      {
+        uri: "mori://example/in-scope/packages/core",
+        path: "test/Example/LifecycleSpec.hs",
+      },
+    ];
+    expect(validateInventory(inventory, { root }).errors).toEqual([]);
+  });
+
+  test("rejects ambiguous or escaping external regression test references", () => {
+    const inventory = inventoryFixture();
+    inventory.findings[0].regressionTests = [
+      { uri: "example/in-scope", path: "../other/Test.hs" },
+      {
+        uri: "mori://example/in-scope/packages/core",
+        path: "../other/Test.hs",
+      },
+    ];
+    const errors = errorText(validateInventory(inventory, { root }));
+    expect(errors).toContain("expected a local path or { uri: canonical mori:// URI");
+    expect(errors).toContain("escapes the external project root");
+  });
+
   test("rejects unjustified exclusions", () => {
     const inventory = inventoryFixture();
     delete inventory.findings[1].disposition.decision.by;
@@ -212,7 +237,7 @@ describe("release validation", () => {
     const stderr = process.stderr.toString();
     expect(process.exitCode).toBe(1);
     expect(stdout).toContain("UNCERTIFIED: REV-12-F1");
-    expect(stderr).toContain("REV-7-F1: open finding blocks release");
+    expect(stderr).toContain("REV-11-F1: open finding blocks release");
     expect(stderr).toContain("startup-registration:normal: missing mandatory matrix run");
   });
 });

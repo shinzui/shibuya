@@ -146,6 +146,20 @@ review-derived finding, even when one fix closes several entries, and changes bo
 to `passed` only with repository-relative artifact paths. Adapter evidence uses the canonical
 component identities in the inventory: `mori://shinzui/shibuya-kafka-adapter`,
 `mori://shinzui/shibuya-pgmq-adapter`, and `mori://shinzui/kiroku` remain the owning projects.
+Repository-local regression tests are strings. A regression test owned by another repository
+is an object with its canonical Mori project or package `uri` and a `path` relative to that
+project, for example:
+
+```json
+{
+  "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter",
+  "path": "test/Shibuya/Adapter/Kafka/AckHandleTest.hs"
+}
+```
+
+The split form is deliberate while source-file artifact URIs are pending: the URI unambiguously
+identifies the owner and the path identifies the file inside it. The validator rejects bare
+cross-repository paths, non-canonical owners, absolute paths, and parent traversal.
 
 EP-44 creates the final clean candidate manifest and runs release validation. It does not
 edit historical evidence to make a candidate pass. A changed source SHA or solver-plan hash
