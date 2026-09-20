@@ -48,7 +48,7 @@ Make the audit measurable: every finding and every lifecycle boundary has an own
 
 - [x] (2026-09-20T14:09:02Z) Milestone 1: Inventory every finding and lifecycle boundary.
 - [x] (2026-09-20T14:16:17Z) Milestone 2: Implement and test the evidence validator.
-- [ ] Milestone 3: Document candidate manifests and execution budgets.
+- [x] (2026-09-20T14:18:47Z) Milestone 3: Document candidate manifests and execution budgets.
 
 
 ## Surprises & Discoveries
@@ -98,7 +98,27 @@ the stale run. The validator compares the complete map, not only the project tha
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+EP-37 is complete. The initiative now has a schema-versioned inventory with 52 records from
+all sixteen reviews, 15 owned lifecycle boundaries, 70 mandatory in-scope matrix cells, and
+five explicit MessageDB exclusions. Inventory validation passes without pretending that the
+31 open records are fixed. Release validation binds results to the complete candidate source
+map and solver-plan hash, requires every finding result and mandatory matrix cell, rejects
+incomplete or agent-approved waivers, and always surfaces exclusions.
+
+The validator has 17 passing Bun tests, including a positive complete candidate and a stale-SHA
+mutation of that same candidate. The checked-in incomplete example exits 1 with 152 errors;
+representative errors name `REV-2-F1` as open and `startup-registration:normal` as missing,
+while all five REV-12 records print as `UNCERTIFIED`. The evidence README defines the
+append-only candidate/run layout, raw artifact requirements, identical local and eventual-CI
+entry points, deterministic repetition and property budgets, both RTS modes, adapter soaks,
+and initial regression limits.
+
+No lifecycle defect beyond the already completed EP-33 and EP-46 work is claimed fixed here.
+The remaining children must populate this contract with candidate-bound evidence. The durable
+lesson and policy are recorded in
+`docs/adr/0002-require-candidate-bound-machine-checkable-release-evidence.md`: evidence is a
+property of an exact candidate, and one changed source or solver identity invalidates every
+run that depended on the old candidate.
 
 
 ## Context and Orientation
@@ -157,6 +177,20 @@ matrix run, stale source SHA, stale solver plan, incomplete waiver, and excluded
 candidate rejection. The valid release fixture is the control that passes before its source
 SHA is changed in the stale-evidence test.
 
+Milestone 3 added the checked-in incomplete candidate and its CLI-level negative-control test.
+The final focused run reports:
+
+```text
+17 pass
+0 fail
+Release invalid: 152 error(s)
+- REV-2-F1: open finding blocks release
+- startup-registration:normal: missing mandatory matrix run
+```
+
+The release command also prints all five REV-12 entries as `UNCERTIFIED`, so the excluded
+adapter remains visible even while validation fails.
+
 
 ## Validation and Acceptance
 
@@ -182,3 +216,9 @@ This plan owns the ledger schema, validator, coverage taxonomy, and README. Reme
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. Extended the inventory range to REV-16, recorded after IR-6 and fixed by a standalone plan outside this initiative, so that it is neither orphaned nor double-owned, and added its two probes to the list of diagnostic scripts. Added the `out-of-scope` disposition and its validator rules because the project owner excluded the deprecated MessageDB adapter: the REV-12 findings stay visible in the ledger and in the verdict without being fixed, and without being mislabelled as waived or resolved. Corrected the count of remediation plans from six to five and scoped soak budgets to the three in-scope adapters.
+
+2026-09-20 UTC: Implemented all three milestones. Added the full review inventory and
+boundary taxonomy, the tested inventory/release validator and fixtures, the append-only
+candidate evidence contract and execution budgets, a deliberately failing incomplete
+candidate, and ADR 0002. The plan is complete; subsequent children append candidate-bound
+evidence without changing the schema unless a separately recorded revision is required.

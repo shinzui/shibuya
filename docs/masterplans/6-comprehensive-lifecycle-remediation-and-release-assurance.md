@@ -65,7 +65,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | In Progress |
+| 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | Not Started |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Not Started |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Not Started |
@@ -130,13 +130,14 @@ Status is visible in this registry and each child's Progress. During implementat
 ## Progress
 
 
-EP-37 Milestone 1 has established the complete review inventory and lifecycle boundary
-taxonomy. Check any later item only when the owning child records its acceptance evidence.
-The standalone EP-46 tracks its own progress and is verified, not tracked, here.
+EP-37 is complete: it established the review inventory, lifecycle boundary taxonomy,
+validators, candidate layout, and execution budgets. Check any later item only when the
+owning child records its acceptance evidence. The standalone EP-46 tracks its own progress
+and is verified, not tracked, here.
 
 - [x] EP-37 M1: Inventory every finding and lifecycle boundary, including REV-16 and the out-of-scope REV-12 dispositions.
 - [x] EP-37 M2: Implement and test the evidence validator.
-- [ ] EP-37 M3: Document candidate manifests and execution budgets.
+- [x] EP-37 M3: Document candidate manifests and execution budgets.
 - [ ] EP-45 M1: Capture matched baseline data before remediation.
 - [ ] EP-45 M2: Extend production-runner and lifecycle performance workloads.
 - [ ] EP-45 M3: Implement and test the statistical performance comparator. EP-45 pauses here.
@@ -192,6 +193,13 @@ must update every applicable review-derived key they close, even when one regres
 satisfies several entries. The 15 lifecycle boundaries contribute 70 mandatory in-scope
 matrix cells plus five explicit MessageDB exclusions.
 
+**Evidence belongs to a complete candidate identity, not an individual test (2026-09-20 UTC,
+EP-37 Milestones 2-3).** A passing run records the full source-SHA map and unified solver-plan
+hash. Changing any source or dependency solution invalidates every result from that run, even
+if a particular test lives in an unchanged package. Finding results and matrix cells reference
+the run rather than copying a partial identity. Downstream children must preserve that
+indirection when they append evidence.
+
 
 ## Decision Log
 
@@ -216,11 +224,22 @@ matrix cells plus five explicit MessageDB exclusions.
 
 2026-09-19: Treat the next release as a major one for planning purposes. Rejecting duplicate processor IDs and nonpositive concurrency with structured errors requires new constructors on exported error types, which is a breaking change under the Haskell Package Versioning Policy. Children may make such changes deliberately and must record them; they still do not pick the version.
 
+2026-09-20: Adopt EP-37's candidate-bound evidence-run identity and the durable policy in
+`docs/adr/0002-require-candidate-bound-machine-checkable-release-evidence.md`. The complete
+source-SHA map and solver-plan hash are the unit of freshness; a changed input creates a new
+candidate and reruns affected evidence rather than editing old artifacts. This makes stale
+evidence rejection consistent across all five remediation streams and final certification.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation and final certification. No finding is closed merely by drafting these plans.
+EP-37 completed the coordination foundation: 52 review-derived records, 15 lifecycle
+boundaries, 70 mandatory in-scope cells, a 17-test validator, and an append-only candidate/run
+layout with fixed execution budgets. Its intentionally incomplete candidate fails with 152
+actionable errors and surfaces all five MessageDB exclusions. No open remediation finding is
+closed by this result; the ledger now makes those gaps mechanically visible to every later
+child and to final certification.
 
 
 ## Revision Notes
@@ -231,3 +250,8 @@ To be filled during implementation and final certification. No finding is closed
 2026-09-20 UTC: Recorded that the external prerequisite EP-46 is complete and released as 0.9.0.3. No child, dependency or scope changed; EP-45's baseline capture and EP-44's candidate manifest should now treat 0.9.0.3, not 0.9.0.2, as the latest released source.
 
 2026-09-20 UTC: Widened EP-39 at the project owner's request so that the initiative closes the metrics package's missing test suite: its first milestone now characterizes the full published contract before any behavior changes, adopting the test-suite item of IR-5, and the suite joins the release gate. Added the integration points this creates, golden fixtures shared with any core change that alters an encoder and the release skill's test step shared with the garbage-collection fixes, and recorded the decision. No child, dependency edge or scope boundary otherwise changed.
+
+2026-09-20 UTC: Completed EP-37. Added the complete review and lifecycle-boundary inventory,
+tested inventory and release validators, the append-only candidate evidence layout, execution
+and initial regression budgets, and ADR 0002. The registry and aggregate progress now mark all
+three EP-37 milestones complete; later children consume its schema and candidate-run identity.

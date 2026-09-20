@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "example-incomplete-0.9.0.3-baseline",
+  "inventory": "docs/audits/lifecycle-release/findings.json",
+  "createdAt": "2026-09-20T14:18:47Z",
+  "compiler": "ghc-9.12.4",
+  "platform": "aarch64-darwin",
+  "solverPlanHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "services": [],
+  "commands": [
+    {
+      "command": "bun scripts/audit/validate-evidence.ts --inventory docs/audits/lifecycle-release/findings.json",
+      "exitCode": 0,
+      "startedAt": "2026-09-20T14:18:00Z",
+      "finishedAt": "2026-09-20T14:18:01Z"
+    }
+  ],
+  "projects": [
+    {
+      "component": "mori://shinzui/shibuya/packages/shibuya-core",
+      "sha": "7512b5c692af1c005392e4445cfa26a9be41f9ea",
+      "clean": true,
+      "packageVersions": { "shibuya-core": "0.9.0.3" }
+    },
+    {
+      "component": "mori://shinzui/shibuya/packages/shibuya-metrics",
+      "sha": "7512b5c692af1c005392e4445cfa26a9be41f9ea",
+      "clean": true,
+      "packageVersions": { "shibuya-metrics": "0.9.0.3" }
+    },
+    {
+      "component": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter",
+      "sha": "6c0cd3fc840c9f5ba48558ca94c7d826a3da6c9f",
+      "clean": true,
+      "packageVersions": { "shibuya-kafka-adapter": "0.9.0.1" }
+    },
+    {
+      "component": "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter",
+      "sha": "392f7545af32ef893c24139fd194d16ec1172f75",
+      "clean": true,
+      "packageVersions": { "shibuya-pgmq-adapter": "0.16.0.0" }
+    },
+    {
+      "component": "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter",
+      "sha": "758b81acddf482b08643acf8802f095e621a3e07",
+      "clean": true,
+      "packageVersions": { "shibuya-kiroku-adapter": "0.5.1.2" }
+    }
+  ],
+  "evidenceRuns": [],
+  "findingResults": [],
+  "matrixRuns": [],
+  "waivers": []
+}

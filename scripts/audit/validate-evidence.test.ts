@@ -197,4 +197,22 @@ describe("release validation", () => {
       "must contain every and only included candidate component",
     );
   });
+
+  test("the checked-in incomplete candidate fails with actionable release evidence errors", () => {
+    const process = Bun.spawnSync(
+      [
+        "bun",
+        "scripts/audit/validate-evidence.ts",
+        "--release",
+        "docs/audits/lifecycle-release/candidates/example-incomplete.json",
+      ],
+      { cwd: root },
+    );
+    const stdout = process.stdout.toString();
+    const stderr = process.stderr.toString();
+    expect(process.exitCode).toBe(1);
+    expect(stdout).toContain("UNCERTIFIED: REV-12-F1");
+    expect(stderr).toContain("REV-2-F1: open finding blocks release");
+    expect(stderr).toContain("startup-registration:normal: missing mandatory matrix run");
+  });
 });

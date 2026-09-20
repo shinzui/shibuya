@@ -47,6 +47,13 @@ budget. A waiver records rationale, expiry, affected release scope, and compensa
 an agent cannot approve its own waiver. Performance thresholds and execution budgets are set
 before remediation measurements and changed only with the same named human approval.
 
+The initial execution budgets are 100 repetitions per deterministic concurrency regression,
+1,000 recorded-seed cases per reference model or property workload, both single-capability and
+multi-capability RTS runs, and a bounded 30-minute soak for each in-scope adapter at its
+documented supported concurrency. The initial regression limits are 5% throughput, 10% tail
+or shutdown latency, and 5% allocation or live memory, with paired-run confidence bounds and
+separately calibrated absolute idle budgets. Existing stricter limits take precedence.
+
 ## Consequences
 
 - Passing tests are necessary but do not imply release readiness unless their source and
