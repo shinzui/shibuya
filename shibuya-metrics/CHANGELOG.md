@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+- Export `combinedApp` so callers can mount the unified metrics WAI application on
+  an externally managed server.
+
+### Other Changes
+
+- Add `shibuya-metrics-test`, a release-gated Hspec suite covering every published
+  HTTP route and WebSocket frame plus exact JSON and Prometheus golden contracts.
+
 ## 0.9.0.3 — 2026-09-20
 
 Version bumped to track `shibuya-core` 0.9.0.3. The core dependency bound is

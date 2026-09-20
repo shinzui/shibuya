@@ -1,0 +1,30 @@
+# HELP shibuya_messages_received_total Total messages received by processor
+# TYPE shibuya_messages_received_total counter
+shibuya_messages_received_total{processor="failed"} 1.0
+shibuya_messages_received_total{processor="idle"} 0.0
+shibuya_messages_received_total{processor="processing"} 2.0
+shibuya_messages_received_total{processor="stopped"} 4.0
+# HELP shibuya_messages_processed_total Total messages successfully processed
+# TYPE shibuya_messages_processed_total counter
+shibuya_messages_processed_total{processor="failed"} 0.0
+shibuya_messages_processed_total{processor="idle"} 0.0
+shibuya_messages_processed_total{processor="processing"} 0.0
+shibuya_messages_processed_total{processor="stopped"} 1.0
+# HELP shibuya_messages_failed_total Total messages that failed processing
+# TYPE shibuya_messages_failed_total counter
+shibuya_messages_failed_total{processor="failed"} 1.0
+shibuya_messages_failed_total{processor="idle"} 0.0
+shibuya_messages_failed_total{processor="processing"} 0.0
+shibuya_messages_failed_total{processor="stopped"} 0.0
+# HELP shibuya_processor_state Current processor state (1=idle, 2=processing, 3=failed, 4=stopped)
+# TYPE shibuya_processor_state gauge
+shibuya_processor_state{processor="failed"} 3.0
+shibuya_processor_state{processor="idle"} 1.0
+shibuya_processor_state{processor="processing"} 2.0
+shibuya_processor_state{processor="stopped"} 4.0
+# HELP shibuya_processor_in_flight Number of messages currently being processed
+# TYPE shibuya_processor_in_flight gauge
+shibuya_processor_in_flight{processor="failed"} 0.0
+shibuya_processor_in_flight{processor="idle"} 0.0
+shibuya_processor_in_flight{processor="processing"} 1.0
+shibuya_processor_in_flight{processor="stopped"} 0.0

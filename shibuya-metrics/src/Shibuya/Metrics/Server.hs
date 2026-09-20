@@ -5,6 +5,7 @@ module Shibuya.Metrics.Server
     startMetricsServerWithDeps,
     stopMetricsServer,
     withMetricsServer,
+    combinedApp,
 
     -- * Re-exports
     MetricsServer (..),

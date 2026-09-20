@@ -59,6 +59,8 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 2026-09-20: Implementation starts after EP-38 completed, so both soft-gated items are available immediately: lifecycle-aware health and terminal WebSocket notification can consume the retained bounded `LifecycleSnapshot` without a second pause.
 
+2026-09-20: The first real-server characterization run showed that cancelling Warp does not produce the advertised `goodbye` frame; the client remained blocked until the test timeout. Because Milestone 1 must not freeze an audited lifecycle defect as expected behavior, exact `goodbye` encoding/decoding is covered in `TypesSpec` and real delivery is deferred to the failing defect test and fix in Milestone 3.
+
 
 ## Decision Log
 

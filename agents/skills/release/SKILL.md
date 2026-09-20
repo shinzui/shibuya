@@ -108,6 +108,8 @@ Show the user ALL changes (version bumps, dependency bounds, changelog entries) 
   guards a caller blocked in bare `waitApp` on an idle application; the second
   guards a caller that keeps running after its application has finished and its
   handle has been dropped.
+- Run `cabal test shibuya-metrics` to verify every published metrics/health route,
+  JSON and Prometheus golden contract, and WebSocket frame and connection behavior.
 - Run `nix flake check` to verify treefmt and pre-commit checks pass.
   - The flake currently exposes only `checks` / `devShells` / `formatter` (no `packages.default`), so `nix flake check` is the appropriate gate; `nix build` will fail with "does not provide attribute packages.<system>.default".
   - Note: newly created files must be `git add`-ed before nix evaluation will see them, since nix uses the git tree.

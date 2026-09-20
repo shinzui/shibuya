@@ -14,6 +14,17 @@
   shutdown, and repeated/concurrent stop exception safe. Retain internal terminal lifecycle
   state after live metrics unregister so `IgnoreFailures` does not erase failures.
 
+### New Features
+
+- `shibuya-metrics`: export `combinedApp` so applications and tests can mount the
+  unified JSON, Prometheus, health, and WebSocket WAI application on an externally
+  managed server.
+
+### Other Changes
+
+- `shibuya-metrics`: add a release-gated Hspec suite covering every published HTTP
+  route and WebSocket frame plus exact JSON and Prometheus golden contracts.
+
 ## 0.9.0.3 — 2026-09-20
 
 A patch release that fixes two failure-delivery defects in `shibuya-core`, both
