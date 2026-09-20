@@ -4,6 +4,16 @@
   "confidenceLevel": 0.95,
   "bootstrapIterations": 10000,
   "resamplingSeed": 20260920,
+  "calibration": {
+    "date": "2026-09-20",
+    "sourceArtifacts": [
+      "docs/audits/lifecycle-release/artifacts/baseline-0.9.0.3/pre-remediation-n1.json",
+      "docs/audits/lifecycle-release/artifacts/baseline-0.9.0.3/pre-remediation-n4.json"
+    ],
+    "idleCpuPercentObservedRange": [2.2562517224438934, 3.712247903603686],
+    "idleMaxLiveBytesObservedRange": [53184, 87552],
+    "rationale": "Absolute idle limits were calibrated from ten pre-remediation samples under both -N1 and -N4 before any candidate measurement. The CPU maximum rounds the observed 3.71% ceiling up to 4%; the live-memory maximum is the next power-of-two ceiling above the observed 87,552 bytes."
+  },
   "metrics": {
     "throughputPerSecond": {
       "direction": "higher-is-better",
@@ -36,13 +46,13 @@
         "direction": "lower-is-better",
         "nearZeroThreshold": 0.1,
         "absoluteDelta": 1.0,
-        "absoluteMaximum": 2.0
+        "absoluteMaximum": 4.0
       },
       "maxLiveBytes": {
         "direction": "lower-is-better",
         "nearZeroThreshold": 1,
-        "absoluteDelta": 1048576,
-        "absoluteMaximum": 8388608
+        "absoluteDelta": 32768,
+        "absoluteMaximum": 131072
       }
     }
   },

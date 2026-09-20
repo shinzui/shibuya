@@ -54,6 +54,13 @@ documented supported concurrency. The initial regression limits are 5% throughpu
 or shutdown latency, and 5% allocation or live memory, with paired-run confidence bounds and
 separately calibrated absolute idle budgets. Existing stricter limits take precedence.
 
+The pre-remediation 0.9.0.3 calibration fixed those absolute idle limits before candidate
+measurement: at most 4% process CPU and 131,072 live bytes, plus adverse candidate deltas of
+at most 1 percentage point and 32,768 bytes. Ten fresh-process samples under both `-N1` and
+`-N4` observed 2.256%–3.712% CPU and 53,184–87,552 live bytes. The raw calibration artifacts
+are marked ineligible for final paired comparison; final evidence rebuilds the same baseline
+and alternates it with candidate runs.
+
 ## Consequences
 
 - Passing tests are necessary but do not imply release readiness unless their source and
@@ -77,3 +84,6 @@ Integrated certification is owned by
 [`docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md`](../plans/44-certify-the-integrated-lifecycle-release-candidate.md),
 and matched performance evidence is owned by
 [`docs/plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md`](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md).
+The raw pre-remediation calibration and exact production, harness, solver, compiler, machine,
+and RTS identities are recorded under
+[`docs/audits/lifecycle-release/artifacts/baseline-0.9.0.3/`](../audits/lifecycle-release/artifacts/baseline-0.9.0.3/README.md).

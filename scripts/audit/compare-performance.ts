@@ -25,6 +25,11 @@ export interface PerformanceSample {
 export interface PerformanceDataset {
   schemaVersion: number;
   label: string;
+  capture?: {
+    purpose: string;
+    pairedComparisonEligible: boolean;
+    warmupsPerScenario: number;
+  };
   environment: {
     machineId: string;
     platform: string;
@@ -373,6 +378,12 @@ export function comparePerformance(
   budgets: PerformanceBudgets,
 ): PerformanceVerdict {
   const errors = [...validateDataset(baseline, "baseline"), ...validateDataset(candidate, "candidate")];
+  if (baseline.capture?.pairedComparisonEligible === false) {
+    errors.push("baseline: pre-remediation calibration data is not eligible for a final paired comparison");
+  }
+  if (candidate.capture?.pairedComparisonEligible === false) {
+    errors.push("candidate: calibration data is not eligible for a final paired comparison");
+  }
   if (budgets.schemaVersion !== 1) errors.push("budgets.schemaVersion: expected 1");
   if (budgets.minimumPairs < 2) errors.push("budgets.minimumPairs: expected at least 2");
   if (!(budgets.confidenceLevel > 0 && budgets.confidenceLevel < 1)) {

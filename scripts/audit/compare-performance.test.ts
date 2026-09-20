@@ -143,4 +143,16 @@ describe("paired performance comparator", () => {
     const second = comparePerformance(dataset("baseline"), dataset("candidate"), budgets);
     expect(second).toEqual(first);
   });
+
+  test("rejects baseline-only calibration artifacts as final paired evidence", () => {
+    const baseline = dataset("baseline");
+    baseline.capture = {
+      purpose: "pre-remediation-calibration",
+      pairedComparisonEligible: false,
+      warmupsPerScenario: 1,
+    };
+    const verdict = comparePerformance(baseline, dataset("candidate"), budgets);
+    expect(verdict.status).toBe("fail");
+    expect(verdict.errors.join("\n")).toContain("not eligible for a final paired comparison");
+  });
 });

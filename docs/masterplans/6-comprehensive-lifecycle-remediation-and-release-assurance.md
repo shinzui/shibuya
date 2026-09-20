@@ -71,7 +71,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
-| 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress |
+| 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Not Started |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Not Started |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Not Started |
@@ -143,9 +143,9 @@ and is verified, not tracked, here.
 - [x] EP-37 M1: Inventory every finding and lifecycle boundary, including REV-16 and the out-of-scope REV-12 dispositions.
 - [x] EP-37 M2: Implement and test the evidence validator.
 - [x] EP-37 M3: Document candidate manifests and execution budgets.
-- [ ] EP-45 M1: Capture matched baseline data before remediation.
-- [ ] EP-45 M2: Extend production-runner and lifecycle performance workloads.
-- [ ] EP-45 M3: Implement and test the statistical performance comparator. EP-45 pauses here.
+- [x] EP-45 M1: Capture matched baseline data before remediation.
+- [x] EP-45 M2: Extend production-runner and lifecycle performance workloads.
+- [x] EP-45 M3: Implement and test the statistical performance comparator. EP-45 pauses here.
 - [ ] EP-38 M1: Add deterministic regressions for ownership, halt, failures and policies.
 - [ ] EP-38 M2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
 - [ ] EP-38 M3: Make stop/failure wakeups and scheduler ownership reliable.
@@ -205,6 +205,13 @@ if a particular test lives in an unchanged package. Finding results and matrix c
 the run rather than copying a partial identity. Downstream children must preserve that
 indirection when they append evidence.
 
+**The unmodified idle worker exceeds the guessed 2% CPU cap (2026-09-20 UTC, EP-45 pass
+one).** Ten fresh-process samples under N1 and N4 measured 2.256% to 3.712% CPU and 53,184 to
+87,552 live bytes. Before any candidate observation, EP-45 calibrated the absolute caps to 4%
+CPU and 131,072 live bytes, preserving the 1-point and 32,768-byte adverse-delta checks. The
+320 raw calibration samples lost no acknowledgements. They deliberately cannot serve as final
+paired evidence; pass two rebuilds this exact baseline and alternates it with the candidate.
+
 
 ## Decision Log
 
@@ -235,6 +242,12 @@ source-SHA map and solver-plan hash are the unit of freshness; a changed input c
 candidate and reruns affected evidence rather than editing old artifacts. This makes stale
 evidence rejection consistent across all five remediation streams and final certification.
 
+2026-09-20: Accept EP-45's 0.9.0.3 N1/N4 capture as pre-remediation calibration and pause the
+plan after Milestone 3. The capture fixes the absolute idle budgets before candidate observation
+but is marked ineligible for final paired comparison, because a candidate did not yet exist to
+alternate with it. Each remediation child can now use the committed harness for focused
+before/after evidence; EP-45 pass two rebuilds the same baseline for the final paired verdict.
+
 
 ## Outcomes & Retrospective
 
@@ -260,3 +273,9 @@ child and to final certification.
 tested inventory and release validators, the append-only candidate evidence layout, execution
 and initial regression budgets, and ADR 0002. The registry and aggregate progress now mark all
 three EP-37 milestones complete; later children consume its schema and candidate-run identity.
+
+2026-09-20 UTC: Completed EP-45 pass one and paused it after Milestone 3. Added the shared
+lifecycle load catalog, one-process JSON sampler, deterministic comparator, precommitted and
+calibrated budgets, and 320 N1/N4 samples against the released 0.9.0.3 production code. The raw
+capture is explicitly calibration-only; final paired evidence remains EP-45 pass two after all
+five remediation children complete.

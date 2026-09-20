@@ -46,7 +46,7 @@ Catch performance regressions before release using reproducible baseline/candida
 ## Progress
 
 
-- [ ] Milestone 1: Capture matched baseline data before remediation. The 0.9.0.3 production SHA, compiler and platform are identified; controlled N1/N4 sample capture remains.
+- [x] (2026-09-20 14:48Z) Milestone 1: Capture matched baseline data before remediation.
 - [x] (2026-09-20 14:43Z) Milestone 2: Extend production-runner and lifecycle performance workloads.
 - [x] (2026-09-20 14:43Z) Milestone 3: Implement and test the statistical performance comparator.
 - [ ] Milestone 4: Measure fixed adapters and candidate soaks.
@@ -68,6 +68,13 @@ scenarios `health-poll-proxy` and `websocket-churn-proxy`, and the emitted JSON 
 `core-proxy; ... belongs to EP-39`. This prevents proxy measurements from being mistaken for
 wire-protocol evidence while still freezing the core load shape before remediation.
 
+The guessed 2% idle CPU maximum was below the unmodified baseline. Ten samples per scenario
+under both `-N1` and `-N4` measured idle CPU from 2.256% to 3.712%, while idle
+`maxLiveBytes` ranged from 53,184 to 87,552 bytes. Before any candidate was observed, the
+absolute limits were therefore calibrated to 4% CPU and 131,072 live bytes, with adverse
+deltas of 1 percentage point and 32,768 bytes. The raw artifacts retain the measurements and
+the budget file records the derivation.
+
 
 ## Decision Log
 
@@ -83,16 +90,23 @@ the comparator input.
 EP-39 supplies its protocol harness. Recording a proxy as if it were an HTTP or WebSocket run
 would be weaker than leaving the final matrix cell open.
 
+2026-09-20: Treat the first N1/N4 capture as pre-remediation calibration, not final paired
+evidence. It freezes the unmodified 0.9.0.3 behavior and calibrates near-zero absolute budgets,
+but final release evidence must rebuild this exact production/harness identity and alternate its
+runs with the candidate. The comparator rejects calibration artifacts marked
+`pairedComparisonEligible: false` so they cannot accidentally certify a release.
+
 
 ## Outcomes & Retrospective
 
 
-Pass one now has a compiled production-runner workload catalog and a deterministic paired
-bootstrap comparator. The Haskell smoke matrix completed every expected delivery and
-acknowledgement across concurrency, partition, batching, retry, dead-letter, idle, observer and
-startup scenarios. The comparator's six synthetic tests prove pass, fail, inconclusive,
-environment-mismatch, dropped-work, absolute-budget and deterministic-seed behavior. Baseline
-capture remains before pass one can pause; no candidate performance verdict exists yet.
+Pass one is complete and paused. It has a compiled production-runner workload catalog, a
+deterministic paired bootstrap comparator, and 320 raw pre-remediation samples: ten runs for
+each of 16 scenarios under both `-N1` and `-N4`, with zero dropped acknowledgements. The
+comparator's seven synthetic tests prove pass, fail, inconclusive, environment-mismatch,
+dropped-work, absolute-budget, deterministic-seed, and calibration-misuse behavior. No candidate
+performance verdict exists yet; pass two must recapture this baseline in alternating order with
+the integrated candidate.
 
 
 ## Context and Orientation
@@ -133,6 +147,15 @@ cabal run shibuya-core-bench:lifecycle-load -- \
   --messages 200 \
   +RTS -N1 -T -RTS
 bun test scripts/audit/compare-performance.test.ts
+bun scripts/audit/capture-performance-baseline.ts \
+  --executable "$(cabal list-bin shibuya-core-bench:lifecycle-load)" \
+  --output docs/audits/lifecycle-release/artifacts/baseline-0.9.0.3/pre-remediation-n1.json \
+  --label baseline-0.9.0.3-n1 --rts -N1 --iterations 10 \
+  --machine-id MacBookPro18,2 --platform Darwin-arm64 \
+  --compiler ghc-9.12.4 --optimization O2 --capabilities 1 \
+  --production-sha 7512b5c692af1c005392e4445cfa26a9be41f9ea \
+  --harness-sha 886f5910a5f1a47b5465dce9380bce831467fe2b \
+  --solver-plan-hash 47f9680ce1ad6be1220c85dfc30c850d097e20d4e97bef9d4394cbce30ec4dc4
 cabal bench shibuya-core-bench --benchmark-options="--stdev 5 --timeout 300 --csv baseline.csv"
 cabal run shibuya-core-bench:prod-stress
 # In a matched candidate worktree, after capturing the baseline:
@@ -141,9 +164,12 @@ bun test scripts/audit/compare-performance.test.ts
 bun scripts/audit/compare-performance.ts --baseline baseline.json --candidate candidate.json --budgets docs/audits/lifecycle-release/performance-budgets.json
 ```
 
-The first build command succeeds under GHC 9.12.4. The comparator test command reports six
+The first build command succeeds under GHC 9.12.4. The comparator test command reports seven
 passing tests. The smoke command emits one JSON object whose `expected`, `completed`, and
-`acknowledged` values are all 200. Successful suites exit zero and report executed tests; zero
+`acknowledged` values are all 200. The two capture commands, differing only in `--rts`,
+`--capabilities`, `--label`, and output name, wrote 160 samples each and no sample lost work.
+The command substitution shown above is for a human shell; the recorded run used the exact
+path printed by `cabal list-bin`. Successful suites exit zero and report executed tests; zero
 tests or skipped services are not acceptance. Record exact selectors and fixture commands in
 this section when the harness is extended.
 
@@ -178,4 +204,11 @@ This plan runs in two passes. Pass one is Milestones 1 through 3. When they are 
 2026-09-20 UTC: Implemented the pass-one workload and comparator interfaces. Added a shared
 production-runner scenario catalog, a one-scenario JSON load executable, precommitted budgets,
 and a deterministic paired bootstrap comparator with synthetic negative controls. Baseline data
-capture remains open so the harness can be committed first and its exact SHA recorded.
+capture remained open so the harness could be committed first and its exact SHA recorded.
+
+2026-09-20 UTC: Completed pass one. Captured ten fresh-process samples for all 16 scenarios under
+both N1 and N4 against production SHA `7512b5c692af1c005392e4445cfa26a9be41f9ea`, harness
+SHA `886f5910a5f1a47b5465dce9380bce831467fe2b`, and solver hash
+`47f9680ce1ad6be1220c85dfc30c850d097e20d4e97bef9d4394cbce30ec4dc4`; calibrated the
+absolute idle budgets from those results; and marked the raw data ineligible for the later final
+paired verdict so pass two must alternate baseline and candidate processes.

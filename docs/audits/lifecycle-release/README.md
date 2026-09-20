@@ -95,6 +95,13 @@ cabal run shibuya-core-bench:lifecycle-load -- \
 Their JSON labels that fidelity explicitly; they do not satisfy the final HTTP or WebSocket
 cells. EP-39 supplies the real protocol fixtures before EP-45 pass two.
 
+The initial 0.9.0.3 calibration is under
+`artifacts/baseline-0.9.0.3/`. It contains 320 raw samples and records the production SHA,
+harness SHA, solver-plan hash, compiler, machine and RTS settings. Its
+`pairedComparisonEligible: false` marker is deliberate: it sets pre-remediation expectations
+and absolute idle budgets, while pass two must collect a new baseline in alternating order
+with the candidate.
+
 ## Local and eventual CI commands
 
 Run from the Shibuya repository root. The same commands are the eventual CI entry points; CI
