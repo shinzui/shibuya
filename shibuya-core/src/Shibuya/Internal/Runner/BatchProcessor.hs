@@ -33,6 +33,7 @@ module Shibuya.Internal.Runner.BatchProcessor
 where
 
 import Control.Applicative ((<|>))
+import Control.Concurrent.STM (TVar)
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty (NonEmpty)
@@ -77,6 +78,7 @@ import Shibuya.Internal.Runner.Halt
     newProcessorSignal,
     readProcessorExit,
     requestProcessorExit,
+    requestProcessorExitWithWake,
     throwProcessorExit,
   )
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
@@ -124,10 +126,11 @@ processOneBatch ::
   ProcessorId ->
   Int ->
   ProcessorSignal ->
+  Maybe (TVar Bool) ->
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatch metricsHandle procId maxConc stopSignal handler (info, batch) = do
+processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -244,7 +247,10 @@ processOneBatch metricsHandle procId maxConc stopSignal handler (info, batch) = 
 
       -- Halt: set the shared flag; do NOT throw (let the stream drain).
       for_ requestedExit $ \processorExit ->
-        liftIO $ requestProcessorExit stopSignal processorExit
+        liftIO $
+          case intakeWake of
+            Nothing -> requestProcessorExit stopSignal processorExit
+            Just wake -> requestProcessorExitWithWake stopSignal wake processorExit
   where
     isFailing :: AckDecision -> Bool
     isFailing (AckDeadLetter _) = True
@@ -291,15 +297,16 @@ processBatchesUntilDrained ::
   BatchHandler es msg ->
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
   ProcessorSignal ->
+  Maybe (TVar Bool) ->
   Eff es ()
-processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal = do
+processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal intakeWake = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
         Async n -> n
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal handler
+    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
@@ -330,7 +337,7 @@ runBatchesWithMetrics procId concurrency handler batches = do
   stopSignal <- liftIO newProcessorSignal
 
   let batchesStream = Stream.fromList batches
-  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal
+  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal Nothing
 
   maybeExit <- liftIO $ readProcessorExit stopSignal
   case maybeExit of

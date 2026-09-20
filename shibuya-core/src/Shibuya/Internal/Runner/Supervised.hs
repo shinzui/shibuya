@@ -35,6 +35,7 @@ import Control.Concurrent.STM
     atomically,
     modifyTVar',
     newTVarIO,
+    orElse,
     readTVar,
     readTVarIO,
     retry,
@@ -87,8 +88,7 @@ import Shibuya.Internal.Runner.Halt
     isProcessorStopping,
     newProcessorSignal,
     readProcessorExit,
-    readProcessorExitSTM,
-    requestProcessorExit,
+    requestProcessorExitWithWake,
     throwProcessorExit,
   )
 import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics)
@@ -468,6 +468,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
                 batchHandler
                 readyBatchStream
                 stopSignal
+                (Just streamDoneVar)
               maybeExit <- liftIO (readProcessorExit stopSignal)
               maybe (pure ()) (liftIO . throwProcessorExit) maybeExit
       batchProcessor `catchAny` \processorErr -> do
@@ -504,21 +505,16 @@ inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
         then pure Nothing
         else do
           result <-
-            atomically $ do
-              empty <- mailboxEmptySTM inbox
-              if not empty
-                then Just <$> receiveSTM inbox
-                else do
-                  -- Only an observed-empty inbox joins the wake variables to
-                  -- the transaction's read set. A new message, terminal exit,
-                  -- or source completion then reruns this same transaction.
-                  terminal <- readProcessorExitSTM stopSignal
+            atomically $
+              (Just <$> receiveSTM inbox)
+                `orElse` do
+                  -- Source completion and terminal publication share this
+                  -- wake cell. A populated inbox therefore keeps the original
+                  -- receive-only hot branch, while either terminal event wakes
+                  -- an empty intake wait.
                   done <- readTVar streamDoneVar
-                  case terminal of
-                    Just _ -> pure Nothing
-                    Nothing
-                      | done -> pure Nothing
-                      | otherwise -> retry
+                  empty <- mailboxEmptySTM inbox
+                  if done && empty then pure Nothing else retry
           pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.
@@ -551,7 +547,7 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
-        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal handler
+        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal streamDoneVar handler
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -601,10 +597,11 @@ processOne ::
   HashMap.HashMap Text Attribute ->
   Int ->
   ProcessorSignal ->
+  TVar Bool ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal handler ingested = do
+processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal streamDoneVar handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
 
@@ -715,12 +712,13 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal hand
       case finalizeResult of
         Left _ ->
           liftIO $
-            requestProcessorExit
+            requestProcessorExitWithWake
               stopSignal
+              streamDoneVar
               (ProcessorFailed (finalizationFailureText msgIdText) (Just ingested.envelope.messageId))
         Right () -> case result of
           Right (AckHalt reason) ->
-            liftIO $ requestProcessorExit stopSignal (ProcessorHalted reason)
+            liftIO $ requestProcessorExitWithWake stopSignal streamDoneVar (ProcessorHalted reason)
           _ -> pure ()
   where
     isLeft :: Either a b -> Bool

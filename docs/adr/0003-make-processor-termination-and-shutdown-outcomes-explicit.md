@@ -25,13 +25,11 @@ could invoke an adapter more than once.
 Represent deliberate halt and infrastructure failure as distinct outcomes. `ProcessorHalt`
 continues to mean a graceful handler decision. Exhausted framework-owned finalization throws
 `ProcessorFailure`, retaining the failed `MessageId` when one exists, and participates in the
-configured supervision policy. The shared stop signal stores its terminal exit in a `TVar`
-read by the same STM wait as inbox and source completion, so any terminal request wakes
-blocked intake. A companion boolean `IORef` preserves the populated-inbox fast path; terminal
-publication updates it under masking before waking the STM waiter. Intake uses one
-conditional STM decision: a populated inbox checks and receives without joining the wake
-variables to the transaction's read set, while an observed-empty inbox reads the terminal
-and source-completion variables before retrying.
+configured supervision policy. The shared stop signal stores its terminal exit in an atomic
+`IORef` and marks the source-completion `TVar`, so any terminal request wakes blocked intake.
+Terminal publication records the outcome under masking before publishing the wake. Intake
+retains one two-branch STM decision: receive from the inbox, or observe the shared completion
+cell and an empty inbox.
 
 The internal `Master` retains one bounded lifecycle entry per configured processor:
 `LifecycleRunning`, `LifecycleDraining`, `LifecycleStopped`, or `LifecycleFailed Text
