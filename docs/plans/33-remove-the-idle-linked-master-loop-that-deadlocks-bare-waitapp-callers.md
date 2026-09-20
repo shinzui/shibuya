@@ -79,7 +79,7 @@ existing follow-up in `mori://tan/mls-service-v2`. Per the user's clarification,
 - [x] (2026-09-20 UTC) Review the original plan against current source, history, package registry, and upstream release tags.
 - [x] (2026-09-20 UTC) Milestone 1: Add the dedicated GC regression executable and confirm failure with the reported linked-thread exception on 0.9.0.1.
 - [x] (2026-09-20 UTC) Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
-- [ ] Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
+- [x] (2026-09-20 UTC) Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
 - [ ] Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
 - [ ] Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
 
@@ -148,6 +148,12 @@ FAIL: bare waitApp died: ExceptionInLinkedThread (ThreadId 10) thread blocked in
 0 of 1 test suites (0 of 1 test cases) passed.
 ```
 
+**The current concurrency and message-flow references were already actor-free.** Inspection
+of `docs/architecture/CONCURRENCY.md` and `docs/architecture/MESSAGE_FLOW.md` found that both
+already describe `Master` as the owner of the supervisor and metrics map. The stale actor
+descriptions were confined to the explicitly historical design/incident documents and the
+processor-pause proposal; those now label their actor snippets as historical.
+
 
 ## Decision Log
 
@@ -185,7 +191,9 @@ Refresh validation: `cabal test shibuya-core --offline --test-show-details=failu
 selected both suites: the existing Hspec suite passed and the GC suite failed with the
 expected linked STM exception. `cabal check` reported no warnings or errors. `nix fmt`
 and explicit Fourmolu formatting of the new file completed, and `git diff --check` passed.
-The release/flake gates and downstream verification remain implementation work.
+Current-tree validation after the documentation update passed `cabal build all`, both suites
+selected by `cabal test shibuya-core --test-show-details=failures`, `nix fmt`, and
+`nix flake check`. Release publication and downstream verification remain implementation work.
 
 
 ## Context and Orientation
@@ -489,3 +497,8 @@ registration-service-v2. Production implementation and publication remain pendin
 master mailbox actor, and verified the fix with three optimized GC runs, the full core suite,
 and a detached pre-fix reproduction. Updated the living sections to record Milestone 2;
 documentation, release, and MLS consumer follow-up remain.
+
+2026-09-20 UTC: Updated current architecture descriptions, marked historical master-actor
+snippets and the pause protocol proposal explicitly, corrected lifecycle-test cleanup comments,
+and passed the full build, both core suites, formatting, and flake checks. Milestone 3 is
+complete; release and MLS consumer follow-up remain.

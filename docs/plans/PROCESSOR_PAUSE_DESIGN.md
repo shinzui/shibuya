@@ -269,7 +269,10 @@ isProcessorPaused appHandle procId =
 
 ### 7. Master Message Extension (Optional)
 
-For remote/message-based control, extend `MasterMessage`:
+This was a hypothetical extension to the master actor that existed when this design was
+written. The current `Master` has no actor loop, mailbox, or `MasterMessage` type. If remote
+message-based control becomes necessary, introduce a dedicated control actor and protocol;
+the following snippet is historical design material, not an existing extension point:
 
 ```haskell
 data MasterMessage
@@ -282,7 +285,7 @@ data MasterMessage
   | ResumeProcessor !ProcessorId !(Listen Bool)   -- NEW
 ```
 
-This is optional for the initial implementation. Direct access via `AppHandle` is sufficient. The message-based approach adds value when the Master needs to coordinate across threads or when external systems (metrics UI, HTTP API) need to control processors.
+This was optional for the initial design. Direct access via `AppHandle` remains sufficient.
 
 ---
 
@@ -550,7 +553,7 @@ test "in-flight messages complete after pause" $ do
 ## Future Work
 
 - **Adapter-internal pause (Option C):** For adapters with prefetch, gate before `parBuffered` to eliminate stranded messages. Extend `Adapter` with optional `pause`/`resume` fields.
-- **Master message-based control:** Add `PauseProcessor`/`ResumeProcessor` to `MasterMessage` for remote control via the Master actor.
+- **Message-based control:** Introduce a dedicated control actor and protocol for remote pause/resume control if direct `AppHandle` access becomes insufficient.
 - **Metrics UI integration:** Expose pause/resume controls in the planned WebSocket metrics UI.
 - **Pause with drain:** A variant that waits for the inbox to drain before confirming pause, useful for "pause and I want to know when it's truly quiescent."
 - **Pause timeout:** Auto-resume after a configurable duration, useful for temporary rate limiting.

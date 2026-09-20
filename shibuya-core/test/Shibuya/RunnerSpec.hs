@@ -70,11 +70,7 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
-            -- Stop the app to cancel the (always-linked) master coordinator.
-            -- Without this the idle master blocks forever on its mailbox and the
-            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
-            -- through the link as a flaky ExceptionInLinkedThread landing on
-            -- whichever test happens to be running when GC fires.
+            -- Stop the supervisor and its children so they do not outlive this test.
             stopApp appHandle
             pure $ Right ()
 
@@ -107,8 +103,7 @@ spec = do
             pure (decs, Left err)
           Right appHandle -> do
             waitApp appHandle
-            -- See note in "processes messages from mock adapter": stop the app so
-            -- the linked master does not deadlock and flake a later test.
+            -- Stop the supervisor and its children so they do not outlive this test.
             stopApp appHandle
             decs <- liftIO $ readIORef tracking.trackedDecisions
             pure (decs, Right ())
@@ -141,11 +136,7 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
-            -- Stop the app to cancel the (always-linked) master coordinator.
-            -- Without this the idle master blocks forever on its mailbox and the
-            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
-            -- through the link as a flaky ExceptionInLinkedThread landing on
-            -- whichever test happens to be running when GC fires.
+            -- Stop the supervisor and its children so they do not outlive this test.
             stopApp appHandle
             pure $ Right ()
 
@@ -200,11 +191,7 @@ spec = do
           Left err -> pure $ Left err
           Right appHandle -> do
             waitApp appHandle
-            -- Stop the app to cancel the (always-linked) master coordinator.
-            -- Without this the idle master blocks forever on its mailbox and the
-            -- RTS eventually raises BlockedIndefinitelyOnSTM, which propagates
-            -- through the link as a flaky ExceptionInLinkedThread landing on
-            -- whichever test happens to be running when GC fires.
+            -- Stop the supervisor and its children so they do not outlive this test.
             stopApp appHandle
             pure $ Right ()
 

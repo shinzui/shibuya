@@ -39,7 +39,7 @@ This left the NQE Supervisor and all its child threads running after `stopMaster
 
 ### Root Cause
 
-The `Master` contains two async processes:
+At the time of this v0.1.0 incident, `Master` contained two async processes:
 1. `masterLoop` - handles control messages (GetMetrics, RegisterProcessor, etc.)
 2. `supervisor` - NQE Supervisor that manages child processor threads
 
@@ -65,6 +65,17 @@ stopMaster master = liftIO $ do
 ```
 
 NQE's `supervisorProcess` has `finally (loop state) (stopAll state)`, so when the supervisor is cancelled, it properly cancels all children via `stopAll`.
+
+The later 0.9.1 fix removed the now-unused master message loop and mailbox entirely. The
+current `Master` owns only state, so current shutdown is simply:
+
+```haskell
+stopMaster :: (IOE :> es) => Master -> Eff es ()
+stopMaster master = liftIO $ cancel (getProcessAsync master.state.supervisor)
+```
+
+This preserves the supervisor cleanup fixed here without leaving an idle linked actor whose
+unreachable mailbox can trigger `BlockedIndefinitelyOnSTM` during garbage collection.
 
 ### Why This Wasn't Caught by Tests
 

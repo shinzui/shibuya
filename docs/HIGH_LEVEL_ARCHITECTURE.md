@@ -24,6 +24,10 @@ Benefits:
 
 ## Architecture
 
+The diagram below records the original proposed architecture. The current implementation
+does not have a master process or master inbox: `Master` is a state handle containing the
+shared NQE supervisor and metrics registry. Each processor still has its own bounded inbox.
+
 ```
                     ┌────────────────────────────────────────────────────────┐
                     │                    Master Process                      │
@@ -447,7 +451,11 @@ runStreamProcessor allMetrics StreamProcessorConfig {..} = do
     waitForFailure = threadDelay maxBound
 ```
 
-### Master Process
+### Historical Master Process Sketch
+
+This code was a pre-implementation proposal. There is no `MasterMessage` protocol in the
+current implementation; metrics access uses the shared registry directly, and `stopMaster`
+cancels the NQE supervisor.
 
 ```haskell
 -- | Messages for the master

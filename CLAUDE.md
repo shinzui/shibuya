@@ -27,7 +27,9 @@ auto-formats — re-`git add` and commit again.
 | `shibuya-core-bench` | Benchmarks plus `standalone-test` / `prod-stress` executables. |
 
 Runner internals live under `Shibuya.Internal.Runner.*` (Master, Supervised,
-Batcher, KeyedScheduler, …) — exposed but not part of the stable API.
+Batcher, KeyedScheduler, …) — exposed but not part of the stable API. `Master`
+is a handle around the shared NQE supervisor and metrics registry, not a
+mailbox actor.
 
 ## Conventions
 

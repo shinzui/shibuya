@@ -14,10 +14,10 @@ This document describes the design for `runApp`, which enables a single Shibuya 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                      Master                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
-│  │ MetricsMap  │  │ Supervisor  │  │   Inbox     │  │
-│  │  (TVar)     │  │   (NQE)     │  │ (messages)  │  │
-│  └─────────────┘  └─────────────┘  └─────────────┘  │
+│       ┌─────────────┐       ┌─────────────┐         │
+│       │ MetricsMap  │       │ Supervisor  │         │
+│       │  (TVar)     │       │   (NQE)     │         │
+│       └─────────────┘       └─────────────┘         │
 └─────────────────────────────────────────────────────┘
          │                 │
          │    ┌────────────┼────────────┐
@@ -32,8 +32,8 @@ This document describes the design for `runApp`, which enables a single Shibuya 
 ```
 
 **Components:**
-- `Master` - Coordinator process managing child processors
-- `Supervisor` (NQE) - Restarts failed children based on strategy
+- `Master` - State handle owning the shared metrics registry and supervisor; it has no actor loop or mailbox
+- `Supervisor` (NQE) - Manages child processors according to the selected strategy
 - `runSupervised` - Spawns adapter+handler as supervised child
 - `ProcessorMetrics` - Per-processor stats (received, processed, failed)
 
@@ -71,7 +71,7 @@ runApp strategy namedProcessors = do
   for_ namedProcessors $ \(_, QueueProcessor{..}) ->
     validatePolicy ...
 
-  -- 2. Start the Master coordinator
+  -- 2. Create the shared Master state
   master <- startMaster strategy
 
   -- 3. Spawn each processor under supervision
