@@ -132,7 +132,7 @@ a first ADR, recorded in the Decision Log below and revisited at completion.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | In Progress (fix and docs complete; 0.9.0.2 release pending) |
+| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | In Progress (0.9.0.2 released; MLS verification pending) |
 | 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | Not Started |
 | 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | Not Started |
 | 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Not Started |
@@ -202,7 +202,7 @@ dependency bump is benchmark-gated regardless of PVP bump level.
 - [x] (2026-09-20 UTC) EP-1: dedicated garbage-collection regression test compiles and fails with the linked STM exception on 0.9.0.1
 - [x] (2026-09-20 UTC) EP-1: master loop, mailbox, and `MasterMessage` removed; suite green
 - [x] (2026-09-20 UTC) EP-1: documentation no longer describes the master as an actor
-- [ ] EP-1: shibuya-core and shibuya-metrics 0.9.0.2 released with the runtime fix
+- [x] (2026-09-20 UTC) EP-1: shibuya-core and shibuya-metrics 0.9.0.2 released with the runtime fix
 - [ ] EP-1: `mls-service-v2` single-processor subcommands run past the crash point
 - [ ] EP-3: shibuya-pgmq-adapter bound widened and released
 - [ ] EP-3: shibuya-kafka-adapter bound tightened and released
@@ -229,6 +229,11 @@ interactions between child plans. Provide concise evidence.
   diff changes only an expressly unstable internal representation and fixes runtime behavior,
   so the release skill selects patch 0.9.0.2. EP-2 had not started; it now owns the following
   patch instead of delaying the crash fix.
+
+- 2026-09-20 UTC: EP-1 published shibuya-core and shibuya-metrics 0.9.0.2 with Haddocks,
+  pushed annotated tag `v0.9.0.2`, and published the matching GitHub release. The downstream
+  MLS solver initially observed Hackage's package pages before its package index had advanced;
+  it correctly rejected 0.9.0.2 until the authoritative index includes the release.
 
 - 2026-09-16: The review that produced this plan benchmarked the current tree under effectful
   2.6.1.0 and under effectful 2.7.1.0 with effectful-core 2.7.1.2 (the pair the 0.9.0.1 bound
@@ -326,10 +331,10 @@ Compare the result against the original vision. Before marking the MasterPlan co
 distill durable project context from this MasterPlan and its child ExecPlans into
 docs/adr/. Keep task-local execution and coordination details here.
 
-EP-1's code and documentation milestones are complete. The idle actor is removed, the
+EP-1's code, documentation, and release milestones are complete. The idle actor is removed, the
 process-isolated GC regression passes repeatedly, the pre-fix tree reproduces the crash, and
-the complete core build/test/flake gates pass. Release 0.9.0.2 and its MLS consumer follow-up
-remain before EP-1 is complete; EP-2 through EP-4 remain separate initiative work.
+the complete core build/test/flake gates pass. Release 0.9.0.2 is public; its MLS consumer
+follow-up remains before EP-1 is complete. EP-2 through EP-4 remain separate initiative work.
 
 Revision 2026-09-20 UTC: Synchronize EP-33's confirmed regression history, completed
 failing-test milestone, isolated-test/release gate, and provisional release-version
@@ -339,3 +344,6 @@ the user-confirmed consumer scope remains MLS only.
 Revision 2026-09-20 UTC: Linked the user-created intention, recorded EP-1's completed code and
 documentation milestones, and replaced the provisional combined 0.9.1.0 release with EP-1
 patch 0.9.0.2 followed by EP-2's provisional 0.9.0.3. Cascaded the targets to plans 34–36.
+
+Revision 2026-09-20 UTC: Recorded the published 0.9.0.2 packages, Haddocks, annotated tag, and
+GitHub release. EP-1 now waits only on the MLS consumer pin and isolated worker observation.

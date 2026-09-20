@@ -80,7 +80,7 @@ existing follow-up in `mori://tan/mls-service-v2`. Per the user's clarification,
 - [x] (2026-09-20 UTC) Milestone 1: Add the dedicated GC regression executable and confirm failure with the reported linked-thread exception on 0.9.0.1.
 - [x] (2026-09-20 UTC) Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
 - [x] (2026-09-20 UTC) Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
-- [ ] Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
+- [x] (2026-09-20 UTC) Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
 - [ ] Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
 
 
@@ -160,6 +160,13 @@ packages passed after the version and changelog edits. Cabal also produced sourc
 documentation tarballs for core and metrics at 0.9.0.2. Haddock emitted only the repository's
 existing missing-link and coverage warnings; generation succeeded for both packages.
 
+**Release 0.9.0.2 is public.** Commit `d27448e` is tagged `v0.9.0.2` and pushed. Hackage
+serves both `shibuya-core-0.9.0.2` and `shibuya-metrics-0.9.0.2`, including their Haddocks,
+and the GitHub release is published at
+<https://github.com/shinzui/shibuya/releases/tag/v0.9.0.2>. Post-publication requests for
+both Hackage package pages returned HTTP 200 and `gh release view` reported a non-draft,
+non-prerelease release for the tag.
+
 
 ## Decision Log
 
@@ -197,8 +204,9 @@ existing missing-link and coverage warnings; generation succeeded for both packa
 The review found the removal design sound and the implementation now removes the obsolete
 mailbox actor without changing public APIs, metrics access, supervisor behavior, or failure
 propagation. The dedicated process-isolated regression passes repeatedly, the old actor fails
-the same test in a detached worktree, and all existing core tests pass. Documentation, release,
-and consumer update work remains.
+the same test in a detached worktree, and all existing core tests pass. Release 0.9.0.2 is
+published for both core and metrics with matching Haddocks, tag, and GitHub release. The MLS
+consumer update and verification remain.
 
 Refresh validation: `cabal test shibuya-core --offline --test-show-details=failures`
 selected both suites: the existing Hspec suite passed and the GC suite failed with the
@@ -208,7 +216,8 @@ Current-tree validation after the documentation update passed `cabal build all`,
 selected by `cabal test shibuya-core --test-show-details=failures`, `nix fmt`, and
 `nix flake check`. The prepared 0.9.0.2 candidate repeated those gates, passed `cabal check`
 for both packages, and produced both source distributions and Hackage documentation tarballs.
-Release approval/publication and downstream verification remain implementation work.
+The exact artifacts were published after user approval; downstream verification remains
+implementation work.
 
 
 ## Context and Orientation
@@ -524,3 +533,7 @@ MLS verification remain.
 formatting and flake checks, per-package `cabal check`, source distributions, and Hackage
 documentation tarballs. The release commit, tag, push, and uploads await the release skill's
 required version/changelog confirmation.
+
+2026-09-20 UTC: Published shibuya-core and shibuya-metrics 0.9.0.2 to Hackage with Haddocks,
+pushed annotated tag `v0.9.0.2`, and published the matching GitHub release. Milestone 4 is
+complete; only the MLS consumer pin and isolated worker observation remain.
