@@ -67,6 +67,8 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 2026-09-20: The prescribed per-handler monotonic-clock design failed its focused performance gate. Against `682003e` under `-N1`, serial/10,000 rose from 3.987 ms and 20,567,968 allocated bytes to 5.112 ms and 24,251,596 bytes (28% slower), while async8 rose from 7.931 ms to 8.915 ms (12% slower). Moving monotonic timing to `sampleMetrics` and leaving only atomic burst/accounting operations on the handler path passed the same 5% tasty-bench gate: serial 4.153 ms/20,888,497 bytes and async8 8.336 ms/34,068,866 bytes, both reported statistically unchanged from baseline.
 
+2026-09-20: Milestone 2 landed as `82a8e90f02b5c52a291a4655ee34c604d8fdb2e9`. Its raw focused baseline, rejected direct-clock candidate, accepted sampler candidate, machine identity, solver hash, and commands are retained under `docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/`.
+
 
 ## Decision Log
 
