@@ -67,7 +67,9 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason. Observed on the unfixed library: three `FAIL` lines from `shibuya-core-gc-finished-test`, `expected: Just 1 but got: Just 2` as the only failure among 213 Hspec examples, and `shibuya-core-gc-test` still passing.
 - [x] (2026-09-20 UTC) Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass. All three suites pass with 213 Hspec examples and zero failures, the finished-application suite passed three consecutive runs, and both diagnostic probes confirm the change on the fixed library.
 - [x] (2026-09-20 UTC) Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix. `CLAUDE.md`, the release skill and `docs/architecture/CONCURRENCY.md` updated; ADR 0001 amended; unreleased entries added to the root and core changelogs; `nix fmt`, `nix flake check` and all three core suites pass. `docs/HIGH_LEVEL_ARCHITECTURE.md` and `docs/architecture/RUNNER_BUG_FIXES.md` contained no present-tense claim of a linked supervisor and were left unchanged.
-- [ ] Milestone 4: Prepare and validate the patch release; publish only after the owner approves the version and changelog.
+- [x] (2026-09-20 UTC) Milestone 4, prepared: Hackage and upstream tags both stop at 0.9.0.2, so the candidate is 0.9.0.3. Both package versions, the metrics bound and all three changelogs are edited in the working tree, uncommitted, and the candidate passes every pre-publication gate.
+- [ ] Milestone 4, remaining: owner approval of the version and changelog; then the release commit, annotated tag `v0.9.0.3`, push, upload of core then metrics with documentation, and the GitHub release.
+- [ ] Milestone 4, remaining after publication: record the consumed version in master plan 5's Decision Log and move the provisional 0.9.0.3 statements in plans 34 and 35 to the next patch.
 
 
 ## Surprises & Discoveries
@@ -149,6 +151,16 @@ The failing-first evidence for Milestone 1 was taken in the working tree whose c
 exactly commit `afa8889`, immediately before the fix was written, so a separate worktree run
 of that commit would repeat the same observation and was not performed.
 
+**The 0.9.0.3 candidate passes every pre-publication gate.** Verified on 2026-09-20 UTC
+against the uncommitted candidate: the Hackage preferred-versions endpoints for both packages
+and `git ls-remote --tags origin` all list 0.9.0.2 as the latest, leaving 0.9.0.3 free.
+`nix fmt`, `cabal build all`, `cabal test shibuya-core` (three suites, 213 examples, zero
+failures) and `nix flake check` all exit zero. `cabal check` reports no errors or warnings for
+either package. Source distributions and Hackage documentation tarballs were produced for both
+at 0.9.0.3, and the core source distribution contains `test-gc/Finished.hs`. Haddock emitted
+only the repository's existing missing-link warnings. The release skill's benchmark step does
+not apply to a patch.
+
 **`cabal build all --offline` cannot build the metrics package here.** The local store lacks
 `warp`, so the offline solver refuses. Plain `cabal build all`, which is what Concrete Steps
 prescribes, works; only the core package builds and tests offline.
@@ -206,6 +218,14 @@ before building resolves it.
   0.9.0.2 fix took; Milestone 4 repeats that precedent and moves the provisional claim along.
   Date: 2026-09-19
 
+- Decision: Propose 0.9.0.3 and stop before the release commit.
+  Rationale: The registry and the upstream tags confirm the number is free, and the change is
+  internal-only with a corrected failure mode, so the patch classification stands. The release
+  skill is invoked by the owner, not by an agent, and requires the owner to confirm the version
+  and changelog before any commit, tag or upload; publication cannot be undone. The candidate
+  edits are therefore left uncommitted in the working tree for review.
+  Date: 2026-09-20
+
 - Decision: No downstream consumer milestone.
   Rationale: The known consumer runs processors that never finish, so it is not exposed unless
   all of them die; it can take the patch at its normal cadence. Registration-service-v2
@@ -215,9 +235,19 @@ before building resolves it.
 
 ## Outcomes & Retrospective
 
-Nothing is released yet. The defects are reproduced, the fix is prototyped, and the regression
-source is proven to fail on the current library. The production change, its committed tests,
-documentation and release remain. Before marking the plan complete, distill the durable lesson
+The fix is implemented and committed. A finished application whose handle is dropped no longer
+kills its caller during garbage collection, under either supervision strategy or after a source
+failure, and one `StopAllOnFailure` failure now reaches the caller exactly once instead of
+twice. Both behaviors have committed tests that failed first for the documented reason, the
+0.9.0.2 idle-application regression and all 213 ordinary examples pass, no public signature
+changed, and ADR 0001 now carries the durable rule. The 0.9.0.3 candidate is prepared and
+validated but not released: publication awaits the owner's approval, after which the
+version bookkeeping in master plan 5 and plans 34 and 35 remains.
+
+The lesson worth keeping is already in the ADR: a regression test for a reachability-sensitive
+defect proves only the reachability state it constructs. The 0.9.0.2 test held a live child and
+so could not see the childless state, and a review that reads the library being delegated to,
+rather than only the code that calls it, is what found it. Before marking the plan complete, distill the durable lesson
 into `docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md` as Milestone 3 describes.
 
 
