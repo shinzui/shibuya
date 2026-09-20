@@ -273,11 +273,16 @@ spec:
 
 ## Graceful Shutdown
 
-Shibuya supports graceful shutdown with configurable drain timeout:
+Shibuya supports graceful shutdown with separate drain and total graceful-phase
+timeouts:
 
 ```haskell
 -- In your application
-let shutdownConfig = ShutdownConfig { drainTimeout = 30 }  -- 30 seconds
+let shutdownConfig =
+      ShutdownConfig
+        { drainTimeout = 30
+        , totalShutdownTimeout = 45
+        }
 
 -- When stopping
 drained <- stopAppGracefully shutdownConfig appHandle
@@ -287,9 +292,10 @@ unless drained $
 
 ### Kubernetes Integration
 
-1. Set `terminationGracePeriodSeconds` higher than your `drainTimeout`:
+1. Set `terminationGracePeriodSeconds` higher than your
+   `totalShutdownTimeout`, leaving room for forced supervisor stop:
    ```yaml
-   terminationGracePeriodSeconds: 60  # > drainTimeout of 30
+   terminationGracePeriodSeconds: 60  # > totalShutdownTimeout of 45
    ```
 
 2. Handle SIGTERM in your application:

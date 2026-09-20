@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `shibuya-core`: add structured duplicate-ID, invalid-concurrency, and capacity-overflow
+  errors; add `ProcessorFailure` for infrastructure finalization failure; and extend
+  `ShutdownConfig` with a total shutdown deadline.
+
+### Bug Fixes
+
+- `shibuya-core`: make startup, idle halt/failure wakeup, keyed worker ownership, adapter
+  shutdown, and repeated/concurrent stop exception safe. Retain internal terminal lifecycle
+  state after live metrics unregister so `IgnoreFailures` does not erase failures.
+
 ## 0.9.0.3 — 2026-09-20
 
 A patch release that fixes two failure-delivery defects in `shibuya-core`, both

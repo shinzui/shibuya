@@ -201,7 +201,7 @@ runScenario s = runEff $ runTracingNoop $ do
       adapter = trackedListAdapter tracking (scenarioEnvelopes s)
       proc = mkBatchProcessor adapter (intendedHandler (scenarioIntended s)) (scenarioConfig s)
   app <- runAppOrFail 100 [(pid, proc)]
-  _drained <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+  _drained <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
   m <- metricsFor app pid
   tracked <- getTrackedDecisions tracking
   pure (tracked, m)
@@ -274,7 +274,7 @@ spec = describe "Shibuya.Batch reliability" $ do
         app <- runAppOrFail 100 [(pid, proc)]
         liftIO $ threadDelay 400000 -- 400 ms > 100 ms timeout: ticker flushes
         t0 <- getTrackedDecisions tracking
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         o <- liftIO $ readIORef observedRef
         pure (t0, o)
       finalizedExactlyOnce tracked (Map.fromList [(MessageId ("msg-" <> tshowT i), AckOk) | i <- [1 .. 3 :: Int]])
@@ -295,7 +295,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             adapter = trackedListAdapter tracking (fixedEnvelopes 5)
             proc = mkBatchProcessor adapter handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         t <- getTrackedDecisions tracking
         m <- metricsFor app pid
         pure (t, m)
@@ -321,7 +321,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             adapter = trackedListAdapter tracking (fixedEnvelopes 4)
             proc = mkBatchProcessor adapter handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
-        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         t <- getTrackedDecisions tracking
         pure (t, d)
       let expected = Map.fromList [(MessageId ("msg-" <> tshowT i), AckRetry (RetryDelay 0)) | i <- [1 .. 4 :: Int]]
@@ -351,7 +351,7 @@ spec = describe "Shibuya.Batch reliability" $ do
         doneState <- case Map.lookup pid app.processors of
           Just (sp, _) -> liftIO $ readTVarIO sp.done
           Nothing -> liftIO $ ioError (userError "missing batch-key-failure processor")
-        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
         t <- getTrackedDecisions tracking
         pure (t, m.state, doneState, d)
       case mState of
@@ -378,7 +378,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             handler _ _ = pure ackAllOk
             proc = mkBatchProcessor (listAdapter [ing]) handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         t <- liftIO $ readIORef trackRef
         a <- liftIO $ readIORef attemptRef
         pure (t, a)
@@ -398,7 +398,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             proc = mkBatchProcessor (listAdapter [ing1, ing2]) handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
         liftIO $ threadDelay 700000 -- allow the [10,50,250]ms retry schedule to exhaust
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
         t <- getTrackedDecisions tracking
         m <- metricsFor app pid
         pure (t, m.state)
@@ -423,7 +423,7 @@ spec = describe "Shibuya.Batch reliability" $ do
         app <- runAppOrFail 100 [(pidA, procA), (pidB, procB)]
         liftIO $ threadDelay 300000
         mA' <- metricsFor app pidA
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
         tA <- getTrackedDecisions trackingA
         tB <- getTrackedDecisions trackingB
         pure (tA, tB, mA')
@@ -457,7 +457,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             proc = mkBatchProcessor adapter handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
         liftIO $ threadDelay 100000 -- accumulate (no size/timeout flush)
-        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         t <- getTrackedDecisions tracking
         o <- liftIO $ readIORef observedRef
         pure (t, d, o)
@@ -477,7 +477,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             adapter = trackedListAdapter tracking (keyedEnvelopes [BatchKey "ka", BatchKey "kb"] 6)
             proc = mkBatchProcessor adapter handler cfg
         app <- runAppOrFail 100 [(pid, proc)]
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         t <- getTrackedDecisions tracking
         o <- liftIO $ readIORef observedRef
         pure (t, o)
@@ -516,7 +516,7 @@ spec = describe "Shibuya.Batch reliability" $ do
                   concurrency = Async 2
                 }
         app <- runAppOrFail 100 [(pid, proc)]
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
         v <- liftIO $ readTVarIO violatedVar
         t <- getTrackedDecisions tracking
         pure (v, t)
@@ -536,7 +536,7 @@ spec = describe "Shibuya.Batch reliability" $ do
             adapter = trackedListAdapter tracking (fixedEnvelopes 20)
             proc = mkBatchProcessor adapter handler cfg
         app <- runAppOrFail 2 [(pid, proc)] -- inbox size 2
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 10}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 10, totalShutdownTimeout = 11}) app
         getTrackedDecisions tracking
       finalizedExactlyOnce tracked (Map.fromList [(MessageId ("msg-" <> tshowT i), AckOk) | i <- [1 .. 20 :: Int]])
         `shouldBe` Right ()
@@ -575,7 +575,7 @@ spec = describe "Shibuya.Batch reliability" $ do
         liftIO $ threadDelay 300000
         pulled <- liftIO $ readIORef pulledRef
         liftIO $ atomically $ writeTVar gate True
-        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 10}) app
+        _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 10, totalShutdownTimeout = 11}) app
         t <- getTrackedDecisions tracking
         liftIO $ pulled `shouldSatisfy` (<= allowedPulls)
         pure (pulled, t)
@@ -602,7 +602,7 @@ spec = describe "Shibuya.Batch reliability" $ do
                 }
         app <- runAppOrFail 2 [(pid, proc)]
         liftIO $ threadDelay 50000
-        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 0.05}) app
+        d <- stopAppGracefully (ShutdownConfig {drainTimeout = 0.05, totalShutdownTimeout = 1}) app
         t1 <- getTrackedDecisions tracking
         liftIO $ threadDelay 300000
         t2 <- getTrackedDecisions tracking

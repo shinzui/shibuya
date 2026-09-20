@@ -1054,7 +1054,7 @@ spec = do
               liftIO $ threadDelay 100000 -- 100ms
 
               -- Graceful shutdown with generous timeout
-              let config = ShutdownConfig {drainTimeout = 5} -- 5 seconds
+              let config = ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6} -- 5 seconds
               stopAppGracefully config appHandle
 
         drained `shouldBe` True
@@ -1086,7 +1086,7 @@ spec = do
               liftIO $ threadDelay 100000 -- 100ms
 
               -- Very short timeout (0.3 seconds)
-              let config = ShutdownConfig {drainTimeout = 0.3}
+              let config = ShutdownConfig {drainTimeout = 0.3, totalShutdownTimeout = 1.3}
               stopAppGracefully config appHandle
 
         -- Should timeout (not all drained)
@@ -1110,7 +1110,7 @@ spec = do
             Right appHandle -> do
               -- Give time to complete
               liftIO $ threadDelay 200000 -- 200ms
-              let config = ShutdownConfig {drainTimeout = 1}
+              let config = ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}
               stopAppGracefully config appHandle
 
         drained `shouldBe` True

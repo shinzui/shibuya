@@ -30,7 +30,7 @@ import Data.Set qualified as Set
 import Data.Unique (Unique, newUnique)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (Async, SomeException, async, cancel, catchAny, finally, throwIO, withAsync)
+import UnliftIO (Async, SomeException, async, cancel, catchAny, finally, mask, throwIO, withAsync)
 
 -- | Run every item in a stream through the worker action, at most
 -- @maxConcurrency@ at a time. Items with the same @Just key@ run strictly in
@@ -68,15 +68,19 @@ runKeyedScheduler requestedConcurrency requestedPendingLimit itemKey itemAction 
         case step of
           SchedulerDone Nothing -> pure ()
           SchedulerDone (Just ex) -> throwIO ex
-          StartItem item -> do
-            workerId <- newUnique
-            startGate <- newEmptyMVar
-            worker <- async $ do
-              takeMVar startGate
-              runWorker scheduler workers workerId itemKey itemAction item
-            atomically $ modifyTVar' workers (Map.insert workerId worker)
-            putMVar startGate ()
-            loop
+          StartItem item ->
+            -- Keep worker creation, registration, and gate release in one masked
+            -- ownership transfer. The worker cannot pass the gate before its
+            -- handle is present in the cancellation registry.
+            mask $ \restore -> do
+              workerId <- newUnique
+              startGate <- newEmptyMVar
+              worker <- async $ do
+                takeMVar startGate
+                runWorker scheduler workers workerId itemKey itemAction item
+              atomically $ modifyTVar' workers (Map.insert workerId worker)
+              putMVar startGate ()
+              restore loop
 
   withAsync reader $ \_reader ->
     loop `finally` cancelWorkers
@@ -155,21 +159,24 @@ nextSchedulerStep ::
   STM (SchedulerStep item)
 nextSchedulerStep maxConcurrency itemKey scheduler = do
   s <- readTVar scheduler
-  case (s.running < maxConcurrency, popStartable itemKey s.activeKeys s.pending) of
-    (True, Just (item, rest)) -> do
-      writeTVar
-        scheduler
-        s
-          { activeKeys = maybe s.activeKeys (`Set.insert` s.activeKeys) (itemKey item),
-            running = s.running + 1,
-            pending = rest
-          }
-      pure (StartItem item)
-    _
-      | s.inputDone && Seq.null s.pending && s.running == 0 ->
-          pure (SchedulerDone s.firstFailure)
-      | otherwise ->
-          retry
+  case s.firstFailure of
+    Just failure -> pure (SchedulerDone (Just failure))
+    Nothing ->
+      case (s.running < maxConcurrency, popStartable itemKey s.activeKeys s.pending) of
+        (True, Just (item, rest)) -> do
+          writeTVar
+            scheduler
+            s
+              { activeKeys = maybe s.activeKeys (`Set.insert` s.activeKeys) (itemKey item),
+                running = s.running + 1,
+                pending = rest
+              }
+          pure (StartItem item)
+        _
+          | s.inputDone && Seq.null s.pending && s.running == 0 ->
+              pure (SchedulerDone Nothing)
+          | otherwise ->
+              retry
 
 finishItem ::
   (Ord key) =>

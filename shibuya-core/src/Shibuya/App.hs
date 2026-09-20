@@ -41,14 +41,28 @@ module Shibuya.App
 where
 
 import Control.Concurrent.NQE.Supervisor qualified as NQE
-import Control.Concurrent.STM (STM, atomically, check, orElse, readTVar, registerDelay)
-import Control.Monad (forM_, void)
+import Control.Concurrent.STM
+  ( STM,
+    atomically,
+    check,
+    newEmptyTMVarIO,
+    newTVarIO,
+    orElse,
+    putTMVar,
+    readTMVar,
+    readTVar,
+    registerDelay,
+    writeTVar,
+  )
+import Control.Monad (forM, forM_, void)
 import Data.Bifunctor (first)
 import Data.Foldable (traverse_)
 import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Time.Clock (NominalDiffTime)
-import Effectful (Eff, IOE, liftIO, (:>))
+import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
+import Effectful.Exception qualified as Exception
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Shibuya.Adapter (Adapter (..))
@@ -59,13 +73,21 @@ import Shibuya.Core.Metrics
     ProcessorId (..),
     ProcessorMetrics (..),
   )
-import Shibuya.Internal.App (AppHandle (..), QueueProcessor (..), mkBatchProcessor, mkProcessor)
+import Shibuya.Internal.App
+  ( AppHandle (..),
+    OwnershipFailure (..),
+    QueueProcessor (..),
+    acquireOwned,
+    mkBatchProcessor,
+    mkProcessor,
+  )
 import Shibuya.Internal.Runner.Master
   ( Master,
     getAllMetrics,
     getAllMetricsIO,
     getProcessorMetrics,
     getProcessorMetricsIO,
+    markProcessorDraining,
     startMaster,
     stopMaster,
   )
@@ -76,7 +98,8 @@ import Shibuya.Internal.Runner.Supervised
   )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..), validatePolicy)
 import Shibuya.Telemetry.Effect (Tracing)
-import UnliftIO (SomeException, catch, displayException, try)
+import UnliftIO (SomeException, displayException)
+import UnliftIO qualified as UIO
 
 --------------------------------------------------------------------------------
 -- Supervision Strategy
@@ -112,13 +135,18 @@ data ShutdownConfig = ShutdownConfig
   { -- | Maximum time to wait for in-flight messages to drain.
     -- After this timeout, remaining processors are forcefully stopped.
     -- Default: 30 seconds.
-    drainTimeout :: !NominalDiffTime
+    drainTimeout :: !NominalDiffTime,
+    -- | Maximum time for adapter shutdown plus graceful draining before
+    -- forced supervisor stop begins.
+    -- Default: 60 seconds.
+    totalShutdownTimeout :: !NominalDiffTime
   }
   deriving stock (Eq, Show, Generic)
 
--- | Default shutdown configuration with 30 second drain timeout.
+-- | Default shutdown configuration with a 30 second drain timeout and a
+-- 60 second bound on the graceful shutdown phase.
 defaultShutdownConfig :: ShutdownConfig
-defaultShutdownConfig = ShutdownConfig {drainTimeout = 30}
+defaultShutdownConfig = ShutdownConfig {drainTimeout = 30, totalShutdownTimeout = 60}
 
 --------------------------------------------------------------------------------
 -- Errors
@@ -174,35 +202,66 @@ runApp ::
   Eff es (Either AppError (AppHandle es))
 runApp config namedProcessors =
   -- Validate all policies (and batch configs) first
-  case validateAppConfig config *> validateAllPolicies namedProcessors of
+  case validateAppConfig config *> validateUniqueProcessorIds namedProcessors *> validateAllPolicies namedProcessors of
     Left err -> pure $ Left err
     Right () -> do
       let nqeStrategy = toNQEStrategy config.strategy
-      catch
-        ( do
-            master <- startMaster nqeStrategy
-            spawnResult <- try $ spawnProcessors master (fromIntegral config.inboxSize) namedProcessors
-            case spawnResult of
-              Left (e :: SomeException) -> do
-                stopMaster master
-                pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
-              Right processors ->
-                pure $
-                  Right
-                    AppHandle
-                      { master = master,
-                        processors = Map.fromList processors
-                      }
-        )
-        ( \(e :: SomeException) ->
-            pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException e
-        )
+      startupResult <-
+        acquireOwned
+          (startMaster nqeStrategy)
+          stopMaster
+          ( \master -> do
+              processors <- spawnProcessors master (fromIntegral config.inboxSize) namedProcessors
+              shutdownStarted <- liftIO $ newTVarIO False
+              shutdownResult <- liftIO newEmptyTMVarIO
+              pure
+                AppHandle
+                  { master = master,
+                    processors = Map.fromList processors,
+                    shutdownStarted,
+                    shutdownResult
+                  }
+          )
+      case startupResult of
+        Right appHandle -> pure $ Right appHandle
+        Left (OwnerAcquisitionFailed failure) -> startupFailure failure
+        Left (OwnedActionFailed failure cleanupFailure) ->
+          startupFailureWithCleanup failure cleanupFailure
+  where
+    startupFailure failure
+      | Exception.isAsyncException failure = Exception.throwIO failure
+      | otherwise =
+          pure $ Left $ AppRuntimeError $ SupervisorFailed $ Text.pack $ displayException failure
+
+    startupFailureWithCleanup failure cleanupFailure
+      | Exception.isAsyncException failure = Exception.throwIO failure
+      | otherwise =
+          let cleanupSuffix = case cleanupFailure of
+                Nothing -> ""
+                Just cleanupException ->
+                  "; supervisor cleanup also failed: " <> Text.pack (displayException cleanupException)
+           in pure $
+                Left $
+                  AppRuntimeError $
+                    SupervisorFailed $
+                      Text.pack (displayException failure) <> cleanupSuffix
 
 -- | Validate app configuration before starting any processor.
 validateAppConfig :: AppConfig -> Either AppError ()
 validateAppConfig config
   | config.inboxSize < 1 = Left $ AppConfigInvalid $ InvalidInboxSize config.inboxSize
   | otherwise = Right ()
+
+-- | Reject duplicate processor identifiers before the master or any adapter is
+-- acquired. Keeping this separate from handle construction prevents a live
+-- processor from being silently discarded by 'Map.fromList'.
+validateUniqueProcessorIds :: [(ProcessorId, QueueProcessor es)] -> Either AppError ()
+validateUniqueProcessorIds = go Set.empty
+  where
+    go _ [] = Right ()
+    go seen ((pid, _) : rest)
+      | pid `Set.member` seen = Left $ AppConfigInvalid $ DuplicateProcessorId pid
+      | otherwise = go (Set.insert pid seen) rest
 
 -- | Validate all processor policies (and batch configs) before starting.
 validateAllPolicies :: [(ProcessorId, QueueProcessor es)] -> Either AppError ()
@@ -267,12 +326,12 @@ getAppMaster :: AppHandle es -> Master
 getAppMaster appHandle = appHandle.master
 
 -- | Gracefully stop all processors with default configuration.
--- Uses 'defaultShutdownConfig' (30 second drain timeout).
+-- Uses 'defaultShutdownConfig' (30 second drain timeout, 60 second graceful-phase bound).
 -- For custom timeout, use 'stopAppGracefully'.
 stopApp :: (IOE :> es) => AppHandle es -> Eff es ()
 stopApp = void . stopAppGracefully defaultShutdownConfig
 
--- | Gracefully stop all processors with configurable drain timeout.
+-- | Gracefully stop all processors with configurable drain and total timeout.
 --
 -- Shutdown sequence:
 -- 1. Signal all adapters to stop producing (close source streams)
@@ -282,25 +341,64 @@ stopApp = void . stopAppGracefully defaultShutdownConfig
 --
 -- Returns whether all processors drained cleanly (True) or were forced (False).
 stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
-stopAppGracefully config appHandle = do
-  -- 1. Signal adapters to stop producing
-  mapM_ shutdownAdapter (Map.elems appHandle.processors)
-
-  -- 2. Wait for drain with timeout
-  let timeoutMicros = floor (config.drainTimeout * 1_000_000)
-  drained <- liftIO $ waitForDrainWithTimeout timeoutMicros (Map.elems appHandle.processors)
-
-  -- 3. Log warning if forced shutdown (caller can check return value)
-  -- Note: We don't log here to avoid IO dependencies, caller can log if needed
-
-  -- 4. Stop master (cancels any remaining processors)
-  stopMaster appHandle.master
-
-  pure drained
+stopAppGracefully config appHandle =
+  Exception.mask $ \restore -> do
+    isLeader <-
+      liftIO $
+        atomically $ do
+          started <- readTVar appHandle.shutdownStarted
+          if started
+            then pure False
+            else writeTVar appHandle.shutdownStarted True >> pure True
+    if isLeader
+      then do
+        result <- Exception.try @SomeException (restore performShutdown)
+        liftIO $ atomically $ putTMVar appHandle.shutdownResult result
+        either Exception.throwIO pure result
+      else do
+        result <- restore $ liftIO $ atomically $ readTMVar appHandle.shutdownResult
+        either Exception.throwIO pure result
   where
+    performShutdown = Exception.mask $ \restore -> do
+      let totalTimeoutMicros = nominalToMicros config.totalShutdownTimeout
+      outcome <-
+        Exception.try $
+          restore $
+            withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
+              UIO.timeout totalTimeoutMicros (runInIO shutdownAndDrain)
+
+      -- Master cleanup is unconditional: adapter failures, external cancellation,
+      -- drain cancellation, and the total deadline all converge here.
+      stopOutcome <- Exception.try @SomeException (stopMaster appHandle.master)
+      case outcome of
+        Left (primaryFailure :: SomeException) -> Exception.throwIO primaryFailure
+        Right Nothing -> finishStopOutcome stopOutcome False
+        Right (Just drained) -> finishStopOutcome stopOutcome drained
+
+    shutdownAndDrain = do
+      forM_ (Map.keys appHandle.processors) $
+        markProcessorDraining appHandle.master
+
+      -- Catch only synchronous adapter failures. External cancellation and the
+      -- total timeout must abort this phase so the master is force-stopped.
+      shutdownResults <-
+        forM (Map.elems appHandle.processors) $ \processor ->
+          Exception.trySync (shutdownAdapter processor)
+
+      case [failure | Left failure <- shutdownResults] of
+        firstFailure : _ -> Exception.throwIO firstFailure
+        [] -> do
+          let drainTimeoutMicros = nominalToMicros config.drainTimeout
+          liftIO $ waitForDrainWithTimeout drainTimeoutMicros (Map.elems appHandle.processors)
+
     shutdownAdapter (_, qp) = case qp of
       QueueProcessor {adapter} -> adapter.shutdown
       BatchingProcessor {adapter} -> adapter.shutdown
+
+    finishStopOutcome (Left stopFailure) _ = Exception.throwIO stopFailure
+    finishStopOutcome (Right ()) drained = pure drained
+
+    nominalToMicros timeout = max 0 (floor (timeout * 1_000_000))
 
 -- | Wait for all processors to be done, with timeout.
 -- Returns True if all drained cleanly, False if timeout occurred.

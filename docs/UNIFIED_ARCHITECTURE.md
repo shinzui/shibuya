@@ -196,6 +196,7 @@ data SupervisionStrategy
 
 data ShutdownConfig = ShutdownConfig
   { drainTimeout :: !NominalDiffTime
+  , totalShutdownTimeout :: !NominalDiffTime
   }
 ```
 
@@ -204,8 +205,9 @@ siblings continue. `StopAllOnFailure` maps to NQE `IgnoreGraceful`; real
 failures stop siblings, but graceful exits do not.
 
 `stopApp` is `stopAppGracefully defaultShutdownConfig`. Shutdown signals every
-adapter, waits for processors to drain until the timeout, then stops the master
-and any remaining supervised processors.
+adapter, waits for processors to drain until `drainTimeout`, then stops the
+master and any remaining supervised processors. `totalShutdownTimeout` bounds
+adapter shutdown plus graceful drain before forced supervisor stop begins.
 
 ## Metrics
 

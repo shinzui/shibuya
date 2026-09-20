@@ -2,6 +2,7 @@
 
 module Shibuya.PolicySpec (spec) where
 
+import Shibuya.Core.Error (PolicyError (..))
 import Shibuya.Policy
 import Test.Hspec
 
@@ -61,6 +62,29 @@ spec = do
 
       it "allows Async" $ do
         validatePolicy Unordered (Async 10) `shouldBe` Right ()
+
+    describe "resource bounds" $ do
+      mapM_
+        ( \concurrency ->
+            it ("rejects nonpositive " <> show concurrency) $
+              validatePolicy Unordered concurrency `shouldBe` Left (InvalidConcurrency 0)
+        )
+        [Ahead 0, Async 0]
+
+      mapM_
+        ( \concurrency ->
+            it ("rejects negative " <> show concurrency) $
+              validatePolicy PartitionedInOrder concurrency `shouldBe` Left (InvalidConcurrency (-1))
+        )
+        [Ahead (-1), Async (-1)]
+
+      let overflowing = maxBound `div` 2 + 1
+      mapM_
+        ( \concurrency ->
+            it ("rejects derived-capacity overflow for " <> show concurrency) $
+              validatePolicy Unordered concurrency `shouldBe` Left (ConcurrencyCapacityOverflow overflowing)
+        )
+        [Ahead overflowing, Async overflowing]
 
     describe "validatePolicy matrix" $ do
       let ok = True

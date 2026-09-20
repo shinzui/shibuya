@@ -44,6 +44,21 @@ data Concurrency
 -- | Validate policy combinations.
 -- Invariant: StrictInOrder => Serial
 validatePolicy :: OrderingPolicy -> Concurrency -> Either PolicyError ()
-validatePolicy StrictInOrder (Ahead _) = Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
-validatePolicy StrictInOrder (Async _) = Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
-validatePolicy _ _ = Right ()
+validatePolicy ordering concurrency = do
+  validateConcurrency concurrency
+  validateCombination ordering concurrency
+  where
+    validateConcurrency Serial = Right ()
+    validateConcurrency (Ahead n) = validateBound n
+    validateConcurrency (Async n) = validateBound n
+
+    validateBound n
+      | n < 1 = Left $ InvalidConcurrency n
+      | n > maxBound `div` 2 = Left $ ConcurrencyCapacityOverflow n
+      | otherwise = Right ()
+
+    validateCombination StrictInOrder (Ahead _) =
+      Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
+    validateCombination StrictInOrder (Async _) =
+      Left $ InvalidPolicyCombo "StrictInOrder requires Serial concurrency"
+    validateCombination _ _ = Right ()

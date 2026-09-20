@@ -294,14 +294,16 @@ printMetrics metrics = do
 
 ## Graceful Shutdown
 
-Use `ShutdownConfig` and `stopAppGracefully` for controlled shutdown with drain timeout:
+Use `ShutdownConfig` and `stopAppGracefully` for controlled shutdown with a
+drain timeout and an overall bound on the graceful phase:
 
 ```haskell
 data ShutdownConfig = ShutdownConfig
   { drainTimeout :: !NominalDiffTime
+  , totalShutdownTimeout :: !NominalDiffTime
   }
 
-defaultShutdownConfig :: ShutdownConfig  -- 30 second drain timeout
+defaultShutdownConfig :: ShutdownConfig  -- 30 second drain, 60 second total graceful phase
 
 -- Returns True if shutdown completed within the timeout
 stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Bool
@@ -310,7 +312,11 @@ stopAppGracefully :: (IOE :> es) => ShutdownConfig -> AppHandle es -> Eff es Boo
 Example:
 
 ```haskell
-let config = ShutdownConfig { drainTimeout = 60 }  -- 60 seconds
+let config =
+      ShutdownConfig
+        { drainTimeout = 60
+        , totalShutdownTimeout = 75
+        }
 success <- stopAppGracefully config appHandle
 unless success $
   liftIO $ putStrLn "Warning: shutdown timed out, some messages may not have been processed"

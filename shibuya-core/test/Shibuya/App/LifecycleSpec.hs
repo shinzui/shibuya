@@ -2,16 +2,19 @@
 
 module Shibuya.App.LifecycleSpec (spec) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (newEmptyMVar, putMVar, threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
-import Control.Concurrent.STM (readTVarIO)
+import Control.Concurrent.STM (atomically, check, readTVar, readTVarIO, retry)
 import Control.Exception (SomeException, mask, try)
-import Control.Monad (join, void)
+import Control.Monad (forM_, join, void)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), diffUTCTime, fromGregorian, getCurrentTime)
-import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, runEff, withEffToIO, (:>))
+import Effectful.Exception qualified as Exception
+import OpenTelemetry.Attributes qualified as OTelAttributes
+import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
   ( AppConfig (..),
@@ -31,17 +34,49 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..), ProcessorMetrics (..), ProcessorState (..), sampleMetrics)
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
-import Shibuya.Internal.App (AppHandle (..))
-import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
+import Shibuya.Internal.App
+  ( AppHandle (..),
+    OwnershipFailure (..),
+    acquireOwned,
+  )
+import Shibuya.Internal.Runner.Master
+  ( ProcessorLifecycle (..),
+    getLifecycleSnapshot,
+    startMaster,
+    stopMaster,
+  )
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervised)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
-import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
+import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import UnliftIO qualified as UIO
 
 spec :: Spec
 spec = describe "Shibuya.App lifecycle" $ do
+  it "cleans an acquired startup owner when cancellation lands at the transfer barrier" $ do
+    transferReached <- newEmptyMVar
+    cleanupCalled <- newEmptyMVar
+    worker <-
+      UIO.async $
+        runEff $
+          acquireOwned
+            (pure ())
+            (const $ liftIO $ putMVar cleanupCalled ())
+            (\() -> liftIO (putMVar transferReached ()) >> liftIO (atomically retry))
+
+    UIO.takeMVar transferReached
+    UIO.cancel worker
+    result <- UIO.wait worker
+    cleaned <- UIO.timeout 1_000_000 (UIO.takeMVar cleanupCalled)
+
+    case result of
+      Left (OwnedActionFailed failure Nothing) ->
+        Exception.isAsyncException failure `shouldBe` True
+      Left other -> expectationFailure $ "unexpected ownership failure: " <> show other
+      Right () -> expectationFailure "startup transfer unexpectedly completed"
+    cleaned `shouldBe` Just ()
+
   it "waitApp returns after a handler halts" $ do
     result <-
       UIO.timeout 5_000_000 $
@@ -52,7 +87,7 @@ spec = describe "Shibuya.App lifecycle" $ do
                 processor = mkProcessor (testAdapter messages) handler
             app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "halt", processor)]
             waitApp app
-            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
             pure ()
 
     result `shouldBe` Just ()
@@ -68,7 +103,7 @@ spec = describe "Shibuya.App lifecycle" $ do
             app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "halt-stop", processor)]
             liftIO $ threadDelay 200_000
             startedAt <- liftIO getCurrentTime
-            drained <- stopAppGracefully (ShutdownConfig {drainTimeout = 5}) app
+            drained <- stopAppGracefully (ShutdownConfig {drainTimeout = 5, totalShutdownTimeout = 6}) app
             finishedAt <- liftIO getCurrentTime
             pure (drained, diffUTCTime finishedAt startedAt)
 
@@ -99,10 +134,195 @@ spec = describe "Shibuya.App lifecycle" $ do
                 processor = mkBatchProcessor (testAdapter messages) handler config
             app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "batch-halt", processor)]
             waitApp app
-            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
             pure ()
 
     result `shouldBe` Just ()
+
+  it "halt wakes idle intake in every queue strategy and batch mode" $ do
+    let queue concurrency ordering =
+          QueueProcessor oneThenIdleAdapter (const (pure (AckHalt (HaltFatal "idle halt")))) ordering concurrency
+        batch =
+          mkBatchProcessor
+            oneThenIdleAdapter
+            (\_ _ -> pure (ackAll (AckHalt (HaltFatal "idle batch halt"))))
+            defaultBatchConfig {batchSize = 10, batchTimeout = 0.05}
+        processors =
+          [ (ProcessorId "idle-serial", queue Serial Unordered),
+            (ProcessorId "idle-ahead", queue (Ahead 2) Unordered),
+            (ProcessorId "idle-async", queue (Async 2) Unordered),
+            (ProcessorId "idle-keyed", queue (Async 2) PartitionedInOrder),
+            (ProcessorId "idle-batch", batch)
+          ]
+
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            app <- runAppOrFail IgnoreFailures 10 processors
+            waitApp app
+            getLifecycleSnapshot app.master
+
+    case result of
+      Nothing -> expectationFailure "idle halt did not wake every processor"
+      Just snapshot ->
+        Map.elems snapshot `shouldSatisfy` all (== LifecycleStopped)
+
+  it "IgnoreFailures retains finalizer failure and message identity after waitApp" $ do
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            let pid = ProcessorId "retained-finalizer-failure"
+                processor = mkProcessor permanentFinalizerFailureAdapter alwaysAckOk
+            app <- runAppOrFail IgnoreFailures 10 [(pid, processor)]
+            waitApp app
+            snapshot <- getLifecycleSnapshot app.master
+            stopMaster app.master
+            pure (Map.lookup pid snapshot)
+
+    case result of
+      Just (Just (LifecycleFailed message (Just messageId))) -> do
+        message `shouldSatisfy` Text.isInfixOf "finalization failed"
+        messageId `shouldBe` MessageId "finalizer-failure"
+      other -> expectationFailure $ "expected retained finalizer failure, got: " <> show other
+
+  it "retains finalizer failure with tracing enabled" $ do
+    provider <- OTel.createTracerProvider [] OTel.emptyTracerProviderOptions
+    let instrumentation =
+          OTel.InstrumentationLibrary
+            { OTel.libraryName = "shibuya-lifecycle-test",
+              OTel.libraryVersion = "",
+              OTel.librarySchemaUrl = "",
+              OTel.libraryAttributes = OTelAttributes.emptyAttributes
+            }
+        tracer = OTel.makeTracer provider instrumentation OTel.tracerOptions
+        pid = ProcessorId "traced-finalizer-failure"
+
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracing tracer $ do
+            app <- runAppOrFail IgnoreFailures 10 [(pid, mkProcessor permanentFinalizerFailureAdapter alwaysAckOk)]
+            waitApp app
+            snapshot <- getLifecycleSnapshot app.master
+            stopMaster app.master
+            pure (Map.lookup pid snapshot)
+
+    case result of
+      Just (Just (LifecycleFailed _ (Just (MessageId "finalizer-failure")))) -> pure ()
+      other -> expectationFailure $ "expected traced finalizer failure, got: " <> show other
+
+  it "StopAllOnFailure delivers exhausted finalization exactly once" $ do
+    let failing = mkProcessor permanentFinalizerFailureAdapter alwaysAckOk
+    result <-
+      UIO.timeout 15_000_000 $
+        UIO.withAsync (countLinkedDeliveries [(ProcessorId "finalizer-single-delivery", failing)]) UIO.wait
+    result `shouldBe` Just 1
+
+  it "attempts every adapter shutdown and stops all children when one throws" $ do
+    secondShutdownRef <- newIORef False
+    (shutdownResult, secondCalled, waited) <-
+      runEff $
+        runTracingNoop $ do
+          let throwing =
+                infiniteAdapter
+                  { adapterName = "test:throwing-shutdown",
+                    shutdown = liftIO $ ioError (userError "first shutdown failed")
+                  }
+              observing =
+                infiniteAdapter
+                  { adapterName = "test:observing-shutdown",
+                    shutdown = liftIO $ writeIORef secondShutdownRef True
+                  }
+          app <-
+            runAppOrFail
+              IgnoreFailures
+              10
+              [ (ProcessorId "a-throwing-shutdown", mkProcessor throwing alwaysAckOk),
+                (ProcessorId "z-observing-shutdown", mkProcessor observing alwaysAckOk)
+              ]
+          result <-
+            Exception.try @SomeException $
+              stopAppGracefully
+                (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2})
+                app
+          didWait <- liftIO $ UIO.timeout 1_000_000 (waitForDoneIO app)
+          observed <- liftIO $ readIORef secondShutdownRef
+          pure (result, observed, didWait)
+
+    shutdownResult `shouldSatisfy` isLeft
+    secondCalled `shouldBe` True
+    waited `shouldBe` Just ()
+
+  it "bounds a never-returning adapter shutdown with the total deadline" $ do
+    result <-
+      UIO.timeout 2_000_000 $
+        runEff $
+          runTracingNoop $ do
+            let blocking =
+                  infiniteAdapter
+                    { adapterName = "test:blocking-shutdown",
+                      shutdown = liftIO $ atomically retry
+                    }
+            app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "blocking-shutdown", mkProcessor blocking alwaysAckOk)]
+            drained <-
+              stopAppGracefully
+                (ShutdownConfig {drainTimeout = 10, totalShutdownTimeout = 0.1})
+                app
+            waitApp app
+            pure drained
+
+    result `shouldBe` Just False
+
+  it "runs adapter shutdown once for concurrent and repeated stop calls" $ do
+    shutdownCountRef <- newIORef (0 :: Int)
+    ((first, second, repeated), shutdownCount) <-
+      runEff $
+        runTracingNoop $ do
+          let adapter =
+                infiniteAdapter
+                  { adapterName = "test:coordinated-shutdown",
+                    shutdown = liftIO $ modifyIORef' shutdownCountRef (+ 1)
+                  }
+              config = ShutdownConfig {drainTimeout = 0.05, totalShutdownTimeout = 1}
+          app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "coordinated-shutdown", mkProcessor adapter alwaysAckOk)]
+          (firstResult, secondResult) <-
+            withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
+              UIO.concurrently
+                (runInIO $ stopAppGracefully config app)
+                (runInIO $ stopAppGracefully config app)
+          repeatedResult <- stopAppGracefully config app
+          count <- liftIO $ readIORef shutdownCountRef
+          pure ((firstResult, secondResult, repeatedResult), count)
+
+    first `shouldBe` False
+    second `shouldBe` first
+    repeated `shouldBe` first
+    shutdownCount `shouldBe` 1
+
+  it "stops the master when the shutdown caller is cancelled during drain" $ do
+    result <-
+      UIO.timeout 5_000_000 $
+        runEff $
+          runTracingNoop $ do
+            handlerStarted <- liftIO newEmptyMVar
+            let handler _ = do
+                  liftIO $ putMVar handlerStarted ()
+                  liftIO $ atomically retry
+                processor = mkProcessor infiniteAdapter handler
+                config = ShutdownConfig {drainTimeout = 10, totalShutdownTimeout = 20}
+            app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "cancel-drain", processor)]
+            liftIO $ UIO.takeMVar handlerStarted
+            withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
+              stopper <- UIO.async (runInIO $ stopAppGracefully config app)
+              threadDelay 20_000
+              UIO.cancel stopper
+              stopResult <- UIO.waitCatch stopper
+              completed <- UIO.timeout 1_000_000 (waitForDoneIO app)
+              pure (isLeft stopResult, completed)
+
+    result `shouldBe` Just (True, Just ())
 
   it "graceful completion under StopAllOnFailure does not kill siblings" $ do
     countBRef <- newIORef (0 :: Int)
@@ -126,7 +346,7 @@ spec = describe "Shibuya.App lifecycle" $ do
                 10
                 [(ProcessorId "complete-A", procA), (ProcessorId "complete-B", procB)]
             waitApp app
-            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
             liftIO $ readIORef countBRef
 
     result `shouldBe` Just 30
@@ -159,7 +379,7 @@ spec = describe "Shibuya.App lifecycle" $ do
                 10
                 [(ProcessorId "halt-A", procA), (ProcessorId "halt-B", procB)]
             waitApp app
-            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
             liftIO $ readIORef countBRef
 
     result `shouldBe` Just 30
@@ -185,7 +405,7 @@ spec = describe "Shibuya.App lifecycle" $ do
                   10
                   [(ProcessorId "fail-A", procA), (ProcessorId "fail-B", procB)]
               liftIO $ threadDelay 500_000
-              _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+              _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
               pure ()
         )
         UIO.waitCatch
@@ -254,7 +474,7 @@ spec = describe "Shibuya.App lifecycle" $ do
                 [(ProcessorId "ignore-fail-A", procA), (ProcessorId "ignore-fail-B", procB)]
             waitApp app
             metricsA <- processorMetrics app (ProcessorId "ignore-fail-A")
-            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app
+            _ <- stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app
             countB <- liftIO $ readIORef countBRef
             pure (metricsA, countB)
 
@@ -305,7 +525,7 @@ countLinkedDeliveries processors =
                 writeIORef stopRef $
                   runEff $
                     runTracingNoop $
-                      void (stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app)
+                      void (stopAppGracefully (ShutdownConfig {drainTimeout = 1, totalShutdownTimeout = 2}) app)
     let arrivesWithin :: Int -> IO Bool
         arrivesWithin micros = either (const True) (const False) <$> try @SomeException (restore (threadDelay micros))
         countExtra :: Int -> IO Int
@@ -328,6 +548,14 @@ processorMetrics app pid =
       case Map.lookup pid processorsMap of
         Nothing -> liftIO $ expectationFailure ("missing processor: " <> show pid) >> error "unreachable"
         Just (SupervisedProcessor {metrics = metricsHandle}, _) -> liftIO $ sampleMetrics metricsHandle
+
+waitForDoneIO :: AppHandle es -> IO ()
+waitForDoneIO app =
+  case app of
+    AppHandle {processors = processorsMap} ->
+      atomically $
+        forM_ (Map.elems processorsMap) $
+          \(sp, _) -> readTVar sp.done >>= check
 
 alwaysAckOk :: (Applicative f) => a -> f AckDecision
 alwaysAckOk _ = pure AckOk
@@ -382,3 +610,34 @@ infiniteAdapter =
       liftIO $ threadDelay 5_000
       msg <- createTestMessage n
       pure (Just (msg, n + 1))
+
+oneThenIdleAdapter :: (IOE :> es) => Adapter es String
+oneThenIdleAdapter =
+  Adapter
+    { adapterName = "test:one-then-idle",
+      source = Stream.unfoldrM step False,
+      shutdown = pure ()
+    }
+  where
+    step False = do
+      msg <- createTestMessage 1
+      pure (Just (msg, True))
+    step True = liftIO $ atomically retry
+
+permanentFinalizerFailureAdapter :: (IOE :> es) => Adapter es String
+permanentFinalizerFailureAdapter =
+  Adapter
+    { adapterName = "test:permanent-finalizer-failure",
+      source = Stream.fromEffect (pure ingested),
+      shutdown = pure ()
+    }
+  where
+    envelope = mkEnvelope (MessageId "finalizer-failure") "message"
+    ingested =
+      mkIngested
+        envelope
+        (AckHandle $ \_ -> liftIO $ ioError (userError "permanent finalizer failure"))
+
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft (Right _) = False

@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Add omitted modules and suites, total shutdown bound, per-strategy failure observability, deliberate error-constructor break; boundary with standalone EP-46; now a soft dependency of metrics and adapter plans."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T14:55:33Z
+      mode: "implement"
+      note: "Begin implementation from audited lifecycle defects; add deterministic regressions before changing ownership, termination, and snapshot contracts."
 ---
 
 # Make core processor ownership and termination exception safe
@@ -41,16 +46,22 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 ## Progress
 
 
-- [ ] Milestone 1: Add deterministic regressions for ownership, halt, failures and policies.
-- [ ] Milestone 2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
-- [ ] Milestone 3: Make stop/failure wakeups and scheduler ownership reliable.
+- [x] Milestone 1: Add deterministic regressions for ownership, halt, failures and policies.
+- [x] Milestone 2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
+- [x] Milestone 3: Make stop/failure wakeups and scheduler ownership reliable.
 - [ ] Milestone 4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
 
 
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-20: The existing UnliftIO `catch`/`tryAny` helpers intentionally exclude asynchronous exceptions, exactly as REV-3 reported. `Effectful.Exception.mask`, `try`, and `trySync` supply the needed split: ownership transfer catches cancellation, while the adapter-shutdown loop catches only synchronous failures so an external cancellation or total deadline cannot be mistaken for another adapter failure and swallowed.
+
+2026-09-20: The batch ticker concern in REV-15 was a real ownership gap even though no supported configuration had naturally thrown from the ticker. The output loop observed only the consumer async, so a ticker exception could leave it waiting forever. `pollSTM` now makes ticker failure one of the output loop's STM wake sources, and an internal tick hook gives the regression a deterministic fault-injection point without changing the public API.
+
+2026-09-20: One shutdown coordinator is necessary in addition to exception-safe cleanup. Without it, two correct callers could concurrently invoke every adapter twice. `AppHandle` now retains the first caller's result in a `TMVar`; later callers see the same success, forced-shutdown result, or exception.
+
+2026-09-20: A deterministic startup-cancellation regression required the ownership transfer itself to be injectable without exposing a stable public hook. The generic `acquireOwned` primitive therefore lives in the explicitly unstable `Shibuya.Internal.App` module. `runApp` uses that exact primitive, and the test pauses its acquired action on an STM barrier, cancels it, and observes cleanup before the cancellation is classified and rethrown by `runApp`.
 
 
 ## Decision Log
@@ -64,11 +75,17 @@ None yet; implementation has not started.
 
 2026-09-19: Failure observability is defined per supervision strategy so that "reaches waitApp" is testable. Under `StopAllOnFailure` the failure reaches the thread that called `runApp` as the existing linked-thread exception and siblings are stopped. Under `IgnoreFailures` `waitApp` still returns normally, because its type has no failure channel and changing that belongs to IR-1; the failure must instead remain readable from the retained terminal snapshot with the failed processor's identity and the failed message identity.
 
+2026-09-20: Add `totalShutdownTimeout` to `ShutdownConfig`, defaulting to 60 seconds while retaining the existing 30-second `drainTimeout`. It bounds adapter shutdown plus graceful drain and initiates forced master shutdown on expiry. As already accepted in REV-14-A1, no library timeout can bound user code that masks cancellation uninterruptibly. The first concurrent stop caller's configuration wins, every adapter is invoked once, and all callers observe its cached result. This public record-field addition is part of the planned major release and is recorded in ADR 0003 and both changelogs.
+
+2026-09-20: The internal snapshot contract consumed by EP-39 is `type LifecycleSnapshot = Map ProcessorId ProcessorLifecycle`, where `ProcessorLifecycle = LifecycleRunning | LifecycleDraining | LifecycleStopped | LifecycleFailed Text (Maybe MessageId)`. Registration creates the bounded entry; live metrics unregister independently; deliberate halt and ordinary completion retain `LifecycleStopped`; infrastructure failure retains its rendered reason and message identity when available. No public probe is added.
+
+2026-09-20: Export `ProcessorFailure Text (Maybe MessageId)` from the umbrella module so a `StopAllOnFailure` caller can distinguish an infrastructure finalization failure from `ProcessorHalt`. This is additive at the constructor level but deliberately changes the previously incorrect runtime outcome; it ships with the planned major release.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+Milestones 1 through 3 are implemented. The ordinary core suite now asserts deterministic cancellation at the startup ownership-transfer barrier; duplicate and policy rejection before acquisition; idle halt across Serial, Ahead, Async, partitioned and batch paths; traced and untraced finalizer failure; supervision-specific observability; exception-safe and bounded adapter shutdown; cancellation during drain; repeated/concurrent stop; prompt keyed failure with infinite input; and ticker failure. The implementation uses a wakeable STM terminal signal, separate graceful and infrastructure exceptions, masked ownership transfers, immediate keyed failure propagation, and coordinated shutdown. Milestone 4 remains open until candidate-bound evidence, the findings ledger, repeated schedule runs, and focused EP-45 performance comparison are complete.
 
 
 ## Context and Orientation
@@ -118,6 +135,8 @@ cabal test shibuya-core --offline --test-show-details=failures
 cabal test shibuya-core:shibuya-core-gc-test --offline --test-show-details=direct
 ```
 
+On the implementation tree, `cabal test shibuya-core --offline --test-show-details=failures` builds and passes the ordinary suite plus both isolated GC suites. The focused audit probe is compiled with its object directory outside the repository and now reports structured duplicate/policy rejection, successful idle halt for all strategies, both shutdown actions attempted after a synchronous failure, and prompt keyed failure. Exact candidate SHA, solver hash, repetitions, and logs are added to the EP-37 evidence artifact after the implementation commit exists.
+
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
 
 
@@ -139,6 +158,23 @@ Work on the current branch, preserve unrelated edits, and commit small conventio
 
 
 Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md for evidence acceptance. This plan alone owns App/Internal.App, Internal/Runner/Master.hs apart from the supervisor construction in `startMaster`, which belongs to the standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, the terminal snapshot, supervision, stop/failure representation, policy validation, scheduler and batching lifecycle. docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md consumes the terminal snapshot and owns Core/Metrics.hs; this plan calls into that module from the runner but does not change its accounting model, and requests any new metrics hook at this boundary rather than having both plans change lifecycle semantics. The metrics plan's first milestone records the package's exact JSON and Prometheus output as golden fixtures under shibuya-metrics/test/golden/ and adds `cabal test shibuya-metrics` to the release gate. If a change in this plan alters what a metrics encoder emits, for example a new processor state, run that suite, update the affected fixture in the same commit, and record in both plans' Decision Logs that the wire change is deliberate; if the metrics suite does not exist yet, tell the metrics plan so its baseline is taken before this plan's change rather than after.
+
+The settled internal consumer interface is:
+
+```haskell
+data ProcessorLifecycle
+  = LifecycleRunning
+  | LifecycleDraining
+  | LifecycleStopped
+  | LifecycleFailed Text (Maybe MessageId)
+
+type LifecycleSnapshot = Map ProcessorId ProcessorLifecycle
+
+getLifecycleSnapshot :: IOE :> es => Master -> Eff es LifecycleSnapshot
+getLifecycleSnapshotIO :: Master -> IO LifecycleSnapshot
+```
+
+The map has at most one entry per configured processor ID and outlives the mutable metrics registration. EP-39 may read it but must not mutate lifecycle state or infer failure from a missing metrics handle.
 
 This plan is a soft dependency of the metrics plan above and of docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md, docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md and docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md. They start once the evidence plan is complete and do not wait for this one. Milestone 4's snapshot gates the metrics plan's lifecycle-aware health; Milestone 3's failure contract gates the Kafka and PGMQ plans' acceptance that a terminal acknowledgement failure is visible to the application. Because those plans are in flight concurrently, do not change the decided contract, that infrastructure finalization failure is failure and not Halt, without updating the parent MasterPlan first. Both this plan and the metrics plan append to the changelogs; add only this plan's entries under the unreleased heading, mark breaking ones, and do not choose the version. Source-only residuals must be tested or explicitly remain open.
 

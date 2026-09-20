@@ -35,7 +35,6 @@ where
 import Control.Applicative ((<|>))
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
-import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
@@ -71,7 +70,14 @@ import Shibuya.Core.Metrics
   )
 import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
-import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
+import Shibuya.Internal.Runner.Halt
+  ( ProcessorExit (..),
+    ProcessorSignal,
+    newProcessorSignal,
+    readProcessorExit,
+    requestProcessorExit,
+    throwProcessorExit,
+  )
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
@@ -104,7 +110,7 @@ import Shibuya.Telemetry.Semantic
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (catchAny, throwIO)
+import UnliftIO (catchAny)
 
 -- | Execute one emitted batch and finalize every retained message resiliently.
 --
@@ -116,11 +122,11 @@ processOneBatch ::
   MetricsHandle ->
   ProcessorId ->
   Int ->
-  IORef (Maybe HaltReason) ->
+  ProcessorSignal ->
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
+processOneBatch metricsHandle procId maxConc stopSignal handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -150,7 +156,7 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
 
       addEvent traceSpan (mkEvent eventBatchStarted [])
 
-      alreadyHalted <- liftIO $ readIORef haltRef
+      alreadyHalted <- liftIO $ readProcessorExit stopSignal
 
       -- Run the handler under exception isolation. On any exception, record it
       -- on the span and substitute the whole-batch retry default.
@@ -188,15 +194,18 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
           finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
 
       -- Compute halt and partial-failure signals from the resolved decisions.
-      let finalizationHalt =
+      let finalizationFailure =
             case finalizeFailures of
               [] -> Nothing
-              failed ->
+              failed@((firstMessageId, _) : _) ->
                 Just $
-                  HaltFatal $
-                    "batch finalization failed for message ids: "
-                      <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
-          firstHalt = finalizationHalt <|> listToMaybe [r | AckHalt r <- decisions]
+                  ProcessorFailed
+                    ( "batch finalization failed for message ids: "
+                        <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
+                    )
+                    (Just firstMessageId)
+          firstHalt = listToMaybe [r | AckHalt r <- decisions]
+          requestedExit = finalizationFailure <|> (ProcessorHalted <$> firstHalt)
           overrideFailures =
             [ ()
             | (_, explicitlyNamed, d, _) <- results,
@@ -207,8 +216,8 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
 
       -- Span status: error on halt or exception, otherwise Ok.
       addEvent traceSpan (mkEvent eventBatchCompleted [])
-      case firstHalt of
-        Just reason -> setStatus traceSpan (OTel.Error (haltReasonText reason))
+      case requestedExit of
+        Just processorExit -> setStatus traceSpan (OTel.Error (processorExitText processorExit))
         Nothing ->
           if skippedAfterHalt
             then setStatus traceSpan (OTel.Error "batch skipped after halt")
@@ -230,11 +239,11 @@ processOneBatch metricsHandle procId maxConc haltRef handler (info, batch) = do
           handlerThrew
           partialInc
           (decisionMetric <$> decisions)
-          (haltReasonText <$> firstHalt)
+          (processorExitText <$> requestedExit)
 
       -- Halt: set the shared flag; do NOT throw (let the stream drain).
-      for_ firstHalt $ \reason ->
-        liftIO $ atomicWriteIORef haltRef (Just reason)
+      for_ requestedExit $ \processorExit ->
+        liftIO $ requestProcessorExit stopSignal processorExit
   where
     isFailing :: AckDecision -> Bool
     isFailing (AckDeadLetter _) = True
@@ -261,6 +270,10 @@ haltReasonText :: HaltReason -> Text
 haltReasonText (HaltOrderedStream t) = t
 haltReasonText (HaltFatal t) = t
 
+processorExitText :: ProcessorExit -> Text
+processorExitText (ProcessorHalted reason) = haltReasonText reason
+processorExitText (ProcessorFailed failure _) = failure
+
 tshow :: (Show a) => a -> Text
 tshow = Text.pack . show
 
@@ -276,16 +289,16 @@ processBatchesUntilDrained ::
   Concurrency ->
   BatchHandler es msg ->
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
-  IORef (Maybe HaltReason) ->
+  ProcessorSignal ->
   Eff es ()
-processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream haltRef = do
+processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
         Async n -> n
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc haltRef handler
+    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal handler
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
@@ -313,12 +326,12 @@ runBatchesWithMetrics ::
 runBatchesWithMetrics procId concurrency handler batches = do
   now <- liftIO getCurrentTime
   metricsHandle <- liftIO $ newMetricsHandle now
-  haltRef <- liftIO $ newIORef Nothing
+  stopSignal <- liftIO newProcessorSignal
 
   let batchesStream = Stream.fromList batches
-  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream haltRef
+  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal
 
-  maybeHalt <- liftIO $ readIORef haltRef
-  case maybeHalt of
-    Just reason -> throwIO (ProcessorHalt reason)
+  maybeExit <- liftIO $ readProcessorExit stopSignal
+  case maybeExit of
+    Just processorExit -> liftIO $ throwProcessorExit processorExit
     Nothing -> liftIO $ sampleMetrics metricsHandle

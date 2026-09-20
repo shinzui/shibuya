@@ -42,6 +42,7 @@ module Shibuya
     renderDeadLetterReason,
     HaltReason (..),
     ProcessorHalt (..),
+    ProcessorFailure (..),
 
     -- * Batch processing
     BatchHandler,
@@ -148,6 +149,6 @@ import Shibuya.Core.Metrics
 import Shibuya.Core.Retry
 import Shibuya.Core.Types (Attempt (..), Cursor (..), Envelope (..), Headers, MessageId (..), TraceHeaders, mkEnvelope)
 import Shibuya.Handler (Handler)
-import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
+import Shibuya.Internal.Runner.Halt (ProcessorFailure (..), ProcessorHalt (..))
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..), validatePolicy)
 import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop)

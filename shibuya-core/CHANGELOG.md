@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `ShutdownConfig` gains `totalShutdownTimeout`; existing record construction must choose an
+  overall shutdown deadline. The default keeps the 30-second drain timeout and adds a
+  60-second bound covering adapter shutdown and graceful drain before forced supervisor
+  stop begins.
+- `ConfigError` gains `DuplicateProcessorId`; `PolicyError` gains `InvalidConcurrency` and
+  `ConcurrencyCapacityOverflow`. Exhaustive matches must handle the new constructors.
+- Permanent framework-owned finalization failure now throws `ProcessorFailure` with the
+  failed message identity instead of being caught as graceful `ProcessorHalt`.
+
+### Bug Fixes
+
+- Reject duplicate processor IDs and invalid or overflow-prone concurrency before acquiring
+  resources.
+- Wake idle Serial, Ahead, Async, partitioned, and batch intake when a handler halts or
+  finalization fails.
+- Stop keyed input immediately on worker failure and close the worker start-gate ownership
+  gap.
+- Make startup and shutdown exception safe: all adapter shutdowns are attempted, the master
+  is always stopped, a blocking adapter is bounded by the total deadline, and repeated or
+  concurrent stop calls invoke adapters once.
+- Retain a bounded internal terminal lifecycle snapshot after live metrics unregister so
+  ignored failures remain observable with processor and message identity.
+- Observe batch ticker failure from the consuming stream instead of allowing an unmonitored
+  ticker death to leave the batcher blocked.
+
 ## 0.9.0.3 — 2026-09-20
 
 ### Bug Fixes

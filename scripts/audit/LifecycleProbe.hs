@@ -11,6 +11,7 @@ module Main (main) where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.MVar
+import Control.Exception qualified as Exception
 import Control.Monad (forM_)
 import Data.IORef
 import Effectful
@@ -44,19 +45,21 @@ main = do
     closed <- liftIO $ newIORef False
     let first = mkProcessor (idle (liftIO $ writeIORef closed True)) (const $ pure AckOk)
         lastOne = mkProcessor (Adapter "empty" (Stream.fromList []) (pure ())) (const $ pure AckOk)
-    app <- runApp defaultAppConfig [(ProcessorId "duplicate", first), (ProcessorId "duplicate", lastOne)] >>= requireApp
-    completed <- U.timeout 300000 (waitApp app)
-    drained <- stopAppGracefully (ShutdownConfig 0.1) app
-    signalled <- liftIO $ readIORef closed
-    pure (completed, drained, signalled)
-  putStrLn $ "duplicate (wait, drained, first shutdown called): " <> show duplicate
+    runApp defaultAppConfig [(ProcessorId "duplicate", first), (ProcessorId "duplicate", lastOne)] >>= \case
+      Left appError -> pure (Left appError)
+      Right app -> do
+        completed <- U.timeout 300000 (waitApp app)
+        drained <- stopAppGracefully (ShutdownConfig 0.1 1) app
+        signalled <- liftIO $ readIORef closed
+        pure (Right (completed, drained, signalled))
+  putStrLn $ "duplicate (rejection or legacy wait/drain/signal): " <> show duplicate
 
   shutdownResult <- runEff $ runTracingNoop $ do
     secondClosed <- liftIO $ newIORef False
     let first = mkProcessor (idle (U.throwIO $ userError "shutdown failed")) (const $ pure AckOk)
         second = mkProcessor (idle (liftIO $ writeIORef secondClosed True)) (const $ pure AckOk)
     app <- runApp defaultAppConfig [(ProcessorId "a", first), (ProcessorId "b", second)] >>= requireApp
-    result <- U.tryAny (stopAppGracefully (ShutdownConfig 0.1) app)
+    result <- U.tryAny (stopAppGracefully (ShutdownConfig 0.1 1) app)
     completed <- U.timeout 100000 (waitApp app)
     signalled <- liftIO $ readIORef secondClosed
     stopMaster (getAppMaster app)
@@ -101,18 +104,18 @@ main = do
       pure (finalized, completed)
     putStrLn $ "single halt " <> show (ordering, concurrency) <> " (finalized, wait): " <> show outcome
 
-  exhausted <- runEff $ runTracingNoop $ do
-    attempts <- liftIO $ newIORef (0 :: Int)
+  attempts <- newIORef (0 :: Int)
+  exhausted <- Exception.try @Exception.SomeException $ runEff $ runTracingNoop $ do
     let item = mkIngested (mkEnvelope (MessageId "finalize-failure") ()) $ AckHandle $ \_ -> do
           liftIO $ modifyIORef' attempts (+ 1)
           U.throwIO $ userError "finalizer failed"
         adapter = Adapter "finalize-failure" (Stream.fromList [item]) (pure ())
     app <- runApp (defaultAppConfig {strategy = StopAllOnFailure}) [(ProcessorId "failure", mkProcessor adapter (const $ pure AckOk))] >>= requireApp
-    result <- U.tryAny $ U.timeout 2000000 (waitApp app)
-    n <- liftIO $ readIORef attempts
+    result <- U.timeout 2000000 (waitApp app)
     stopMaster (getAppMaster app)
-    pure (result, n)
-  putStrLn $ "finalizer exhaustion StopAllOnFailure (wait result, attempts): " <> show exhausted
+    pure result
+  attemptCount <- readIORef attempts
+  putStrLn $ "finalizer exhaustion StopAllOnFailure (caller result, attempts): " <> show (exhausted, attemptCount)
 
   count <- newIORef (0 :: Int)
   let input = Stream.unfoldrM (\n -> threadDelay 1000 >> pure (Just (n, n + 1))) (0 :: Int)
@@ -131,9 +134,11 @@ main = do
             liftIO $ threadDelay 50000
             liftIO $ atomicModifyIORef' counters $ \(active, peak) -> ((active - 1, peak), ())
             pure AckOk
-      app <- runApp defaultAppConfig [(ProcessorId "policy", QueueProcessor adapter handler Unordered (Async limit))] >>= requireApp
-      completed <- U.timeout 2000000 (waitApp app)
-      stopMaster (getAppMaster app)
-      peak <- liftIO $ snd <$> readIORef counters
-      pure (completed, peak)
-    putStrLn $ "Async " <> show limit <> " (wait, peak handlers): " <> show outcome
+      runApp defaultAppConfig [(ProcessorId "policy", QueueProcessor adapter handler Unordered (Async limit))] >>= \case
+        Left appError -> pure (Left appError)
+        Right app -> do
+          completed <- U.timeout 2000000 (waitApp app)
+          stopMaster (getAppMaster app)
+          peak <- liftIO $ snd <$> readIORef counters
+          pure (Right (completed, peak))
+    putStrLn $ "Async " <> show limit <> " (rejection or wait/peak): " <> show outcome

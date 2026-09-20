@@ -1,6 +1,7 @@
 module Shibuya.Runner.BatcherSpec (spec) where
 
 import Control.Concurrent (threadDelay)
+import Control.Concurrent.STM (atomically, retry)
 import Data.List (sort)
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
@@ -21,6 +22,7 @@ import Shibuya.Internal.Runner.Batcher
   ( ReadyBatch,
     emptyBatcherState,
     runBatcher,
+    runBatcherWithTickHook,
     stepArrival,
     stepFlush,
     stepTick,
@@ -29,6 +31,7 @@ import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import Test.QuickCheck
+import UnliftIO qualified as UIO
 
 -- The engine is parameterized by an effect stack and payload; the pure core
 -- treats them as phantom. We pick es = 'E' (an empty effect stack, kind pinned
@@ -178,6 +181,25 @@ spec = describe "Shibuya.Internal.Runner.Batcher" $ do
       out <- Stream.fold Fold.toList (runBatcher 8 cfg slow)
       any (\(info, _) -> info.trigger == TriggerTimeout) out `shouldBe` True
       sort (batchIds out) `shouldBe` [MessageId "m-0", MessageId "m-1"]
+
+    it "propagates ticker failure while input remains idle" $ do
+      let cfg =
+            (partitionKeyConfig 100)
+              { batchTimeout = 1,
+                tickInterval = Just 0.01
+              }
+          idle = Stream.repeatM (atomically retry :: IO (Ingested E String))
+          failTick = ioError (userError "ticker failed")
+
+      result <-
+        UIO.timeout 1_000_000 $
+          UIO.tryAny $
+            Stream.fold Fold.drain (runBatcherWithTickHook failTick 8 cfg idle)
+
+      case result of
+        Just (Left failure) ->
+          Text.pack (UIO.displayException failure) `shouldSatisfy` Text.isInfixOf "ticker failed"
+        other -> expectationFailure $ "expected ticker failure, got: " <> show other
 
 -- QuickCheck generators and properties -------------------------------------
 

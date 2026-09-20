@@ -42,11 +42,12 @@ import Control.Concurrent.STM
     writeTVar,
   )
 import Control.Monad (when)
+import Data.Foldable (traverse_)
 import Data.HashMap.Strict qualified as HashMap
-import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
+import Effectful.Exception qualified as Exception
 import OpenTelemetry.Attributes (Attribute, toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
@@ -79,10 +80,26 @@ import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.BatchProcessor (processBatchesUntilDrained)
 import Shibuya.Internal.Runner.Batcher (runBatcher)
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
-import Shibuya.Internal.Runner.Halt (ProcessorHalt (..))
+import Shibuya.Internal.Runner.Halt
+  ( ProcessorExit (..),
+    ProcessorFailure (..),
+    ProcessorHalt (..),
+    ProcessorSignal,
+    newProcessorSignal,
+    readProcessorExit,
+    requestProcessorExit,
+    throwProcessorExit,
+  )
 import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics)
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
-import Shibuya.Internal.Runner.Master (Master (..), MasterState (..), registerProcessor, unregisterProcessor)
+import Shibuya.Internal.Runner.Master
+  ( Master (..),
+    MasterState (..),
+    markProcessorFailed,
+    markProcessorStopped,
+    registerProcessor,
+    unregisterProcessor,
+  )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Prelude
 import Shibuya.Telemetry.Effect
@@ -116,7 +133,7 @@ import Shibuya.Telemetry.Semantic
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
 import Streamly.Data.Stream.Prelude qualified as StreamP
-import UnliftIO (Async, catch, catchAny, displayException, finally, throwIO)
+import UnliftIO (Async, SomeException, catchAny, displayException, finally)
 import UnliftIO qualified as UIO
 
 -- | Handle for a supervised processor.
@@ -169,7 +186,7 @@ runSupervised ::
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId ordering concurrency adapter handler = do
+runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
   -- Initialize state
@@ -184,11 +201,10 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = do
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO
-        ( -- Catch ProcessorHalt to prevent propagation via link
-          -- (Halt is intentional, not a failure - other processors should continue)
-          ( runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
-              `catch` \(ProcessorHalt _) -> pure () -- Convert halt to graceful exit
-          )
+        ( superviseProcessorLifecycle
+            master
+            procId
+            (runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler)
             `finally` unregisterProcessor master procId
         )
         `finally` atomically (writeTVar doneVar True)
@@ -302,7 +318,7 @@ runSupervisedBatch ::
   -- | Batch handler
   BatchHandler es msg ->
   Eff es SupervisedProcessor
-runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = do
+runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
   metricsHandle <- liftIO $ newMetricsHandle now
@@ -313,16 +329,18 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO
-        ( ( runIngesterAndProcessorBatch
-              metricsHandle
-              procId
-              inboxSize
-              concurrency
-              batchConfig
-              adapter
-              batchHandler
-              `catch` \(ProcessorHalt _) -> pure ()
-          )
+        ( superviseProcessorLifecycle
+            master
+            procId
+            ( runIngesterAndProcessorBatch
+                metricsHandle
+                procId
+                inboxSize
+                concurrency
+                batchConfig
+                adapter
+                batchHandler
+            )
             `finally` unregisterProcessor master procId
         )
         `finally` atomically (writeTVar doneVar True)
@@ -338,6 +356,30 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
         done = doneVar,
         child = Just supervisedChild
       }
+
+-- | Convert deliberate halt into successful termination while retaining every
+-- infrastructure failure in the master's bounded terminal snapshot. Async
+-- cancellation is a stop, not a processor failure, and is rethrown after the
+-- snapshot transition so supervisor cleanup keeps its normal semantics.
+superviseProcessorLifecycle ::
+  (IOE :> es) =>
+  Master ->
+  ProcessorId ->
+  Eff es () ->
+  Eff es ()
+superviseProcessorLifecycle master procId action =
+  let handleHalt =
+        Exception.catch
+          (action >> markProcessorStopped master procId)
+          (\(ProcessorHalt _) -> markProcessorStopped master procId)
+   in Exception.catch handleHalt $ \(unexpected :: SomeException) -> do
+        case Exception.fromException unexpected of
+          Just (ProcessorFailure message messageId) ->
+            markProcessorFailed master procId message messageId
+          Nothing
+            | Exception.isAsyncException unexpected -> markProcessorStopped master procId
+            | otherwise -> markProcessorFailed master procId (Text.pack (displayException unexpected)) Nothing
+        Exception.throwIO unexpected
 
 -- | Run a batching processor with metrics but without Master supervision.
 -- Blocks until the adapter stream is exhausted and every accumulated batch has
@@ -406,7 +448,7 @@ runIngesterAndProcessorBatch ::
 runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchConfig adapter batchHandler = do
   inbox <- liftIO $ newBoundedInbox inboxSize
   streamDoneVar <- liftIO $ newTVarIO False
-  haltRef <- liftIO $ newIORef Nothing
+  stopSignal <- liftIO newProcessorSignal
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
@@ -414,7 +456,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
-      let inboxStream = inboxToStream inbox streamDoneVar haltRef
+      let inboxStream = inboxToStream inbox streamDoneVar stopSignal
           readyBatchStream = runBatcher inboxSize batchConfig inboxStream
           batchProcessor =
             runInIO $ do
@@ -424,9 +466,9 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
                 concurrency
                 batchHandler
                 readyBatchStream
-                haltRef
-              maybeHalt <- liftIO (readIORef haltRef)
-              maybe (pure ()) (throwIO . ProcessorHalt) maybeHalt
+                stopSignal
+              maybeExit <- liftIO (readProcessorExit stopSignal)
+              maybe (pure ()) (liftIO . throwProcessorExit) maybeExit
       batchProcessor `catchAny` \processorErr -> do
         now <- getCurrentTime
         atomically $
@@ -451,33 +493,25 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
 inboxToStream ::
   Inbox (Ingested es msg) ->
   TVar Bool ->
-  IORef (Maybe HaltReason) ->
+  ProcessorSignal ->
   Stream.Stream IO (Ingested es msg)
-inboxToStream inbox streamDoneVar haltRef = Stream.unfoldrM step ()
+inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
   where
     step _ = do
-      -- Check halt flag first (outside STM since it's an IORef)
-      halted <- readIORef haltRef
-      case halted of
-        Just _ -> pure Nothing -- Stop reading
-        Nothing -> do
-          -- Atomically either receive a message or detect completion.
-          -- This avoids TOCTOU race where we check done/empty separately
-          -- and then block on receive after the stream has completed.
-          result <-
-            atomically $
-              -- Try to receive a message
-              (Just <$> receiveSTM inbox)
-                `orElse`
-                -- Or check if we're done (stream exhausted and inbox empty)
-                ( do
-                    done <- readTVar streamDoneVar
-                    empty <- mailboxEmptySTM inbox
-                    if done && empty
-                      then pure Nothing
-                      else retry -- Inbox empty but stream not done, wait for message
-                )
-          pure $ fmap (,()) result
+      result <-
+        atomically $
+          -- A stop request participates in the same transaction as intake, so
+          -- writing the signal wakes an empty-inbox waiter immediately.
+          (readTVar stopSignal >>= maybe retry (const (pure Nothing)))
+            `orElse` (Just <$> receiveSTM inbox)
+            `orElse` ( do
+                         done <- readTVar streamDoneVar
+                         empty <- mailboxEmptySTM inbox
+                         if done && empty
+                           then pure Nothing
+                           else retry
+                     )
+      pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.
 -- Supports Serial, Ahead, and Async concurrency modes.
@@ -492,7 +526,7 @@ processUntilDrained ::
   TVar Bool ->
   Eff es ()
 processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
-  haltRef <- liftIO $ newIORef Nothing
+  stopSignal <- liftIO newProcessorSignal
 
   let maxConc = case concurrency of
         Serial -> 1
@@ -508,8 +542,8 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
           ]
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let inboxStream = inboxToStream inbox streamDoneVar haltRef
-        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
+    let inboxStream = inboxToStream inbox streamDoneVar stopSignal
+        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal handler
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -543,10 +577,8 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
           StreamP.parMapM (StreamP.maxThreads n . StreamP.maxBuffer (2 * n)) processAction inboxStream
 
     -- After draining, check if we halted
-    maybeHalt <- readIORef haltRef
-    case maybeHalt of
-      Just reason -> throwIO $ ProcessorHalt reason
-      Nothing -> pure ()
+    maybeExit <- readProcessorExit stopSignal
+    traverse_ throwProcessorExit maybeExit
 
 handlerStartedEvent :: OTel.NewEvent
 handlerStartedEvent = mkEvent eventHandlerStarted []
@@ -560,11 +592,11 @@ processOne ::
   Text ->
   HashMap.HashMap Text Attribute ->
   Int ->
-  IORef (Maybe HaltReason) ->
+  ProcessorSignal ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler ingested = do
+processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
 
@@ -674,9 +706,13 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc haltRef handler
       -- Handle halt (set flag, don't throw - let stream drain)
       case finalizeResult of
         Left _ ->
-          liftIO $ atomicWriteIORef haltRef (Just (HaltFatal (finalizationFailureText msgIdText)))
+          liftIO $
+            requestProcessorExit
+              stopSignal
+              (ProcessorFailed (finalizationFailureText msgIdText) (Just ingested.envelope.messageId))
         Right () -> case result of
-          Right (AckHalt reason) -> liftIO $ atomicWriteIORef haltRef (Just reason)
+          Right (AckHalt reason) ->
+            liftIO $ requestProcessorExit stopSignal (ProcessorHalted reason)
           _ -> pure ()
   where
     isLeft :: Either a b -> Bool

@@ -17,7 +17,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
-import Shibuya (ProcessorHalt (..))
+import Shibuya (ProcessorFailure (..), ProcessorHalt (..))
 import Shibuya.Adapter.Mock
   ( TrackingAck (..),
     getTrackedDecisions,
@@ -230,10 +230,11 @@ spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
         pure ()
 
       case result of
-        Left (ProcessorHalt (HaltFatal msg)) ->
+        Left (ProcessorFailure msg (Just messageId)) -> do
           msg `shouldSatisfy` Text.isInfixOf "perm-1"
-        Left other -> expectationFailure ("unexpected halt reason: " <> show other)
-        Right () -> expectationFailure "expected ProcessorHalt from exhausted finalization"
+          messageId `shouldBe` MessageId "perm-1"
+        Left other -> expectationFailure ("unexpected processor failure: " <> show other)
+        Right () -> expectationFailure "expected ProcessorFailure from exhausted finalization"
 
       -- The other message was still attempted and finalized despite msg-1 failing.
       tracked <- runEff $ runTracingNoop $ getTrackedDecisions tracking

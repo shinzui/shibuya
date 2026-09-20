@@ -8,7 +8,8 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
-import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkProcessor, runApp, stopApp, waitApp)
+import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkBatchProcessor, mkProcessor, runApp, stopApp, waitApp)
+import Shibuya.Batch (ackAll, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (ConfigError (..), PolicyError (..))
@@ -17,7 +18,7 @@ import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
-import Shibuya.Telemetry.Effect (runTracingNoop)
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 
@@ -45,6 +46,27 @@ spec = do
         Left (AppConfigInvalid (InvalidInboxSize (-5))) -> pure ()
         Left err -> expectationFailure $ "Expected AppConfigInvalid, got: " ++ show err
         Right _ -> expectationFailure "Expected config validation to fail"
+
+    describe "processor identity validation" $ do
+      it "rejects duplicate ordinary processor IDs before adapter acquisition" $ do
+        assertDuplicateRejected $ \adapter ->
+          [ (ProcessorId "duplicate", mkProcessor adapter alwaysAckOk),
+            (ProcessorId "duplicate", mkProcessor adapter alwaysAckOk)
+          ]
+
+      it "rejects duplicate batch processor IDs before adapter acquisition" $ do
+        assertDuplicateRejected $ \adapter ->
+          let batchHandler _ _ = pure (ackAll AckOk)
+           in [ (ProcessorId "duplicate", mkBatchProcessor adapter batchHandler defaultBatchConfig),
+                (ProcessorId "duplicate", mkBatchProcessor adapter batchHandler defaultBatchConfig)
+              ]
+
+      it "rejects duplicate mixed processor IDs before adapter acquisition" $ do
+        assertDuplicateRejected $ \adapter ->
+          let batchHandler _ _ = pure (ackAll AckOk)
+           in [ (ProcessorId "duplicate", mkProcessor adapter alwaysAckOk),
+                (ProcessorId "duplicate", mkBatchProcessor adapter batchHandler defaultBatchConfig)
+              ]
 
     it "processes messages from mock adapter" $ do
       result <- runEff $ runTracingNoop $ do
@@ -143,6 +165,25 @@ spec = do
       result `shouldBe` Right ()
 
   describe "Policy validation" $ do
+    it "rejects nonpositive and overflowing concurrency before adapter acquisition" $ do
+      let overflow = maxBound `div` 2 + 1
+          batchHandler _ _ = pure (ackAll AckOk)
+      assertPolicyRejected
+        (InvalidConcurrency 0)
+        (\adapter -> QueueProcessor adapter alwaysAckOk Unordered (Ahead 0))
+      assertPolicyRejected
+        (InvalidConcurrency (-1))
+        (\adapter -> QueueProcessor adapter alwaysAckOk PartitionedInOrder (Async (-1)))
+      assertPolicyRejected
+        (InvalidConcurrency 0)
+        (\adapter -> (mkBatchProcessor adapter batchHandler defaultBatchConfig) {concurrency = Async 0})
+      assertPolicyRejected
+        (ConcurrencyCapacityOverflow overflow)
+        (\adapter -> QueueProcessor adapter alwaysAckOk Unordered (Async overflow))
+      assertPolicyRejected
+        (ConcurrencyCapacityOverflow overflow)
+        (\adapter -> (mkBatchProcessor adapter batchHandler defaultBatchConfig) {concurrency = Ahead overflow})
+
     it "rejects StrictInOrder with Async" $ do
       result <- runEff $ runTracingNoop $ do
         messages <- createTestMessages 3
@@ -267,3 +308,48 @@ testHandler ref ingested = do
 -- | Handler that always returns AckOk
 alwaysAckOk :: Handler es msg
 alwaysAckOk _ = pure AckOk
+
+assertDuplicateRejected ::
+  (Adapter '[Tracing, IOE] String -> [(ProcessorId, QueueProcessor '[Tracing, IOE])]) ->
+  Expectation
+assertDuplicateRejected mkProcessors = do
+  acquiredRef <- newIORef (0 :: Int)
+  result <- runEff $ runTracingNoop $ do
+    messages <- createTestMessages 1
+    let adapter =
+          (testAdapter messages)
+            { source =
+                Stream.mapM
+                  (\msg -> liftIO (modifyIORef' acquiredRef (+ 1)) >> pure msg)
+                  (Stream.fromList messages)
+            }
+    runApp defaultAppConfig (mkProcessors adapter)
+
+  case result of
+    Left (AppConfigInvalid (DuplicateProcessorId (ProcessorId "duplicate"))) -> pure ()
+    Left err -> expectationFailure $ "Expected duplicate-ID config error, got: " ++ show err
+    Right _ -> expectationFailure "Expected duplicate processor IDs to be rejected"
+  readIORef acquiredRef `shouldReturn` 0
+
+assertPolicyRejected ::
+  PolicyError ->
+  (Adapter '[Tracing, IOE] String -> QueueProcessor '[Tracing, IOE]) ->
+  Expectation
+assertPolicyRejected expectedError mkProcessorUnderTest = do
+  acquiredRef <- newIORef (0 :: Int)
+  result <- runEff $ runTracingNoop $ do
+    messages <- createTestMessages 1
+    let adapter =
+          (testAdapter messages)
+            { source =
+                Stream.mapM
+                  (\msg -> liftIO (modifyIORef' acquiredRef (+ 1)) >> pure msg)
+                  (Stream.fromList messages)
+            }
+    runApp defaultAppConfig [(ProcessorId "invalid-policy", mkProcessorUnderTest adapter)]
+
+  case result of
+    Left (AppPolicyError actualError) -> actualError `shouldBe` expectedError
+    Left err -> expectationFailure $ "Expected policy error, got: " ++ show err
+    Right _ -> expectationFailure "Expected concurrency policy to be rejected"
+  readIORef acquiredRef `shouldReturn` 0

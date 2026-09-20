@@ -18,12 +18,15 @@ import Shibuya.Core.Ingested (Message (..))
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..))
 import Shibuya.Core.Types qualified as Core
+import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
 import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervised)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
+import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import Test.QuickCheck
+import UnliftIO qualified as UIO
 import UnliftIO.Concurrent (threadDelay)
 
 data Payload = Payload
@@ -118,6 +121,26 @@ spec = describe "Shibuya.Runner.PartitionOrdering" $ do
             (`elemIndexOrMax` orderedIds)
             ["msg-1", "msg-3", "msg-5"]
     all (< lastSlowIndex) fastIndexes `shouldBe` True
+
+  it "propagates a keyed worker failure without waiting for infinite input" $ do
+    successorsRef <- newIORef (0 :: Int)
+    let infiniteInput = Stream.unfoldrM (\n -> pure (Just (n, n + 1))) (0 :: Int)
+        worker n
+          | n == 0 = ioError (userError "keyed worker failed")
+          | otherwise = atomicModifyIORef' successorsRef (\count -> (count + 1, ()))
+
+    result <-
+      UIO.timeout 1_000_000 $
+        UIO.tryAny $
+          runKeyedScheduler 2 4 (Just . (`mod` 2)) worker infiniteInput
+
+    case result of
+      Just (Left failure) ->
+        Text.pack (UIO.displayException failure) `shouldSatisfy` Text.isInfixOf "keyed worker failed"
+      other -> expectationFailure $ "expected prompt keyed worker failure, got: " <> show other
+
+    successors <- readIORef successorsRef
+    successors `shouldSatisfy` (< 20)
 
 runPartitioned ::
   [(Maybe Text, Int)] ->

@@ -29,6 +29,7 @@ module Shibuya.Internal.Runner.Batcher
 
     -- * IO engine
     runBatcher,
+    runBatcherWithTickHook,
   )
 where
 
@@ -40,6 +41,7 @@ import Control.Concurrent.STM
     readTVar,
     readTVarIO,
     retry,
+    throwSTM,
     writeTVar,
   )
 import Control.Monad (when)
@@ -60,7 +62,7 @@ import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
 import UnliftIO (finally, throwIO)
-import UnliftIO.Async (Async, async, cancel, waitCatch)
+import UnliftIO.Async (Async, async, cancel, pollSTM, waitCatch)
 
 -- | In-progress state for one batch key.
 data Accum es msg = Accum
@@ -191,7 +193,18 @@ runBatcher ::
   BatchConfig es msg ->
   Stream IO (Ingested es msg) ->
   Stream IO (ReadyBatch es msg)
-runBatcher outputCapacity cfg input =
+runBatcher = runBatcherWithTickHook (pure ())
+
+-- | Test seam for deterministic ticker-failure injection. The hook runs once
+-- after each tick delay and before the clock/state step. Production uses a
+-- no-op hook through 'runBatcher'.
+runBatcherWithTickHook ::
+  IO () ->
+  Natural ->
+  BatchConfig es msg ->
+  Stream IO (Ingested es msg) ->
+  Stream IO (ReadyBatch es msg)
+runBatcherWithTickHook tickHook outputCapacity cfg input =
   Stream.bracketIO acquire release consume
   where
     tickMicros = nominalToMicros (fromMaybe cfg.batchTimeout cfg.tickInterval)
@@ -219,6 +232,7 @@ runBatcher outputCapacity cfg input =
 
           tickerLoop = do
             threadDelay tickMicros
+            tickHook
             done <- readTVarIO doneVar
             if done
               then pure ()
@@ -235,31 +249,36 @@ runBatcher outputCapacity cfg input =
       cancel tickerA
       cancel consumerA
 
-    consume (stateVar, doneVar, consumerA, _tickerA) = drainQueue consumerA stateVar doneVar
+    consume (stateVar, doneVar, consumerA, tickerA) = drainQueue consumerA tickerA stateVar doneVar
 
 -- | Stream finished batches out of the bounded queue, ending when the consumer
 -- has flushed everything (doneVar), the queue has drained, and the consumer
 -- async is known to have completed successfully.
 drainQueue ::
   Async () ->
+  Async () ->
   TVar (BatcherState es msg, Seq (ReadyBatch es msg)) ->
   TVar Bool ->
   Stream IO (ReadyBatch es msg)
-drainQueue consumerA stateVar doneVar = Stream.unfoldrM step ()
+drainQueue consumerA tickerA stateVar doneVar = Stream.unfoldrM step ()
   where
     step _ = do
       drainStep <-
         atomically $ do
-          (state, pending) <- readTVar stateVar
-          case Seq.viewl pending of
-            rb Seq.:< rest -> do
-              writeTVar stateVar (state, rest)
-              pure (DrainReady rb)
-            Seq.EmptyL -> do
-              done <- readTVar doneVar
-              if done
-                then pure DrainDone
-                else retry
+          tickerStatus <- pollSTM tickerA
+          case tickerStatus of
+            Just (Left tickerFailure) -> throwSTM tickerFailure
+            _ -> do
+              (state, pending) <- readTVar stateVar
+              case Seq.viewl pending of
+                rb Seq.:< rest -> do
+                  writeTVar stateVar (state, rest)
+                  pure (DrainReady rb)
+                Seq.EmptyL -> do
+                  done <- readTVar doneVar
+                  if done
+                    then pure DrainDone
+                    else retry
       case drainStep of
         DrainReady rb -> pure (Just (rb, ()))
         DrainDone ->
