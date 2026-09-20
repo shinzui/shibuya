@@ -3,7 +3,8 @@
 module Shibuya.Runner.SupervisedSpec (spec) where
 
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
-import Control.Concurrent.STM (atomically, check, readTVar, readTVarIO)
+import Control.Concurrent.STM (atomically, check, newEmptyTMVarIO, readTVar, readTVarIO, takeTMVar, tryPutTMVar)
+import Control.Exception (MaskingState (..), getMaskingState)
 import Control.Monad (forM, forM_, replicateM)
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
@@ -98,6 +99,25 @@ spec = do
       processorMetrics `shouldBe` Just Nothing
 
   describe "Shibuya.Internal.Runner.Supervised" $ do
+    it "restores interruptibility inside a supervised child" $ do
+      observed <- newEmptyTMVarIO
+      result <-
+        UIO.timeout 1_000_000 $
+          runEff $
+            runTracingNoop $ do
+              messages <- createTestMessages 1
+              let handler _ = do
+                    state <- liftIO getMaskingState
+                    liftIO $ atomically $ tryPutTMVar observed state >> pure ()
+                    pure AckOk
+              master <- startMaster IgnoreAll
+              _ <- runSupervised master 1 (ProcessorId "masking-state") Unordered Serial (testAdapter messages) handler
+              state <- liftIO $ atomically $ takeTMVar observed
+              stopMaster master
+              pure state
+
+      result `shouldBe` Just Unmasked
+
     describe "runWithMetrics" $ do
       it "processes messages and tracks metrics" $ do
         (finalMetrics, processedMsgs) <- runEff $ runTracingNoop $ do

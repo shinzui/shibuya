@@ -187,7 +187,7 @@ runSupervised ::
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask_ $ do
+runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask $ \restore -> do
   now <- liftIO getCurrentTime
 
   -- Initialize state
@@ -202,11 +202,13 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = Exc
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO
-        ( superviseProcessorLifecycle
-            master
-            procId
-            (runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler)
-            `finally` unregisterProcessor master procId
+        ( restore
+            ( superviseProcessorLifecycle
+                master
+                procId
+                (runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler)
+                `finally` unregisterProcessor master procId
+            )
         )
         `finally` atomically (writeTVar doneVar True)
 
@@ -319,7 +321,7 @@ runSupervisedBatch ::
   -- | Batch handler
   BatchHandler es msg ->
   Eff es SupervisedProcessor
-runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask_ $ do
+runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask $ \restore -> do
   now <- liftIO getCurrentTime
 
   metricsHandle <- liftIO $ newMetricsHandle now
@@ -330,19 +332,21 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     addChild master.state.supervisor $
       runInIO
-        ( superviseProcessorLifecycle
-            master
-            procId
-            ( runIngesterAndProcessorBatch
-                metricsHandle
+        ( restore
+            ( superviseProcessorLifecycle
+                master
                 procId
-                inboxSize
-                concurrency
-                batchConfig
-                adapter
-                batchHandler
+                ( runIngesterAndProcessorBatch
+                    metricsHandle
+                    procId
+                    inboxSize
+                    concurrency
+                    batchConfig
+                    adapter
+                    batchHandler
+                )
+                `finally` unregisterProcessor master procId
             )
-            `finally` unregisterProcessor master procId
         )
         `finally` atomically (writeTVar doneVar True)
 

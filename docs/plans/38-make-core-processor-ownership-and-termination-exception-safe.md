@@ -69,6 +69,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: Merely moving the terminal branch behind `receiveSTM` was insufficient: constructing a third `orElse` alternative added roughly 100--130 allocated bytes per message on the serial path. Splitting the empty check and wakeable wait into two transactions removed that allocation but made a frequently empty retry workload pay two transactions per message. The terminal signal now pairs an atomic outcome `IORef` with the existing source-completion wake cell: terminal publication records the exit before marking that cell. Intake therefore retains the original two-branch receive/completion transaction and the original populated and frequently-empty costs, while an idle terminal request still wakes the completion branch.
 
+2026-09-20: A 100-pair retry-path sample exposed a masking-state bug hidden by the shorter noisy runs. `runSupervised` and `runSupervisedBatch` protected registration and child creation with `mask_`, but the NQE child inherited `MaskedInterruptible` for its entire lifetime. Both functions now use `mask` and apply its restore function inside the child action: registration, spawn, linking, and handle publication remain masked ownership transfers, while ingesters, handlers, finalizers, and waits execute in the caller's original interruptibility state.
+
 
 ## Decision Log
 
