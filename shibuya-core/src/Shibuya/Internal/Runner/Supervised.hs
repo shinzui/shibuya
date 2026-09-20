@@ -41,6 +41,7 @@ import Control.Concurrent.STM
     retry,
     writeTVar,
   )
+import Control.Exception qualified as IOException
 import Control.Monad (when)
 import Data.Foldable (traverse_)
 import Data.HashMap.Strict qualified as HashMap
@@ -96,8 +97,8 @@ import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Internal.Runner.Master
   ( Master (..),
     MasterState (..),
-    markProcessorFailed,
-    markProcessorStopped,
+    markProcessorFailedIO,
+    markProcessorStoppedIO,
     registerProcessor,
     unregisterProcessor,
   )
@@ -200,17 +201,15 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = Exc
   -- Add as supervised child using NQE's Supervisor
   -- ConcUnlift Persistent allows the runInIO function to be used in the async child
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-    addChild master.state.supervisor $
-      runInIO
-        ( restore
-            ( superviseProcessorLifecycle
-                master
-                procId
-                (runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler)
-                `finally` unregisterProcessor master procId
-            )
-        )
-        `finally` atomically (writeTVar doneVar True)
+    let processorAction =
+          runInIO $
+            restore $
+              runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
+        unregisterAction = runInIO $ unregisterProcessor master procId
+     in addChild master.state.supervisor $
+          superviseProcessorLifecycleIO master procId processorAction
+            `finally` unregisterAction
+            `finally` atomically (writeTVar doneVar True)
 
   -- Link so exceptions propagate to the parent for strategies that request it.
   when master.state.propagateFailures $
@@ -330,25 +329,22 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
   registerProcessor master procId metricsHandle
 
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-    addChild master.state.supervisor $
-      runInIO
-        ( restore
-            ( superviseProcessorLifecycle
-                master
+    let processorAction =
+          runInIO $
+            restore $
+              runIngesterAndProcessorBatch
+                metricsHandle
                 procId
-                ( runIngesterAndProcessorBatch
-                    metricsHandle
-                    procId
-                    inboxSize
-                    concurrency
-                    batchConfig
-                    adapter
-                    batchHandler
-                )
-                `finally` unregisterProcessor master procId
-            )
-        )
-        `finally` atomically (writeTVar doneVar True)
+                inboxSize
+                concurrency
+                batchConfig
+                adapter
+                batchHandler
+        unregisterAction = runInIO $ unregisterProcessor master procId
+     in addChild master.state.supervisor $
+          superviseProcessorLifecycleIO master procId processorAction
+            `finally` unregisterAction
+            `finally` atomically (writeTVar doneVar True)
 
   when master.state.propagateFailures $
     unsafeEff_ $
@@ -366,25 +362,24 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
 -- infrastructure failure in the master's bounded terminal snapshot. Async
 -- cancellation is a stop, not a processor failure, and is rethrown after the
 -- snapshot transition so supervisor cleanup keeps its normal semantics.
-superviseProcessorLifecycle ::
-  (IOE :> es) =>
-  Master ->
-  ProcessorId ->
-  Eff es () ->
-  Eff es ()
-superviseProcessorLifecycle master procId action =
-  let handleHalt =
-        Exception.catch
-          (action >> markProcessorStopped master procId)
-          (\(ProcessorHalt _) -> markProcessorStopped master procId)
-   in Exception.catch handleHalt $ \(unexpected :: SomeException) -> do
-        case Exception.fromException unexpected of
-          Just (ProcessorFailure message messageId) ->
-            markProcessorFailed master procId message messageId
-          Nothing
-            | Exception.isAsyncException unexpected -> markProcessorStopped master procId
-            | otherwise -> markProcessorFailed master procId (Text.pack (displayException unexpected)) Nothing
-        Exception.throwIO unexpected
+superviseProcessorLifecycleIO :: Master -> ProcessorId -> IO () -> IO ()
+superviseProcessorLifecycleIO master procId action = do
+  outcome <- IOException.try @SomeException action
+  case outcome of
+    Right () -> markProcessorStoppedIO master procId
+    Left unexpected -> do
+      case IOException.fromException unexpected of
+        Just (ProcessorHalt _) -> markProcessorStoppedIO master procId
+        Nothing ->
+          case IOException.fromException unexpected of
+            Just (ProcessorFailure message messageId) ->
+              markProcessorFailedIO master procId message messageId
+            Nothing
+              | Exception.isAsyncException unexpected -> markProcessorStoppedIO master procId
+              | otherwise -> markProcessorFailedIO master procId (Text.pack (displayException unexpected)) Nothing
+      case IOException.fromException unexpected of
+        Just (ProcessorHalt _) -> pure ()
+        Nothing -> IOException.throwIO unexpected
 
 -- | Run a batching processor with metrics but without Master supervision.
 -- Blocks until the adapter stream is exhausted and every accumulated batch has

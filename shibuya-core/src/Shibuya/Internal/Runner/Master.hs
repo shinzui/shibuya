@@ -33,7 +33,9 @@ module Shibuya.Internal.Runner.Master
     unregisterProcessor,
     markProcessorDraining,
     markProcessorStopped,
+    markProcessorStoppedIO,
     markProcessorFailed,
+    markProcessorFailedIO,
   )
 where
 
@@ -201,23 +203,28 @@ markProcessorDraining master pid =
           }
 
 markProcessorStopped :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
-markProcessorStopped master pid =
-  liftIO $
-    atomically $
-      modifyTVar' master.state.registry $ \registry ->
-        registry
-          { lifecycles =
-              Map.adjust
-                (\case LifecycleFailed failure messageId -> LifecycleFailed failure messageId; _ -> LifecycleStopped)
-                pid
-                registry.lifecycles
-          }
+markProcessorStopped master = liftIO . markProcessorStoppedIO master
+
+markProcessorStoppedIO :: Master -> ProcessorId -> IO ()
+markProcessorStoppedIO master pid =
+  atomically $
+    modifyTVar' master.state.registry $ \registry ->
+      registry
+        { lifecycles =
+            Map.adjust
+              (\case LifecycleFailed failure messageId -> LifecycleFailed failure messageId; _ -> LifecycleStopped)
+              pid
+              registry.lifecycles
+        }
 
 markProcessorFailed :: (IOE :> es) => Master -> ProcessorId -> Text -> Maybe MessageId -> Eff es ()
 markProcessorFailed master pid failure messageId =
-  liftIO $
-    atomically $
-      modifyTVar' master.state.registry $ \registry ->
-        registry
-          { lifecycles = Map.insert pid (LifecycleFailed failure messageId) registry.lifecycles
-          }
+  liftIO $ markProcessorFailedIO master pid failure messageId
+
+markProcessorFailedIO :: Master -> ProcessorId -> Text -> Maybe MessageId -> IO ()
+markProcessorFailedIO master pid failure messageId =
+  atomically $
+    modifyTVar' master.state.registry $ \registry ->
+      registry
+        { lifecycles = Map.insert pid (LifecycleFailed failure messageId) registry.lifecycles
+        }

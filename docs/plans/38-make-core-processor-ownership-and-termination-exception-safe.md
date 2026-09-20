@@ -71,6 +71,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: A 100-pair retry-path sample exposed a masking-state bug hidden by the shorter noisy runs. `runSupervised` and `runSupervisedBatch` protected registration and child creation with `mask_`, but the NQE child inherited `MaskedInterruptible` for its entire lifetime. Both functions now use `mask` and apply its restore function inside the child action: registration, spawn, linking, and handle publication remain masked ownership transfers, while ingesters, handlers, finalizers, and waits execute in the caller's original interruptibility state.
 
+2026-09-20: After restoring interruptibility, the N4 retry path still carried a reproducible tail-latency penalty even though throughput and long-workload probes matched baseline. A controlled build without lifecycle observation removed it. The cause was `Effectful.Exception.catch` wrapping the full processor computation, which installed an unlift layer across every effect. Terminal classification now performs one `Control.Exception.try` at the already-unlifted IO child boundary and uses IO lifecycle-transition helpers. The retained snapshot and failure classification are unchanged, while a 50-pair N4 probe brought retry p95/p99 back within the 10% budget.
+
 
 ## Decision Log
 
