@@ -15,7 +15,7 @@ import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
   ( AppConfig (..),
-    QueueProcessor,
+    QueueProcessor (..),
     ShutdownConfig (..),
     SupervisionStrategy (..),
     defaultAppConfig,
@@ -200,7 +200,36 @@ spec = describe "Shibuya.App lifecycle" $ do
     countB `shouldSatisfy` (< 50)
 
   it "StopAllOnFailure delivers one processor failure to the caller exactly once" $ do
-    result <- UIO.timeout 10_000_000 $ UIO.withAsync countLinkedDeliveries UIO.wait
+    let failing = mkProcessor (failingAfterAdapter 0 "single-delivery failure") alwaysAckOk
+    result <-
+      UIO.timeout 15_000_000 $
+        UIO.withAsync (countLinkedDeliveries [(ProcessorId "single-delivery", failing)]) UIO.wait
+    result `shouldBe` Just 1
+
+  it "StopAllOnFailure delivers one failure exactly once while cancelling busy siblings" $ do
+    -- Siblings of every runner shape are cancelled by the supervisor; their
+    -- cancellation must not surface as further exceptions in the caller.
+    let failing = mkProcessor (failingAfterAdapter 3 "sibling-delivery failure") alwaysAckOk
+        serialSibling = mkProcessor infiniteAdapter alwaysAckOk
+        asyncSibling = (mkProcessor infiniteAdapter alwaysAckOk) {ordering = Unordered, concurrency = Async 4}
+        keyedSibling = (mkProcessor infiniteAdapter alwaysAckOk) {ordering = PartitionedInOrder, concurrency = Ahead 4}
+        batchSibling =
+          mkBatchProcessor
+            infiniteAdapter
+            (\_info _msgs -> pure (ackAll AckOk))
+            defaultBatchConfig {batchSize = 2, batchTimeout = 0.1}
+    result <-
+      UIO.timeout 15_000_000 $
+        UIO.withAsync
+          ( countLinkedDeliveries
+              [ (ProcessorId "sibling-delivery", failing),
+                (ProcessorId "serial-sibling", serialSibling),
+                (ProcessorId "async-sibling", asyncSibling),
+                (ProcessorId "keyed-sibling", keyedSibling),
+                (ProcessorId "batch-sibling", batchSibling)
+              ]
+          )
+          UIO.wait
     result `shouldBe` Just 1
 
   it "IgnoreFailures isolates a failing processor" $ do
@@ -249,16 +278,21 @@ runAppOrFail strategy inboxSize processors = do
     Left err -> liftIO $ expectationFailure ("runApp failed: " <> show err) >> error "unreachable"
     Right app -> pure app
 
--- | Run one failing processor under 'StopAllOnFailure' on the calling thread and
--- count the linked-thread exceptions that thread receives.
+-- | Run the processors under 'StopAllOnFailure' on the calling thread and count
+-- the linked-thread exceptions that thread receives.
 --
 -- The deliveries are asynchronous exceptions, so one that lands between two
 -- handlers escapes both. Everything therefore runs under 'mask' and waits only
 -- inside 'restore', wrapped in base's 'try' (UnliftIO's deliberately ignores
 -- asynchronous exceptions): none can arrive between iterations, and the count is
 -- exact. The handle is retained until the end so garbage collection plays no part.
-countLinkedDeliveries :: IO Int
-countLinkedDeliveries =
+--
+-- The first delivery gets a generous deadline, because a loaded machine may be
+-- slow to schedule the failing processor; only the search for a /second/
+-- delivery uses a short quiet window. A duplicate follows the first within
+-- milliseconds, since both come from the same failure.
+countLinkedDeliveries :: [(ProcessorId, QueueProcessor '[Tracing, IOE])] -> IO Int
+countLinkedDeliveries processors =
   mask $ \restore -> do
     stopRef <- newIORef (pure ())
     started <-
@@ -266,20 +300,20 @@ countLinkedDeliveries =
         restore $
           runEff $
             runTracingNoop $ do
-              let failing = mkProcessor (failingAfterAdapter 0 "single-delivery failure") (\_ -> pure AckOk)
-              app <- runAppOrFail StopAllOnFailure 10 [(ProcessorId "single-delivery", failing)]
+              app <- runAppOrFail StopAllOnFailure 10 processors
               liftIO $
                 writeIORef stopRef $
                   runEff $
                     runTracingNoop $
                       void (stopAppGracefully (ShutdownConfig {drainTimeout = 1}) app)
-    let countUntilQuiet :: Int -> IO Int
-        countUntilQuiet n = do
-          window <- try @SomeException (restore (threadDelay 300_000))
-          case window of
-            Left _ -> countUntilQuiet (n + 1)
-            Right () -> pure n
-    deliveries <- countUntilQuiet (either (const 1) (const 0) started)
+    let arrivesWithin :: Int -> IO Bool
+        arrivesWithin micros = either (const True) (const False) <$> try @SomeException (restore (threadDelay micros))
+        countExtra :: Int -> IO Int
+        countExtra n = do
+          another <- arrivesWithin 500_000
+          if another then countExtra (n + 1) else pure n
+    first <- either (const (pure True)) (const (arrivesWithin 10_000_000)) started
+    deliveries <- if first then countExtra 1 else pure 0
     join (readIORef stopRef)
     pure deliveries
 

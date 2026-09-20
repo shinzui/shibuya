@@ -67,6 +67,7 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Milestone 1: Commit the process-isolated finished-application regression and the single-delivery lifecycle test, both failing for the right reason. Observed on the unfixed library: three `FAIL` lines from `shibuya-core-gc-finished-test`, `expected: Just 1 but got: Just 2` as the only failure among 213 Hspec examples, and `shibuya-core-gc-test` still passing.
 - [x] (2026-09-20 UTC) Milestone 2: Start the supervisor without NQE's unconditional link; both new tests and every existing test pass. All three suites pass with 213 Hspec examples and zero failures, the finished-application suite passed three consecutive runs, and both diagnostic probes confirm the change on the fixed library.
 - [x] (2026-09-20 UTC) Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix. `CLAUDE.md`, the release skill and `docs/architecture/CONCURRENCY.md` updated; ADR 0001 amended; unreleased entries added to the root and core changelogs; `nix fmt`, `nix flake check` and all three core suites pass. `docs/HIGH_LEVEL_ARCHITECTURE.md` and `docs/architecture/RUNNER_BUG_FIXES.md` contained no present-tense claim of a linked supervisor and were left unchanged.
+- [x] (2026-09-20 UTC) Coverage review before release, at the owner's request: probed the shapes the tests only reasoned about, fixed a load-sensitivity in the single-delivery case, added a busy-siblings delivery case, three more finished-application scenarios and a positive control, and proved every addition red on the pre-fix library and green on the fix.
 - [x] (2026-09-20 UTC) Milestone 4, prepared: Hackage and upstream tags both stop at 0.9.0.2, so the candidate is 0.9.0.3. Both package versions, the metrics bound and all three changelogs are edited in the working tree, uncommitted, and the candidate passes every pre-publication gate.
 - [ ] Milestone 4, remaining: owner approval of the version and changelog; then the release commit, annotated tag `v0.9.0.3`, push, upload of core then metrics with documentation, and the GitHub release.
 - [ ] Milestone 4, remaining after publication: record the consumed version in master plan 5's Decision Log and move the provisional 0.9.0.3 statements in plans 34 and 35 to the next patch.
@@ -154,12 +155,39 @@ of that commit would repeat the same observation and was not performed.
 **The 0.9.0.3 candidate passes every pre-publication gate.** Verified on 2026-09-20 UTC
 against the uncommitted candidate: the Hackage preferred-versions endpoints for both packages
 and `git ls-remote --tags origin` all list 0.9.0.2 as the latest, leaving 0.9.0.3 free.
-`nix fmt`, `cabal build all`, `cabal test shibuya-core` (three suites, 213 examples, zero
+`nix fmt`, `cabal build all`, `cabal test shibuya-core` (three suites, 214 examples after the coverage review, zero
 failures) and `nix flake check` all exit zero. `cabal check` reports no errors or warnings for
 either package. Source distributions and Hackage documentation tarballs were produced for both
 at 0.9.0.3, and the core source distribution contains `test-gc/Finished.hs`. Haddock emitted
 only the repository's existing missing-link warnings. The release skill's benchmark step does
 not apply to a patch.
+
+**A coverage review before release found the fix sound and two weaknesses in its tests.**
+Asked whether anything was missing, a scratch probe exercised shapes the committed tests had
+only reasoned about, against the fixed library, three runs each. With Serial,
+Async and Ahead-partitioned, and batch siblings, one failure was still delivered exactly once,
+so cancelling siblings does not surface as further exceptions. An application whose handler
+halts with `AckHalt` on a live but idle source, a finite batch application, and a mixed
+serial, concurrent and batch application all survived a dropped handle under forced
+collections. Nothing in the fix needed to change.
+
+The tests did. The single-delivery case gave the first delivery only a 300 ms window, so a
+loaded machine that scheduled the failing processor slowly would have produced a spurious
+`Just 0`; it now waits up to ten seconds for the first delivery and uses a short quiet window
+only to look for a second, which follows the first within milliseconds because both come from
+the same failure. And the finished-application suite proves something only while the handle
+really is dropped and the runtime really does detect the blocked supervisor; a compiler change
+or a careless edit could make it pass vacuously. It now ends with a positive control that
+rebuilds the defect from NQE alone, a linked supervisor with no children whose handle is
+discarded, and fails the suite unless that control kills its caller with the
+blocked-indefinitely exception.
+
+Every addition was proved in both directions. In a worktree with `Master.hs` restored to commit
+`afa8889`, all six finished-application scenarios failed with the linked-thread exception while
+the control passed, and the ordinary suite reported exactly two failures among 214 examples,
+both delivery cases with `expected: Just 1 but got: Just 2`. On the fix, all three suites pass,
+and the two delivery cases passed 20 consecutive runs while a full build loaded the machine to
+a load average above six.
 
 **`cabal build all --offline` cannot build the metrics package here.** The local store lacks
 `warp`, so the offline solver refuses. Plain `cabal build all`, which is what Concrete Steps
@@ -217,6 +245,21 @@ before building resolves it.
   provisionally claimed 0.9.0.3, exactly as it once provisionally claimed the number the
   0.9.0.2 fix took; Milestone 4 repeats that precedent and moves the provisional claim along.
   Date: 2026-09-19
+
+- Decision: Give the finished-application suite a positive control that must fail.
+  Rationale: A liveness test of this kind can pass for the wrong reason, because the handle was
+  accidentally retained or because a future runtime no longer reports the blocked thread. The
+  earlier instruction to re-establish a reproducer if a future compiler makes the pre-fix test
+  pass depended on someone noticing. Rebuilding the defect from NQE alone inside the same
+  executable turns that instruction into an automatic check; it costs one direct test
+  dependency on `nqe`, which the library already depends on.
+  Date: 2026-09-20
+
+- Decision: Separate the deadline for the first delivery from the quiet window for a second.
+  Rationale: The expected path must not depend on scheduling speed, or the release gate becomes
+  flaky on loaded builders. Only the search for a duplicate needs to be short, and a duplicate
+  is prompt by construction.
+  Date: 2026-09-20
 
 - Decision: Propose 0.9.0.3 and stop before the release commit.
   Rationale: The registry and the upstream tags confirm the number is free, and the change is
@@ -356,10 +399,13 @@ At the end of this milestone the repository contains two tests that fail on the 
 library for the documented reason. They stay visibly failing until Milestone 2; do not mark
 them pending, weaken their assertions, or retain the handle to make them pass.
 
-Create `shibuya-core/test-gc/Finished.hs` with exactly this content. It has been compiled
-under `-Wall` and run against the 0.9.0.2 library, where all three scenarios fail as shown in
-Concrete Steps. The third scenario is the one most likely in production: a source fails under
-`IgnoreFailures` and the service carries on.
+Create `shibuya-core/test-gc/Finished.hs` with this content. The first three scenarios were
+compiled under `-Wall` and run against the 0.9.0.2 library before the plan was implemented; the
+halt, mixed-processor and control parts were added by the coverage review recorded under
+Surprises & Discoveries. The failed-source and handler-halt scenarios are the ones most likely
+in production: a processor ends under `IgnoreFailures`, or halts deliberately, and the service
+carries on. The final control rebuilds the defect from NQE alone and must kill its caller;
+it keeps the suite from ever passing vacuously.
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
@@ -371,70 +417,134 @@ Concrete Steps. The third scenario is the one most likely in production: a sourc
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
+import Control.Concurrent.NQE.Supervisor (Strategy (IgnoreAll), supervisor)
 import Control.Exception (displayException, throwIO)
-import Control.Monad (forM, replicateM_, unless)
-import Effectful (liftIO, runEff)
+import Control.Monad (forM, replicateM_, unless, void)
+import Data.List (isInfixOf)
+import Effectful (IOE, liftIO, runEff)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.App
   ( AppConfig (..),
     ProcessorId (..),
+    QueueProcessor (..),
     SupervisionStrategy (..),
     defaultAppConfig,
+    mkBatchProcessor,
     mkProcessor,
     runApp,
     waitApp,
   )
-import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Telemetry.Effect (runTracingNoop)
+import Shibuya.Batch (BatchConfig (..), ackAll, defaultBatchConfig)
+import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
+import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Ingested (Ingested, mkIngested)
+import Shibuya.Core.Types (MessageId (..), mkEnvelope)
+import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
 import System.Exit (die, exitFailure)
 import System.Mem (performMajorGC)
 import UnliftIO qualified as UIO
 
+type Processors = [(ProcessorId, QueueProcessor '[Tracing, IOE])]
+
 main :: IO ()
 main = do
-  results <- forM scenarios $ \(name, strat, sourceFails) -> do
-    -- Each scenario gets its own thread: the supervisor links to whichever
+  survived <- forM scenarios $ \(name, strat, processors) -> do
+    -- Each scenario gets its own thread: a linked supervisor targets whichever
     -- thread calls runApp, and that is the thread a regression kills.
-    outcome <- UIO.timeout 10_000_000 $ UIO.withAsync (caller strat sourceFails) UIO.waitCatch
+    outcome <- observe (finishThenKeepRunning strat processors)
     case outcome of
       Nothing -> False <$ putStrLn ("FAIL [" <> name <> "]: the observation did not finish within ten seconds")
       Just (Left err) -> False <$ putStrLn ("FAIL [" <> name <> "]: caller died after its application finished: " <> displayException err)
       Just (Right ()) -> True <$ putStrLn ("PASS [" <> name <> "]: caller survives major collections after its application finished")
-  unless (and results) exitFailure
+  detectable <- control
+  unless (and survived && detectable) exitFailure
   where
-    scenarios =
-      [ ("finite source, IgnoreFailures", IgnoreFailures, False),
-        ("finite source, StopAllOnFailure", StopAllOnFailure, False),
-        ("failed source, IgnoreFailures", IgnoreFailures, True)
-      ]
+    observe action = UIO.timeout 10_000_000 $ UIO.withAsync action UIO.waitCatch
 
-caller :: SupervisionStrategy -> Bool -> IO ()
-caller strat sourceFails = do
+    -- The defect itself, rebuilt from NQE alone: a linked supervisor with no
+    -- children whose handle is dropped. It MUST kill its caller. If it ever
+    -- stops doing so, this build cannot detect the failure class at all and the
+    -- PASS lines above prove nothing, so the suite fails rather than pass vacuously.
+    control = do
+      outcome <- observe $ do
+        void (supervisor IgnoreAll)
+        keepRunningThroughCollections
+      case outcome of
+        Just (Left err)
+          | "blocked indefinitely" `isInfixOf` displayException err ->
+              True <$ putStrLn "PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful"
+        other -> False <$ putStrLn ("FAIL [control]: a linked childless supervisor no longer kills its caller (" <> maybe "timed out" (either displayException (const "survived")) other <> "); re-establish a reproducer before trusting this suite")
+
+scenarios :: [(String, SupervisionStrategy, Processors)]
+scenarios =
+  [ ("finite source, IgnoreFailures", IgnoreFailures, [(ProcessorId "finished", mkProcessor (finite 0) ok)]),
+    ("finite source, StopAllOnFailure", StopAllOnFailure, [(ProcessorId "finished", mkProcessor (finite 0) ok)]),
+    ("failed source, IgnoreFailures", IgnoreFailures, [(ProcessorId "failed", mkProcessor failedSource ok)]),
+    ("handler halt on a live idle source, IgnoreFailures", IgnoreFailures, [(ProcessorId "halted", mkProcessor oneThenIdle halt)]),
+    ("handler halt on a live idle source, StopAllOnFailure", StopAllOnFailure, [(ProcessorId "halted", mkProcessor oneThenIdle halt)]),
+    ( "serial, concurrent and batch processors together, StopAllOnFailure",
+      StopAllOnFailure,
+      [ (ProcessorId "serial", mkProcessor (finite 5) ok),
+        (ProcessorId "concurrent", (mkProcessor (finite 50) ok) {ordering = Unordered, concurrency = Async 4}),
+        (ProcessorId "batch", mkBatchProcessor (finite 7) (\_ _ -> pure (ackAll AckOk)) defaultBatchConfig {batchSize = 2, batchTimeout = 0.1})
+      ]
+    )
+  ]
+  where
+    ok _ = pure AckOk
+    halt _ = pure (AckHalt (HaltFatal "halt on purpose"))
+
+-- | Run an application to its end on this thread, let the handle go out of
+-- scope, and keep running. Deliberately no stopApp and no retained reference.
+finishThenKeepRunning :: SupervisionStrategy -> Processors -> IO ()
+finishThenKeepRunning strat processors = do
   runEff $ runTracingNoop $ do
-    let adapter =
-          Adapter
-            { adapterName = "gc-regression:finished",
-              source =
-                if sourceFails
-                  then Stream.fromEffect (liftIO (throwIO (userError "the source failed on purpose")))
-                  else Stream.nil,
-              shutdown = pure ()
-            }
-    result <-
-      runApp
-        defaultAppConfig {strategy = strat}
-        [(ProcessorId "finished", mkProcessor adapter (\_ -> pure AckOk))]
+    result <- runApp defaultAppConfig {strategy = strat, inboxSize = 10} processors
     case result of
       Left err -> liftIO $ die ("runApp failed: " <> show err)
       Right app -> waitApp app
-  -- The handle is now out of scope. Deliberately no stopApp and no retained
-  -- reference: every processor has finished and this thread simply carries on.
+  keepRunningThroughCollections
+
+keepRunningThroughCollections :: IO ()
+keepRunningThroughCollections = do
   replicateM_ 5 $ do
     threadDelay 100_000
     performMajorGC
   -- Leave time for a linked exception from the last collection to arrive.
   threadDelay 200_000
+
+message :: Int -> Ingested '[Tracing, IOE] String
+message n = mkIngested (mkEnvelope (MessageId "gc-regression") ("message-" <> show n)) (AckHandle $ \_ -> pure ())
+
+finite :: Int -> Adapter '[Tracing, IOE] String
+finite count =
+  Adapter
+    { adapterName = "gc-regression:finite",
+      source = Stream.fromList (map message [1 .. count]),
+      shutdown = pure ()
+    }
+
+failedSource :: Adapter '[Tracing, IOE] String
+failedSource =
+  Adapter
+    { adapterName = "gc-regression:failed",
+      source = Stream.fromEffect (liftIO (throwIO (userError "the source failed on purpose"))),
+      shutdown = pure ()
+    }
+
+-- | One message, then a quiet queue: the source stays alive but produces nothing.
+oneThenIdle :: Adapter '[Tracing, IOE] String
+oneThenIdle =
+  Adapter
+    { adapterName = "gc-regression:one-then-idle",
+      source = Stream.unfoldrM step (0 :: Int),
+      shutdown = pure ()
+    }
+  where
+    step 0 = pure (Just (message 0, 1))
+    step _ = liftIO (threadDelay 60_000_000) >> pure Nothing
 ```
 
 Register it in `shibuya-core/shibuya-core.cabal` directly after the `shibuya-core-gc-test`
@@ -455,12 +565,13 @@ test-suite shibuya-core-gc-finished-test
   build-depends:
     base ^>=4.21.0.0,
     effectful,
+    nqe,
     shibuya-core,
     streamly-core,
     unliftio,
 ```
 
-Two suites sharing `test-gc` is fine because each names its own `main-is` and neither lists
+The `nqe` dependency is for the control only. Two suites sharing `test-gc` is fine because each names its own `main-is` and neither lists
 other modules. Keep the normal optimization profile; do not add flags to coax a result.
 
 Then add a case to `shibuya-core/test/Shibuya/App/LifecycleSpec.hs`, next to "failure under
@@ -476,10 +587,14 @@ stopping at the first window that ends with `Right ()`. With exceptions masked e
 except inside those `restore` calls, none can land between iterations, so the count is exact.
 Keep the application handle alive until after the loop and then call `stopApp` on it, so that
 garbage collection cannot contribute. Assert the count equals one. On the unfixed library it
-is two.
+is two. Give the first delivery a long deadline, ten seconds, and only the search for a second
+one a short quiet window, so that a loaded machine cannot produce a spurious zero. A second
+case, "StopAllOnFailure delivers one failure exactly once while cancelling busy siblings",
+runs the same count with a failing processor beside serial, concurrent, partitioned and batch
+siblings that never finish, to show that cancelling them adds no exception.
 
-Acceptance is that `cabal test shibuya-core` fails, with the new GC suite printing three `FAIL`
-lines that name `ExceptionInLinkedThread` and "blocked indefinitely", the new lifecycle case
+Acceptance is that `cabal test shibuya-core` fails, with the new GC suite printing a `FAIL`
+line for every scenario, each naming `ExceptionInLinkedThread` and "blocked indefinitely", the new lifecycle cases
 reporting two where one was expected, and every other test passing. A compile error, a
 timeout, or a failure in any other test is not acceptance.
 
@@ -608,6 +723,10 @@ cabal test shibuya-core:shibuya-core-gc-finished-test --test-show-details=direct
 FAIL [finite source, IgnoreFailures]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 7) thread blocked indefinitely in an STM transaction
 FAIL [finite source, StopAllOnFailure]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 13) thread blocked indefinitely in an STM transaction
 FAIL [failed source, IgnoreFailures]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 20) thread blocked indefinitely in an STM transaction
+FAIL [handler halt on a live idle source, IgnoreFailures]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 26) thread blocked indefinitely in an STM transaction
+FAIL [handler halt on a live idle source, StopAllOnFailure]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 32) thread blocked indefinitely in an STM transaction
+FAIL [serial, concurrent and batch processors together, StopAllOnFailure]: caller died after its application finished: ExceptionInLinkedThread (ThreadId 39) thread blocked indefinitely in an STM transaction
+PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful
 ```
 
 Thread numbers vary. After Milestone 2, expect exit status zero and:
@@ -616,7 +735,14 @@ Thread numbers vary. After Milestone 2, expect exit status zero and:
 PASS [finite source, IgnoreFailures]: caller survives major collections after its application finished
 PASS [finite source, StopAllOnFailure]: caller survives major collections after its application finished
 PASS [failed source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [serial, concurrent and batch processors together, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful
 ```
+
+The control line is `PASS` both before and after the fix; if it ever reads `FAIL`, the suite can no
+longer detect this class of defect and its other lines mean nothing until a reproducer is restored.
 
 The complete check after Milestone 2 and again after Milestone 3:
 
@@ -723,3 +849,14 @@ unchanged. The package gains one test suite, `shibuya-core-gc-finished-test`.
 The later core lifecycle plan in master plan 6 owns further changes to `Master.hs`, including
 a retained lifecycle snapshot. It must keep both tests from this plan passing and must not
 restore a link on the supervisor thread.
+
+
+## Revision Notes
+
+2026-09-20 UTC: After Milestones 1 through 3 and the release preparation, the owner asked whether
+anything was missing and whether coverage was good. A review probed untested shapes, found the
+fix sound, and hardened the tests: a load-tolerant deadline in the single-delivery case, a
+busy-siblings delivery case, three more finished-application scenarios, and a positive control
+that prevents a vacuous pass. Milestone 1's embedded source, Cabal stanza, acceptance wording
+and expected transcripts were updated to the committed state so the plan stays self-contained,
+and the evidence and the two decisions are recorded above.

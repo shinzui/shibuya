@@ -185,6 +185,7 @@ test-suite shibuya-core-gc-finished-test
   build-depends:
     base ^>=4.21.0.0,
     effectful,
+    nqe,
     shibuya-core,
     streamly-core,
     unliftio,
