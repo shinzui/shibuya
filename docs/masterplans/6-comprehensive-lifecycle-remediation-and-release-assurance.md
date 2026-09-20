@@ -73,7 +73,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
-| 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | In Progress |
+| 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Complete |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Not Started |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Not Started |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
@@ -150,10 +150,10 @@ and is verified, not tracked, here.
 - [x] EP-38 M2: Fix exception-safe resource acquisition and cleanup, and decide the total shutdown bound.
 - [x] EP-38 M3: Make stop/failure wakeups and scheduler ownership reliable.
 - [x] EP-38 M4: Validate capacities, publish the terminal snapshot and verify all core/GC regressions.
-- [ ] EP-39 M1: Characterize the published HTTP and WebSocket contract in a new metrics test suite, before any behavior changes, and add it to the release gate.
-- [ ] EP-39 M2: Repair activity accounting and lifecycle-aware health.
-- [ ] EP-39 M3: Fix WebSocket ownership, enablement and subscriptions.
-- [ ] EP-39 M4: Verify endpoint compatibility and accounting together, and retire the metrics package's "unproven" caveat.
+- [x] EP-39 M1: Characterize the published HTTP and WebSocket contract in a new metrics test suite, before any behavior changes, and add it to the release gate.
+- [x] EP-39 M2: Repair activity accounting and lifecycle-aware health.
+- [x] EP-39 M3: Fix WebSocket ownership, enablement and subscriptions.
+- [x] EP-39 M4: Verify endpoint compatibility and accounting together, and retire the metrics package's "unproven" caveat.
 - [ ] EP-40 M1: Reproduce Kafka acknowledgement interleavings with a reference model.
 - [ ] EP-40 M2: Fix unresolved-delivery tracking and terminal failure propagation.
 - [ ] EP-40 M3: Verify recovery and reassignment against a live ephemeral broker.
@@ -222,6 +222,13 @@ classifying failure once at the unlifted IO boundary preserved the new lifecycle
 returning every N1/N4 cell inside the original budgets. The retained diagnostic comparisons are
 part of EP-38's evidence rather than being discarded after the fixes.
 
+**A healthy endpoint must normalize provider failures without swallowing control exceptions
+(2026-09-20 UTC, EP-39).** Endpoint-level testing found that synchronous dependency exceptions
+escaped the WAI application instead of producing 503. Catching only exceptions outside
+`SomeAsyncException` fixes the published health contract while preserving both cancellation and
+`System.Timeout`. The same closeout confirmed that the only deliberate golden change is additive
+`lastProgress`; Prometheus remains byte-for-byte compatible.
+
 
 ## Decision Log
 
@@ -278,6 +285,14 @@ N1 and N4 with no waiver or budget change. Its retained bounded lifecycle snapsh
 EP-39's lifecycle-aware health work, and its infrastructure-failure contract unblocks EP-40 and
 EP-41 acceptance.
 
+EP-39 completed observability remediation at implementation SHA
+`6535a036827c0bdfa1dd8c8a3ca9d228776f3f51`. It closes all nine fixable REV-7 through REV-9
+entries and passes all ten metrics/health and WebSocket boundary cells. Its new 48-example
+release-gated suite covers every published route, exact JSON and Prometheus output, every frame,
+and real sockets; final verification also passed 236 core examples and both GC suites. Focused
+activity and socket comparisons stayed inside the inherited 5% budget without a waiver. The
+remaining IR-5 CORS/Origin and broader convention work stays explicitly outside this initiative.
+
 
 ## Revision Notes
 
@@ -310,3 +325,11 @@ original EP-45 budgets, so no release-owner waiver or post-observation budget ch
 two-pass protocol. EP-38's completed snapshot removes both of EP-39's soft-gated waits, so the
 child can implement characterization, activity/health, WebSocket ownership, and final endpoint
 verification in sequence.
+
+2026-09-20 UTC: Completed EP-39. Added the full release-gated metrics contract suite,
+progress-based and lifecycle-aware health, bounded dependency checks with synchronous exception
+normalization, exception-safe WebSocket ownership, explicit enablement/subscriptions, graceful
+shutdown, and bounded terminal frames. Closed nine findings and ten boundary cells with
+candidate-bound logs, preserved the 5% focused performance budget, and updated CAP-10 and IR-5
+without expanding scope into CORS or broader protocol convention work. EP-40 is now the next
+eligible unstarted child while EP-45 remains paused.

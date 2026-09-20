@@ -1,0 +1,71 @@
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-metrics-0.9.0.3 (test:shibuya-metrics-test) (ephemeral targets)
+Preprocessing test suite 'shibuya-metrics-test' for shibuya-metrics-0.9.0.3...
+Building test suite 'shibuya-metrics-test' for shibuya-metrics-0.9.0.3...
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+combinedApp HTTP routes
+  serves every enabled JSON, health, Prometheus, and WebSocket path [✔]
+  returns the published JSON error for an unknown processor [✔]
+  returns the published JSON error for an unknown path [✔]
+  returns 404 for every JSON route when JSON endpoints are disabled [✔]
+  returns 404 when Prometheus is disabled [✔]
+  uses the generic 404 for plain HTTP when WebSockets are disabled [✔]
+  returns 503 from readiness and detailed health for an unhealthy dependency [✔]
+  returns 503 when a dependency check throws synchronously [✔]
+JSON wire contract
+  matches the golden encoding for all four processor states [✔]
+Prometheus wire contract
+  matches the golden series names, labels, state values, and counters [✔]
+ClientMessage JSON contract
+  SubscribeAll [✔]
+  Subscribe [ProcessorId {unProcessorId = "alpha"}] [✔]
+  Unsubscribe [ProcessorId {unProcessorId = "alpha"}] [✔]
+  Ping [✔]
+  rejects an unknown client message tag [✔]
+ServerMessage JSON contract
+  MetricsSnapshot (fromList [(ProcessorId {unProcessorId = "failed"},ProcessorMetrics {state = Failed "boom" 2026-09-20 00:01:30 UTC, stats = StreamStats {received = 21, processed = 22, failed = 23}, batch = BatchStats {batchesEmitted = 24, batchedMessages = 25, partialFailures = 26, sizeTriggered = 27, timeoutTriggered = 28, flushTriggered = 29}, startedAt = 2026-09-20 03:25:45 UTC}),(ProcessorId {unProcessorId = "idle"},ProcessorMetrics {state = Idle, stats = StreamStats {received = 1, processed = 2, failed = 3}, batch = BatchStats {batchesEmitted = 4, batchedMessages = 5, partialFailures = 6, sizeTriggered = 7, timeoutTriggered = 8, flushTriggered = 9}, startedAt = 2026-09-20 03:25:45 UTC}),(ProcessorId {unProcessorId = "processing"},ProcessorMetrics {state = Processing (InFlightInfo {inFlight = 2, maxConcurrency = 4}) 2026-09-20 00:01:00 UTC 2026-09-20 00:01:15 UTC, stats = StreamStats {received = 11, processed = 12, failed = 13}, batch = BatchStats {batchesEmitted = 14, batchedMessages = 15, partialFailures = 16, sizeTriggered = 17, timeoutTriggered = 18, flushTriggered = 19}, startedAt = 2026-09-20 03:25:45 UTC}),(ProcessorId {unProcessorId = "stopped"},ProcessorMetrics {state = Stopped, stats = StreamStats {received = 31, processed = 32, failed = 33}, batch = BatchStats {batchesEmitted = 34, batchedMessages = 35, partialFailures = 36, sizeTriggered = 37, timeoutTriggered = 38, flushTriggered = 39}, startedAt = 2026-09-20 03:25:45 UTC})]) [✔]
+  ProcessorUpdate (ProcessorId {unProcessorId = "processing"}) (ProcessorMetrics {state = Processing (InFlightInfo {inFlight = 2, maxConcurrency = 4}) 2026-09-20 00:01:00 UTC 2026-09-20 00:01:15 UTC, stats = StreamStats {received = 11, processed = 12, failed = 13}, batch = BatchStats {batchesEmitted = 14, batchedMessages = 15, partialFailures = 16, sizeTriggered = 17, timeoutTriggered = 18, flushTriggered = 19}, startedAt = 2026-09-20 03:25:45 UTC}) [✔]
+  Pong [✔]
+  ProcessorTerminal (ProcessorId {unProcessorId = "alpha"}) TerminalStopped [✔]
+  ProcessorTerminal (ProcessorId {unProcessorId = "alpha"}) (TerminalFailed "boom" (Just "message-1")) [✔]
+  Goodbye [✔]
+  rejects an unknown server message tag [✔]
+WebSocket wire protocol
+  sends an initial snapshot [✔]
+  answers subscribe_all and selective subscribe with snapshots [✔]
+  answers ping with pong [✔]
+  pushes an update after metrics change [✔]
+  does not push an update when metrics have not changed [✔]
+  rejects a connection beyond the configured limit [✔]
+  rejects WebSocket upgrades when disabled [✔]
+  excludes processors unsubscribed from subscribe-all [✔]
+  restores a slot after a peer disconnects [✔]
+  restores a slot when initial snapshot generation fails [✔]
+  sends goodbye when WebSocket shutdown is requested [✔]
+  reports a retained terminal failure once when a processor disappears [✔]
+health characterization
+  reports a running, intentionally empty master live and ready [✔]
+  reports a failed processor while it remains registered [✔]
+  reports an unhealthy dependency unready with its diagnostic fields [✔]
+  restamps separated bursts and reports progress independently [✔]
+  keeps sustained concurrent progress ready after the burst threshold [✔]
+  reports a genuinely non-progressing handler stuck [✔]
+  never lets duplicate completion drive in-flight below zero [✔]
+  retains a configured processor failure after metrics unregister [✔]
+  reports draining and stopped masters unavailable [✔]
+  bounds each hung dependency check [✔]
+  normalizes a synchronous dependency exception [✔]
+  preserves asynchronous cancellation of a dependency check [✔]
+  keeps repeated master stop observable and idempotent [✔]
+starting health
+  distinguishes a starting master from a configured-empty running master [✔]
+
+Finished in 0.2219 seconds
+48 examples, 0 failures
+Test suite shibuya-metrics-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.9.0.3/t/shibuya-metrics-test/test/shibuya-metrics-0.9.0.3-shibuya-metrics-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

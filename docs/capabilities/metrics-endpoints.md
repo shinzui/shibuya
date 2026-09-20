@@ -34,6 +34,21 @@ evidence:
   - kind: module
     resource: shibuya-metrics/src/Shibuya/Metrics/Health.hs
     proves: A health endpoint suitable for orchestrator probes.
+  - kind: test
+    resource: shibuya-metrics/test/Shibuya/Metrics/ServerSpec.hs
+    proves: Every HTTP route, enable flag, 404 path, and unhealthy 503 path is exercised.
+  - kind: test
+    resource: shibuya-metrics/test/Shibuya/Metrics/TypesSpec.hs
+    proves: Every published client and server frame has an exact JSON contract and round trip.
+  - kind: test
+    resource: shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs
+    proves: Real loopback connections exercise snapshots, subscriptions, updates, shutdown, limits, and terminal removal.
+  - kind: test
+    resource: shibuya-metrics/test/golden/processor-metrics.json.golden
+    proves: Processor JSON fields and state shapes are compared byte-for-byte.
+  - kind: test
+    resource: shibuya-metrics/test/golden/prometheus.golden
+    proves: Prometheus series, labels, state values, and counters are compared byte-for-byte.
 ---
 
 # Metrics endpoints over HTTP, Prometheus, and WebSocket
@@ -54,10 +69,14 @@ pipeline uses CAP-9 directly and never depends on this.
 
 ## Limits
 
-- **This package has no test suite.** Its evidence here is module-level only, which is
-  materially weaker than the rest of this catalog — every other capability names tests that
-  exercise it. Treat the endpoints as working-but-unproven and verify them in your own
-  deployment.
+- The release-gated `shibuya-metrics-test` suite exercises every published HTTP route,
+  including enable flags and 404/503 paths, exact JSON and Prometheus golden output, every
+  client/server frame encoding, and the WebSocket protocol over real loopback connections.
+  This is contract and lifecycle evidence, not a production-network or security certification.
+- Cross-origin browser access remains unsupported: the server has no configurable CORS
+  response policy or WebSocket `Origin` validation. Bounded slow-consumer queues, overflow
+  signaling, and broader cross-project WebSocket convention alignment also remain open under
+  IR-5.
 - Versions track `shibuya-core` rather than signalling independent change. Several releases
   (0.2.0.0, 0.3.0.0, 0.5.0.0, 0.6.0.0, 0.7.0.0) are re-releases with no user-visible change of
   their own.

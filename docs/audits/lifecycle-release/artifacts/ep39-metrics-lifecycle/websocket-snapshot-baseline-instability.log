@@ -1,0 +1,25 @@
+Command:
+hyperfine --warmup 5 --runs 30 --show-output --command-name baseline-websocket-snapshot '<baseline-test-binary> --match "sends an initial snapshot" --seed 1'
+
+Source: 98bbede929f31326b9ca488bbfa56f3f6d6a3b77
+Observation: warmups and the first nine benchmark iterations passed. Benchmark iteration 10 failed:
+
+WebSocket wire protocol
+  sends an initial snapshot [FAIL]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:42:5:
+  1) WebSocket wire protocol sends an initial snapshot
+       uncaught exception: ConnectionException
+       ConnectionClosed
+
+  To rerun use: --match "/WebSocket wire protocol/sends an initial snapshot/" --seed 1
+
+Randomized with seed 1
+Finished in 0.0018 seconds
+1 example, 1 failure
+
+Hyperfine stopped on the nonzero exit. The accepted comparison used an unmeasured 100 ms
+prepare interval to isolate successive ephemeral-server invocations; see
+websocket-snapshot-hyperfine.json.

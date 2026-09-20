@@ -70,7 +70,15 @@ EP-38 completed all 45 mandatory cells for startup/registration through supervis
 implementation SHA `2108292e15c2cf79e40e8ca09a74604926beaedc`. The inventory points each
 passed cell to the full core/GC run or the 100-seed schedule-repetition log, indexed by
 `docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md`. The remaining
-in-scope rows stay open for their owning children; this is not an integrated release verdict.
+in-scope adapter rows stay open for their owning children; this is not an integrated release
+verdict.
+
+EP-39 completed all ten mandatory metrics/health and Metrics WebSocket cells at implementation
+SHA `6535a036827c0bdfa1dd8c8a3ca9d228776f3f51`. The inventory points every passed cell to the
+48-example real-endpoint metrics run, indexed by
+`docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md`. Normal, synchronous
+exception, cancellation, timeout, and repeated-stop behavior are all explicit assertions rather
+than source-only observations.
 
 EP-44 owns integrated certification but does not overwrite child evidence. It assembles an
 exact candidate manifest, confirms that every mandatory cell belongs to that candidate, and

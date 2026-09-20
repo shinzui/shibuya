@@ -6,7 +6,7 @@ description: >-
   WebSocket frame, and strictly additive alignment with the cross-project WebSocket convention,
   so a browser UI on another origin can consume the server and its contract stops being
   working-but-unproven.
-timestamp: 2026-08-19T00:00:00Z
+timestamp: 2026-09-20T19:22:46Z
 requestId: IR-5
 status: proposed
 origin: mori://shinzui/keiro-ui
@@ -22,6 +22,14 @@ Proposed by the keiro runtime UI initiative
 This is the enabling request for browser consumption of shibuya-metrics: without CORS, none of
 the surface is reachable from a browser page on another origin. Implementation is shibuya's
 own downstream work.
+
+The test-suite deliverable in requested change 2 is complete under
+`docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md`:
+`shibuya-metrics-test` now covers every published HTTP route, exact JSON and Prometheus
+fixtures, every frame encoding, and real loopback WebSocket behavior, and the release skill
+runs it. CAP-10 no longer calls the endpoints working-but-unproven. Requested changes 1 and
+3—configurable CORS/Origin policy and broader additive convention alignment—remain open, so
+this request stays proposed and its scope is unchanged.
 
 ## Context
 

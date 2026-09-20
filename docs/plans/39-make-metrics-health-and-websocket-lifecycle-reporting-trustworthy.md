@@ -28,6 +28,11 @@ provenance:
       at: 2026-09-20T18:30:00Z
       mode: "implement"
       note: "Begin implementation after EP-38 completed the retained lifecycle snapshot and focused performance acceptance."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T20:00:00Z
+      mode: "implement"
+      note: "Complete all four milestones with candidate-bound contract, lifecycle, performance, OKF, and boundary-matrix evidence."
 ---
 
 # Make metrics health and WebSocket lifecycle reporting trustworthy
@@ -51,7 +56,7 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 - [x] Milestone 1: Characterize the published HTTP and WebSocket contract in a new test suite, before any behavior changes, and add the suite to the release gate.
 - [x] Milestone 2: Repair activity accounting and lifecycle-aware health.
 - [x] Milestone 3: Fix WebSocket ownership, enablement and subscriptions.
-- [ ] Milestone 4: Verify endpoint compatibility and accounting together, and retire the package's "unproven" caveat.
+- [x] Milestone 4: Verify endpoint compatibility and accounting together, and retire the package's "unproven" caveat.
 
 
 ## Surprises & Discoveries
@@ -72,6 +77,14 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: Three WebSocket defect tests were applied to an isolated worktree at `98bbede`: a disabled upgrade was still accepted, unsubscribe from subscribe-all still emitted the excluded processor, and an ordinary peer disconnect let `ConnectionClosed` escape cleanup. All three failed in one 11-example run with seed `719269874`. A separate injected initial-snapshot failure at the same baseline left `connectionCount` nonzero for the full one-second STM barrier (`expected Just (), got Nothing`, seed `1370922219`).
 
 2026-09-20: Milestone 3 landed as `75d99fc49ac84509fe41f91f52bd4167487fda5d`. The connection slot is now bracketed across acceptance, initial sampling, and structurally raced sender/receiver loops; normal peer closure no longer escapes the WAI application. Upgrade routing honors `enableWebSocket`; subscribe-all retains explicit exclusions; server shutdown wakes senders through STM and delivers `goodbye`; and a removed visible processor emits one retained `terminal` outcome without accumulating a second history. The full metrics suite passed 44 examples and `cabal build all` succeeded.
+
+2026-09-20: Milestone 4 found one remaining endpoint failure while exercising dependency behavior through WAI: a synchronous exception escaped `runDependencyCheck`, so `/health` and `/health/ready` failed instead of returning 503. The endpoint regression failed at baseline `686bfe2c50d028f1387c2cd7f4c6b503a64f1bd9` with seed `2048864257`. Commit `6535a036827c0bdfa1dd8c8a3ca9d228776f3f51` normalizes synchronous exceptions while deliberately excluding `SomeAsyncException`, preserving both cancellation and `System.Timeout` behavior.
+
+2026-09-20: Comparing the final fixtures with Milestone 1 commit `4d590346ff21f2d8b4dfa992d963e65995e2f013` found exactly one golden change: processing JSON adds the recorded `lastProgress` field. The Prometheus golden is unchanged. The final metrics run passed 48 examples; all 236 ordinary core examples and both process-isolated GC suites also passed.
+
+2026-09-20: A 30-sample focused real-socket comparison measured the final snapshot case at 25.208 ms versus 26.251 ms for the pre-WebSocket baseline, 3.97% faster and inside the inherited 5% time budget. Rapid baseline repetition without an unmeasured settle interval reproduced an intermittent uncaught `ConnectionClosed`; the accepted comparison isolates ephemeral-server invocations with a 100 ms prepare interval. This is a child-plan signal, not a substitute for EP-45 pass two.
+
+2026-09-20: The capability and improvement-request bundles pass their OKF profile and log enforcement after the capability evidence and IR-5 delivery note were updated. Strict validation still reports the bundle-wide pre-existing absence of recommended `reviews` fields on every concept. EP-39 does not fabricate retrospective review provenance for unrelated records; the inherited advisory remains visible for later OKF maintenance.
 
 
 ## Decision Log
@@ -101,13 +114,30 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 2026-09-20: Deliver shutdown through the shared WebSocket state rather than a network send in cleanup. Sender loops wait in STM on either the push interval or a one-way shutdown flag, send `goodbye` when shutdown wins, and then finish; the slot-release finalizer performs only local STM bookkeeping and therefore cannot be skipped by a failed close or goodbye send.
 
+2026-09-20: Normalize dependency-check exceptions with `tryJust`, excluding `SomeAsyncException`. Rationale: a provider's ordinary synchronous failure is an unhealthy dependency result and must become an HTTP 503, while cancellation and the health timeout are ownership/control signals that must keep their existing propagation. GHC 9.12.4's `SomeAsyncException` hierarchy confirms that `System.Timeout` and async cancellation remain outside the normalization path.
+
 2026-09-19: Start before the core lifecycle plan completes. Only lifecycle-aware readiness and terminal WebSocket notifications need its retained snapshot; the test suite, activity accounting and WebSocket slot ownership do not, and the activity defect is high priority.
 
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+EP-39 completed at implementation SHA `6535a036827c0bdfa1dd8c8a3ca9d228776f3f51`.
+The metrics package now has a 48-example release-gated suite covering every published HTTP
+route, exact JSON and Prometheus output, every frame encoding, and real loopback WebSocket
+behavior. Progress-based health no longer mistakes either separated bursts or sustained work
+for a stuck processor; retained lifecycle state keeps failures and shutdown visible; dependency
+checks are bounded and normalize synchronous provider failures without swallowing cancellation.
+WebSocket slots are released on every tested exit, enablement and subscriptions have explicit
+semantics, shutdown delivers `goodbye`, and removed processors deliver one bounded terminal
+outcome.
+
+All nine fixable REV-7 through REV-9 inventory entries are fixed and all ten owned lifecycle
+matrix cells pass. Final verification passed 48 metrics examples, 236 ordinary core examples,
+and both GC suites. The focused activity and socket measurements stayed within the inherited
+5% budget without a waiver. CAP-10 now names executable evidence, while IR-5 correctly remains
+open for configurable CORS/Origin policy and broader WebSocket convention alignment. EP-45
+still owns the final paired performance verdict and EP-44 owns integrated release certification.
 
 
 ## Context and Orientation
@@ -212,3 +242,10 @@ New interfaces at the end of Milestone 1: the test suite `shibuya-metrics-test`,
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan against docs/reviews, IR-6 and the working tree. The drafted Milestone 2 prescribed only restamping the burst start on a zero-to-one transition; checked against Health.hs, that leaves a healthy worker under sustained concurrent load reported stuck after the threshold, which REV-7 and IR-6 item 8 explicitly warn about, so the milestone now bases stuck detection on absence of progress, names the hot-path cost and its fallback, and adds sustained-throughput and genuinely-stuck acceptance. The core lifecycle plan changed from a hard to a soft dependency with two named gated items, because most of this plan, including a high-priority defect, needs nothing from it. Added Prometheus.hs to the module list, defined in-flight and burst, and recorded changelog ownership shared with the core plan.
 
 2026-09-20 UTC: Widened Milestone 1 at the project owner's request, after the question of whether the initiative would fix the package's missing test suite. As drafted, Milestone 1 built a suite only to reproduce the three audited defects, which would have left the routes, the frames and the JSON and Prometheus encoders unproven, given Milestone 4's ban on incidental schema changes no baseline to enforce it against, and left the suite outside every routine gate. Milestone 1 now characterizes the whole published contract first, adopting the test-suite item of IR-5 while leaving its cross-origin and convention items out; defect tests moved into the milestones that fix them so the suite stays green; and the plan now exports `combinedApp`, adds the suite to the release gate, and retires the capability record's "unproven" caveat. The harness description was corrected against source: `combinedApp` was not exported and the server cannot bind a free port, so the drafted ephemeral-port fixture was not achievable as written. Also noted the repository's first ADR, which the earlier revision of this plan predated.
+
+2026-09-20 UTC: Completed EP-39. Added the release-gated full-contract suite, progress-based
+activity and lifecycle-aware health, bounded dependency behavior, exception-safe WebSocket
+ownership, explicit enablement and subscriptions, graceful shutdown, and bounded terminal
+delivery. Recorded negative controls, exact fixture comparison, final package/GC runs, focused
+performance evidence, all nine finding closures, and all ten owned boundary cells. Updated
+CAP-10 and IR-5 without expanding the initiative into CORS or broader convention work.

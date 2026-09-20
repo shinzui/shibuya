@@ -324,10 +324,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Readiness distinguishes absence of progress from both fresh bursts and sustained healthy throughput.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/HealthSpec.hs"],
+      "fixSha": "82a8e90f02b5c52a291a4655ee34c604d8fdb2e9",
+      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-7-A1",
@@ -375,10 +375,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Readiness retains configured identities and terminal outcomes and distinguishes intentionally empty from unexpectedly missing workers.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/HealthSpec.hs"],
+      "fixSha": "82a8e90f02b5c52a291a4655ee34c604d8fdb2e9",
+      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-8-F2",
@@ -392,10 +392,10 @@
       "confirmation": "runtime",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Health reports the defined process and worker lifecycle states rather than successful access to stale shared memory.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/HealthSpec.hs"],
+      "fixSha": "82a8e90f02b5c52a291a4655ee34c604d8fdb2e9",
+      "evidence": [{ "path": "scripts/audit/HealthProbe.hs" }, { "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-8-L1",
@@ -409,10 +409,10 @@
       "confirmation": "source",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "The published health contract states and tests its dependency deadline and exception behavior.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/HealthSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/ServerSpec.hs"],
+      "fixSha": "6535a036827c0bdfa1dd8c8a3ca9d228776f3f51",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-8-L2",
@@ -426,10 +426,10 @@
       "confirmation": "verified",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "The release gate executes a metrics suite that characterizes every published HTTP route, encoder, and WebSocket frame.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [{ "path": "shibuya-metrics/shibuya-metrics.cabal" }],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/ServerSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/JSONSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/PrometheusSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/TypesSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs"],
+      "fixSha": "4d590346ff21f2d8b4dfa992d963e65995e2f013",
+      "evidence": [{ "path": "shibuya-metrics/shibuya-metrics.cabal" }, { "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-9-F1",
@@ -443,10 +443,10 @@
       "confirmation": "source",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Every WebSocket exit returns the acquired connection slot to zero and structurally terminates its push child.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs"],
+      "fixSha": "75d99fc49ac84509fe41f91f52bd4167487fda5d",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-9-F2",
@@ -460,10 +460,10 @@
       "confirmation": "source",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Disabled WebSocket configuration rejects all upgrade requests without acquiring a slot.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs"],
+      "fixSha": "75d99fc49ac84509fe41f91f52bd4167487fda5d",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-9-F3",
@@ -477,10 +477,10 @@
       "confirmation": "source",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "Unsubscribe-all suppresses processor updates until a later explicit subscription.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs"],
+      "fixSha": "75d99fc49ac84509fe41f91f52bd4167487fda5d",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-9-L1",
@@ -494,10 +494,10 @@
       "confirmation": "source",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "invariant": "The release verdict names this protocol limitation unless a removal or snapshot protocol is deliberately added.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "accepted", "rationale": "Protocol refinement is outside the lifecycle release blocker, but the limitation remains visible." }
+      "regressionTests": ["shibuya-metrics/test/Shibuya/Metrics/TypesSpec.hs", "shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs"],
+      "fixSha": "75d99fc49ac84509fe41f91f52bd4167487fda5d",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-10-F1",
@@ -1056,11 +1056,11 @@
       "description": "Activity accounting, configured identities, terminal outcomes, readiness, and liveness.",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] }
       }
     },
     {
@@ -1068,11 +1068,11 @@
       "description": "Upgrade gating, connection slots, snapshot/push children, subscriptions, and disconnect cleanup.",
       "owner": "docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/cabal-test-shibuya-metrics.log"] }
       }
     },
     {
