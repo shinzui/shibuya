@@ -11,6 +11,18 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-09-20T04:05:13Z
+  reviews:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:45:51Z
+      verdict: "comments"
+      note: "REV-13 claims re-verified at unchanged HEAD; ADR-4 resolves; nothing is gated on core; adapter bounds shibuya-core <0.10."
+  revisions:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:46:05Z
+      mode: "update"
+      note: "Core plan becomes an integration-only soft dependency; record core <0.10 bound handling; owner marks adapter critical."
 ---
 
 # Make Kiroku subscription ownership exception safe
@@ -55,11 +67,11 @@ To be filled during implementation. No remediation or certification is claimed b
 ## Context and Orientation
 
 
-The owning repository is mori://shinzui/kiroku. Project-relative paths (artifact-level source URIs pending) are shibuya-kiroku-adapter/src/Shibuya/Adapter/Kiroku.hs, shibuya-kiroku-adapter/test/Main.hs and kiroku-store/src/Kiroku/Store/Subscription/Stream.hs. REV-13 records source-only ownership risks between successful member creation and recursive group construction, and cleanup aborting after the first throwing shutdown. The bridge uses an acknowledgement reply variable and a closed-state signal; cancelling before checkpoint persistence can legitimately replay. The accepted decision mori://shinzui/kiroku/okf/adrs/concepts/ADR-4 says missing-checkpoint initialization is explicit, existing checkpoints win, normal saves are monotonic, and reset is a separate intentional operation.
+The owning repository is mori://shinzui/kiroku. Project-relative paths (artifact-level source URIs pending) are shibuya-kiroku-adapter/src/Shibuya/Adapter/Kiroku.hs, shibuya-kiroku-adapter/test/Main.hs and kiroku-store/src/Kiroku/Store/Subscription/Stream.hs. REV-13 records source-only ownership risks between successful member creation and recursive group construction, and cleanup aborting after the first throwing shutdown. On 2026-09-20 the repository's HEAD was still the reviewed commit 758b81a, and both were confirmed in `kirokuConsumerGroupProcessorsWith`: `onException` wraps only the next `mkMemberAdapter` call, and `shutdownCreated` is a plain `mapM_`; recheck before starting. The project owner has called this adapter critical. The bridge uses an acknowledgement reply variable and a closed-state signal; cancelling before checkpoint persistence can legitimately replay. The accepted decision mori://shinzui/kiroku/okf/adrs/concepts/ADR-4 says missing-checkpoint initialization is explicit, existing checkpoints win, normal saves are monotonic, and reset is a separate intentional operation.
 
 The baseline is the committed source audit in docs/lifecycle-audit-progress.md and docs/reviews/, not a completed fault-injection campaign. Source inspection, diagnostic reproduction, fixed code, and release verification are separate evidence levels. A finalizer is the adapter operation that acknowledges, retries, or dead-letters a handled delivery. At-least-once delivery allows replay after interruption; it does not permit silently skipping unresolved work. A timeout in a test is a failure bound, not evidence that production cleanup succeeded.
 
-No local docs/adr corpus existed when this plan was drafted. Before introducing durable interfaces, follow .agents/skills/exec-plan/ADR.md and record the decision using the then-current repository convention. Locate dependency sources with Mori before choosing APIs. Verify registry releases and upstream tags before changing dependency bounds. Registration-service-v2 is excluded.
+When this plan was drafted no local docs/adr corpus existed in the Shibuya repository; its first record, docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md, was added on 2026-09-20. It concerns linked threads and garbage-collection liveness tests in core; its testing rule, that a liveness test must not retain the object under test through its own cleanup, is worth applying to the subscription-leak tests here. Before introducing durable interfaces, follow .agents/skills/exec-plan/ADR.md and record the decision using the then-current repository convention. Locate dependency sources with Mori before choosing APIs. Verify registry releases and upstream tags before changing dependency bounds. Registration-service-v2 is excluded.
 
 
 ## Plan of Work
@@ -108,4 +120,10 @@ Work on the current branch, preserve unrelated edits, and commit small conventio
 ## Interfaces and Dependencies
 
 
-Hard dependencies: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md and docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md. This plan owns the Kiroku adapter and its tests in mori://shinzui/kiroku, not the database checkpoint contract. Obtain required cross-workspace write permission. Core owns processor lifetime; the adapter owns subscription acquisition until explicit transfer. Changes to the store bridge, if unavoidable, require a separately recorded rationale and tests in the owning project. Coordinate bounds with docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md.
+Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md. Soft dependency: docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md, for integration only: nothing in this plan is gated on a core milestone, because group construction and cleanup happen before core owns the processors, so this plan starts as soon as the evidence plan is complete. This plan owns the Kiroku adapter and its tests in mori://shinzui/kiroku, not the database checkpoint contract. Obtain required cross-workspace write permission. Core owns processor lifetime; the adapter owns subscription acquisition until explicit transfer. Changes to the store bridge, if unavoidable, require a separately recorded rationale and tests in the owning project. Coordinate effectful bounds with docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md. The adapter's committed Cabal file bounds shibuya-core as `>=0.9 && <0.10`, and the candidate core is expected to carry a new major version because the core plan adds constructors to exported error types. Build against the candidate in a temporary Cabal project that lists the candidate core checkout and this adapter as packages and relaxes only that bound, for example with `allow-newer: shibuya-kiroku-adapter:shibuya-core`; never commit the relaxation. Change the committed bound once, in the adapter's repository and as part of this plan, when Milestone 1 of docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md fixes the candidate core version with the release owner, because final evidence must come from clean committed sources.
+
+
+## Revision Notes
+
+
+2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. The core lifecycle plan changed from a hard dependency to an integration-only soft one, because the group-construction ownership defect sits entirely before core takes ownership. Recorded the adapter's 0.9-series bound on shibuya-core and how to build against a major-version candidate. Recorded that the review's source claims were re-verified against the repository's unchanged HEAD, that the owner considers this adapter critical, and the Shibuya repository's new first ADR.

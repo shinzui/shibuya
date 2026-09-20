@@ -11,6 +11,12 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-09-20T04:05:13Z
+  revisions:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:46:05Z
+      mode: "update"
+      note: "Cancelled: project owner declared the MessageDB adapter deprecated; findings dispositioned out of scope, body preserved."
 ---
 
 # Repair MessageDB checkpoint and shutdown lifecycle semantics
@@ -18,6 +24,15 @@ provenance:
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
 If durable project context changes, update or create ADRs in docs/adr/ in the same change.
+
+**Status: Cancelled on 2026-09-19. Do not implement this plan.** The project owner stated
+during review of the parent MasterPlan that the MessageDB adapter is deprecated. The
+REV-12 findings described below remain true of that adapter and are not fixed; they are
+carried in the evidence ledger with an out-of-scope disposition by
+docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md, and the release
+verdict produced by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md
+names the adapter as uncertified and unsupported. The body is preserved unchanged as a
+record of the intended remediation should the adapter ever be revived.
 
 
 ## Purpose / Big Picture
@@ -45,6 +60,8 @@ None yet; implementation has not started.
 
 
 2026-09-19: Track contiguous completion in the observed delivery sequence, not integer global positions; durable progress changes only after persistence succeeds.
+
+2026-09-19: Cancel this plan. The project owner declared the MessageDB adapter deprecated and limited adapter scope to Kafka, PGMQ and Kiroku. Repairing code that will not ship would consume the initiative's budget, and the compatibility prerequisite in docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md had not started. The findings are dispositioned as out of scope, not resolved.
 
 
 ## Outcomes & Retrospective
@@ -112,3 +129,9 @@ Work on the current branch, preserve unrelated edits, and commit small conventio
 
 
 Hard dependencies: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md, docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md, and the existing compatibility plan docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md. This plan owns adapter lifecycle/checkpoint fixes and tests, not that plan's API migration. Changes are in mori://shinzui/shibuya-message-db-adapter and require cross-workspace authority. Consult mori://message-db/message-db for authoritative category query semantics (project-relative database/functions/get-category-messages.sql; artifact URI pending) and discover the Haskell client through Mori. Use a candidate Cabal project with one resolved core version.
+
+
+## Revision Notes
+
+
+2026-09-20 UTC: Marked the plan Cancelled and recorded the decision. The project owner declared the MessageDB adapter deprecated during review of the parent MasterPlan, so none of the milestones will be implemented. No milestone text was altered, so the plan still documents the intended repair; the unchecked Progress items are abandoned, not pending.

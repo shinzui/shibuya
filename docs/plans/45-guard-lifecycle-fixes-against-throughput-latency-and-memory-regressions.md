@@ -11,6 +11,18 @@ provenance:
     model: "gpt-6-astra"
     harness: "codex-cli"
     at: 2026-09-20T04:11:26Z
+  reviews:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:45:51Z
+      verdict: "changes-requested"
+      note: "Bench paths, executables and tasty-bench options verified; as listed the plan cannot complete before the plans it measures, which stalls plan selection without a two-pass protocol."
+  revisions:
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T04:46:05Z
+      mode: "update"
+      note: "Two-pass protocol with paused registry status; explicit dependency list without cancelled plan 42; three in-scope adapters."
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -61,7 +73,7 @@ The existing harness is shibuya-core-bench/bench/Main.hs with Bench/HotPath.hs, 
 
 The baseline is the committed source audit in docs/lifecycle-audit-progress.md and docs/reviews/, not a completed fault-injection campaign. Source inspection, diagnostic reproduction, fixed code, and release verification are separate evidence levels. A finalizer is the adapter operation that acknowledges, retries, or dead-letters a handled delivery. At-least-once delivery allows replay after interruption; it does not permit silently skipping unresolved work. A timeout in a test is a failure bound, not evidence that production cleanup succeeded.
 
-No local docs/adr corpus existed when this plan was drafted. Before introducing durable interfaces, follow .agents/skills/exec-plan/ADR.md and record the decision using the then-current repository convention. Locate dependency sources with Mori before choosing APIs. Verify registry releases and upstream tags before changing dependency bounds. Registration-service-v2 is excluded.
+When this plan was drafted no local docs/adr corpus existed in the Shibuya repository; its first record, docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md, was added on 2026-09-20. It concerns linked threads and garbage-collection liveness tests and does not constrain benchmarks. Before introducing durable interfaces, follow .agents/skills/exec-plan/ADR.md and record the decision using the then-current repository convention. Locate dependency sources with Mori before choosing APIs. Verify registry releases and upstream tags before changing dependency bounds. Registration-service-v2 is excluded.
 
 
 ## Plan of Work
@@ -73,7 +85,7 @@ Milestone 2 adds Bench/Lifecycle.hs and a production load executable under shibu
 
 Milestone 3 adds scripts/audit/compare-performance.ts with fixtures and Bun tests. Use at least ten alternating baseline/candidate measured runs after warmup on a quiet fixed machine, paired by workload and RTS configuration (-N1 and a fixed multicore count such as -N4). Report paired ratios and 95% confidence intervals using a documented reproducible resampling seed. Default release budgets are at most 5% throughput loss, 10% p95/p99 or shutdown-latency increase, and 5% allocation/live-memory increase per matched scenario. A confidence interval whose adverse upper bound exceeds the budget cannot pass: overlapping/too-wide intervals are inconclusive and require more samples or a less noisy runner, not a waiver. Establish absolute idle CPU and idle-memory budgets from baseline repeatability before measuring the candidate; near-zero denominators require absolute deltas. Zero sustained memory growth after warmup at a fixed bounded workload and no busy-spin are mandatory regardless of percentage comparisons. Preserve any stricter existing project budgets. Record these initial policy choices in the evidence manifest; changing them after a failed run requires a named human release-owner decision with rationale.
 
-Milestone 4 measures adapters against their live ephemeral services using fixtures owned by their remediation plans. Separate broker/database bottlenecks from core overhead with both mock/no-op and real-service runs; run at baseline sustainable load as well as saturation. Include a 30-minute steady-state/stop-restart soak, record queue depth and backlog, and fit retained-memory trend after warmup. Performance harness development and baseline capture can proceed alongside remediation; final measurements require the integrated candidate SHAs. Each fix touching hot paths must supply a focused before/after measurement before acceptance, followed by the full matrix here. If a regression appears, profile the affected path, fix it and rerun correctness tests as well as benchmarks. Do not restore an unsafe implementation to meet a budget.
+Milestone 4 measures the three in-scope adapters, Kafka, PGMQ and Kiroku, against their live ephemeral services using fixtures owned by their remediation plans. The MessageDB adapter is deprecated and excluded. Separate broker/database bottlenecks from core overhead with both mock/no-op and real-service runs; run at baseline sustainable load as well as saturation. Include a 30-minute steady-state/stop-restart soak, record queue depth and backlog, and fit retained-memory trend after warmup. Performance harness development and baseline capture can proceed alongside remediation; final measurements require the integrated candidate SHAs. Each fix touching hot paths must supply a focused before/after measurement before acceptance, followed by the full matrix here. If a regression appears, profile the affected path, fix it and rerun correctness tests as well as benchmarks. Do not restore an unsafe implementation to meet a budget.
 
 Milestone 5 publishes matched raw data, summaries, machine metadata and a machine-readable verdict consumed by the release validator. Run the gate for all lifecycle and runtime-dependency changes regardless of patch/minor version. Coordinate any release-skill edit through the existing dependency-bound plan's owner. Keep noisy shared-runner smoke tests distinct from controlled release measurements.
 
@@ -112,4 +124,12 @@ Work on the current branch, preserve unrelated edits, and commit small conventio
 ## Interfaces and Dependencies
 
 
-Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md. Soft dependencies: docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md through docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md for final measurements, not initial baseline work. This plan owns benchmark code, performance scenario definitions, budgets and comparator; adapter plans own their service fixtures. It produces the performance verdict required by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md. The JSON comparator inputs and CLI are new interfaces, to be specified and tested here; CSV alone does not contain latency distributions. EP-37 owns evidence schema and receives additive performance fields. No package release or benchmark-policy weakening is authorized.
+Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md. Soft dependencies, for final measurements and not initial baseline work: docs/plans/38-make-core-processor-ownership-and-termination-exception-safe.md, docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md, docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md, docs/plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md and docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md. Plan 42 is cancelled.
+
+This plan runs in two passes. Pass one is Milestones 1 through 3. When they are done, stop, and set this plan's status in the parent MasterPlan's registry to In Progress with the note "paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete". Whoever picks the next plan to implement must skip this one while it is paused, even though it is listed first and is In Progress; otherwise the selection rule, first plan whose hard dependencies are complete and which is not finished, would choose it forever. Pass two is Milestones 4 and 5 and begins only when those five plans are Complete. They in turn cannot close before pass one is finished, because each must take focused before/after measurements with this plan's harness. This plan owns benchmark code, performance scenario definitions, budgets and comparator; adapter plans own their service fixtures. It produces the performance verdict required by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md. The JSON comparator inputs and CLI are new interfaces, to be specified and tested here; CSV alone does not contain latency distributions. EP-37 owns evidence schema and receives additive performance fields. No package release or benchmark-policy weakening is authorized.
+
+
+## Revision Notes
+
+
+2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. Defined the two-pass protocol and its paused registry status, because as drafted this plan was listed ahead of the plans it must measure and could not finish until they did, which would have stalled plan selection. Replaced the dependency range that included the cancelled MessageDB plan with an explicit list, scoped adapter measurement to the three in-scope adapters, and noted the repository's new first ADR.
