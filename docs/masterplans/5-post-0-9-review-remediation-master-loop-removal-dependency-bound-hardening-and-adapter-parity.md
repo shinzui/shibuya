@@ -21,6 +21,11 @@ provenance:
       at: 2026-09-20T03:15:22Z
       mode: "update"
       note: "Synchronize EP-1 patch release target and active intention"
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T13:46:21Z
+      mode: "update"
+      note: "Move EP-2's provisional release target to 0.9.0.4 after standalone EP-46 published 0.9.0.3"
 ---
 
 # Post-0.9 review remediation: master loop removal, dependency bound hardening, and adapter parity
@@ -149,15 +154,16 @@ The ordering constraints are about releases.
 Phase 1 is the core in two patch releases. EP-1 removes the master loop and cuts
 shibuya-core/shibuya-metrics 0.9.0.2. EP-2 then changes the dependency bounds and release skill,
 runs the bound-sensitive benchmark gate it introduces, and owns the following patch release,
-provisionally 0.9.0.3. Neither plan has a compiler dependency on the other; the release ordering
+provisionally 0.9.0.4. The standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, which is not a child of this MasterPlan, took
+0.9.0.3 on 2026-09-20 for an urgent supervisor-link fix. Neither plan has a compiler dependency on the other; the release ordering
 keeps consumers able to identify which patch contains the urgent runtime fix.
 
 The 0.9.0.2 target was selected after the release diff, live Hackage versions, and upstream
-tags were checked on 2026-09-20. The 0.9.0.3 target remains provisional: EP-2 must select the
+tags were checked on 2026-09-20. The 0.9.0.4 target remains provisional: EP-2 must select the
 next free patch at its own release time and resynchronize consumers if another release appears.
 
 Phase 2 is the adapters. EP-3 can be developed independently but should release after EP-2 and
-verify against 0.9.0.3 so its copied effectful-core bound is exercised with the owning core
+verify against 0.9.0.4 so its copied effectful-core bound is exercised with the owning core
 release. EP-4 can proceed after EP-1 and target 0.9.0.2; it need not wait for the independent
 dependency-bound work.
 
@@ -167,7 +173,7 @@ dependency-bound work.
 The shibuya-core version, `shibuya-core/shibuya-core.cabal`, and changelog are touched by EP-1
 and EP-2 in sequence. EP-1 owns 0.9.0.2, the matching `shibuya-metrics` tracking bump, and its
 release. EP-2 begins from that published baseline, adds the bound and release-policy changes,
-and owns the following patch, provisionally 0.9.0.3. EP-3 consumes EP-2's released core; EP-4
+and owns the following patch, provisionally 0.9.0.4. EP-3 consumes EP-2's released core; EP-4
 may target EP-1's 0.9.0.2 because its API migration does not depend on the bound work.
 
 The effectful-core bound expression is defined by EP-2 and consumed verbatim by EP-3 (pgmq,
@@ -286,6 +292,17 @@ interactions between child plans. Provide concise evidence.
   EP-2 is a bound and a process change; it has no reason to reach Hackage ahead of the crash fix.
   Date: 2026-09-16
 
+- Decision: Move EP-2's provisional release target from 0.9.0.3 to 0.9.0.4.
+  Rationale: shibuya-core and shibuya-metrics 0.9.0.3 were published on 2026-09-20 by the
+  standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md. An independent review of EP-1's fix found that the remaining NQE
+  supervisor link still killed callers of finished applications during garbage collection and
+  delivered each StopAllOnFailure failure twice; the owner judged it urgent and released it
+  alone, exactly as EP-1 had taken 0.9.0.2. EP-2 is still unstarted and must, as before, choose
+  the next free patch at its own release time. EP-3's verification target moves with it. The
+  title and file name of plan 35 keep "0.9.0.3" so that its identity and existing references
+  stay stable; its body states the current target.
+  Date: 2026-09-20
+
 - Decision: Supersede the combined 0.9.1.0 release with sequential patches: EP-1 at 0.9.0.2
   and EP-2 provisionally at 0.9.0.3.
   Rationale: EP-1 is complete and is the initiative's most serious runtime defect, while EP-2
@@ -359,3 +376,5 @@ GitHub release. EP-1 now waits only on the MLS consumer pin and isolated worker 
 Revision 2026-09-20 UTC: Marked EP-1 complete after the MLS consumer selected 0.9.0.2 without
 unrelated dependency movement, passed its build/test/flake gates, and survived the bounded
 isolated-worker observation. Added ADR 0001 for the durable concurrency and test decision.
+
+2026-09-20 UTC: Moved EP-2's provisional release target, and EP-3's verification target with it, from 0.9.0.3 to 0.9.0.4, because the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md was published as 0.9.0.3. Historical entries that mention 0.9.0.3 as the then-provisional target are left as written; the new Decision Log entry supersedes them. Cascaded to plans 34 and 35.

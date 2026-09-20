@@ -22,6 +22,11 @@ provenance:
       at: 2026-09-20T03:19:36Z
       mode: "update"
       note: "Correct the adapter verification target to the post-EP-2 patch 0.9.0.3"
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T13:46:21Z
+      mode: "update"
+      note: "Target core release moves to provisional 0.9.0.4; title and file name kept for stable identity"
 ---
 
 # Align adapter effectful bounds and releases with shibuya-core 0.9.0.3
@@ -48,9 +53,14 @@ The bound expression is owned by
 `docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`
 and is copied here verbatim; if that plan changes it, change it here in the same way.
 
-The target core release is 0.9.0.3: plan 33 ships the urgent master-loop fix alone as
-0.9.0.2, and plan 34 owns the following patch release containing the shared dependency
-bounds and benchmark policy that this adapter work consumes.
+The target core release is 0.9.0.4, provisionally: plan 33 shipped the urgent master-loop fix
+alone as 0.9.0.2, the standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md
+shipped an urgent supervisor-link fix alone as 0.9.0.3 on 2026-09-20, and plan 34 owns the
+following patch release containing the shared dependency bounds and benchmark policy that this
+adapter work consumes. This plan's title and file name still say 0.9.0.3; they are kept so that
+its identity and existing references stay stable, and this paragraph states the current target.
+All three adapters' existing bounds on shibuya-core already admit 0.9.0.3, so that release
+required no adapter change.
 
 
 ## Progress
@@ -312,7 +322,7 @@ build-type:    Simple
 library
   build-depends:
     base,
-    shibuya-core ^>=0.9.0.3,
+    shibuya-core ^>=0.9.0.4,
     shibuya-pgmq-adapter ^>=0.16.0.1,
     shibuya-kafka-adapter ^>=0.9.0.2
 CABAL
@@ -324,8 +334,8 @@ cabal build --dry-run --constraint='effectful-core==2.7.1.0'
 
 Expected: the first two commands print a plan; the third ends with a solver rejection that
 names at least one of the three packages and `effectful-core-2.7.1.0`. Paste the three tails
-into this plan under Outcomes & Retrospective. If shibuya-core 0.9.0.3 is not yet on Hackage,
-substitute `^>=0.9.0.2` and note it.
+into this plan under Outcomes & Retrospective. If shibuya-core 0.9.0.4 is not yet on Hackage,
+substitute `^>=0.9.0.3`, which is published, and note it.
 
 
 ## Validation and Acceptance
@@ -368,3 +378,5 @@ Both are owned by `docs/plans/34-harden-shibuya-core-dependency-bounds-and-relea
 2026-09-20 UTC: Retargeted adapter verification from the provisional combined 0.9.1.0
 release to shibuya-core 0.9.0.3. Plan 33 now ships the urgent runtime fix alone as 0.9.0.2;
 plan 34 owns the following dependency-bound patch.
+
+2026-09-20 UTC: Moved the target core release from 0.9.0.3 to the provisional 0.9.0.4, because 0.9.0.3 was published by the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md and plan 34's dependency-bound release now follows it. The title, file name and earlier revision notes keep 0.9.0.3 for stable identity and as history.

@@ -17,6 +17,11 @@ provenance:
       at: 2026-09-20T03:15:22Z
       mode: "update"
       note: "Defer bound hardening to the release after EP-1 and inherit the active intention"
+    - model: "claude-fable-5-1"
+      harness: "claude-code"
+      at: 2026-09-20T13:46:21Z
+      mode: "update"
+      note: "Provisional release target moves from 0.9.0.3 to 0.9.0.4; no scope change"
 ---
 
 # Harden shibuya-core dependency bounds and release gating for effectful 2.7
@@ -48,7 +53,7 @@ measurement, recorded below, is that effectful 2.7.1 is at parity or better on e
 roughly twice as fast on the `Async` hot path.
 
 Plan 33 ships its urgent runtime fix alone as 0.9.0.2. This plan therefore owns the following
-core/metrics patch release, provisionally 0.9.0.3, after the bound, benchmark-policy, and
+core/metrics patch release, provisionally 0.9.0.4, after the bound, benchmark-policy, and
 evidence milestones are complete. Recheck Hackage and upstream tags before release; if another
 version is published first, use the next free patch and synchronize the parent and consumers.
 
@@ -58,7 +63,7 @@ version is published first, use the next free patch and synchronize the parent a
 - [ ] Milestone 1: `effectful-core` exclusion bound in shibuya-core, shibuya-example, and shibuya-core-bench; three dry-run solves recorded.
 - [ ] Milestone 2: release skill gates runtime-dependency changes on the benchmark regardless of bump level and documents the one-tree comparison procedure.
 - [ ] Milestone 3: benchmark evidence for the 0.9.0.1 swap recorded in this plan, including the 2.7.1.0 measurement.
-- [ ] Milestone 4: release shibuya-core and shibuya-metrics with the hardened bounds, provisionally as 0.9.0.3.
+- [ ] Milestone 4: release shibuya-core and shibuya-metrics with the hardened bounds, provisionally as 0.9.0.4.
 
 
 ## Surprises & Discoveries
@@ -152,6 +157,16 @@ version is published first, use the next free patch and synchronize the parent a
   the bounds admit, not what was shipped.
   Date: 2026-09-16
 
+- Decision: Move the provisional release target from 0.9.0.3 to 0.9.0.4.
+  Rationale: 0.9.0.3 was published on 2026-09-20 by the standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md,
+  an urgent fix for the NQE supervisor link that killed callers of finished applications
+  during garbage collection. That release changed no dependency bound, so this plan's work is
+  unaffected; only the number moves. Milestone 4 still chooses the next free patch from the
+  registry at release time. That release also added a third core test suite,
+  `shibuya-core-gc-finished-test`, which `cabal test shibuya-core` runs and which the release
+  gate now names.
+  Date: 2026-09-20
+
 - Decision: Cut the dependency-bound work as the patch release after 0.9.0.2, provisionally
   0.9.0.3.
   Rationale: Plan 33's crash fix is ready while this plan has not started. Shipping 0.9.0.2
@@ -238,7 +253,7 @@ Edit the six dependency lines so that each package depends on `effectful-core` w
 exclusion range instead of on `effectful`. Because the imported modules are the same, no
 Haskell source changes. Then prove the bound with three dry-run solves and record them. Add a
 changelog entry under an `## Unreleased` heading at the top of `shibuya-core/CHANGELOG.md`
-(Milestone 4 renames it to `## 0.9.0.3 — <date>` if that remains the next free version). At the end of this
+(Milestone 4 renames it to `## 0.9.0.4 — <date>` if that remains the next free version). At the end of this
 milestone the library, tests, examples, and benchmarks build unchanged, the solver rejects
 effectful-core 2.7.1.0, and `cabal check` in `shibuya-core/` still passes.
 
@@ -266,7 +281,7 @@ framework and not only by the upstream changelog.
 ### Milestone 4: coordinated core and metrics release
 
 Run the repository release skill after the first three milestones are complete. Recheck live
-Hackage versions and upstream tags, choose the next free patch (provisionally 0.9.0.3), rename
+Hackage versions and upstream tags, choose the next free patch (provisionally 0.9.0.4), rename
 the unreleased changelog sections, bump both package versions and the metrics core bound, and
 apply the skill's full build, test, benchmark, package, publication, and GitHub-release gates.
 This bound-changing patch must run the benchmark procedure introduced by Milestone 2.
@@ -436,4 +451,6 @@ if this range changes, change it there in the same commit.
 
 2026-09-20 UTC: Split release ownership after plan 33 selected the PVP patch 0.9.0.2 for its
 urgent runtime fix. This plan now owns the following bound-changing core/metrics patch,
-provisionally 0.9.0.3, and applies its new benchmark gate to that release.
+provisionally 0.9.0.4, and applies its new benchmark gate to that release.
+
+2026-09-20 UTC: Moved the provisional release target from 0.9.0.3 to 0.9.0.4 throughout, because 0.9.0.3 was published by the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md. The earlier Decision Log entry naming 0.9.0.3 is kept as history and superseded by the new one. No scope, bound or milestone changed.

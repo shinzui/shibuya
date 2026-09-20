@@ -69,8 +69,8 @@ which shipped its fix as an independent patch release.
 - [x] (2026-09-20 UTC) Milestone 3: Correct the architecture documents, amend ADR 0001, and point the audit records at the fix. `CLAUDE.md`, the release skill and `docs/architecture/CONCURRENCY.md` updated; ADR 0001 amended; unreleased entries added to the root and core changelogs; `nix fmt`, `nix flake check` and all three core suites pass. `docs/HIGH_LEVEL_ARCHITECTURE.md` and `docs/architecture/RUNNER_BUG_FIXES.md` contained no present-tense claim of a linked supervisor and were left unchanged.
 - [x] (2026-09-20 UTC) Coverage review before release, at the owner's request: probed the shapes the tests only reasoned about, fixed a load-sensitivity in the single-delivery case, added a busy-siblings delivery case, three more finished-application scenarios and a positive control, and proved every addition red on the pre-fix library and green on the fix.
 - [x] (2026-09-20 UTC) Milestone 4, prepared: Hackage and upstream tags both stop at 0.9.0.2, so the candidate is 0.9.0.3. Both package versions, the metrics bound and all three changelogs are edited in the working tree, uncommitted, and the candidate passes every pre-publication gate.
-- [ ] Milestone 4, remaining: owner approval of the version and changelog; then the release commit, annotated tag `v0.9.0.3`, push, upload of core then metrics with documentation, and the GitHub release.
-- [ ] Milestone 4, remaining after publication: record the consumed version in master plan 5's Decision Log and move the provisional 0.9.0.3 statements in plans 34 and 35 to the next patch.
+- [x] (2026-09-20 UTC) Milestone 4, released: the owner approved; release commit `7512b5c`, annotated tag `v0.9.0.3`, push, upload of core then metrics with documentation, and the GitHub release are all done and verified.
+- [x] (2026-09-20 UTC) Milestone 4, bookkeeping: master plan 5's Decision Log records that this release consumed 0.9.0.3, and the provisional target in plans 34 and 35 moved to 0.9.0.4. Plan files were not renamed.
 
 
 ## Surprises & Discoveries
@@ -189,6 +189,17 @@ both delivery cases with `expected: Just 1 but got: Just 2`. On the fix, all thr
 and the two delivery cases passed 20 consecutive runs while a full build loaded the machine to
 a load average above six.
 
+**Release 0.9.0.3 is public.** The owner approved the version and changelog on 2026-09-20.
+The changelog date was corrected to 2026-09-20 and every gate was rerun on the final candidate
+before committing: `nix fmt`, `cabal build all`, all three core suites with 214 examples and zero
+failures, `nix flake check`, and `cabal check` for both packages. Commit `7512b5c` is tagged
+`v0.9.0.3` and pushed. Hackage serves `shibuya-core-0.9.0.3` and `shibuya-metrics-0.9.0.3` with
+their documentation; both package pages and both documentation roots returned HTTP 200 after
+upload, and the preferred-versions endpoint lists 0.9.0.3 first. The GitHub release is published,
+neither draft nor prerelease, at <https://github.com/shinzui/shibuya/releases/tag/v0.9.0.3>. Its
+notes carry the root changelog entry and a short known-issues paragraph stating that the audit's
+other lifecycle findings are inherited and not addressed by this patch.
+
 **`cabal build all --offline` cannot build the metrics package here.** The local store lacks
 `warp`, so the offline solver refuses. Plain `cabal build all`, which is what Concrete Steps
 prescribes, works; only the core package builds and tests offline.
@@ -283,9 +294,14 @@ kills its caller during garbage collection, under either supervision strategy or
 failure, and one `StopAllOnFailure` failure now reaches the caller exactly once instead of
 twice. Both behaviors have committed tests that failed first for the documented reason, the
 0.9.0.2 idle-application regression and all 213 ordinary examples pass, no public signature
-changed, and ADR 0001 now carries the durable rule. The 0.9.0.3 candidate is prepared and
-validated but not released: publication awaits the owner's approval, after which the
-version bookkeeping in master plan 5 and plans 34 and 35 remains.
+changed, and ADR 0001 now carries the durable rule. Release 0.9.0.3 of both
+packages is published with documentation, tag and GitHub release, and the version bookkeeping
+in master plan 5 and plans 34 and 35 is done. The plan is complete.
+
+What remains is outside this plan. The three adapters' bounds already admit 0.9.0.3, so
+consumers only need to move their pins. The audit's other lifecycle findings are untouched and
+belong to master plan 6, whose core child must keep both of this plan's tests passing and must
+not restore a link on the supervisor thread. The metrics package still has no test suite.
 
 The lesson worth keeping is already in the ADR: a regression test for a reachability-sensitive
 defect proves only the reachability state it constructs. The 0.9.0.2 test held a live child and
@@ -860,3 +876,7 @@ busy-siblings delivery case, three more finished-application scenarios, and a po
 that prevents a vacuous pass. Milestone 1's embedded source, Cabal stanza, acceptance wording
 and expected transcripts were updated to the committed state so the plan stays self-contained,
 and the evidence and the two decisions are recorded above.
+
+2026-09-20 UTC: Published 0.9.0.3 after the owner's approval, recorded the verified publication
+and the version bookkeeping, and completed Outcomes & Retrospective. The durable decision was
+already distilled into ADR 0001 in Milestone 3, so no further ADR change was needed at completion.
