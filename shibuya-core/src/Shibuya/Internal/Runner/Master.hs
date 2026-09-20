@@ -2,11 +2,10 @@
 -- No PVP guarantees: anything here may change or disappear in any release.
 -- Application authors should import "Shibuya" instead.
 --
--- Master process - central coordinator for queue processors.
+-- Master handle - owns the shared supervisor and metrics registry for queue processors.
 -- Provides supervision, metrics collection, and control API.
 --
 -- Architecture:
--- - Master is an NQE Process that handles control messages
 -- - Holds a Supervisor for managing child processors
 -- - Maintains TVar MetricsMap for O(1) metrics access
 -- - Processors register their metrics TVars with the Master
@@ -14,9 +13,6 @@ module Shibuya.Internal.Runner.Master
   ( -- * Master Handle
     Master (..),
     MasterState (..),
-
-    -- * Control Messages
-    MasterMessage (..),
 
     -- * Starting the Master
     startMaster,
@@ -34,13 +30,7 @@ module Shibuya.Internal.Runner.Master
   )
 where
 
-import Control.Concurrent.NQE.Process
-  ( Inbox,
-    Listen,
-    Process (..),
-    newInbox,
-    receive,
-  )
+import Control.Concurrent.NQE.Process (Process (..))
 import Control.Concurrent.NQE.Supervisor (Strategy (..), Supervisor)
 import Control.Concurrent.NQE.Supervisor qualified as Supervisor
 import Control.Concurrent.STM
@@ -50,7 +40,6 @@ import Control.Concurrent.STM
     newTVarIO,
     readTVar,
   )
-import Control.Monad (forever)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Effectful (Eff, IOE, liftIO, (:>))
@@ -62,16 +51,7 @@ import Shibuya.Core.Metrics
     sampleMetrics,
   )
 import Shibuya.Prelude
-import UnliftIO (Async, async, cancel, link)
-
--- | Messages for the master process.
-data MasterMessage
-  = -- | Register a processor's metrics handle
-    RegisterProcessor !ProcessorId !MetricsHandle !(Listen ())
-  | -- | Unregister a processor
-    UnregisterProcessor !ProcessorId !(Listen ())
-  | -- | Shutdown all processors
-    Shutdown !(Listen ())
+import UnliftIO (cancel)
 
 -- | Master state held in TVars.
 data MasterState = MasterState
@@ -86,19 +66,15 @@ data MasterState = MasterState
   }
   deriving (Generic)
 
--- | Master handle - provides access to the master process.
-data Master = Master
-  { -- | The async handle for the master
-    handle :: !(Async ()),
-    -- | Direct access to master state
-    state :: !MasterState,
-    -- | Inbox for sending messages
-    inbox :: !(Inbox MasterMessage)
+-- | Master handle - owns the shared supervisor and metrics registry.
+newtype Master = Master
+  { -- | Direct access to master state
+    state :: MasterState
   }
   deriving (Generic)
 
 -- | Start the master process.
--- Returns a handle for interacting with the master.
+-- Returns a handle for accessing shared application state.
 -- The caller is responsible for calling stopMaster when done.
 startMaster :: (IOE :> es) => Strategy -> Eff es Master
 startMaster strategy = liftIO $ do
@@ -111,52 +87,12 @@ startMaster strategy = liftIO $ do
         IgnoreGraceful -> True
         IgnoreAll -> False
         Notify _ -> False
-      masterState = MasterState metricsMapVar sup propagate
-
-  masterInbox <- newInbox
-
-  -- Start master loop
-  masterHandle <- async $ masterLoop masterState masterInbox
-  link masterHandle
-
-  pure
-    Master
-      { handle = masterHandle,
-        state = masterState,
-        inbox = masterInbox
-      }
+  pure Master {state = MasterState metricsMapVar sup propagate}
 
 -- | Stop the master and all child processors.
--- Cancels the supervisor first (which cancels all children via NQE's stopAll),
--- then cancels the master message loop.
+-- Cancels the supervisor, which cancels all children via NQE's stopAll.
 stopMaster :: (IOE :> es) => Master -> Eff es ()
-stopMaster master = liftIO $ do
-  -- Cancel the supervisor first - this triggers NQE's stopAll which cancels all children
-  cancel (getProcessAsync master.state.supervisor)
-  -- Then cancel the master message loop
-  cancel master.handle
-
--- | The master process main loop.
-masterLoop :: MasterState -> Inbox MasterMessage -> IO ()
-masterLoop state inbox = forever $ do
-  msg <- receive inbox
-  handleMessage state msg
-
--- | Handle a single master message.
-handleMessage :: MasterState -> MasterMessage -> IO ()
-handleMessage state msg = case msg of
-  RegisterProcessor pid metricsHandle respond -> do
-    atomically $ do
-      modifyTVar' state.metrics $ Map.insert pid metricsHandle
-    atomically $ respond ()
-  UnregisterProcessor pid respond -> do
-    atomically $ do
-      modifyTVar' state.metrics $ Map.delete pid
-    atomically $ respond ()
-  Shutdown respond -> do
-    -- Clear all processors
-    atomically $ modifyTVar' state.metrics (const Map.empty)
-    atomically $ respond ()
+stopMaster master = liftIO $ cancel (getProcessAsync master.state.supervisor)
 
 -- | Get metrics for all processors.
 getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap

@@ -4,6 +4,7 @@ slug: remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers
 title: "Remove the idle linked master loop that deadlocks bare waitApp callers"
 kind: exec-plan
 created_at: 2026-09-16T22:33:21Z
+intention: intention_01m2ycc3fxedxtw5339e0efzy1
 master_plan: "docs/masterplans/5-post-0-9-review-remediation-master-loop-removal-dependency-bound-hardening-and-adapter-parity.md"
 provenance:
   created_by:
@@ -21,6 +22,11 @@ provenance:
       at: 2026-09-20T03:01:02Z
       mode: "update"
       note: "Refresh history, process-isolated regression and release coordination; implement the failing test and exclude RS2 per user clarification."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T03:05:33Z
+      mode: "implement"
+      note: "Implement remaining milestones and link the new intention"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -37,8 +43,8 @@ provenance:
 # Remove the idle linked master loop that deadlocks bare waitApp callers
 
 This ExecPlan is a living document. Keep Progress, Surprises & Discoveries, Decision Log,
-and Outcomes & Retrospective current. This refresh reviews the existing design and adds its
-failing regression test; it does not implement the library fix or publish a release.
+and Outcomes & Retrospective current. The failing regression and library fix are now
+implemented; documentation, release, and consumer follow-up remain in progress.
 
 
 ## Purpose / Big Picture
@@ -72,7 +78,7 @@ existing follow-up in `mori://tan/mls-service-v2`. Per the user's clarification,
 
 - [x] (2026-09-20 UTC) Review the original plan against current source, history, package registry, and upstream release tags.
 - [x] (2026-09-20 UTC) Milestone 1: Add the dedicated GC regression executable and confirm failure with the reported linked-thread exception on 0.9.0.1.
-- [ ] Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
+- [x] (2026-09-20 UTC) Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
 - [ ] Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
 - [ ] Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
 - [ ] Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
@@ -131,6 +137,17 @@ likewise printed `PASS: bare waitApp survives major collections` under `-O1` and
 capabilities. That control supports the reachability diagnosis; retaining the master is not
 the planned library fix and is absent from the committed-test candidate.
 
+**Removing only the obsolete actor fixes the failure.** With `Master` reduced to its state,
+the dedicated GC executable passed three consecutive runs under GHC 9.12.4 and `-O1`, and
+the complete core suite passed all 212 Hspec examples plus the dedicated executable. A
+detached worktree at pre-fix commit `9e2a038` reproduced the original failure with the same
+test:
+
+```text
+FAIL: bare waitApp died: ExceptionInLinkedThread (ThreadId 10) thread blocked indefinitely in an STM transaction
+0 of 1 test suites (0 of 1 test cases) passed.
+```
+
 
 ## Decision Log
 
@@ -151,30 +168,33 @@ the planned library fix and is absent from the committed-test candidate.
 - Decision (2026-09-20 UTC): The user's clarification excludes
   `mori://tan/registration-service-v2` from follow-up. The initial review provenance's
   suggestion to add that consumer is superseded by this explicit scope decision.
+- Decision (2026-09-20 UTC): Keep the NQE supervisor cancellation as the complete
+  `stopMaster` implementation after removing the mailbox actor. This preserves child teardown
+  and failure propagation while eliminating the only unreachable STM wait.
 
 
 ## Outcomes & Retrospective
 
-The review found the removal design sound but corrected its history, weak-pointer teardown,
-NQE liveness explanation, test integration, documentation inventory, and release coordination.
-The original plan was authored by `claude-fable-5-1` and contained no review entries before
-this pass. The new regression is implemented and intentionally red against the unchanged
-library. No fix, release, or consumer update is claimed complete.
+The review found the removal design sound and the implementation now removes the obsolete
+mailbox actor without changing public APIs, metrics access, supervisor behavior, or failure
+propagation. The dedicated process-isolated regression passes repeatedly, the old actor fails
+the same test in a detached worktree, and all existing core tests pass. Documentation, release,
+and consumer update work remains.
 
 Refresh validation: `cabal test shibuya-core --offline --test-show-details=failures`
 selected both suites: the existing Hspec suite passed and the GC suite failed with the
 expected linked STM exception. `cabal check` reported no warnings or errors. `nix fmt`
 and explicit Fourmolu formatting of the new file completed, and `git diff --check` passed.
-The library-removal green result and release/flake gates remain implementation work.
+The release/flake gates and downstream verification remain implementation work.
 
 
 ## Context and Orientation
 
-`shibuya-core/src/Shibuya/Internal/Runner/Master.hs` currently defines `Master` with
-`handle :: Async ()`, `state :: MasterState`, and `inbox :: Inbox MasterMessage`.
-`startMaster` creates the NQE supervisor, the metrics registry, and a second async running
-`masterLoop`, which it unconditionally links to the creating thread. `stopMaster` cancels
-the supervisor and then that second async. Metrics operations already bypass the mailbox.
+`shibuya-core/src/Shibuya/Internal/Runner/Master.hs` now defines `Master` as a newtype around
+`MasterState`. `startMaster` creates only the NQE supervisor and metrics registry, and
+`stopMaster` cancels the supervisor. The removed representation also had an `Async` handle,
+an inbox, and a linked `masterLoop` whose mailbox had no senders. Metrics operations continue
+to use the registry directly.
 
 `shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs` registers processors, adds children
 to `master.state.supervisor`, and unregisters metrics in `finally`. The
@@ -464,3 +484,8 @@ benchmark-policy hardening, this plan owns the crash fix and coordinated release
 implemented and reproduced the dedicated GC regression, and refreshed test/release gates,
 documentation scope, and MLS follow-up. The user's clarification explicitly excludes
 registration-service-v2. Production implementation and publication remain pending.
+
+2026-09-20 UTC: Linked intention `intention_01m2ycc3fxedxtw5339e0efzy1`, removed the idle
+master mailbox actor, and verified the fix with three optimized GC runs, the full core suite,
+and a detached pre-fix reproduction. Updated the living sections to record Milestone 2;
+documentation, release, and MLS consumer follow-up remain.
