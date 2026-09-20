@@ -504,20 +504,26 @@ inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
       if stopping
         then pure Nothing
         else do
-          result <-
-            atomically $
-              -- Keep receive first so the populated-inbox hot path matches the
-              -- old IORef implementation. When it blocks, the second branch
-              -- reads the terminal TVar and is woken by a stop request.
-              (Just <$> receiveSTM inbox)
-                `orElse` (readProcessorExitSTM stopSignal >>= maybe retry (const (pure Nothing)))
-                `orElse` ( do
-                             done <- readTVar streamDoneVar
-                             empty <- mailboxEmptySTM inbox
-                             if done && empty
-                               then pure Nothing
-                               else retry
-                         )
+          immediate <-
+            atomically $ do
+              empty <- mailboxEmptySTM inbox
+              if empty then pure Nothing else Just <$> receiveSTM inbox
+          result <- case immediate of
+            Just item -> pure $ Just item
+            Nothing ->
+              atomically $
+                -- Only an observed-empty inbox pays for the wake branches.
+                -- A terminal request participates in this transaction and
+                -- wakes it; the populated hot path above stays branch-free.
+                (readProcessorExitSTM stopSignal >>= maybe retry (const (pure Nothing)))
+                  `orElse` (Just <$> receiveSTM inbox)
+                  `orElse` ( do
+                               done <- readTVar streamDoneVar
+                               empty <- mailboxEmptySTM inbox
+                               if done && empty
+                                 then pure Nothing
+                                 else retry
+                           )
           pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.

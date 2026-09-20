@@ -67,6 +67,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: The next paired run passed the corrected keyed and startup allocation paths but exposed a 15%--24% serial populated-inbox regression: checking the terminal `TVar` first made every successful receive join the STM read set. `ProcessorSignal` now pairs the terminal `TVar`, which wakes blocked intake, with a boolean `IORef` for the pre-existing fast check. A populated inbox again completes its receive branch without reading the terminal `TVar`; an empty inbox reads it through `orElse` and remains wakeable. Terminal publication masks the two writes so cancellation cannot leave only the fast flag set.
 
+2026-09-20: Merely moving the terminal branch behind `receiveSTM` was insufficient: STM still retained every `orElse` alternative in the successful transaction and added roughly 100--130 allocated bytes per message on the serial path. Intake now performs a two-phase transaction. A populated inbox checks and receives in one branch-free transaction; only an observed-empty inbox enters the combined terminal/inbox/source-completion wait. The allocation probe is now below the audited baseline on the serial path while an idle terminal request still wakes the combined wait.
+
 
 ## Decision Log
 
