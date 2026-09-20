@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.9.0.3 — 2026-09-20
+
+A patch release that fixes two failure-delivery defects in `shibuya-core`, both
+caused by one unconditional thread link; public APIs and dependency bounds are
+unchanged.
 
 ### Bug Fixes
 
@@ -23,6 +27,8 @@
   `shibuya-core-gc-finished-test`, covering an application that has finished and
   whose handle has been dropped, and a lifecycle test asserting a single failure
   delivery. `cabal test shibuya-core` now runs three suites.
+- `shibuya-metrics`: version bumped to track `shibuya-core` 0.9.0.3 with an
+  updated `^>=0.9.0.3` core bound; no user-visible metrics changes.
 
 ## 0.9.0.2 — 2026-09-19
 
