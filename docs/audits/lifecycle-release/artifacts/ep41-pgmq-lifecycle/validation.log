@@ -1,0 +1,52 @@
+cabal build all
+  adapter library, example consumer, and endurance executable compiled against
+  exact candidate shibuya-core and shibuya-metrics
+  exit 0
+
+cabal haddock shibuya-pgmq-adapter
+  public PgmqAcknowledgementException included
+  existing Haddock link/coverage warnings retained
+  exit 0
+
+nix fmt
+  traversed 104 files
+  emitted 42 files for processing
+  formatted 7 files (0 changed)
+  exit 0
+
+nix flake check
+  checks.aarch64-darwin.pre-commit: pass
+  checks.aarch64-darwin.treefmt: pass
+  exit 0
+
+mori validate
+  configuration valid
+  warning: recorded schema hash differs from the current binary's embedded semantic hash;
+           Mori ignores that hash and validation succeeds
+  exit 0
+
+okf validate docs/capabilities --strict --profile docs/capabilities/profile.dhall --profile-enforce --log-enforce
+  OK: 6 concepts (okf_version 0.2)
+  exit 0
+
+okf graph docs/capabilities
+  emitted six capability nodes and six declared edges
+  exit 0
+
+Main Shibuya evidence gate:
+bun test scripts/audit/validate-evidence.test.ts
+  19 pass, 0 fail, 30 expectations
+  exit 0
+
+bun scripts/audit/validate-evidence.ts --inventory docs/audits/lifecycle-release/findings.json
+  Inventory valid: 52 findings, 15 boundaries, 70 mandatory cells, 5 exclusions.
+  exit 0
+
+mori validate
+  configuration valid with the same non-fatal recorded-vs-embedded schema-hash warning
+  exit 0
+
+nix flake check
+  checks.aarch64-darwin.pre-commit: pass
+  checks.aarch64-darwin.treefmt: pass
+  exit 0

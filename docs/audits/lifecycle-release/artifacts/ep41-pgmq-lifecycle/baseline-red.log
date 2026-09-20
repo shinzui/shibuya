@@ -1,0 +1,20 @@
+Command:
+cabal test shibuya-pgmq-adapter-test --test-options='-p discarded DLQ commit confirmation' --test-show-details=direct
+
+Identity:
+production source 392f7545af32ef893c24139fd194d16ec1172f75
+test-only patch SHA-256 9d0309be799ff8286a7046d0748ca48af4443ea76d8b7d83cfc5ed0847ecb042
+Shibuya source 4f11f02b763b1679b41af17647e8bd2717b1f4e3
+GHC 9.12.4, -O1
+QuickCheck seed 12880255
+
+Chaos Tests
+  Chaos
+    Poison messages
+      a discarded DLQ commit confirmation can be retried without creating a second copy: FAIL
+        expected: 1
+         but got: 2
+
+Finished in 1.1751 seconds
+1 example, 1 failure
+Test suite shibuya-pgmq-adapter-test: FAIL

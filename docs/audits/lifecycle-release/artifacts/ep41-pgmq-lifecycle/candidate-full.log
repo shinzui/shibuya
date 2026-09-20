@@ -1,0 +1,31 @@
+Command:
+cabal test shibuya-pgmq-adapter-test --enable-tests --test-show-details=direct
+
+Identity:
+adapter implementation 130b2502a9eaaa2d6f7f927baf9235510297a9f8
+adapter evidence candidate fe26ce9064999f6b4e373a6a283139c6f68a5971
+Shibuya source 4f11f02b763b1679b41af17647e8bd2717b1f4e3
+PostgreSQL 17.11 via ephemeral-pg
+GHC 9.12.4, -O1
+
+Focused EP-41 cases passed:
+- discarded DLQ commit confirmation converges on one durable copy
+- concurrent finalization converges on one durable copy
+- cancellation releases finalizer ownership and same-handle retry succeeds
+- failed DLQ move preserves the source and reaches LifecycleFailed
+- failed automatic DLQ remains visible and calls only the failure hook
+- lease renewal retries a transient outage within budget
+- database restart preserves lease-expiry redelivery of the same message identity
+- prefetch shutdown strands only a bounded buffer and loses no messages
+- repeated graceful shutdown returns the same completed result
+
+Whole-suite groups passed:
+- Unit Tests
+- Property Tests
+- Integration Tests
+- Chaos Tests
+- Database restart
+
+Finished in 60.4947 seconds
+177 examples, 0 failures
+Test suite shibuya-pgmq-adapter-test: PASS
