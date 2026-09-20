@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "minimumPairs": 10,
+  "confidenceLevel": 0.95,
+  "bootstrapIterations": 10000,
+  "resamplingSeed": 20260920,
+  "metrics": {
+    "throughputPerSecond": {
+      "direction": "higher-is-better",
+      "relativeLimit": 0.05
+    },
+    "latencyP95Ms": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.1
+    },
+    "latencyP99Ms": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.1
+    },
+    "shutdownLatencyMs": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.1
+    },
+    "allocatedBytesPerMessage": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.05
+    },
+    "maxLiveBytes": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.05
+    }
+  },
+  "scenarioMetrics": {
+    "idle-worker": {
+      "cpuPercent": {
+        "direction": "lower-is-better",
+        "nearZeroThreshold": 0.1,
+        "absoluteDelta": 1.0,
+        "absoluteMaximum": 2.0
+      },
+      "maxLiveBytes": {
+        "direction": "lower-is-better",
+        "nearZeroThreshold": 1,
+        "absoluteDelta": 1048576,
+        "absoluteMaximum": 8388608
+      }
+    }
+  },
+  "scenarioExclusions": {
+    "idle-worker": ["throughputPerSecond"],
+    "startup-shutdown": ["throughputPerSecond", "latencyP95Ms", "latencyP99Ms"]
+  }
+}

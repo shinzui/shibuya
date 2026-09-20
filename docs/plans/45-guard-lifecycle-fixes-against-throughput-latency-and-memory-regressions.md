@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Two-pass protocol with paused registry status; explicit dependency list without cancelled plan 42; three in-scope adapters."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T14:43:19Z
+      mode: "implement"
+      note: "Implemented pass-one lifecycle workloads and paired performance comparator"
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -41,9 +46,9 @@ Catch performance regressions before release using reproducible baseline/candida
 ## Progress
 
 
-- [ ] Milestone 1: Capture matched baseline data before remediation.
-- [ ] Milestone 2: Extend production-runner and lifecycle performance workloads.
-- [ ] Milestone 3: Implement and test the statistical performance comparator.
+- [ ] Milestone 1: Capture matched baseline data before remediation. The 0.9.0.3 production SHA, compiler and platform are identified; controlled N1/N4 sample capture remains.
+- [x] (2026-09-20 14:43Z) Milestone 2: Extend production-runner and lifecycle performance workloads.
+- [x] (2026-09-20 14:43Z) Milestone 3: Implement and test the statistical performance comparator.
 - [ ] Milestone 4: Measure fixed adapters and candidate soaks.
 - [ ] Milestone 5: Publish raw data and the candidate-bound performance verdict.
 
@@ -51,7 +56,17 @@ Catch performance regressions before release using reproducible baseline/candida
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+The original tasty-bench harness cannot be the release evidence format. It reports aggregate
+benchmark statistics, but does not retain end-to-end latency samples, acknowledgement counts,
+or one-process-per-sample GHC high-water marks. The new `lifecycle-load` executable therefore
+runs exactly one production-runner scenario and writes one JSON sample. The existing tasty
+suite imports the same scenario definitions for quick local regression feedback.
+
+The metrics package does not yet expose the test harness that EP-39 will add for HTTP health
+polling and real WebSocket subscriber churn. Pass one labels its internal registry-sampling
+scenarios `health-poll-proxy` and `websocket-churn-proxy`, and the emitted JSON says
+`core-proxy; ... belongs to EP-39`. This prevents proxy measurements from being mistaken for
+wire-protocol evidence while still freezing the core load shape before remediation.
 
 
 ## Decision Log
@@ -59,11 +74,25 @@ None yet; implementation has not started.
 
 2026-09-19: Performance evidence is a mandatory release gate with controlled paired comparisons; inconclusive results cannot be reported as no regression.
 
+2026-09-20: Use one bounded scenario per `lifecycle-load` process. GHC's `max_live_bytes` is a
+process high-water mark, so running multiple measured scenarios in one process would make later
+samples inherit earlier peaks. Tasty-bench remains a developer signal; JSON process samples are
+the comparator input.
+
+2026-09-20: Keep HTTP health and WebSocket churn measurements explicitly at proxy fidelity until
+EP-39 supplies its protocol harness. Recording a proxy as if it were an HTTP or WebSocket run
+would be weaker than leaving the final matrix cell open.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+Pass one now has a compiled production-runner workload catalog and a deterministic paired
+bootstrap comparator. The Haskell smoke matrix completed every expected delivery and
+acknowledgement across concurrency, partition, batching, retry, dead-letter, idle, observer and
+startup scenarios. The comparator's six synthetic tests prove pass, fail, inconclusive,
+environment-mismatch, dropped-work, absolute-budget and deterministic-seed behavior. Baseline
+capture remains before pass one can pause; no candidate performance verdict exists yet.
 
 
 ## Context and Orientation
@@ -96,6 +125,14 @@ Milestone 5 publishes matched raw data, summaries, machine metadata and a machin
 Run local commands from the Shibuya repository root unless the command block explicitly directs a change to a Mori-resolved project. New validator and comparator commands become available when their owning milestones implement them. Use the repository development shell if the compiler or services are missing; an unavailable dependency in offline mode requires an approved fetch, not removal of the test.
 
 ```bash
+cabal build shibuya-core-bench:lifecycle-load shibuya-core-bench:bench:shibuya-core-bench
+cabal run shibuya-core-bench:lifecycle-load -- --list
+cabal run shibuya-core-bench:lifecycle-load -- \
+  --scenario serial-small-inbox \
+  --sample-id smoke-serial \
+  --messages 200 \
+  +RTS -N1 -T -RTS
+bun test scripts/audit/compare-performance.test.ts
 cabal bench shibuya-core-bench --benchmark-options="--stdev 5 --timeout 300 --csv baseline.csv"
 cabal run shibuya-core-bench:prod-stress
 # In a matched candidate worktree, after capturing the baseline:
@@ -104,7 +141,11 @@ bun test scripts/audit/compare-performance.test.ts
 bun scripts/audit/compare-performance.ts --baseline baseline.json --candidate candidate.json --budgets docs/audits/lifecycle-release/performance-budgets.json
 ```
 
-Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
+The first build command succeeds under GHC 9.12.4. The comparator test command reports six
+passing tests. The smoke command emits one JSON object whose `expected`, `completed`, and
+`acknowledged` values are all 200. Successful suites exit zero and report executed tests; zero
+tests or skipped services are not acceptance. Record exact selectors and fixture commands in
+this section when the harness is extended.
 
 
 ## Validation and Acceptance
@@ -133,3 +174,8 @@ This plan runs in two passes. Pass one is Milestones 1 through 3. When they are 
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. Defined the two-pass protocol and its paused registry status, because as drafted this plan was listed ahead of the plans it must measure and could not finish until they did, which would have stalled plan selection. Replaced the dependency range that included the cancelled MessageDB plan with an explicit list, scoped adapter measurement to the three in-scope adapters, and noted the repository's new first ADR.
+
+2026-09-20 UTC: Implemented the pass-one workload and comparator interfaces. Added a shared
+production-runner scenario catalog, a one-scenario JSON load executable, precommitted budgets,
+and a deterministic paired bootstrap comparator with synthetic negative controls. Baseline data
+capture remains open so the harness can be committed first and its exact SHA recorded.

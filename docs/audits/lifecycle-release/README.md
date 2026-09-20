@@ -65,6 +65,36 @@ Changing an execution or performance budget after observation requires a named h
 owner, the reason, the affected release scope, and the revised value. Record that decision in
 the candidate and the owning plan. An agent never waives its own failed gate.
 
+## Performance evidence
+
+`performance-budgets.json` is the pre-remediation policy consumed by
+`scripts/audit/compare-performance.ts`. A comparison dataset contains at least ten matched
+pairs for every scenario. Each pair uses the same workload configuration, harness SHA, solver
+plan, compiler, optimization level, machine, service versions and RTS capability count. Run
+baseline and candidate processes in alternating order and give the two samples the same
+`pairId` and `ordinal`.
+
+The comparator uses a deterministic paired bootstrap over adverse ratios. For throughput,
+the adverse ratio is baseline divided by candidate; for latency and memory, it is candidate
+divided by baseline. A confidence interval wholly within the precommitted limit passes, one
+wholly beyond it fails, and one crossing it is inconclusive. Near-zero baseline values use
+the separately calibrated absolute idle budgets. Missing pairs, changed environments,
+different workload configurations, solver drift, harness drift, and any sample whose
+completed or acknowledged count differs from expected are hard failures.
+
+Run one workload per process so GHC high-water marks cannot leak between samples:
+
+```bash
+cabal run shibuya-core-bench:lifecycle-load -- \
+  --scenario serial-small-inbox \
+  --sample-id baseline-n1-01 \
+  +RTS -N1 -T -RTS
+```
+
+`health-poll-proxy` and `websocket-churn-proxy` exercise internal snapshot pressure only.
+Their JSON labels that fidelity explicitly; they do not satisfy the final HTTP or WebSocket
+cells. EP-39 supplies the real protocol fixtures before EP-45 pass two.
+
 ## Local and eventual CI commands
 
 Run from the Shibuya repository root. The same commands are the eventual CI entry points; CI
@@ -73,10 +103,16 @@ selectors.
 
 ```bash
 bun test scripts/audit/validate-evidence.test.ts
+bun test scripts/audit/compare-performance.test.ts
 bun scripts/audit/validate-evidence.ts \
   --inventory docs/audits/lifecycle-release/findings.json
 bun scripts/audit/validate-evidence.ts \
   --release docs/audits/lifecycle-release/candidates/<candidate-id>.json
+bun scripts/audit/compare-performance.ts \
+  --baseline <baseline-dataset.json> \
+  --candidate <candidate-dataset.json> \
+  --budgets docs/audits/lifecycle-release/performance-budgets.json \
+  --output <performance-verdict.json>
 ```
 
 Inventory success reports finding, boundary, mandatory-cell, and exclusion counts. Release

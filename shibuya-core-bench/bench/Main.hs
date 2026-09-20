@@ -6,6 +6,7 @@ import Bench.DeadLetterReason qualified as DeadLetterReason
 import Bench.Framework qualified as Framework
 import Bench.Handler qualified as Handler
 import Bench.HotPath qualified as HotPath
+import Bench.Lifecycle qualified as Lifecycle
 import Test.Tasty.Bench (defaultMain)
 
 main :: IO ()
@@ -16,5 +17,6 @@ main =
       Handler.benchmarks,
       Concurrency.benchmarks,
       HotPath.benchmarks,
+      Lifecycle.benchmarks,
       DeadLetterReason.benchmarks
     ]

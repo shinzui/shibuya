@@ -27,6 +27,32 @@ cabal bench shibuya-core-bench --benchmark-options="--stdev 5 --timeout 120"
 
 ## Running Benchmarks
 
+### Controlled lifecycle workloads
+
+EP-45 adds `lifecycle-load`, which drives the production `runSupervised` and
+`runSupervisedBatch` paths through bounded-inbox, partitioned, batching, retry,
+dead-letter, idle, observer and repeated-start/stop scenarios. Unlike tasty-bench, it runs
+one scenario once and prints JSON with end-to-end acknowledgement latency, throughput,
+allocation, live-heap, CPU, GC and shutdown measurements plus expected/completed/acknowledged
+counts.
+
+```bash
+cabal run shibuya-core-bench:lifecycle-load -- --list
+cabal run shibuya-core-bench:lifecycle-load -- \
+  --scenario serial-small-inbox \
+  --sample-id baseline-n1-01 \
+  +RTS -N1 -T -RTS
+cabal run shibuya-core-bench:lifecycle-load -- \
+  --scenario async-hot-key \
+  --sample-id baseline-n4-01 \
+  +RTS -N4 -T -RTS
+```
+
+Run every measured sample in a fresh process. `maxLiveBytes` is a process high-water mark,
+so combining scenarios would contaminate later samples. The health and WebSocket proxy
+scenarios measure internal snapshot pressure and are labeled as proxies in JSON; they are not
+substitutes for the live protocol fixtures owned by EP-39.
+
 ### Basic Commands
 
 ```bash
@@ -252,10 +278,12 @@ shibuya-core-bench/
 ├── README.md                  # This file
 └── bench/
     ├── Main.hs               # Entry point, combines all benchmarks
+    ├── Test/LifecycleLoad.hs # One-scenario JSON production load executable
     └── Bench/
         ├── Baseline.hs       # Pure streamly benchmarks
         ├── Framework.hs      # Shibuya overhead comparison
-        └── Handler.hs        # Handler pattern benchmarks
+        ├── Handler.hs        # Handler pattern benchmarks
+        └── Lifecycle.hs      # Shared lifecycle scenario catalog and measurements
 ```
 
 ### Benchmark Design
