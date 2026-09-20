@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Core plan becomes an integration-only soft dependency; record core <0.10 bound handling; owner marks adapter critical."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T21:15:00Z
+      mode: "implement"
+      note: "Begin implementation after EP-41 completion; resolve Kiroku, its accepted checkpoint ADR, and Effectful exception APIs through Mori before changing ownership transfer."
 ---
 
 # Make Kiroku subscription ownership exception safe
@@ -49,7 +54,17 @@ Ensure every acquired Kiroku subscription is either transferred to a live proces
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-20: Implementation starts from the unchanged reviewed Kiroku SHA
+`758b81acddf482b08643acf8802f095e621a3e07`. Mori resolves the owner as
+`mori://shinzui/kiroku`, the accepted checkpoint contract as
+`mori://shinzui/kiroku/okf/adrs/concepts/ADR-4`, and the masking/cleanup API to
+`mori://effectful/effectful`. The released baseline suite passes 32 examples against
+ephemeral PostgreSQL before fault regressions are added.
+
+2026-09-20: The checkout has an ignored user `cabal.project.local` that adds
+`codd-extras` with an incompatible historical `ephemeral-pg` bound. EP-43 preserves that file
+and uses dedicated imported Cabal project files for the reviewed baseline and exact candidate
+core instead of changing the user's environment.
 
 
 ## Decision Log

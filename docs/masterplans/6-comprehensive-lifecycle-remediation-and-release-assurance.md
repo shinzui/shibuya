@@ -87,7 +87,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Complete |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Complete |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
-| 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | Not Started |
+| 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | In Progress |
 | 44 | Certify the integrated lifecycle release candidate | [EP-44](../plans/44-certify-the-integrated-lifecycle-release-candidate.md) | EP-37, EP-38, EP-39, EP-40, EP-41, EP-43, EP-45; existing standalone EP-46; existing EP-34 and EP-35 compatibility gates | None | Not Started |
 
 Existing EP-34, EP-35 and EP-46 are not children of this MasterPlan. EP-46 is docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, the urgent standalone fix for REV-16, which ships as its own patch release and is expected to complete before any child here starts. The exact paths and compatibility responsibilities of all three are recorded in EP-44; their completion must be checked rather than inferred from old status prose. At this revision master plan 5 lists EP-34 and EP-35 as Not Started. EP-46 is Complete: its fix was published as shibuya-core and shibuya-metrics 0.9.0.3 on 2026-09-20, which makes 0.9.0.3 the released baseline for this initiative and moves EP-34's provisional release to 0.9.0.4. Existing EP-36 concerns only the MessageDB adapter and is no longer a prerequisite of anything here.
@@ -412,3 +412,8 @@ source row before conditional DLQ send and surfaces terminal finalizer failure w
 PostgreSQL red/green, restart, cancellation, repeated-stop, and performance evidence. Their
 ledger entries and all ten adapter persistence cells are closed. EP-43 is the next eligible
 child; EP-45 remains paused by its two-pass protocol.
+
+2026-09-20 UTC: Started EP-43 at the unchanged reviewed Kiroku baseline. Resolved the owner,
+accepted checkpoint ADR, and Effectful masking source through Mori; confirmed the 32-example
+released-baseline suite; and isolated the work from an incompatible ignored local Cabal
+override. EP-45 remains paused until this final Phase B child completes.
