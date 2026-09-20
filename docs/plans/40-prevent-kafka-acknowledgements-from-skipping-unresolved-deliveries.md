@@ -28,6 +28,11 @@ provenance:
       at: 2026-09-20T20:15:00Z
       mode: "implement"
       note: "Begin implementation after EP-39 completion; resolve adapter and Kafka dependencies through Mori before changing acknowledgement state."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T23:10:00Z
+      mode: "implement"
+      note: "Complete delivery and assignment fencing, terminal failure propagation, live-broker recovery evidence, capability documentation, and focused performance comparison."
 ---
 
 # Prevent Kafka acknowledgements from skipping unresolved deliveries
@@ -46,9 +51,9 @@ Prevent Kafka commits from crossing unresolved deliveries, and surface acknowled
 ## Progress
 
 
-- [ ] Milestone 1: Reproduce acknowledgement interleavings with a reference model.
-- [ ] Milestone 2: Fix unresolved-delivery tracking and terminal failure propagation.
-- [ ] Milestone 3: Verify recovery and reassignment against a live ephemeral broker.
+- [x] (2026-09-20 22:20Z) Milestone 1: Reproduce acknowledgement interleavings with a reference model.
+- [x] (2026-09-20 22:31Z) Milestone 2: Fix unresolved-delivery tracking and terminal failure propagation.
+- [x] (2026-09-20 23:04Z) Milestone 3: Verify recovery and reassignment against a live ephemeral broker.
 
 
 ## Surprises & Discoveries
@@ -61,17 +66,77 @@ Prevent Kafka commits from crossing unresolved deliveries, and surface acknowled
 checkout is clean and the core finalizer-failure contract needed for terminal acceptance is
 already complete, so no soft-gated work remains.
 
+2026-09-20: The unchanged baseline fails both promoted regressions. Buffered retries for
+offsets 42 then 43 seek `[42, 43]`, proving that the later callback replaces the earliest
+recovery boundary, and an acknowledgement operation that exhausts its retry budget returns
+normally instead of throwing. The test-only baseline patch and exact failures are retained in
+`docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/baseline-red.log`.
+
+2026-09-20: A live buffered-retry test initially waited for both replayed records before
+acknowledging either. It correctly blocked after the first replay because the repaired barrier
+must filter its successor until that replay succeeds. A single stateful stream fold that acks
+the boundary replay before awaiting its successor expresses the intended protocol and passes.
+
+2026-09-20: Throwing through `Error KafkaError` was not sufficient for terminal acknowledgement
+visibility: that effect is interpreted around the consumer, outside core's synchronous
+finalizer boundary. A typed synchronous exception reaches EP-38's retained failure path and
+produces `LifecycleFailed` even after the source has ended.
+
+2026-09-20: The actual-reassignment fixture observed librdkafka's BeforeAssign/Assign and
+BeforeRevoke/Revoke callback sequence with two consumers in one group. A callback retained by
+the revoked owner could not store; restarting the group recovered that partition's payload.
+
+2026-09-20: `nix flake check` exposes an unrelated pre-existing package-output defect: the
+generated `callCabal2nix` receives the repository root although the Cabal package is in the
+`shibuya-kafka-adapter/` subdirectory. Formatting, Cabal tests, and strict capability validation
+pass. The package-output failure is retained for EP-44's candidate-build gate rather than being
+misreported as an EP-40 pass.
+
 
 ## Decision Log
 
 
 2026-09-19: Prove the commit boundary against unresolved deliveries and assignment identity; numeric offset adjacency is not a correctness assumption.
 
+2026-09-20: Use a monotonic delivery token plus a per-partition assignment generation. The
+earliest unresolved offset and the token that requested its retry form the recovery barrier;
+only a newer replay at that offset may clear it. Successful duplicate finalization is a no-op,
+while failed or cancelled finalization remains retryable.
+
+2026-09-20: Make reassignment fencing opt-in through the existing `kafkaRebalanceHandler`
+surface. `kafka-effectful` requires callbacks before consumer construction, so silently
+installing one inside `kafkaAdapter` is impossible; callers share state through
+`kafkaAdapterWith` when they need old-owner fencing.
+
+2026-09-20: Surface exhausted store, seek, or pause operations as public
+`KafkaAcknowledgementException` synchronous exceptions. Retain the fatal slot for source
+diagnostics, but do not depend on a future poll for correctness.
+
+2026-09-20: Keep Kafka's absence of a DLQ producer as a deliberate capability boundary.
+`AckDeadLetter` continues to warn and store the offset; a nonexistent producer-failure path is
+documented as not applicable rather than simulated and claimed as broker evidence.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+Completed at adapter implementation SHA `554c969b1d95842628d0483f7ae6331c87249a84`
+and documentation/ADR SHA `796dc07238a053c5f114993fc9763e72f04d7b51`.
+Delivery-token barriers preserve the earliest unresolved record, assignment generations fence
+old-owner callbacks when the documented rebalance helper is installed, and exhausted
+acknowledgement operations reach core as retained processor failures. The final adapter suite
+passes 53 cases, including 13 live-broker integrations and all five mandatory Kafka persistence
+matrix cells.
+
+Ten alternating baseline/candidate runs of the unchanged live AckRetry workload measured a
+mean paired latency change of +0.123% with a 95% bootstrap interval of -0.117% to +0.334%,
+inside EP-45's 10% focused latency budget. This is child-plan evidence, not the final integrated
+performance verdict. The capability contract and changelog now name the opt-in rebalance fence,
+serial-only processing, deliberate DLQ drop behavior, and direct terminal exception. The
+durable state-machine rationale lives in
+`mori://shinzui/shibuya-kafka-adapter` at
+`docs/adr/0001-fence-acknowledgements-by-delivery-and-assignment.md` because an artifact-level
+ADR URI is not registered yet.
 
 
 ## Context and Orientation
@@ -112,6 +177,23 @@ cabal test shibuya-kafka-adapter --test-show-details=direct
 
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
 
+The accepted implementation used the following exact selectors in the Mori-resolved adapter
+checkout, with an ignored local package entry for the exact candidate core:
+
+```bash
+nix develop -c cabal test shibuya-kafka-adapter-test --test-options='-p AckHandle' --test-show-details=direct
+nix develop -c cabal test shibuya-kafka-adapter-test --test-options='-p Integration' --test-show-details=direct
+nix develop -c cabal test all --test-show-details=direct
+okf validate docs/capabilities --strict --profile docs/capabilities/profile.dhall --profile-enforce --log-enforce
+```
+
+The first command passes 16 cases, the live group passes 13, and the full suite passes all 53.
+The Redpanda endpoint was already running locally; tests created unique topics and group IDs and
+did not reset or stop the shared service. Focused performance alternated the baseline and
+candidate test binaries for ten pairs of `AckRetry redelivers within the same session`; raw
+samples and the deterministic bootstrap result are retained under
+`docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/`.
+
 
 ## Validation and Acceptance
 
@@ -141,3 +223,11 @@ Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-eviden
 2026-09-20 UTC: Started EP-40 after EP-39 completed. Resolved the clean adapter checkout and
 its Kafka dependencies through Mori, confirmed the reviewed baseline SHA, and confirmed that
 EP-38's terminal finalizer-failure contract is available for end-to-end acceptance.
+
+2026-09-20 UTC: Completed EP-40. Reproduced REV-10-F1 and REV-10-F2 against the reviewed
+baseline; implemented delivery-token, earliest-barrier, per-handle idempotence, typed terminal
+failure, and assignment-generation fencing; passed deterministic and live-broker recovery,
+restart, cancellation, timeout, repeated-stop, and actual reassignment cases; recorded the
+adapter ADR/capability changes and focused paired performance evidence. The pre-existing broken
+Nix default-package output remains explicit for EP-44 rather than being hidden by the passing
+Cabal and OKF checks.

@@ -32,6 +32,11 @@ provenance:
       at: 2026-09-20T14:31:28Z
       mode: "implement"
       note: "Started EP-45 performance baseline, workload, and comparator implementation"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T23:10:00Z
+      mode: "implement"
+      note: "Completed EP-40 Kafka acknowledgement remediation and evidence; advance to EP-41."
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -74,7 +79,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Complete |
-| 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | In Progress |
+| 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Complete |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Not Started |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
 | 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | Not Started |
@@ -154,9 +159,9 @@ and is verified, not tracked, here.
 - [x] EP-39 M2: Repair activity accounting and lifecycle-aware health.
 - [x] EP-39 M3: Fix WebSocket ownership, enablement and subscriptions.
 - [x] EP-39 M4: Verify endpoint compatibility and accounting together, and retire the metrics package's "unproven" caveat.
-- [ ] EP-40 M1: Reproduce Kafka acknowledgement interleavings with a reference model.
-- [ ] EP-40 M2: Fix unresolved-delivery tracking and terminal failure propagation.
-- [ ] EP-40 M3: Verify recovery and reassignment against a live ephemeral broker.
+- [x] EP-40 M1: Reproduce Kafka acknowledgement interleavings with a reference model.
+- [x] EP-40 M2: Fix unresolved-delivery tracking and terminal failure propagation.
+- [x] EP-40 M3: Verify recovery and reassignment against a live ephemeral broker.
 - [ ] EP-41 M1: Reproduce ambiguous commits and finalizer fault paths.
 - [ ] EP-41 M2: Implement durable idempotent DLQ movement.
 - [ ] EP-41 M3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
@@ -229,6 +234,22 @@ escaped the WAI application instead of producing 503. Catching only exceptions o
 `System.Timeout`. The same closeout confirmed that the only deliberate golden change is additive
 `lastProgress`; Prometheus remains byte-for-byte compatible.
 
+**Kafka recovery needs delivery identity as well as an offset (2026-09-20 UTC, EP-40).** The
+reviewed barrier stored only one offset, so a later buffered retry overwrote the earliest
+obligation and the original callback was indistinguishable from its replay. Delivery tokens
+plus assignment generations make both distinctions explicit. The unchanged baseline fails the
+two promoted regressions; the candidate passes deterministic seeds, live buffered retry/restart,
+and an actual two-consumer reassignment. Exhausted acknowledgement errors also require a typed
+synchronous exception: the Kafka `Error` effect sits outside core's finalizer boundary and
+cannot by itself produce the retained `LifecycleFailed` result after ingestion ends.
+
+**The Kafka adapter's Nix default package was already unevaluable as a build (2026-09-20 UTC,
+EP-40).** `nix flake check` reaches a generated `callCabal2nix` invocation at the repository
+root, where no Cabal file exists; the real package is one directory below. EP-40's formatting,
+Cabal, live-broker, and strict OKF checks pass, but the Nix package output does not. This is
+preserved as an EP-44 candidate-build obligation rather than silently omitted or conflated with
+the acknowledgement fix.
+
 
 ## Decision Log
 
@@ -258,6 +279,13 @@ escaped the WAI application instead of producing 503. Catching only exceptions o
 source-SHA map and solver-plan hash are the unit of freshness; a changed input creates a new
 candidate and reruns affected evidence rather than editing old artifacts. This makes stale
 evidence rejection consistent across all five remediation streams and final certification.
+
+2026-09-20: Accept EP-40's Kafka acknowledgement state machine at adapter implementation SHA
+`554c969b1d95842628d0483f7ae6331c87249a84`. The earliest unresolved delivery remains the
+barrier until a newer replay succeeds; installed rebalance callbacks fence old assignment
+generations; terminal ack exhaustion is a processor failure. Serial processing and the absence
+of a DLQ producer remain explicit adapter limits. The focused live AckRetry comparison passes,
+while EP-45 retains ownership of the final adapter matrix and soak.
 
 2026-09-20: Accept EP-45's 0.9.0.3 N1/N4 capture as pre-remediation calibration and pause the
 plan after Milestone 3. The capture fixes the absolute idle budgets before candidate observation

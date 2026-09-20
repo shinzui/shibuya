@@ -1,0 +1,17 @@
+{
+  "workload": "AckRetry redelivers within the same session",
+  "runsPerVariant": 10,
+  "ordering": "alternating, pair order reversed on even pairs",
+  "bootstrap": {
+    "resamples": 100000,
+    "seed": 400040,
+    "statistic": "mean paired candidate/baseline elapsed-time ratio"
+  },
+  "baselineMeanSeconds": 3.524629092216492,
+  "candidateMeanSeconds": 3.528929829597473,
+  "meanPairedRatio": 1.0012268815968994,
+  "latencyChangePercent": 0.12268815968994318,
+  "latencyChangeCi95Percent": [-0.11721512580290527, 0.3343511849744685],
+  "budgetPercent": 10.0,
+  "verdict": "pass"
+}

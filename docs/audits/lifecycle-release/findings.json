@@ -508,13 +508,16 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-10-kafka-acknowledgement-audit.md", "reviewedSha": "6c0cd3fc840c9f5ba48558ca94c7d826a3da6c9f" },
       "claim": "A buffered later retry can overwrite the earliest unresolved offset and permit commit past unresolved work.",
-      "confirmation": "source",
+      "confirmation": "runtime",
       "owner": "docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md",
       "invariant": "The earliest unresolved offset remains a barrier until that delivery succeeds, regardless of later buffered finalization.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [
+        { "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/AckHandleTest.hs" },
+        { "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/IntegrationTest.hs" }
+      ],
+      "fixSha": "554c969b1d95842628d0483f7ae6331c87249a84",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-10-F2",
@@ -525,13 +528,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-10-kafka-acknowledgement-audit.md", "reviewedSha": "6c0cd3fc840c9f5ba48558ca94c7d826a3da6c9f" },
       "claim": "Exhausted acknowledgement failure can be stored for a source step that never occurs after source termination.",
-      "confirmation": "source",
+      "confirmation": "runtime",
       "owner": "docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md",
       "invariant": "Finalization failure is observed through drain completion even when the source has already terminated.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/AckHandleTest.hs" }],
+      "fixSha": "554c969b1d95842628d0483f7ae6331c87249a84",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-10-A1",
@@ -545,10 +548,13 @@
       "confirmation": "documented",
       "owner": "docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md",
       "invariant": "Tests and release claims remain inside these documented adapter contracts.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "accepted", "rationale": "These are explicit adapter capability boundaries rather than newly discovered regressions." }
+      "regressionTests": [
+        { "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/AckHandleTest.hs" },
+        { "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/IntegrationTest.hs" }
+      ],
+      "fixSha": "554c969b1d95842628d0483f7ae6331c87249a84",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md" }],
+      "disposition": { "status": "accepted", "rationale": "Serial processing and the absence of a DLQ producer remain explicit boundaries. The prior lack of cooperative-rebalance fencing is remediated when callers install kafkaRebalanceHandler; live two-consumer evidence proves the old owner's callback is rejected." }
     },
     {
       "id": "REV-10-A2",
@@ -562,10 +568,10 @@
       "confirmation": "documented",
       "owner": "docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md",
       "invariant": "Live-broker shutdown evidence demonstrates no unresolved offset is skipped under the documented commit timing.",
-      "regressionTests": [],
+      "regressionTests": [{ "uri": "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter", "path": "test/Shibuya/Adapter/Kafka/IntegrationTest.hs" }],
       "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md" }],
+      "disposition": { "status": "accepted", "rationale": "Live buffered-retry, restart, idle-shutdown, and repeated-shutdown cases preserve the documented close-time commit contract without skipping unresolved work." }
     },
     {
       "id": "REV-11-F1",
@@ -1080,11 +1086,11 @@
       "description": "Offset barriers, seek/replay, finalizer failure, rebalance, and committed acknowledgement state.",
       "owner": "docs/plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/candidate-full.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/candidate-ackhandle.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/candidate-ackhandle.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/candidate-ackhandle.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/candidate-full.log"] }
       }
     },
     {

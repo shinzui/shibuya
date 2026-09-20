@@ -1,0 +1,30 @@
+Command:
+nix develop -c cabal test all --test-show-details=direct
+
+Identity:
+adapter implementation 554c969b1d95842628d0483f7ae6331c87249a84
+adapter candidate 796dc07238a053c5f114993fc9763e72f04d7b51
+Shibuya source 96992dfb3d11a55f50c5443bc7321d3a90e61a47
+Redpanda 26.2.1
+GHC 9.12.4, -O1
+
+Groups:
+- AckHandle: 16 passed
+- Adapter: 2 passed
+- Convert: 22 passed
+- Integration: 13 passed
+
+Live integration cases include:
+- Basic produce-consume
+- Offset commit verification
+- Multi-partition distribution
+- Batch polling
+- Graceful, idle, and repeated shutdown
+- AckRetry same-session redelivery and abandoned-session recovery
+- later buffered retry preserves the earliest recovery boundary
+- late callback after synthetic revocation cannot advance broker offset
+- actual two-consumer reassignment fences the old owner
+- handler exception redelivers instead of skipping
+
+All 53 tests passed (10.82s)
+Test suite shibuya-kafka-adapter-test: PASS

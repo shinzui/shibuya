@@ -1,0 +1,33 @@
+nix fmt
+  traversed 108 files
+  emitted 28 files for processing
+  formatted 3 files (1 changed before the final commit)
+  exit 0
+
+okf validate docs/capabilities --strict --profile docs/capabilities/profile.dhall --profile-enforce --log-enforce
+  OK: 4 concepts (okf_version 0.2)
+  exit 0
+
+nix flake check
+  pre-commit and treefmt evaluation passed
+  packages.aarch64-darwin.default failed
+  cabal2nix: Found neither a .cabal file nor package.yaml
+  cause: generated packages.default passes the repository root to callCabal2nix,
+         while the package lives in shibuya-kafka-adapter/
+  disposition: pre-existing repository packaging failure; retain as an explicit
+               EP-44 candidate-build obligation, not an EP-40 pass
+  exit 1
+
+Main Shibuya evidence gate:
+bun test scripts/audit/validate-evidence.test.ts
+  19 pass, 0 fail, 30 expectations
+  exit 0
+
+bun scripts/audit/validate-evidence.ts --inventory docs/audits/lifecycle-release/findings.json
+  Inventory valid: 52 findings, 15 boundaries, 70 mandatory cells, 5 exclusions.
+  exit 0
+
+nix flake check
+  checks.aarch64-darwin.pre-commit: pass
+  checks.aarch64-darwin.treefmt: pass
+  exit 0

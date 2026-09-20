@@ -73,6 +73,12 @@ passed cell to the full core/GC run or the 100-seed schedule-repetition log, ind
 in-scope adapter rows stay open for their owning children; this is not an integrated release
 verdict.
 
+EP-40 completed all five Kafka persistence cells at adapter implementation SHA
+`554c969b1d95842628d0483f7ae6331c87249a84`. Evidence combines deterministic mock
+interleavings with live Redpanda retry, restart, actual reassignment, and repeated-shutdown
+cases, indexed by `docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md`.
+PGMQ and Kiroku remain open, and EP-45 still owns the final adapter performance matrix.
+
 EP-39 completed all ten mandatory metrics/health and Metrics WebSocket cells at implementation
 SHA `6535a036827c0bdfa1dd8c8a3ca9d228776f3f51`. The inventory points every passed cell to the
 48-example real-endpoint metrics run, indexed by

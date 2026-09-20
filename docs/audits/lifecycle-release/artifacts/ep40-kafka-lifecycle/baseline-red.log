@@ -1,0 +1,26 @@
+Command:
+nix develop -c cabal test shibuya-kafka-adapter-test --test-options='-p AckHandle' --test-show-details=direct
+
+Identity:
+production source 6c0cd3fc840c9f5ba48558ca94c7d826a3da6c9f
+test-only patch SHA-256 a084fd2f18cffe5c34b604353d214178171e78414e96fbd8df4081ace5149d00
+GHC 9.12.4, -O1
+
+shibuya-kafka-adapter
+  AckHandle
+    transient store failures retry and then succeed:                        OK
+    persistent transient store failure records fatal slot without throwing: OK
+    fatal store failure records fatal slot after one attempt:               OK
+    AckHalt pause failure does not throw and records fatal slot:            OK
+    AckRetry seeks exact failed offset and does not store:                  OK
+    seek barrier prevents stale successor store:                            OK
+    earliest retry survives a later buffered retry:                         FAIL
+      both retries seek the earliest unresolved offset
+      expected: [orders-0@42, orders-0@42]
+       but got: [orders-0@42, orders-0@43]
+    exhausted acknowledgement throws immediately:                           FAIL
+      exhausted acknowledgement returned instead of throwing
+    source observes fatal slot before polling:                              OK
+
+2 out of 9 tests failed (0.10s)
+Test suite shibuya-kafka-adapter-test: FAIL

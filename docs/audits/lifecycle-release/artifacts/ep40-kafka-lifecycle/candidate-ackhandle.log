@@ -1,0 +1,22 @@
+Command:
+nix develop -c cabal test shibuya-kafka-adapter-test --test-options='-p AckHandle' --test-show-details=direct
+
+Identity:
+adapter source 796dc07238a053c5f114993fc9763e72f04d7b51
+Shibuya source 96992dfb3d11a55f50c5443bc7321d3a90e61a47
+GHC 9.12.4, -O1
+
+AckHandle cases passed:
+- transient, persistent, and fatal store behavior
+- AckHalt pause failure propagation
+- exact retry seek and bounded seek timeout
+- stale-successor, earliest-retry, replay-token, and duplicate-finalization barriers
+- fixed-seed reference sequences 400040 through 400049
+- exhausted acknowledgement synchronous exception
+- revoke generation fence
+- cancellation releases finalizer and consumer ownership
+- terminal failure reaches LifecycleFailed after source completion
+- source diagnostic slot
+
+All 16 tests passed (0.32s)
+Test suite shibuya-kafka-adapter-test: PASS
