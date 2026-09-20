@@ -1,0 +1,48 @@
+Kiroku repository:
+
+cabal test shibuya-kiroku-adapter-test --test-show-details=direct
+  38 examples, 0 failures
+  exit 0
+
+cabal test kiroku-store-test --test-show-details=direct
+  308 examples, 0 failures
+  exit 0
+
+cabal check (shibuya-kiroku-adapter)
+  no errors or warnings
+  exit 0
+
+nix fmt
+  traversed 454 files
+  emitted 130 files for processing
+  formatted 7 files (1 changed and committed)
+  exit 0
+
+nix flake check
+  pre-commit and treefmt checks pass; incompatible-system outputs are warnings only
+  exit 0
+
+just capabilities-validate
+  21 concepts and capability graph pass
+  non-fatal Mori recorded-vs-embedded schema-hash warning retained
+  exit 0
+
+Main Shibuya evidence gate:
+
+bun test scripts/audit/validate-evidence.test.ts
+  19 pass, 0 fail, 30 expectations
+  updated the intentionally incomplete-candidate assertion to the remaining open REV-15-L1
+  exit 0
+
+bun scripts/audit/validate-evidence.ts --inventory docs/audits/lifecycle-release/findings.json
+  Inventory valid: 52 findings, 15 boundaries, 70 mandatory cells, 5 exclusions.
+  exit 0
+
+mori validate
+  configuration valid with a non-fatal recorded-vs-embedded schema-hash warning
+  exit 0
+
+nix flake check
+  checks.aarch64-darwin.pre-commit: pass
+  checks.aarch64-darwin.treefmt: pass
+  exit 0

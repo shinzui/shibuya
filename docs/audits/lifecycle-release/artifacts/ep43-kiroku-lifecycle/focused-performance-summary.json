@@ -1,0 +1,17 @@
+{
+  "workload": "kirokuAdapter / shuts down all subscriptions coordinately",
+  "runsPerVariant": 10,
+  "ordering": "alternating, pair order reversed on even pairs",
+  "bootstrap": {
+    "resamples": 100000,
+    "seed": 430043,
+    "statistic": "mean paired candidate/baseline elapsed-time ratio"
+  },
+  "baselineMeanSeconds": 0.34995,
+  "candidateMeanSeconds": 0.35034,
+  "meanPairedRatio": 0.9991965851508693,
+  "latencyChangePercent": -0.08034148491307125,
+  "latencyChangeCi95Percent": [-3.372526211568072, 4.294037040940557],
+  "budgetPercent": 10.0,
+  "verdict": "pass"
+}

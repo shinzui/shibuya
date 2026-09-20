@@ -1,0 +1,22 @@
+Command:
+cabal test shibuya-kiroku-adapter-test --test-show-details=direct
+
+Identity:
+production source 758b81acddf482b08643acf8802f095e621a3e07
+test-only patch SHA-256 b3e9cdcf024171e6156846472b7052b688e252f46c78e985ccfb2fe2152d443b
+Shibuya source b2b0332133b4251c92b82787264aafe4b83fef3f
+GHC 9.12.4, -O1
+Hspec seed 571275122
+
+kirokuConsumerGroupProcessorsWith
+  shuts down every created member and preserves the factory failure when cleanup throws: FAIL
+    expected exception containing: member 2 failed
+    got: user error (member 1 cleanup failed)
+
+The unchanged `mapM_` cleanup also stops at member 1 rather than attempting member 0. The
+primary-error assertion fails first, so the later expected shutdown order `[1, 0]` is not
+reached in this red run.
+
+Finished in 6.8390 seconds
+32 examples, 1 failure
+Test suite shibuya-kiroku-adapter-test: FAIL

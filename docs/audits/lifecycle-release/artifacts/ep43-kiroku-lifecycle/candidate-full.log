@@ -1,0 +1,38 @@
+Command:
+cabal --project-file=cabal.ep43-candidate.project test shibuya-kiroku-adapter-test --test-show-details=direct
+
+Identity:
+Kiroku implementation eb67688690d5e96427cb8ff6cbf1488b81c279cf
+Shibuya source b2b0332133b4251c92b82787264aafe4b83fef3f
+PostgreSQL 17.11 via ephemeral-pg
+GHC 9.12.4, -O1
+
+Focused EP-43 cases passed:
+- every acquired group member is shut down after a later factory failure
+- a throwing cleanup does not skip earlier members or replace the primary error
+- cancellation sees MaskedInterruptible after member return and cleans the owned member
+- duplicate acknowledgement finalization preserves the first reply
+- AckHalt does not advance the checkpoint and restart replays the event
+- shutdown after AckOk but before checkpoint persistence replays without leaking
+- an existing checkpoint wins when restart requests FromCurrentHead
+- FailIfMissing surfaces the typed missing-checkpoint error without a registry entry
+- synchronous handler exceptions finalize an immediate retry decision
+- retry, dead-letter, source-error, and coordinated-shutdown paths remain passing
+
+Finished in 8.6815 seconds
+38 examples, 0 failures
+Test suite shibuya-kiroku-adapter-test: PASS
+
+Command:
+cabal --project-file=cabal.ep43-baseline.project test kiroku-store-test --test-show-details=direct
+
+Focused bridge case passed:
+- cancelAction is idempotent and leaves no subscription thread registered
+
+Whole-suite groups passed, including subscription bridges, registry, checkpoint
+initialization/policies, worker restart, consumer groups, retry/dead-letter dispositions,
+concurrency, failure injection, and production query plans.
+
+Finished in 51.4130 seconds
+308 examples, 0 failures
+Test suite kiroku-store-test: PASS

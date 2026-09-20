@@ -77,7 +77,20 @@ EP-40 completed all five Kafka persistence cells at adapter implementation SHA
 `554c969b1d95842628d0483f7ae6331c87249a84`. Evidence combines deterministic mock
 interleavings with live Redpanda retry, restart, actual reassignment, and repeated-shutdown
 cases, indexed by `docs/audits/lifecycle-release/artifacts/ep40-kafka-lifecycle/README.md`.
-PGMQ and Kiroku remain open, and EP-45 still owns the final adapter performance matrix.
+
+EP-41 completed all five PGMQ persistence cells at adapter implementation SHA
+`130b2502a9eaaa2d6f7f927baf9235510297a9f8`. Its ephemeral-PostgreSQL evidence covers
+transactional dead-letter claims, ambiguous confirmation, cancellation, outage/restart, and
+repeated shutdown, indexed by
+`docs/audits/lifecycle-release/artifacts/ep41-pgmq-lifecycle/README.md`.
+
+EP-43 completed all five Kiroku persistence cells at implementation SHA
+`eb67688690d5e96427cb8ff6cbf1488b81c279cf`. Its deterministic acquisition tests and
+ephemeral-PostgreSQL restart matrix cover primary-error preservation, cancellation at ownership
+transfer, acknowledgement/checkpoint replay, startup policies, idempotent bridge cancellation,
+and registry cleanup, indexed by
+`docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md`. All three in-scope
+adapter rows are complete; EP-45 still owns the final integrated adapter performance matrix.
 
 EP-39 completed all ten mandatory metrics/health and Metrics WebSocket cells at implementation
 SHA `6535a036827c0bdfa1dd8c8a3ca9d228776f3f51`. The inventory points every passed cell to the

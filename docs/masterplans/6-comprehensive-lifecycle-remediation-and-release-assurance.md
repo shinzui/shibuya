@@ -42,6 +42,11 @@ provenance:
       at: 2026-09-20T21:08:00Z
       mode: "implement"
       note: "Completed EP-41 PGMQ acknowledgement and durable dead-letter recovery remediation; advance to EP-43."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T21:45:00Z
+      mode: "implement"
+      note: "Completed EP-43 Kiroku ownership and checkpoint-recovery remediation; resume EP-45 pass two."
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -81,13 +86,13 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 37 | Establish lifecycle assurance coverage and evidence gates | [EP-37](../plans/37-establish-lifecycle-assurance-coverage-and-evidence-gates.md) | None | None | Complete |
-| 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (paused after Milestone 3; resumes when EP-38, EP-39, EP-40, EP-41 and EP-43 are Complete) |
+| 45 | Guard lifecycle fixes against throughput latency and memory regressions | [EP-45](../plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md) | EP-37 | EP-38, EP-39, EP-40, EP-41, EP-43 for final measurements; two-pass, see Dependency Graph | In Progress (pass two active) |
 | 38 | Make core processor ownership and termination exception safe | [EP-38](../plans/38-make-core-processor-ownership-and-termination-exception-safe.md) | EP-37 | Existing standalone EP-46 lands first in Master.hs; EP-45 baseline and focused measurements | Complete |
 | 39 | Make metrics health and WebSocket lifecycle reporting trustworthy | [EP-39](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md) | EP-37 | EP-38 Milestone 4 snapshot gates lifecycle-aware health; EP-45 measurements | Complete |
 | 40 | Prevent Kafka acknowledgements from skipping unresolved deliveries | [EP-40](../plans/40-prevent-kafka-acknowledgements-from-skipping-unresolved-deliveries.md) | EP-37 | EP-38 Milestone 3 failure contract gates terminal-acknowledgement acceptance; EP-45 measurements | Complete |
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Complete |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
-| 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | In Progress |
+| 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | Complete |
 | 44 | Certify the integrated lifecycle release candidate | [EP-44](../plans/44-certify-the-integrated-lifecycle-release-candidate.md) | EP-37, EP-38, EP-39, EP-40, EP-41, EP-43, EP-45; existing standalone EP-46; existing EP-34 and EP-35 compatibility gates | None | Not Started |
 
 Existing EP-34, EP-35 and EP-46 are not children of this MasterPlan. EP-46 is docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, the urgent standalone fix for REV-16, which ships as its own patch release and is expected to complete before any child here starts. The exact paths and compatibility responsibilities of all three are recorded in EP-44; their completion must be checked rather than inferred from old status prose. At this revision master plan 5 lists EP-34 and EP-35 as Not Started. EP-46 is Complete: its fix was published as shibuya-core and shibuya-metrics 0.9.0.3 on 2026-09-20, which makes 0.9.0.3 the released baseline for this initiative and moves EP-34's provisional release to 0.9.0.4. Existing EP-36 concerns only the MessageDB adapter and is no longer a prerequisite of anything here.
@@ -170,9 +175,9 @@ and is verified, not tracked, here.
 - [x] EP-41 M1: Reproduce ambiguous commits and finalizer fault paths.
 - [x] EP-41 M2: Implement durable idempotent DLQ movement.
 - [x] EP-41 M3: Verify leases, outage recovery and restart on ephemeral PostgreSQL.
-- [ ] EP-43 M1: Reproduce member acquisition and cleanup ownership gaps.
-- [ ] EP-43 M2: Implement exception-safe group ownership transfer.
-- [ ] EP-43 M3: Verify acknowledgement and checkpoint recovery with the real store.
+- [x] EP-43 M1: Reproduce member acquisition and cleanup ownership gaps.
+- [x] EP-43 M2: Implement exception-safe group ownership transfer.
+- [x] EP-43 M3: Verify acknowledgement and checkpoint recovery with the real store.
 - [ ] EP-45 M4: Measure fixed adapters and candidate soaks.
 - [ ] EP-45 M5: Publish raw data and the candidate-bound performance verdict.
 - [ ] EP-44 M1: Freeze an exact compatible candidate manifest, including the core version and adapter bounds.
@@ -312,6 +317,12 @@ second copy. Exception-safe per-handle ownership and typed terminal failure cove
 cancellation, and core lifecycle visibility. At-least-once delivery and lease-expiry replay
 remain explicit; exactly-once application side effects are not claimed.
 
+2026-09-20: Accept EP-43's masked acquisition ledger and store-bridge handoff at Kiroku
+implementation SHA `eb67688690d5e96427cb8ff6cbf1488b81c279cf`. Cleanup attempts every
+acquired member without replacing the primary failure, and deterministic cancellation cannot
+strand a returned subscription. The real-store matrix preserves ADR-4's at-least-once replay,
+existing-checkpoint, and missing-checkpoint semantics; exactly-once side effects are not claimed.
+
 2026-09-20: Accept EP-45's 0.9.0.3 N1/N4 capture as pre-remediation calibration and pause the
 plan after Milestone 3. The capture fixes the absolute idle budgets before candidate observation
 but is marked ineligible for final paired comparison, because a candidate did not yet exist to
@@ -358,8 +369,14 @@ EP-41 completed PGMQ persistence remediation at implementation SHA
 `fe26ce9064999f6b4e373a6a283139c6f68a5971`. It closes the ambiguous-commit, concurrency,
 and automatic-failure entries, runtime-verifies lease-expiry replay, and passes all five PGMQ
 persistence cells with 177 examples against ephemeral PostgreSQL. The focused live AckOk
-latency interval is +0.039% to +4.214%, inside the inherited 10% budget. EP-43 is now the only
-unfinished Phase B remediation child; EP-45 remains paused until it completes.
+latency interval is +0.039% to +4.214%, inside the inherited 10% budget.
+
+EP-43 completed Kiroku ownership remediation at implementation SHA
+`eb67688690d5e96427cb8ff6cbf1488b81c279cf`. It closes the acquisition/cleanup defect and
+the real-store and documentation limitations, runtime-verifies the accepted replay assumption,
+and passes all five Kiroku persistence cells with 38 adapter and 308 store examples against
+ephemeral PostgreSQL. The focused shutdown latency interval is -3.373% to +4.294%, inside the
+inherited 10% budget. All Phase B remediation children are complete, so EP-45 pass two resumes.
 
 
 ## Revision Notes
@@ -417,3 +434,10 @@ child; EP-45 remains paused by its two-pass protocol.
 accepted checkpoint ADR, and Effectful masking source through Mori; confirmed the 32-example
 released-baseline suite; and isolated the work from an incompatible ignored local Cabal
 override. EP-45 remains paused until this final Phase B child completes.
+
+2026-09-20 UTC: Completed EP-43. Kiroku now owns each returned subscription before
+cancellation can interrupt construction, attempts all LIFO cleanup while preserving the primary
+error, and closes the store bridge's subscribe-to-monitor handoff. Deterministic real-store tests
+prove AckHalt and pre-save replay, existing and missing checkpoint policies, idempotent bridge
+cancellation, and empty registry cleanup. All five Kiroku cells and REV-13 entries are closed;
+focused performance passes, so EP-45 resumes for its final candidate matrix.

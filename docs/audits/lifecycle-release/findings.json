@@ -735,13 +735,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-13-kiroku-lifecycle-audit.md", "reviewedSha": "758b81acddf482b08643acf8802f095e621a3e07" },
       "claim": "Consumer-group acquisition and cleanup are not exception safe, so cancellation or cleanup failure can strand subscriptions.",
-      "confirmation": "source",
+      "confirmation": "runtime",
       "owner": "docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md",
       "invariant": "Failure or cancellation at every member acquisition boundary terminates every acquired subscription while preserving the original error.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter", "path": "test/Main.hs" }],
+      "fixSha": "eb67688690d5e96427cb8ff6cbf1488b81c279cf",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-13-A1",
@@ -752,12 +752,12 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-13-kiroku-lifecycle-audit.md", "reviewedSha": "758b81acddf482b08643acf8802f095e621a3e07" },
       "claim": "AckHalt cancels without checkpoint advancement and immediate shutdown can replay late work.",
-      "confirmation": "documented",
+      "confirmation": "runtime",
       "owner": "docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md",
       "invariant": "Integration tests preserve the explicit replay and missing-checkpoint policy in mori://shinzui/kiroku/okf/adrs/concepts/ADR-4.",
-      "regressionTests": [],
+      "regressionTests": [{ "uri": "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter", "path": "test/Main.hs" }],
       "fixSha": null,
-      "evidence": [],
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md" }],
       "disposition": { "status": "accepted", "rationale": "At-least-once replay is an intentional checkpoint contract." }
     },
     {
@@ -769,13 +769,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-13-kiroku-lifecycle-audit.md", "reviewedSha": "758b81acddf482b08643acf8802f095e621a3e07" },
       "claim": "No live database integration or exact checkpoint durability certification was performed.",
-      "confirmation": "documented",
+      "confirmation": "runtime",
       "owner": "docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md",
       "invariant": "The real-store restart matrix proves acknowledgement and checkpoint recovery before certification.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter", "path": "test/Main.hs" }],
+      "fixSha": "eb67688690d5e96427cb8ff6cbf1488b81c279cf",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-13-L2",
@@ -786,13 +786,13 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-13-kiroku-lifecycle-audit.md", "reviewedSha": "758b81acddf482b08643acf8802f095e621a3e07" },
       "claim": "Adapter documentation still claims supervised handler exceptions are not finalized, although current core converts them to AckRetry.",
-      "confirmation": "source",
+      "confirmation": "verified",
       "owner": "docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md",
       "invariant": "Published adapter documentation matches the candidate core's handler-exception behavior.",
-      "regressionTests": [],
-      "fixSha": null,
-      "evidence": [],
-      "disposition": { "status": "open" }
+      "regressionTests": [{ "uri": "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter", "path": "test/Main.hs" }],
+      "fixSha": "eb67688690d5e96427cb8ff6cbf1488b81c279cf",
+      "evidence": [{ "path": "docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md" }],
+      "disposition": { "status": "fixed" }
     },
     {
       "id": "REV-14-V1",
@@ -1110,11 +1110,11 @@
       "description": "Subscription acquisition, acknowledgement coupling, checkpoint policy, cleanup, and restart.",
       "owner": "docs/plans/43-make-kiroku-subscription-ownership-exception-safe.md",
       "cases": {
-        "normal": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "synchronousException": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "cancellation": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "timeout": { "requirement": "mandatory", "status": "open", "evidence": [] },
-        "repeatedStop": { "requirement": "mandatory", "status": "open", "evidence": [] }
+        "normal": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/candidate-full.log"] },
+        "synchronousException": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/candidate-full.log"] },
+        "cancellation": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/candidate-full.log"] },
+        "timeout": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/candidate-full.log"] },
+        "repeatedStop": { "requirement": "mandatory", "status": "passed", "evidence": ["docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/candidate-full.log"] }
       }
     },
     {

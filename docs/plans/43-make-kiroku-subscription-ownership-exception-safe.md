@@ -28,6 +28,11 @@ provenance:
       at: 2026-09-20T21:15:00Z
       mode: "implement"
       note: "Begin implementation after EP-41 completion; resolve Kiroku, its accepted checkpoint ADR, and Effectful exception APIs through Mori before changing ownership transfer."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T21:45:00Z
+      mode: "implement"
+      note: "Complete exception-safe ownership transfer, bridge handoff cleanup, real-store checkpoint recovery, red/green evidence, and focused performance validation."
 ---
 
 # Make Kiroku subscription ownership exception safe
@@ -46,9 +51,9 @@ Ensure every acquired Kiroku subscription is either transferred to a live proces
 ## Progress
 
 
-- [ ] Milestone 1: Reproduce member acquisition and cleanup ownership gaps.
-- [ ] Milestone 2: Implement exception-safe group ownership transfer.
-- [ ] Milestone 3: Verify acknowledgement and checkpoint recovery with the real store.
+- [x] Milestone 1: Reproduce member acquisition and cleanup ownership gaps (2026-09-20 21:23 UTC).
+- [x] Milestone 2: Implement exception-safe group ownership transfer (2026-09-20 21:32 UTC).
+- [x] Milestone 3: Verify acknowledgement and checkpoint recovery with the real store (2026-09-20 21:45 UTC).
 
 
 ## Surprises & Discoveries
@@ -66,17 +71,61 @@ ephemeral PostgreSQL before fault regressions are added.
 and uses dedicated imported Cabal project files for the reviewed baseline and exact candidate
 core instead of changing the user's environment.
 
+2026-09-20: The reviewed implementation fails the cleanup-fault regression: member 1 cleanup
+replaces the primary `member 2 failed` acquisition error, and the plain `mapM_` would not reach
+member 0. The test-only patch SHA-256 is
+`b3e9cdcf024171e6156846472b7052b688e252f46c78e985ccfb2fe2152d443b`; seed
+`571275122` produced 32 examples with one failure.
+
+2026-09-20: Masking group construction alone cannot close the Kiroku stream bridge's internal
+gap between successful subscription creation and monitor-thread ownership. The store bridge
+therefore also needs a masked subscribe-to-monitor handoff, cleanup when monitor creation fails,
+and an idempotent cancel action that waits for the monitor and closes the bridge.
+
+2026-09-20: The final candidate passes 38 adapter examples and 308 store examples against
+PostgreSQL 17.11. Cancellation after AckOk but before the checkpoint SQL statement leaves the
+durable position at zero, restarts by replaying the event, and leaves no subscription registry
+entry. Existing checkpoints and `FailIfMissing` retain the accepted ADR-4 behavior.
+
+2026-09-20: Ten alternating focused shutdown pairs produce a mean paired latency change of
+-0.0803%, with a 95% bootstrap interval of -3.373% to +4.294%. The adverse bound is below the
+precommitted 10% focused latency budget.
+
 
 ## Decision Log
 
 
 2026-09-19: Fix ownership without weakening monotonic checkpoints or silently redefining normal cancellation replay as exactly-once processing.
 
+2026-09-20: Put the deterministic post-acquire hook and `acquireAllAndTransfer` helper in a
+private internal Cabal sublibrary. Rationale: tests need to stop precisely after acquisition,
+but publishing a test seam would expand the adapter API and compatibility surface.
+
+2026-09-20: Change `kiroku-store`'s stream bridge as part of this plan. Rationale: the adapter
+cannot repair cancellation inside the store's subscribe-to-monitor interval. The change is
+limited to ownership transfer and cancellation cleanup; checkpoint SQL and initialization
+policy remain unchanged.
+
+2026-09-20: Add a test-only pre-save checkpoint hook to the Kiroku worker. Rationale: proving
+AckOk-before-persistence replay requires a deterministic database boundary; timing sleeps do
+not establish that ordering. The hook is not exposed by the production public API.
+
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+Complete at Kiroku implementation SHA `eb67688690d5e96427cb8ff6cbf1488b81c279cf`.
+Group construction now uses a masked ownership ledger, LIFO best-effort cleanup, and primary
+error preservation; every acquired resource is either transferred or stopped. The Kiroku
+stream bridge closes its own handoff gap and repeated cancellation leaves no registered worker.
+
+Real PostgreSQL tests preserve the explicit at-least-once checkpoint contract: an AckHalt or
+cancellation before save can replay, an AckOk saved normally advances once, existing rows win,
+and missing-row policy remains typed. Documentation now matches candidate core's synchronous
+handler-exception-to-retry behavior. The red/green, validation, and focused-performance records
+are indexed by `docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/README.md`.
+No residual EP-43 remediation remains; the integrated matrix and final bound selection remain
+with EP-45 pass two and EP-44.
 
 
 ## Context and Orientation
@@ -117,6 +166,25 @@ cabal test shibuya-kiroku-adapter --test-show-details=direct
 
 Successful suites exit zero and report executed tests; zero tests or skipped services are not acceptance. Record exact selectors and fixture commands in this section when the harness is extended.
 
+Executed from the Mori-resolved Kiroku root with exact temporary Cabal projects:
+
+```bash
+cabal --project-file=cabal.ep43-candidate.project test shibuya-kiroku-adapter-test --test-show-details=direct
+# 38 examples, 0 failures; 8.6815 seconds
+
+cabal --project-file=cabal.ep43-baseline.project test kiroku-store-test --test-show-details=direct
+# 308 examples, 0 failures; 51.4130 seconds
+
+nix fmt
+nix flake check
+just capabilities-validate
+# all exit 0
+```
+
+The isolated reviewed-baseline command reports 32 examples and the expected one failing cleanup
+regression. Raw summaries, identities, solution hashes, and the ten-pair performance capture are
+under `docs/audits/lifecycle-release/artifacts/ep43-kiroku-lifecycle/`.
+
 
 ## Validation and Acceptance
 
@@ -142,3 +210,9 @@ Hard dependency: docs/plans/37-establish-lifecycle-assurance-coverage-and-eviden
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. The core lifecycle plan changed from a hard dependency to an integration-only soft one, because the group-construction ownership defect sits entirely before core takes ownership. Recorded the adapter's 0.9-series bound on shibuya-core and how to build against a major-version candidate. Recorded that the review's source claims were re-verified against the repository's unchanged HEAD, that the owner considers this adapter critical, and the Shibuya repository's new first ADR.
+
+2026-09-20 UTC: Completed all milestones. The reviewed baseline now has a deterministic red
+cleanup-fault reproduction; the candidate owns acquisition and bridge handoffs under masking,
+preserves primary errors while attempting every cleanup, and passes real-store acknowledgement,
+checkpoint-restart, startup-policy, and registry-leak tests. Recorded exact identities and a
+passing focused latency comparison without changing the budget.
