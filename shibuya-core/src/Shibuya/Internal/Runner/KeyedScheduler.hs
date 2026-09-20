@@ -30,7 +30,7 @@ import Data.Set qualified as Set
 import Data.Unique (Unique, newUnique)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream qualified as Stream
-import UnliftIO (Async, SomeException, async, cancel, catchAny, finally, mask, throwIO, withAsync)
+import UnliftIO (Async, SomeException, async, cancel, catchAny, finally, mask_, throwIO, withAsync)
 
 -- | Run every item in a stream through the worker action, at most
 -- @maxConcurrency@ at a time. Items with the same @Just key@ run strictly in
@@ -68,11 +68,13 @@ runKeyedScheduler requestedConcurrency requestedPendingLimit itemKey itemAction 
         case step of
           SchedulerDone Nothing -> pure ()
           SchedulerDone (Just ex) -> throwIO ex
-          StartItem item ->
+          StartItem item -> do
             -- Keep worker creation, registration, and gate release in one masked
             -- ownership transfer. The worker cannot pass the gate before its
-            -- handle is present in the cancellation registry.
-            mask $ \restore -> do
+            -- handle is present in the cancellation registry. Leave the mask
+            -- before recurring so each item does not retain another restore
+            -- frame on the scheduler's hot path.
+            mask_ $ do
               workerId <- newUnique
               startGate <- newEmptyMVar
               worker <- async $ do
@@ -80,7 +82,7 @@ runKeyedScheduler requestedConcurrency requestedPendingLimit itemKey itemAction 
                 runWorker scheduler workers workerId itemKey itemAction item
               atomically $ modifyTVar' workers (Map.insert workerId worker)
               putMVar startGate ()
-              restore loop
+            loop
 
   withAsync reader $ \_reader ->
     loop `finally` cancelWorkers

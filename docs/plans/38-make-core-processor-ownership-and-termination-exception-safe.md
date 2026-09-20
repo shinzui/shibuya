@@ -63,6 +63,8 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: A deterministic startup-cancellation regression required the ownership transfer itself to be injectable without exposing a stable public hook. The generic `acquireOwned` primitive therefore lives in the explicitly unstable `Shibuya.Internal.App` module. `runApp` uses that exact primitive, and the test pauses its acquired action on an STM barrier, cancels it, and observes cleanup before the cancellation is classified and rethrown by `runApp`.
 
+2026-09-20: The first focused EP-45 run caught a real keyed hot-path regression before acceptance. Recurring through `restore loop` inside each masked worker transfer retained one exception-restore frame per item, reducing the hot-key workload to 25%--45% of baseline throughput. The transfer now leaves `mask_` before tail-recurring, retaining the cancellation guarantee without the frame chain. The same run exposed that spawning the supervisor with plain `async` under `mask_` made the long-lived child inherit the masked state and added about 1.5 KiB per startup cycle. `asyncWithUnmask` keeps the parent transfer masked while explicitly unmasking the supervisor; the retained lifecycle and live-metrics maps also share one STM registry cell. Quick probes returned hot-key throughput to baseline range and startup allocation from 6,645 to 5,196 bytes per cycle against a 5,004-byte baseline; the final paired rerun remains Milestone 4 evidence.
+
 
 ## Decision Log
 

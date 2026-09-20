@@ -60,21 +60,26 @@ import Shibuya.Core.Metrics
   )
 import Shibuya.Core.Types (MessageId)
 import Shibuya.Prelude
-import UnliftIO (async, cancel)
+import UnliftIO (asyncWithUnmask, cancel)
 
 -- | Master state held in TVars.
 data MasterState = MasterState
-  { -- | Map of processor IDs to their metrics handles
-    metrics :: !(TVar (Map ProcessorId MetricsHandle)),
-    -- | Bounded lifecycle state for every configured processor. Entries remain
-    -- after live metrics unregister so terminal failures stay observable.
-    lifecycle :: !(TVar LifecycleSnapshot),
+  { -- | Live metrics and retained lifecycle state share one STM ownership
+    -- cell. Registration can therefore publish both atomically without adding
+    -- another per-master TVar to the startup path.
+    registry :: !(TVar MasterRegistry),
     -- | The supervisor managing child processors
     supervisor :: !Supervisor,
     -- | Whether child failures should be linked into the spawning thread.
     -- Derived from the supervision strategy: True for KillAll/IgnoreGraceful
     -- (failure must reach the application), False for IgnoreAll/Notify.
     propagateFailures :: !Bool
+  }
+  deriving (Generic)
+
+data MasterRegistry = MasterRegistry
+  { liveMetrics :: !(Map ProcessorId MetricsHandle),
+    lifecycles :: !LifecycleSnapshot
   }
   deriving (Generic)
 
@@ -110,18 +115,24 @@ newtype Master = Master
 startMaster :: (IOE :> es) => Strategy -> Eff es Master
 startMaster strategy = liftIO $ Exception.mask_ $ do
   (inbox, mailbox) <- newMailbox
-  supAsync <- async (Supervisor.supervisorProcess strategy inbox)
-  let finishAcquisition = do
-        let sup = Process supAsync mailbox
-        metricsMapVar <- newTVarIO Map.empty
-        lifecycleVar <- newTVarIO Map.empty
-        let propagate = case strategy of
-              KillAll -> True
-              IgnoreGraceful -> True
-              IgnoreAll -> False
-              Notify _ -> False
-        pure Master {state = MasterState metricsMapVar lifecycleVar sup propagate}
-  finishAcquisition `Exception.onException` cancel supAsync
+  -- The parent stays masked through the ownership transfer, but the long-lived
+  -- supervisor must run unmasked. Inheriting the parent's masking state makes
+  -- every supervisor cycle retain exception machinery and materially regresses
+  -- repeated startup/shutdown.
+  supAsync <- asyncWithUnmask $ \unmask ->
+    unmask (Supervisor.supervisorProcess strategy inbox)
+  -- Everything after 'async' is a non-blocking ownership transfer under the
+  -- mask. Cancellation is delivered only after the completed 'Master' returns
+  -- to 'acquireOwned', which then owns cleanup; there is no interruptible gap
+  -- that needs an extra exception frame here.
+  let sup = Process supAsync mailbox
+  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty
+  let propagate = case strategy of
+        KillAll -> True
+        IgnoreGraceful -> True
+        IgnoreAll -> False
+        Notify _ -> False
+  pure Master {state = MasterState registryVar sup propagate}
 
 -- | Stop the master and all child processors.
 -- Cancels the supervisor, which cancels all children via NQE's stopAll.
@@ -135,8 +146,8 @@ getAllMetrics = liftIO . getAllMetricsIO
 -- | Get metrics for all processors (IO version for web servers).
 getAllMetricsIO :: Master -> IO MetricsMap
 getAllMetricsIO master = do
-  handlesMap <- atomically $ readTVar master.state.metrics
-  traverse sampleMetrics handlesMap
+  registry <- atomically $ readTVar master.state.registry
+  traverse sampleMetrics registry.liveMetrics
 
 -- | Get metrics for a specific processor.
 getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
@@ -145,8 +156,8 @@ getProcessorMetrics master = liftIO . getProcessorMetricsIO master
 -- | Get metrics for a specific processor (IO version for web servers).
 getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
 getProcessorMetricsIO master pid = do
-  handlesMap <- atomically $ readTVar master.state.metrics
-  traverse sampleMetrics (Map.lookup pid handlesMap)
+  registry <- atomically $ readTVar master.state.registry
+  traverse sampleMetrics (Map.lookup pid registry.liveMetrics)
 
 -- | Read the retained processor lifecycle snapshot.
 getLifecycleSnapshot :: (IOE :> es) => Master -> Eff es LifecycleSnapshot
@@ -154,43 +165,59 @@ getLifecycleSnapshot = liftIO . getLifecycleSnapshotIO
 
 -- | IO variant for metrics and health integrations.
 getLifecycleSnapshotIO :: Master -> IO LifecycleSnapshot
-getLifecycleSnapshotIO master = atomically $ readTVar master.state.lifecycle
+getLifecycleSnapshotIO master = (.lifecycles) <$> atomically (readTVar master.state.registry)
 
 -- | Register a processor with the master.
 -- The processor should call this with its metrics handle.
 registerProcessor :: (IOE :> es) => Master -> ProcessorId -> MetricsHandle -> Eff es ()
 registerProcessor master pid metricsHandle =
   liftIO $
-    atomically $ do
-      modifyTVar' master.state.metrics $ Map.insert pid metricsHandle
-      modifyTVar' master.state.lifecycle $ Map.insert pid LifecycleRunning
+    atomically $
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { liveMetrics = Map.insert pid metricsHandle registry.liveMetrics,
+            lifecycles = Map.insert pid LifecycleRunning registry.lifecycles
+          }
 
 -- | Unregister a processor from the master.
 unregisterProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 unregisterProcessor master pid =
-  liftIO $ atomically $ modifyTVar' master.state.metrics $ Map.delete pid
+  liftIO $
+    atomically $
+      modifyTVar' master.state.registry $ \registry ->
+        registry {liveMetrics = Map.delete pid registry.liveMetrics}
 
 markProcessorDraining :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 markProcessorDraining master pid =
   liftIO $
     atomically $
-      modifyTVar' master.state.lifecycle $
-        Map.adjust
-          (\case LifecycleRunning -> LifecycleDraining; terminal -> terminal)
-          pid
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { lifecycles =
+              Map.adjust
+                (\case LifecycleRunning -> LifecycleDraining; terminal -> terminal)
+                pid
+                registry.lifecycles
+          }
 
 markProcessorStopped :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 markProcessorStopped master pid =
   liftIO $
     atomically $
-      modifyTVar' master.state.lifecycle $
-        Map.adjust
-          (\case LifecycleFailed failure messageId -> LifecycleFailed failure messageId; _ -> LifecycleStopped)
-          pid
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { lifecycles =
+              Map.adjust
+                (\case LifecycleFailed failure messageId -> LifecycleFailed failure messageId; _ -> LifecycleStopped)
+                pid
+                registry.lifecycles
+          }
 
 markProcessorFailed :: (IOE :> es) => Master -> ProcessorId -> Text -> Maybe MessageId -> Eff es ()
 markProcessorFailed master pid failure messageId =
   liftIO $
     atomically $
-      modifyTVar' master.state.lifecycle $
-        Map.insert pid (LifecycleFailed failure messageId)
+      modifyTVar' master.state.registry $ \registry ->
+        registry
+          { lifecycles = Map.insert pid (LifecycleFailed failure messageId) registry.lifecycles
+          }
