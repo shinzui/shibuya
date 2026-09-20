@@ -16,397 +16,320 @@ provenance:
       at: 2026-09-16T23:13:49Z
       mode: "update"
       note: "Adopted as EP-1 of master plan 5; frontmatter gains master_plan, body unchanged"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T03:01:02Z
+      mode: "update"
+      note: "Refresh history, process-isolated regression and release coordination; implement the failing test and exclude RS2 per user clarification."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T02:54:27Z
+      verdict: "changes-requested"
+      note: "Core fix is sound; replace weak-pointer cleanup, correct NQE liveness and regression history, add RS2 acceptance, and reconcile release coordination."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-20T03:02:02Z
+      verdict: "approved"
+      note: "Refreshed plan resolves review findings; isolated regression reproduces the crash, retention control and existing suite pass, release gate includes both suites, and RS2 remains out of scope. Library fix pending."
 ---
 
 # Remove the idle linked master loop that deadlocks bare waitApp callers
 
-This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
-Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
-If durable project context changes, update or create ADRs in docs/adr/ in the same change.
+This ExecPlan is a living document. Keep Progress, Surprises & Discoveries, Decision Log,
+and Outcomes & Retrospective current. This refresh reviews the existing design and adds its
+failing regression test; it does not implement the library fix or publish a release.
 
 
 ## Purpose / Big Picture
 
-Today a program that starts a shibuya application and then simply waits for it — `runApp`
-followed by `waitApp`, holding nothing else — dies within a few seconds with:
+An application that calls `runApp` and then only `waitApp` can die during a major garbage
+collection even while its queue processors are healthy:
 
 ```text
-ExceptionInLinkedThread (ThreadId 33) thread blocked indefinitely in an STM transaction
+ExceptionInLinkedThread (ThreadId ...) thread blocked indefinitely in an STM transaction
 ```
 
-This is not a misuse. It is the shape shibuya-core's own `RunnerSpec` uses, and it is the shape
-of every single-processor worker in `mls-service-v2` (`queue-worker run-area-details-cache`
-and its siblings), all of which crash on startup today. The only reason the multi-processor
-worker there survives is that its Warp metrics server happens to hold a reference to the master.
+Remove the unused linked master mailbox thread. The public application API, real NQE
+supervisor, metrics registry, and processor failure policy remain unchanged. After the fix,
+a caller need not retain the master merely to keep an idle application alive.
 
-The cause is a thread shibuya no longer needs. `startMaster` spawns a "master loop" actor that
-blocks forever on a mailbox, and links it to the caller. Nothing in the codebase ever sends to
-that mailbox — the two operations it used to serve, registering and unregistering a processor's
-metrics, already write the metrics `TVar` directly. When nothing outside the loop references
-its mailbox, GHC's runtime correctly concludes the thread can never wake, throws
-`BlockedIndefinitelyOnSTM` at it, and the link forwards that to the caller as a crash.
-
-After this plan, the master loop is gone. `runApp` then `waitApp` runs for as long as the
-processors run, whether or not the caller keeps the handle around, and a regression test that
-fails on today's code proves it:
+The dedicated regression executable already exists in
+`shibuya-core/test-gc/Main.hs`, registered as `shibuya-core-gc-test`. It exercises the public
+API without PostgreSQL, a metrics server, a retained handle, or a cleanup closure capturing
+the application. It must fail before the fix and pass afterwards:
 
 ```bash
-cabal test shibuya-core-test --test-options='-m "survives major collections"'
+cabal test shibuya-core-gc-test --test-show-details=direct
 ```
 
-The public API does not change. `Master` stays the opaque type that `getAppMaster` returns and
-`getAllMetricsIO` reads; only the internal module `Shibuya.Internal.Runner.Master` loses its
-dead actor protocol.
+Scope is the core fix, its tests and documentation, coordinated release preparation, and the
+existing follow-up in `mori://tan/mls-service-v2`. Per the user's clarification,
+`mori://tan/registration-service-v2` is outside the implementation and follow-up scope.
 
 
 ## Progress
 
-- [ ] Milestone 1: Add the regression test and confirm it fails on the current code.
-- [ ] Milestone 2: Remove the master loop, its mailbox, and its message type; make the test pass.
-- [ ] Milestone 3: Update the documentation that still describes the master as an actor.
-- [ ] Milestone 4: Changelog entry and release.
-- [ ] Milestone 5: Consumer follow-up in `mls-service-v2` (bump the pin, confirm the isolation subcommands run).
+- [x] (2026-09-20 UTC) Review the original plan against current source, history, package registry, and upstream release tags.
+- [x] (2026-09-20 UTC) Milestone 1: Add the dedicated GC regression executable and confirm failure with the reported linked-thread exception on 0.9.0.1.
+- [ ] Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
+- [ ] Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
+- [ ] Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
+- [ ] Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
 
 
 ## Surprises & Discoveries
 
-These were found while diagnosing the crash from the consumer side, before this plan was
-written; they are recorded here because the plan rests on them.
+**The runtime regression predates 0.9.** Commit `f36418389cde6bb185c66a730819f4793acf2f86`
+(July 2, 2026, "fix(runner): repair ingester and metrics shutdown paths") replaced mailbox
+queries in all metrics reads, registration, and unregistration with direct STM operations.
+It first shipped in `v0.8.0.0`. Previously, a running processor's eventual
+`unregisterProcessor` needed the master's mailbox; afterwards it needed only the metrics
+state. The linked actor itself dates to the initial implementation. The combination left a
+thread waiting on a mailbox with no internal senders. The current master source is identical
+between `v0.8.0.0` and `v0.9.0.1`; this is history-based attribution, not a runtime bisect
+of every old release. EP-26 later removed obsolete metrics query constructors but was not the
+originating change.
 
-**The master's mailbox has no senders.** `registerProcessor` and `unregisterProcessor` in
-`shibuya-core/src/Shibuya/Internal/Runner/Master.hs` are plain `atomically $ modifyTVar'
-master.state.metrics ...`; they do not go through the inbox. A search of the whole repository
-for sends to `master.inbox` or uses of the `MasterMessage` constructors outside `Master.hs`
-finds none. The `MasterMessage` type, `handleMessage`, and `masterLoop` are dead code left over
-from the hot-path work that moved metrics reads and writes onto the `TVar` directly
-(`docs/plans/26-reduce-per-message-hot-path-overhead.md` removed the query constructors; the
-register/unregister path went the same way).
+**A previous test fix saw the same symptom.** Commit `8ab1bcd`, first released in 0.8.0.1,
+added `stopApp` after `waitApp` in four `RunnerSpec` cases. This was valid cleanup for
+finite streams but retained the application for that later call. It did not cover an infinite
+worker whose only remaining use of the handle is `waitApp`.
 
-**The failure is a reachability question, not a timing one.** GHC treats a thread blocked in
-STM as deadlocked when nothing reachable from a garbage-collection root references the `TVar`
-it waits on. A thread sleeping in `threadDelay` or blocked in a foreign call is a root, so an
-ingester polling a queue keeps its own inbox alive. The master loop's inbox is referenced by
-exactly two things: the loop's own stack, and the `Master` record. If the caller keeps the
-`Master` reachable — `mls-service-v2`'s `run-all-queues` passes `getAppMaster handle` into a
-Warp application closure — the runtime never flags the loop. If the caller only calls
-`waitApp`, GHC selects `appHandle.processors` out of the record, the `Master` becomes garbage,
-and the first major collection resurrects the loop with `BlockedIndefinitelyOnSTM`. Because
-`startMaster` linked it, the caller dies too. The consumer-side census that established this
-is in `mori://tan/mls-service-v2/plans/101-find-and-fix-the-queue-worker-s-per-message-memory-retention`.
+**Weak pointers cannot guarantee teardown.** The original plan's `mkWeakPtr app` cleanup
+could return `Nothing` precisely when the test succeeded in allowing collection. An idle
+adapter could therefore survive into later tests. The replacement is a dedicated Cabal test
+process: its exit terminates all remaining threads without retaining the master during the
+observation window. This is a test isolation technique, not a production shutdown policy.
 
-**shibuya-core's own tests already work around it.** `shibuya-core/test/Shibuya/RunnerSpec.hs`
-calls `stopApp` immediately after `waitApp` with the comment "Without this the idle master
-blocks forever on its mailbox and the RTS eventually raises BlockedIndefinitelyOnSTM, which
-propagates through the link as a flaky ExceptionInLinkedThread landing on whichever test
-happens to be running when GC fires." That is the same defect observed as a flake rather than
-a crash, because a test process holds more references than a worker does.
+**The real supervisor has a live wait source.** Mori has no registered NQE corpus. The
+published [NQE 0.6.6 supervisor source](https://hackage.haskell.org/package/nqe-0.6.6/src/src/Control/Concurrent/NQE/Supervisor.hs)
+shows `receiveSTM i <|> waitForChild state`; `waitForChild` uses `waitAnyCatchSTM` on
+the active children. The [process source](https://hackage.haskell.org/package/nqe-0.6.6/src/src/Control/Concurrent/NQE/Process.hs)
+shows `process` creates an async and links it. The supervisor can therefore be woken by a
+child's completion independently of its mailbox. Do not justify its liveness by assuming that
+an optimized child closure retains the whole `Master`. Preserve the supervisor and verify
+the complete app under GC after removing only the redundant master actor.
 
-**NQE links every process to its creator, including the supervisor.** `nqe-0.6.6`'s
-`Control.Concurrent.NQE.Process.process` runs `withAsync (p i) (\a -> link a >> ...)`, so the
-supervisor `startMaster` creates is also a linked actor blocked in STM. It does not trip the
-detector today because every live child references `master.state.supervisor` through the
-`unregisterProcessor master procId` and `propagateFailures` closures, and children are alive
-whenever an adapter is polling. Removing the master loop does not change that, but the
-regression test must run an idle app through several major collections precisely so that this
-residual linkage is exercised rather than assumed.
+**Release baseline checked during this refresh.** The Hackage version endpoints for
+[core](https://hackage.haskell.org/package/shibuya-core.json) and
+[metrics](https://hackage.haskell.org/package/shibuya-metrics.json), plus
+`git ls-remote --tags origin 'v0.*'`, all list 0.9.0.1 as the latest release.
+Recheck at release time; the plan's provisional 0.9.1.0 must not overwrite an existing release.
+
+The new test compiled under GHC 9.12.4 with Cabal's normal `-O1` library/test profile and
+failed as required:
+
+```text
+FAIL: bare waitApp died: ExceptionInLinkedThread (ThreadId 10) thread blocked indefinitely in an STM transaction
+0 of 1 test suites (0 of 1 test cases) passed.
+```
+
+A separate diagnostic in this session also reproduced the failure and survived when the master
+was retained in an IORef. A temporary copy of the new test, with that same retention added,
+likewise printed `PASS: bare waitApp survives major collections` under `-O1` and two runtime
+capabilities. That control supports the reachability diagnosis; retaining the master is not
+the planned library fix and is absent from the committed-test candidate.
 
 
 ## Decision Log
 
-- Decision: Delete the master loop rather than keep it alive with a `StablePtr` or by making
-  children hold its mailbox.
-  Rationale: The loop serves no messages. A `StablePtr` root would preserve a thread whose only
-  purpose is to exist, and threading the mailbox through child closures would rely on GHC not
-  optimising a free variable away — fragile, and it would still leave a linked actor that can
-  never do anything. Removing it is smaller, faster, and removes the class of bug.
-  Date: 2026-09-16
-
-- Decision: Keep the `Master` type name and the public accessors unchanged; shrink the record
-  to its state.
-  Rationale: `Shibuya.App` exports `Master` abstractly, and `getAppMaster`, `getAllMetrics`,
-  `getAllMetricsIO`, `getProcessorMetrics`, and `getProcessorMetricsIO` are what consumers and
-  `shibuya-metrics` use. None of them need the mailbox or the async. Keeping the name means no
-  consumer changes.
-  Date: 2026-09-16
-
-- Decision: Treat this as a minor release (`0.9.1.0`), not a major one.
-  Rationale: The removed names (`MasterMessage (..)`, the `handle` and `inbox` fields of
-  `Master`) are exported only from `Shibuya.Internal.Runner.Master`, which
-  `docs/plans/25-pre-1-0-public-api-cleanup.md` moved under `Shibuya.Internal.*` with a
-  no-stability Haddock banner, and which the 0.9.0.0 changelog describes as internal with
-  `Master` abstract. A search of `shibuya-pgmq-adapter`, `shibuya-kafka-adapter`,
-  `shibuya-message-db-adapter`, `shibuya-metrics`, `keiro`, `kotei`, `rei`, and
-  `mls-service-v2` finds no use of those names; the benchmarks import only `startMaster` and
-  `stopMaster`. The release skill makes the final call from the diff; if it insists on PVP
-  strictness for exposed modules the bump becomes `0.10.0.0` and the adapters' `^>=0.9` bounds
-  need a follow-up.
-  Date: 2026-09-16
-
-- Decision: Keep the `stopApp` calls in `RunnerSpec` but rewrite their comments.
-  Rationale: Stopping an app after waiting for it is correct cleanup regardless of this bug;
-  only the justification ("otherwise the linked master deadlocks") stops being true.
-  Date: 2026-09-16
+- Decision (2026-09-16, retained): Remove the unused actor rather than add a permanent root or
+  another accidental reference. Its operations already access STM state directly.
+- Decision (2026-09-16, retained): Keep the opaque public `Master` and all public accessors.
+  Only the expressly unstable `Shibuya.Internal.Runner.Master` representation changes.
+- Decision (2026-09-16, retained): Keep `RunnerSpec` shutdown calls; correct their comments
+  once the actor is removed.
+- Decision (2026-09-20 UTC, supersedes the weak-pointer test): Use a separate, failing-first
+  Cabal test executable with startup synchronization, bounded observation, and forced GC.
+  Ordinary core validation and release gates must run both core test suites.
+- Decision (2026-09-20 UTC): Preserve the parent's provisional 0.9.1.0 coordination target,
+  but do not assert that this diff inherently requires a minor bump. The release skill
+  classifies internal-only fixes as patch changes; inspect the complete release diff and
+  unstable-module policy before choosing the actual version. Reconcile the parent and
+  dependent plans if the final choice differs.
+- Decision (2026-09-20 UTC): The user's clarification excludes
+  `mori://tan/registration-service-v2` from follow-up. The initial review provenance's
+  suggestion to add that consumer is superseded by this explicit scope decision.
 
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+The review found the removal design sound but corrected its history, weak-pointer teardown,
+NQE liveness explanation, test integration, documentation inventory, and release coordination.
+The original plan was authored by `claude-fable-5-1` and contained no review entries before
+this pass. The new regression is implemented and intentionally red against the unchanged
+library. No fix, release, or consumer update is claimed complete.
+
+Refresh validation: `cabal test shibuya-core --offline --test-show-details=failures`
+selected both suites: the existing Hspec suite passed and the GC suite failed with the
+expected linked STM exception. `cabal check` reported no warnings or errors. `nix fmt`
+and explicit Fourmolu formatting of the new file completed, and `git diff --check` passed.
+The library-removal green result and release/flake gates remain implementation work.
 
 
 ## Context and Orientation
 
-### The pieces involved
+`shibuya-core/src/Shibuya/Internal/Runner/Master.hs` currently defines `Master` with
+`handle :: Async ()`, `state :: MasterState`, and `inbox :: Inbox MasterMessage`.
+`startMaster` creates the NQE supervisor, the metrics registry, and a second async running
+`masterLoop`, which it unconditionally links to the creating thread. `stopMaster` cancels
+the supervisor and then that second async. Metrics operations already bypass the mailbox.
 
-shibuya is a supervised queue-processing framework. An application is started with `runApp`
-in `shibuya-core/src/Shibuya/App.hs`, which builds a *master* and then spawns one *supervised
-processor* per queue under it. Three files matter here.
+`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs` registers processors, adds children
+to `master.state.supervisor`, and unregisters metrics in `finally`. The
+`propagateFailures` field controls child links. It does not use the master inbox or handle.
+Keep this policy and the completion-flag `finally` intact.
 
-`shibuya-core/src/Shibuya/Internal/Runner/Master.hs` defines the master. `startMaster` creates
-an NQE supervisor (NQE is the actor library shibuya uses for supervision; a "supervisor" is
-an actor that owns child threads and restarts or stops them according to a strategy), a
-`TVar (Map ProcessorId MetricsHandle)` holding every processor's metrics handle, and — the
-subject of this plan — an actor of its own:
+`shibuya-core/src/Shibuya/App.hs` creates the master and processors, exports the opaque
+master and metrics readers, and implements graceful shutdown. Its `waitApp` reads only
+processor completion TVars. An STM transaction is an atomic operation on shared transactional
+variables; when it cannot proceed it waits for one of those variables to change.
+`BlockedIndefinitelyOnSTM` is the runtime's diagnosis that the wait cannot be woken through
+reachable state, not a queue-idle timeout. A linked async forwards failure to its creator.
 
-```haskell
-  masterInbox <- newInbox
-  masterHandle <- async $ masterLoop masterState masterInbox
-  link masterHandle
-```
+The timer-backed adapter in `shibuya-core/test-gc/Main.hs` models an idle polling source.
+Its worker signals startup with an empty MVar filled with `()` (a synchronization cell),
+then calls bare `waitApp`. The observer waits for that signal, forces five major collections
+with scheduling gaps, and checks that the worker remains blocked rather than failing or
+returning. The five-second outer deadline fails if the observation cannot finish. Neither
+the observer nor the signal retains the application. Do not substitute an unreachable
+`atomically retry` adapter; that would introduce another deadlock.
 
-`masterLoop` is `forever $ receive inbox >>= handleMessage state`, and `handleMessage` handles
-three `MasterMessage` constructors — `RegisterProcessor`, `UnregisterProcessor`, `Shutdown` —
-all of which only modify the metrics `TVar`. The `Master` record carries `handle :: Async ()`,
-`state :: MasterState`, and `inbox :: Inbox MasterMessage`. `stopMaster` cancels the
-supervisor and then the async.
+`shibuya-core/test/Shibuya/App/LifecycleSpec.hs` covers finite completion, halt, failures,
+shutdown and metrics. `shibuya-core/test/Shibuya/RunnerSpec.hs` has four cleanup comments
+that describe the old failure. `shibuya-core/shibuya-core.cabal` declares both test suites.
+`CLAUDE.md` and `.agents/skills/release/SKILL.md` must direct normal checks to
+`cabal test shibuya-core`, which selects both.
 
-`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs` spawns each processor as a child of
-`master.state.supervisor`, registers its metrics handle with `registerProcessor` before the
-child starts and unregisters it in a `finally` when the child ends, and links the child to the
-caller when `master.state.propagateFailures` is set. It never touches `master.inbox` or
-`master.handle`.
+No `docs/adr/` directory exists in this repository. Relevant local design context is in
+`docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md` (direct STM metrics
+and conditional failure propagation) and `docs/plans/25-pre-1-0-public-api-cleanup.md`
+(unstable internals). At implementation completion, distill the lesson about obsolete linked
+actors and GC-safe regression tests into an ADR following the repository's then-current
+convention; no new architecture is being adopted by this documentation refresh.
 
-`shibuya-core/src/Shibuya/App.hs` holds `runApp` (calls `startMaster`, spawns the processors,
-returns an `AppHandle` of the master plus the processor map), `waitApp` (an STM transaction
-that blocks until every processor's `done` `TVar` is `True`), `stopAppGracefully` (drains,
-then `stopMaster`), and `getAppMaster`. `Shibuya.App` re-exports `Master` abstractly together
-with `getAllMetrics`, `getAllMetricsIO`, `getProcessorMetrics`, and `getProcessorMetricsIO`,
-all of which read `master.state.metrics`.
-
-### Two terms
-
-A **linked** thread, in the sense of `Control.Concurrent.Async.link`, is one whose failure is
-re-thrown in the thread that linked it, wrapped as `ExceptionInLinkedThread`. shibuya links the
-master so that a master crash is not silent.
-
-**`BlockedIndefinitelyOnSTM`** is the exception GHC's runtime throws at a thread that is
-blocked in an STM transaction on `TVar`s that no live thread can reach. The runtime finds such
-threads during a major garbage collection: anything not reachable from a root (a running
-thread, a thread waiting on a timer or on I/O, a stable pointer) is, by construction, never
-going to be woken. It is not a timeout; an idle-but-reachable thread is never flagged.
-
-### Why the two combine badly here
-
-The master loop is blocked on a mailbox nobody writes to. Its mailbox is reachable only through
-the `Master` record. Whether a caller keeps that record alive is an accident of what the
-caller does with the `AppHandle`. A metrics server closure keeps it alive; a bare `waitApp`
-does not, because `waitApp` only needs `appHandle.processors`. In the second case the first
-major collection resurrects the loop with `BlockedIndefinitelyOnSTM`, and the link turns that
-into a crash of the caller — typically the program's main thread.
-
-### Evidence
-
-From the consumer side, `mls-service-v2`'s single-processor subcommands all fail within two to
-three seconds with the exception above, while its four-processor `run-all-queues` runs for
-days; the sole structural difference is that the latter hands `getAppMaster handle` to a Warp
-application. The full account is in
+The existing consumer diagnosis is
 `mori://tan/mls-service-v2/plans/101-find-and-fix-the-queue-worker-s-per-message-memory-retention`.
-From this repository's side, the `RunnerSpec` comment quoted under Surprises & Discoveries
-describes the same exception as a flake.
-
-### ADRs
-
-This repository has no `docs/adr/` directory, so there is no ADR to cite. The durable design
-context lives in `docs/plans/25-pre-1-0-public-api-cleanup.md` (what is internal and unstable)
-and `docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md` (why children are
-linked conditionally on `propagateFailures`). Neither needs changing; this plan removes an
-actor those plans left in place, not a decision they made.
+Mori currently cannot resolve that artifact, but the plan exists in the registered checkout.
+Keep the canonical URI. The consumer paths below are relative to `mori://tan/mls-service-v2`;
+artifact-level URIs for these individual source/configuration files are pending.
 
 
 ## Plan of Work
 
-### Milestone 1: A regression test that fails today
+### Milestone 1: A permanent regression, failing before the fix
 
-The scope is one test in `shibuya-core/test/Shibuya/App/LifecycleSpec.hs` that reproduces the
-consumer's failure shape inside the test suite: start an app whose adapter is idle in the way a
-real queue adapter is idle (sleeping in `threadDelay` between polls, which keeps the ingester a
-garbage-collection root), call `waitApp` without holding the handle anywhere else, force several
-major collections, and assert that the waiting thread is still waiting rather than dead.
+This milestone now has source and failure evidence. Keep
+`shibuya-core/test-gc/Main.hs` and its Cabal stanza. Confirm the failure is the linked STM
+exception rather than a compile error, startup error, outer deadline, or early return.
+Do not weaken the assertion to accept the exception, mark it pending, or retain the master
+to make it pass. An intentional failing test remains visible until Milestone 2.
 
-The subtlety is not holding the handle. If the test keeps `app` in scope for a later `stopApp`,
-GHC keeps the `Master` reachable and the test passes for the wrong reason. The test therefore
-takes a weak pointer to the handle before waiting and uses that, after the timeout, to stop the
-app for cleanup. A weak pointer does not keep its target alive, so the test sees exactly what a
-bare `waitApp` caller sees.
+The separate process is necessary to isolate teardown. Existing lifecycle tests remain
+responsible for verifying explicit shutdown. The new executable proves the missing case:
+a running app whose caller only waits. Its success message is emitted only after the
+post-startup GC window finishes and the worker has not completed.
 
-At the end of this milestone the test exists, is wired into the suite, and fails on the current
-code with `ExceptionInLinkedThread`. That failure is the milestone's acceptance.
+### Milestone 2: Remove only the obsolete actor
 
-### Milestone 2: Remove the master loop
+Delete `MasterMessage`, `masterLoop`, `handleMessage`, and the master's `handle` and
+`inbox` fields. Make `Master` a newtype around `MasterState`. Remove the redundant
+async/link creation and its cancellation, keeping the real NQE supervisor lifecycle.
+Keep the metrics operations and `propagateFailures` mapping unchanged.
 
-The scope is `Master.hs` and nothing else in `src/`. `MasterMessage`, `handleMessage`,
-`masterLoop`, the `async`/`link` pair in `startMaster`, the `cancel master.handle` in
-`stopMaster`, and the `handle` and `inbox` fields of `Master` all go. `Master` becomes a record
-with a single `state` field. `registerProcessor` and `unregisterProcessor` are already direct
-`TVar` writes and do not change. The imports from `Control.Concurrent.NQE.Process` shrink to
-nothing (the supervisor comes from `Control.Concurrent.NQE.Supervisor`), and the `UnliftIO`
-import shrinks to `cancel`.
+Retain `Process (..)` from `Control.Concurrent.NQE.Process`: `getProcessAsync` still
+comes from it. Remove only `Inbox`, `Listen`, `newInbox`, and `receive`, plus the
+unused `forever`, `async`, `link`, and `Async` imports. Update module Haddock to
+describe an owner of supervisor state and metrics rather than a mailbox actor.
 
-Nothing outside `Master.hs` refers to the removed names: `Supervised.hs` uses only
-`master.state.*`, `App.hs` uses `startMaster`, `stopMaster`, and the metrics readers, and the
-benchmarks import only `startMaster` and `stopMaster`. `cabal build all` is the check.
+Acceptance is a passing GC regression under normal optimization, plus the existing lifecycle,
+failure-isolation, halt, metrics, and shutdown suites. Do not remove real supervisor/child
+links to suppress the exception. Confirm that the existing strategy tests still exercise
+propagation and isolation.
 
-At the end of this milestone the Milestone 1 test passes, the whole suite passes, and the
-`RunnerSpec` comments no longer claim the master deadlocks.
+### Milestone 3: Documentation and checks
 
-### Milestone 3: Documentation
+Correct current actor descriptions in `CLAUDE.md`, `docs/MULTI_QUEUE_DESIGN.md`,
+`docs/HIGH_LEVEL_ARCHITECTURE.md`, and `docs/architecture/RUNNER_BUG_FIXES.md`.
+Also inspect `docs/architecture/CONCURRENCY.md` and `docs/architecture/MESSAGE_FLOW.md`
+for stale snippets. Label historical code as historical. Annotate
+`docs/plans/PROCESSOR_PAUSE_DESIGN.md` so its proposed message protocol is not mistaken
+for an existing interface. Replace all four obsolete explanations in `RunnerSpec` with
+the valid reason to stop apps: supervisors and children must not outlive their tests.
 
-Four documents still describe the master as an actor with a mailbox: `CLAUDE.md` ("NQE-based
-supervision (Master, Supervisor, Inbox)" and the `runApp → Master → …` diagram),
-`docs/MULTI_QUEUE_DESIGN.md` ("`Master` - Coordinator process managing child processors"),
-`docs/HIGH_LEVEL_ARCHITECTURE.md` (a `MasterMessage` sketch and `query GetAllMetrics
-masterProcess`), and `docs/architecture/RUNNER_BUG_FIXES.md` (Bug 1, whose "only cancelled the
-master message loop" history stays true but whose present-tense description should say the
-loop no longer exists). `docs/plans/PROCESSOR_PAUSE_DESIGN.md` proposes extending
-`MasterMessage` for pause/resume; add a note that the actor is gone and that design would
-reintroduce one deliberately. The older plans are history and are not edited.
+Acceptance is accurate present-tense documentation, both core suites in normal/release
+commands, formatting, and the existing flake checks. Do not rewrite unrelated archived plans.
 
-### Milestone 4: Changelog and release
+### Milestone 4: Coordinated release
 
-Add a `0.9.1.0` section to `CHANGELOG.md` under both packages (`shibuya-metrics` bumps to track
-`shibuya-core`, as `0.9.0.1` did) and cut the release with the repository's release skill
-(`agents/skills/release/SKILL.md`), which decides the bump level from the diff and publishes
-`shibuya-core` before `shibuya-metrics`.
+This plan is EP-1 in master plan 5. Its release has a soft dependency on
+`docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`:
+prefer one core/metrics release carrying both changes; if that plan is delayed, the parent's
+existing policy allows this crash fix to ship independently. Do not implement EP-34 silently
+as part of this fix. Inspect its actual progress and record what this release includes.
 
-### Milestone 5: Consumer follow-up
+Use `.agents/skills/release/SKILL.md`, which resolves through the installed skill symlink
+to the tracked `agents/skills/release/SKILL.md`; both paths are valid in this checkout.
+Its version and changelog review precedes release commits, tags, and publication; prepare
+the concrete diff first. The provisional cohort target is 0.9.1.0, not a reservation or a
+substitute for release-time PVP analysis. The internal module explicitly disclaims PVP
+stability but is still listed in Cabal's exposed modules; describe this tradeoff in the release
+decision. If the chosen version changes, synchronize master plan 5 and the release assumptions
+in plans 34–36 before their work proceeds.
 
-In `mls-service-v2`, bump the `shibuya-core` and `shibuya-metrics` pins to the new release via
-its `just update-cabal-freeze` (which regenerates its freeze file and nix overlay together),
-and confirm `cabal run exe:mls-service-v2 -- queue-worker run-area-details-cache` runs past the
-point where it crashes today. `shibuya-pgmq-adapter` does not need a release for this: it
-depends on `shibuya-core ^>=0.9`, which `0.9.1.0` satisfies.
+Update both package cabal versions, the metrics dependency bounds, the root changelog, and
+both package changelogs. Recheck Hackage and upstream tags before choosing a free version.
+Publish core before metrics. Apply the installed release skill's checks, including the new GC
+suite; if EP-34 has changed the benchmark policy, use that updated policy too.
+
+### Milestone 5: Existing MLS consumer follow-up
+
+Use Mori to locate `mori://tan/mls-service-v2`. As inspected, its
+`cabal.project.freeze` and `nix/haskell-overlay.nix` pin core and metrics to 0.9.0.0.
+Its `Justfile` recipe `update-cabal-freeze` removes the freeze, builds/tests, freezes,
+and regenerates the overlay; it does not by itself promise the intended version. Constrain
+or select the actual fixed version using that repository's dependency workflow, regenerate,
+then inspect both files and the solver output. Avoid accepting unrelated dependency upgrades.
+
+Verify `queue-worker run-area-details-cache` against an isolated development database and
+test service endpoints, after reading that repository's instructions. This command consumes
+real queue work: do not point it at a production queue for a liveness check. A startup/config
+failure is not evidence about this fix. Record successful startup, the bounded observation,
+selected package versions, and absence of the linked-thread exception.
+
+The parent retains this consumer follow-up; no additional consumer repository is in scope.
 
 
 ## Concrete Steps
 
-All commands run from the repository root, `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya`.
+Run core commands from this repository root in its existing development environment.
 
-### Milestone 1 steps
-
-Add to `shibuya-core/test/Shibuya/App/LifecycleSpec.hs`, inside the `describe "Shibuya.App
-lifecycle"` block. The spec already defines `infiniteAdapter` (an adapter that sleeps 5 ms in
-`threadDelay` between messages), `runAppOrFail`, and `alwaysAckOk`; the new test needs an
-adapter that is idle for the whole run, so give it a longer sleep:
-
-```haskell
-  it "an idle app whose handle is only used by waitApp survives major collections" $ do
-    -- Reproduces the shape of a bare `runApp` then `waitApp` caller: nothing but the
-    -- waiting transaction refers to the handle, the adapter is idle in threadDelay
-    -- (a GC root, like a queue adapter between polls), and several major collections
-    -- run while we wait. Before the master loop was removed, the first collection
-    -- found the linked master blocked on a mailbox nobody could reach and killed
-    -- this thread with ExceptionInLinkedThread.
-    weakRef <- newIORef Nothing
-    outcome <-
-      UIO.try @_ @SomeException $
-        UIO.timeout 2_000_000 $
-          runEff $
-            runTracingNoop $ do
-              app <- runAppOrFail IgnoreFailures 10 [(ProcessorId "idle", mkProcessor idleAdapter alwaysAckOk)]
-              weak <- liftIO $ mkWeakPtr app Nothing
-              liftIO $ writeIORef weakRef (Just weak)
-              _ <- liftIO $ forkIO $ replicateM_ 5 (threadDelay 100_000 >> performMajorGC)
-              waitApp app
-
-    -- Cleanup through the weak pointer, so the test itself never held the handle.
-    liftIO (readIORef weakRef) >>= \case
-      Just weak -> liftIO (deRefWeak weak) >>= mapM_ (\app -> runEff (runTracingNoop (stopApp app)))
-      Nothing -> pure ()
-
-    case outcome of
-      Right Nothing -> pure () -- timed out while still waiting: the app is alive
-      Right (Just ()) -> expectationFailure "waitApp returned; the idle processor should not finish"
-      Left e -> expectationFailure ("waitApp died: " <> show e)
-```
-
-with the helper next to `infiniteAdapter`:
-
-```haskell
-idleAdapter :: (IOE :> es) => Adapter es String
-idleAdapter =
-  Adapter
-    { adapterName = "test:idle",
-      source = Stream.unfoldrM step (1 :: Int),
-      shutdown = pure ()
-    }
-  where
-    step n = do
-      liftIO $ threadDelay 60_000_000
-      msg <- createTestMessage n
-      pure (Just (msg, n + 1))
-```
-
-and the imports the snippet needs: `Control.Concurrent (forkIO)`, `Control.Exception
-(SomeException)`, `Control.Monad (replicateM_)`, `Data.IORef`, `System.Mem (performMajorGC)`,
-`System.Mem.Weak (deRefWeak, mkWeakPtr)`, and `stopApp` from `Shibuya.App`. If the module
-does not already enable `LambdaCase`, add the pragma.
-
-Run it:
+### Verify the regression
 
 ```bash
-cabal test shibuya-core-test --test-options='-m "survives major collections"'
+cabal test shibuya-core-gc-test --test-show-details=direct
 ```
 
-Expected on the current code — the failure that proves the test is real:
+Before the library fix, expect nonzero exit and the linked STM exception quoted above.
+After the fix, expect exit zero and:
 
 ```text
-  1) Shibuya.App lifecycle an idle app whose handle is only used by waitApp survives major collections
-       waitApp died: ExceptionInLinkedThread (ThreadId ...) thread blocked indefinitely in an STM transaction
+PASS: bare waitApp survives major collections
 ```
 
-If instead the test passes before any fix, the handle is still reachable: check that nothing
-after `waitApp app` mentions `app` directly and that the weak pointer is created *before*
-`waitApp`. GHC's `-O` can also keep `app` alive on the stack; if that happens, move the
-`waitApp` call into a helper that takes only `appHandle.processors`-derived data, or run the
-test with `-O0` for the test suite.
+Do not change the test's normal optimization settings to obtain a misleading green result.
+If future compiler changes make the pre-fix test pass, establish an effective reproducer
+before accepting it as regression coverage.
 
-### Milestone 2 steps
+### Change Master.hs
 
-Edit `shibuya-core/src/Shibuya/Internal/Runner/Master.hs`. The export list loses
-`MasterMessage (..)`. The data declarations become:
+The resulting representation and lifecycle are:
 
 ```haskell
-data MasterState = MasterState
-  { metrics :: !(TVar (Map ProcessorId MetricsHandle)),
-    supervisor :: !Supervisor,
-    propagateFailures :: !Bool
-  }
+newtype Master = Master {state :: MasterState}
   deriving (Generic)
 
--- | The master owns the NQE supervisor and the processor metrics registry.
--- It is not an actor: nothing runs on its behalf, so there is nothing that
--- can be blocked on a mailbox and nothing to link. (An earlier version ran a
--- message loop here; with no senders it was flagged deadlocked by the RTS
--- whenever the caller did not keep this record reachable, and the link
--- turned that into a crash of the caller.)
-newtype Master = Master
-  { state :: MasterState
-  }
-  deriving (Generic)
-```
-
-`startMaster` becomes:
-
-```haskell
 startMaster :: (IOE :> es) => Strategy -> Eff es Master
 startMaster strategy = liftIO $ do
   sup <- Supervisor.supervisor strategy
@@ -417,145 +340,127 @@ startMaster strategy = liftIO $ do
         IgnoreAll -> False
         Notify _ -> False
   pure Master {state = MasterState metricsMapVar sup propagate}
-```
 
-and `stopMaster` cancels only the supervisor:
-
-```haskell
 stopMaster :: (IOE :> es) => Master -> Eff es ()
 stopMaster master = liftIO $ cancel (getProcessAsync master.state.supervisor)
 ```
 
-Delete `MasterMessage`, `masterLoop`, and `handleMessage`. Drop the now-unused imports
-(`Inbox`, `Listen`, `newInbox`, `receive` from `Control.Concurrent.NQE.Process`; `forever`;
-`async` and `link` from `UnliftIO`). Keep `Process (..)` only if `getProcessAsync` comes from
-it — it does; keep that import.
-
-Then in `shibuya-core/test/Shibuya/RunnerSpec.hs`, replace the two comment blocks that justify
-`stopApp` with "Stop the app so its supervisor and children do not outlive the test." The
-calls stay.
-
-Build and test everything:
+`MasterState` and direct metrics functions remain unchanged. Search for removed fields and
+constructors across source, tests, and benchmarks before building; no external reference
+was found during this review.
 
 ```bash
+rg -n 'MasterMessage|masterLoop|master\.inbox|master\.handle' shibuya-core shibuya-metrics shibuya-core-bench
 cabal build all
-cabal test shibuya-core-test
+cabal test shibuya-core --test-show-details=direct
+nix fmt
+nix flake check
 ```
 
-Expected: the build succeeds with no new warnings (the package builds with `-Wall`; an unused
-import left behind will fail `nix flake check` later, so fix any here), and the suite reports
-all tests passing including the new one. Format before committing, as `CLAUDE.md` requires:
+A zero-match `rg` exits 1; that is expected after removal and is not a build failure.
+The package-level test target runs both the existing Hspec suite and the GC executable.
+Repeat the short GC executable three times after the fix, recording results; do not substitute
+repeated full-suite runs for the targeted GC proof. During implementation, also demonstrate
+that restoring the obsolete actor in an isolated checkout makes the same test fail.
+
+### Prepare release evidence
 
 ```bash
-nix fmt
+git ls-remote --tags origin 'v0.*'
+curl -fsSL https://hackage.haskell.org/package/shibuya-core.json
+curl -fsSL https://hackage.haskell.org/package/shibuya-metrics.json
+git diff --check
 ```
 
-### Milestone 3 steps
+Follow the release skill for the actual bump, changelogs, bounds, benchmarks when required,
+source distributions, Haddocks, tags, and uploads. This refresh authorizes none of those
+publication actions.
 
-Edit the four documents named under Plan of Work. Keep each change to the sentences that
-describe the master as a process with a mailbox; do not rewrite the documents.
+### Validate the MLS consumer
 
-### Milestone 4 steps
+First resolve the checkout:
 
-Add to `CHANGELOG.md` above the `0.9.0.1` section:
-
-```markdown
-## 0.9.1.0 — <date>
-
-### Bug Fixes
-
-- `shibuya-core`: a program that called `runApp` and then `waitApp` without keeping the
-  `AppHandle` reachable elsewhere died at its first major garbage collection with
-  `ExceptionInLinkedThread ... thread blocked indefinitely in an STM transaction`. The
-  master started an actor loop that blocked forever on a mailbox nothing ever sent to, and
-  linked it to the caller; when the caller did not keep the master reachable the RTS
-  correctly flagged the loop as deadlocked and the link killed the caller. The loop, its
-  mailbox, and the `MasterMessage` protocol are removed. `Master` (still opaque in
-  `Shibuya.App`) now holds only the supervisor and the metrics registry;
-  `Shibuya.Internal.Runner.Master` no longer exports `MasterMessage`. A regression test
-  runs an idle app through several major collections under a bare `waitApp`.
-- `shibuya-metrics`: version bumped to track `shibuya-core`; no changes.
+```bash
+mori registry show tan/mls-service-v2 --full
 ```
 
-Then run the release skill from the repository root and follow it; it determines the bump from
-the diff, tags `v0.9.1.0`, and publishes `shibuya-core` before `shibuya-metrics`.
-
-### Milestone 5 steps
-
-In `/Users/shinzui/Keikaku/work/microtan/mls-service-v2-master`, once `0.9.1.0` is on Hackage
-or the local index:
+In that checkout, after selecting the fixed version and configuring isolated development
+resources:
 
 ```bash
 just update-cabal-freeze
+rg -n 'shibuya-(core|metrics)' cabal.project.freeze nix/haskell-overlay.nix
 cabal build exe:mls-service-v2
-timeout 40 cabal run -v0 exe:mls-service-v2 -- queue-worker run-area-details-cache; echo "exit=$?"
 ```
 
-Expected `exit=124` — the subcommand ran until `timeout` stopped it, instead of `exit=1` after
-about two seconds with the linked-thread exception. Commit `cabal.project.freeze` and
-`nix/haskell-overlay.nix` together there, as that repository's `CLAUDE.md` requires.
+Build before the timed run, so compilation cannot consume the liveness window. Resolve the
+binary with `cabal list-bin exe:mls-service-v2`, then run that binary under a 40-second
+timeout with `queue-worker run-area-details-cache`. On systems with GNU `timeout`,
+use `timeout 40 <resolved-binary> queue-worker run-area-details-cache`; on macOS use
+`gtimeout` if installed. Record the real exit status immediately. Status 124 means the
+timeout ended the process; require the startup evidence as well. If neither timeout command
+exists, supply an equivalent bounded process runner rather than treating that missing tool
+as a Shibuya failure. Commit the consumer's freeze and overlay together when implementing
+that milestone, following its own repository rules.
 
 
 ## Validation and Acceptance
 
-Milestone 1 is accepted when the new test fails on the current code with
-`ExceptionInLinkedThread` in its message, as shown above. A test that passes before the fix
-proves nothing and must be fixed first.
+Milestone 1 is complete only with a compiled, non-pending test that fails with the reported
+exception against the unchanged library. That evidence is recorded above.
 
-Milestone 2 is accepted when `cabal build all` succeeds without new warnings and `cabal test
-shibuya-core-test` passes with the new test included, run at least three times to confirm the
-former flake in `RunnerSpec` does not reappear.
+Milestone 2 requires the same test to pass, all existing core tests to pass, and unchanged
+public exports and signatures. The production source must contain no idle master mailbox
+actor; removing its link alone is not acceptance.
 
-Milestone 3 is accepted when `grep -rn -i 'master loop\|MasterMessage\|masterProcess'
-CLAUDE.md docs/MULTI_QUEUE_DESIGN.md docs/HIGH_LEVEL_ARCHITECTURE.md
-docs/architecture/RUNNER_BUG_FIXES.md` returns only historical descriptions that say the loop
-was removed, and `nix flake check` passes.
+Milestone 3 requires accurate current descriptions, passing formatting/flake checks, and a
+standard core/release test command that includes the dedicated GC suite.
 
-Milestone 4 is accepted when the tag exists and both packages are published at the same
-version.
+Milestone 4 requires both packages published at the reviewed version and the tag and
+changelogs matching what was built and tested. Build/publish preparation is not publication.
 
-Milestone 5 is accepted when, in `mls-service-v2`, `queue-worker run-area-details-cache` runs
-until killed by `timeout` rather than exiting on its own.
+Milestone 5 requires verified fixed dependency pins and an isolated MLS worker that starts
+successfully and remains alive for the entire observation. Explicit shutdown and processor
+failure behavior must still be covered by the core lifecycle suite.
 
 
 ## Idempotence and Recovery
 
-Every step is a source edit under version control; rerunning a step is harmless and rolling
-back is `git revert`. The Milestone 1 test leaks one idle app for at most the test's lifetime if
-its cleanup path fails; that cannot affect other tests because the processor never processes
-anything. The release in Milestone 4 is the only step with an external side effect, and the
-release skill owns its retry semantics.
+Re-run the dedicated test freely: it has no external service or data dependency, and each
+process terminates its own threads. Its observer signals success only after forced GC;
+an outer timeout is failure. This avoids both accidental handle retention and weak-pointer
+cleanup leaks. The regular suite continues to test production shutdown.
+
+Keep the deliberately failing test while Milestone 2 is pending and report that state clearly;
+do not publish a release with a failing suite. Source changes are reversible with scoped
+patches or commits. Preserve unrelated work. Consumer pin updates remain in their own
+repository. Release retries follow the release skill; never overwrite an existing version.
+
+The old release/consumer commands were instructions for later milestones, not evidence that
+those actions had already happened.
 
 
 ## Interfaces and Dependencies
 
-No dependency changes. `nqe ^>=0.6` stays; the supervisor is still created with
-`Control.Concurrent.NQE.Supervisor.supervisor` and stopped by cancelling
-`getProcessAsync master.state.supervisor`.
+No runtime dependency or public API change is needed. `nqe ^>=0.6` remains. The new test
+uses already-selected `base`, `effectful`, `shibuya-core`, `streamly-core`, and
+`unliftio`; it adds no external service requirement.
 
-Signatures that must hold at the end of Milestone 2, all in
-`Shibuya.Internal.Runner.Master`:
+The resulting internal representation is `newtype Master = Master {state :: MasterState}`.
+`MasterState` still contains the metrics registry, NQE supervisor and failure-propagation
+flag. `MasterMessage`, `Master.handle`, and `Master.inbox` disappear from the unstable
+internal module. Public `runApp`, `waitApp`, `stopApp`, `stopAppGracefully`,
+`getAppMaster`, and all metrics-reader signatures stay unchanged.
 
-```haskell
-data MasterState = MasterState
-  { metrics :: !(TVar (Map ProcessorId MetricsHandle)),
-    supervisor :: !Supervisor,
-    propagateFailures :: !Bool
-  }
+Release coordination is soft, not a compiler dependency: plan 34 owns dependency-bound and
+benchmark-policy hardening, this plan owns the crash fix and coordinated release, and plans
+35–36 consume the actual chosen core version.
 
-newtype Master = Master {state :: MasterState}
 
-startMaster :: (IOE :> es) => Strategy -> Eff es Master
-stopMaster :: (IOE :> es) => Master -> Eff es ()
-getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap
-getAllMetricsIO :: Master -> IO MetricsMap
-getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
-getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
-registerProcessor :: (IOE :> es) => Master -> ProcessorId -> MetricsHandle -> Eff es ()
-unregisterProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
-```
+## Revision Notes
 
-`MasterMessage` no longer exists. `Shibuya.App`'s exports — `Master` (abstract),
-`getAppMaster`, `getAllMetrics`, `getAllMetricsIO`, `getProcessorMetrics`,
-`getProcessorMetricsIO`, `runApp`, `waitApp`, `stopApp`, `stopAppGracefully` — are unchanged
-in name and type.
+2026-09-20 UTC: Reviewed the original plan, verified the 0.8 regression history and current
+0.9.0.1 release baseline, corrected NQE liveness and weak-pointer teardown assumptions,
+implemented and reproduced the dedicated GC regression, and refreshed test/release gates,
+documentation scope, and MLS follow-up. The user's clarification explicitly excludes
+registration-service-v2. Production implementation and publication remain pending.

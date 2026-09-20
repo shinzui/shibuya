@@ -6,7 +6,7 @@ Shibuya is a supervised queue processing framework for Haskell, inspired by Broa
 
 ```bash
 cabal build all                    # Build everything
-cabal test shibuya-core-test       # Run tests
+cabal test shibuya-core            # Run lifecycle/unit and isolated GC tests
 cabal run shibuya-example          # Run example app
 nix flake check                    # Run formatting checks
 nix fmt                            # Format all files
@@ -101,7 +101,7 @@ myHandler ingested = do
 
 Tests use HSpec with property-based testing via QuickCheck:
 ```bash
-cabal test shibuya-core-test
+cabal test shibuya-core
 ```
 
 Test modules mirror source structure in `test/Shibuya/`.

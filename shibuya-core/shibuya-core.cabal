@@ -150,3 +150,23 @@ test-suite shibuya-core-test
     time,
     unliftio,
     unordered-containers,
+
+-- Isolate the bare-waitApp liveness probe so process exit cleans up without
+-- retaining the master (which would conceal the regression).
+test-suite shibuya-core-gc-test
+  import: warnings
+  default-language: GHC2024
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test-gc
+  main-is: Main.hs
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N2
+
+  build-depends:
+    base ^>=4.21.0.0,
+    effectful,
+    shibuya-core,
+    streamly-core,
+    unliftio,
