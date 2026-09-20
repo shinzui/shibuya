@@ -43,8 +43,9 @@ provenance:
 # Remove the idle linked master loop that deadlocks bare waitApp callers
 
 This ExecPlan is a living document. Keep Progress, Surprises & Discoveries, Decision Log,
-and Outcomes & Retrospective current. The failing regression and library fix are now
-implemented; documentation, release, and consumer follow-up remain in progress.
+and Outcomes & Retrospective current. All milestones are complete: the failing regression,
+library fix, documentation, 0.9.0.2 release, and MLS consumer follow-up are implemented and
+verified.
 
 
 ## Purpose / Big Picture
@@ -81,7 +82,7 @@ existing follow-up in `mori://tan/mls-service-v2`. Per the user's clarification,
 - [x] (2026-09-20 UTC) Milestone 2: Remove the master loop, mailbox, and message protocol; make the regression and existing lifecycle tests pass.
 - [x] (2026-09-20 UTC) Milestone 3: Update current architecture descriptions and retain accurate historical explanations.
 - [x] (2026-09-20 UTC) Milestone 4: Prepare and validate the coordinated release; publish through the release workflow.
-- [ ] Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
+- [x] (2026-09-20 UTC) Milestone 5: Update the MLS consumer's pins and verify its isolated worker survives.
 
 
 ## Surprises & Discoveries
@@ -167,6 +168,23 @@ and the GitHub release is published at
 both Hackage package pages returned HTTP 200 and `gh release view` reported a non-draft,
 non-prerelease release for the tag.
 
+**The MLS consumer accepts the fixed release without an unrelated dependency refresh.** In
+`mori://tan/mls-service-v2`, commit `536b107` advances the Hackage snapshot to
+`2026-09-20T04:00:02Z`, pins core and metrics to 0.9.0.2, and constrains every package that
+the later snapshot initially tried to move back to its prior frozen version. The resulting
+freeze and generated Nix overlay change only core and metrics. `just update-cabal-freeze`
+passed the complete 282-test suite, `cabal build exe:mls-service-v2` was up to date, and
+`nix flake check` passed the package, test, generated-overlay, pre-commit, and formatting gates.
+
+**The isolated MLS worker survives the former crash window.** The repository-local PostgreSQL
+17.10 database had an empty `location_service_area_details_cache` queue. The resolved,
+pre-built binary ran `queue-worker run-area-details-cache` under a 40-second GNU timeout and
+returned status 124. PostgreSQL recorded successful queue polls every five seconds throughout
+the bounded run, and neither the process output nor database log contained the linked-thread
+exception. The current development shell supplies PostgreSQL 18.6 and could not start over the
+existing version-17 data directory; this setup mismatch was kept separate from the worker
+proof, which used the already-running, repository-local version-17 server verified by `psql`.
+
 
 ## Decision Log
 
@@ -201,12 +219,14 @@ non-prerelease release for the tag.
 
 ## Outcomes & Retrospective
 
-The review found the removal design sound and the implementation now removes the obsolete
+The review found the removal design sound and the implementation removes the obsolete
 mailbox actor without changing public APIs, metrics access, supervisor behavior, or failure
 propagation. The dedicated process-isolated regression passes repeatedly, the old actor fails
 the same test in a detached worktree, and all existing core tests pass. Release 0.9.0.2 is
 published for both core and metrics with matching Haddocks, tag, and GitHub release. The MLS
-consumer update and verification remain.
+consumer pins both packages, preserves every unrelated frozen version, passes its complete
+build/test/flake gates, and its isolated worker remains alive until the bounded timeout while
+polling the local queue. All milestones are complete.
 
 Refresh validation: `cabal test shibuya-core --offline --test-show-details=failures`
 selected both suites: the existing Hspec suite passed and the GC suite failed with the
@@ -216,8 +236,8 @@ Current-tree validation after the documentation update passed `cabal build all`,
 selected by `cabal test shibuya-core --test-show-details=failures`, `nix fmt`, and
 `nix flake check`. The prepared 0.9.0.2 candidate repeated those gates, passed `cabal check`
 for both packages, and produced both source distributions and Hackage documentation tarballs.
-The exact artifacts were published after user approval; downstream verification remains
-implementation work.
+The exact artifacts were published after user approval. Downstream verification selected the
+published versions and reproduced the expected long-running worker behavior.
 
 
 ## Context and Orientation
@@ -249,17 +269,19 @@ the observer nor the signal retains the application. Do not substitute an unreac
 `atomically retry` adapter; that would introduce another deadlock.
 
 `shibuya-core/test/Shibuya/App/LifecycleSpec.hs` covers finite completion, halt, failures,
-shutdown and metrics. `shibuya-core/test/Shibuya/RunnerSpec.hs` has four cleanup comments
-that describe the old failure. `shibuya-core/shibuya-core.cabal` declares both test suites.
+shutdown and metrics. `shibuya-core/test/Shibuya/RunnerSpec.hs` has four explicit cleanup
+calls so supervisors and children do not outlive their tests. `shibuya-core/shibuya-core.cabal`
+declares both test suites.
 `CLAUDE.md` and `.agents/skills/release/SKILL.md` must direct normal checks to
 `cabal test shibuya-core`, which selects both.
 
-No `docs/adr/` directory exists in this repository. Relevant local design context is in
+This plan created `docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md`.
+Relevant earlier design context is in
 `docs/plans/22-fix-processor-lifecycle-and-supervision-semantics.md` (direct STM metrics
 and conditional failure propagation) and `docs/plans/25-pre-1-0-public-api-cleanup.md`
-(unstable internals). At implementation completion, distill the lesson about obsolete linked
-actors and GC-safe regression tests into an ADR following the repository's then-current
-convention; no new architecture is being adopted by this documentation refresh.
+(unstable internals). ADR 0001 distills the completed lesson about obsolete linked actors,
+supervisor ownership, and process-isolated GC-liveness tests without inventing an OKF identity
+for a repository that has no ADR bundle.
 
 The existing consumer diagnosis is
 `mori://tan/mls-service-v2/plans/101-find-and-fix-the-queue-worker-s-per-message-memory-retention`.
@@ -537,3 +559,9 @@ required version/changelog confirmation.
 2026-09-20 UTC: Published shibuya-core and shibuya-metrics 0.9.0.2 to Hackage with Haddocks,
 pushed annotated tag `v0.9.0.2`, and published the matching GitHub release. Milestone 4 is
 complete; only the MLS consumer pin and isolated worker observation remain.
+
+2026-09-20 UTC: Updated `mori://tan/mls-service-v2` to exact core/metrics 0.9.0.2 pins without
+moving any unrelated frozen dependency, regenerated its Nix overlay, passed all 282 tests and
+flake checks, and observed its repository-local area-details worker polling until a 40-second
+timeout returned 124. Added ADR 0001 for obsolete linked actors and GC-sensitive liveness.
+Milestone 5 and this ExecPlan are complete.
