@@ -44,6 +44,7 @@ module Shibuya.Internal.Runner.Master
   )
 where
 
+import Control.Concurrent.Async (asyncWithUnmask)
 import Control.Concurrent.NQE.Process (Process (..), newMailbox)
 import Control.Concurrent.NQE.Supervisor (Strategy (..), Supervisor)
 import Control.Concurrent.NQE.Supervisor qualified as Supervisor
@@ -55,6 +56,7 @@ import Control.Concurrent.STM
     readTVar,
   )
 import Control.Exception qualified as Exception
+import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Effectful (Eff, IOE, liftIO, (:>))
@@ -67,14 +69,18 @@ import Shibuya.Core.Metrics
   )
 import Shibuya.Core.Types (MessageId)
 import Shibuya.Prelude
-import UnliftIO (asyncWithUnmask, cancel)
+import UnliftIO (cancel)
 
--- | Master state held in TVars.
+-- | Master ownership and observation state.
 data MasterState = MasterState
   { -- | Live metrics and retained lifecycle state share one STM ownership
     -- cell. Registration can therefore publish both atomically without adding
     -- another per-master TVar to the startup path.
     registry :: !(TVar MasterRegistry),
+    -- | The master phase is sampled independently by health endpoints. Keeping
+    -- it in an atomic reference avoids paying for a standalone STM transaction
+    -- on every stop while processor registry updates remain transactional.
+    phaseRef :: !(IORef MasterPhase),
     -- | The supervisor managing child processors
     supervisor :: !Supervisor,
     -- | Whether child failures should be linked into the spawning thread.
@@ -86,8 +92,7 @@ data MasterState = MasterState
 
 data MasterRegistry = MasterRegistry
   { liveMetrics :: !(Map ProcessorId MetricsHandle),
-    lifecycles :: !LifecycleSnapshot,
-    phase :: !MasterPhase
+    lifecycles :: !LifecycleSnapshot
   }
   deriving (Generic)
 
@@ -143,21 +148,20 @@ startMaster strategy = liftIO $ Exception.mask_ $ do
   -- to 'acquireOwned', which then owns cleanup; there is no interruptible gap
   -- that needs an extra exception frame here.
   let sup = Process supAsync mailbox
-  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty MasterStarting
+  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty
+  phaseRef <- newIORef MasterStarting
   let propagate = case strategy of
         KillAll -> True
         IgnoreGraceful -> True
         IgnoreAll -> False
         Notify _ -> False
-  pure Master {state = MasterState registryVar sup propagate}
+  pure Master {state = MasterState registryVar phaseRef sup propagate}
 
 -- | Stop the master and all child processors.
 -- Cancels the supervisor, which cancels all children via NQE's stopAll.
 stopMaster :: (IOE :> es) => Master -> Eff es ()
 stopMaster master = liftIO $ do
-  atomically $
-    modifyTVar' master.state.registry $ \registry ->
-      registry {phase = MasterStopped}
+  atomicWriteIORef master.state.phaseRef MasterStopped
   cancel (getProcessAsync master.state.supervisor)
 
 -- | Get metrics for all processors.
@@ -186,7 +190,7 @@ getMasterPhase = liftIO . getMasterPhaseIO
 
 -- | IO variant for health integrations.
 getMasterPhaseIO :: Master -> IO MasterPhase
-getMasterPhaseIO master = (.phase) <$> atomically (readTVar master.state.registry)
+getMasterPhaseIO = readIORef . (.state.phaseRef)
 
 -- | Read the retained processor lifecycle snapshot.
 getLifecycleSnapshot :: (IOE :> es) => Master -> Eff es LifecycleSnapshot
@@ -217,26 +221,15 @@ unregisterProcessor master pid =
         registry {liveMetrics = Map.delete pid registry.liveMetrics}
 
 markMasterRunning :: (IOE :> es) => Master -> Eff es ()
-markMasterRunning master =
-  liftIO $
-    atomically $
-      modifyTVar' master.state.registry $ \registry ->
-        registry
-          { phase = case registry.phase of
-              MasterStopped -> MasterStopped
-              _ -> MasterRunning
-          }
+markMasterRunning master = liftIO $ advanceMasterPhase master MasterRunning
 
 markMasterDraining :: (IOE :> es) => Master -> Eff es ()
-markMasterDraining master =
-  liftIO $
-    atomically $
-      modifyTVar' master.state.registry $ \registry ->
-        registry
-          { phase = case registry.phase of
-              MasterStopped -> MasterStopped
-              _ -> MasterDraining
-          }
+markMasterDraining master = liftIO $ advanceMasterPhase master MasterDraining
+
+advanceMasterPhase :: Master -> MasterPhase -> IO ()
+advanceMasterPhase master next =
+  atomicModifyIORef' master.state.phaseRef $ \current ->
+    (case current of MasterStopped -> MasterStopped; _ -> next, ())
 
 markProcessorDraining :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
 markProcessorDraining master pid =

@@ -33,6 +33,11 @@ provenance:
       at: 2026-09-20T20:00:00Z
       mode: "implement"
       note: "Complete all four milestones with candidate-bound contract, lifecycle, performance, OKF, and boundary-matrix evidence."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T23:39:00Z
+      mode: "update"
+      note: "Record the EP-45 profiling addendum that removes activity-accounting hot-path atomics"
 ---
 
 # Make metrics health and WebSocket lifecycle reporting trustworthy
@@ -86,6 +91,13 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 
 2026-09-20: The capability and improvement-request bundles pass their OKF profile and log enforcement after the capability evidence and IR-5 delivery note were updated. Strict validation still reports the bundle-wide pre-existing absence of recommended `reviews` fields on every concept. EP-39 does not fabricate retrospective review provenance for unrelated records; the inherited advisory remains visible for later OKF maintenance.
 
+2026-09-20: EP-45's optimized pass-two profile showed that Milestone 2's accepted sampler
+design still paid for a burst-generation atomic increment and CAS decrement on the serial hot
+path. Together they accounted for the remaining 32 allocated bytes per message and roughly
+9-10% throughput loss after closure-retention fixes. Removing both operations restored focused
+serial throughput and allocation. The existing separated-burst, sustained-progress, stuck, and
+in-flight-floor regressions still pass; the complete core suite passes 236 examples.
+
 
 ## Decision Log
 
@@ -105,6 +117,15 @@ Give the metrics package the test suite it has never had, and give it first. Tod
 2026-09-20: Add `lastProgress` beside `lastActivity` in processing-state JSON. `lastActivity` remains the sampled burst start for compatibility; stuck detection uses `lastProgress`. The Haskell `Processing` constructor gains the corresponding third timestamp, so this is recorded as a breaking source change and an additive wire change.
 
 2026-09-20: Use sampler-side progress detection after the direct monotonic-clock design failed the 5% focused performance gate. `sampleMetrics` remembers processed, failed, in-flight, and burst-generation counters and reads the monotonic clock only when that tuple changes. A first observation establishes the progress point; a processor is stuck only after a later observation exceeds the threshold. One wedged handler remains invisible while siblings keep changing the aggregate counters, as explicitly deferred to the per-message inspection request.
+
+2026-09-20: Refine the sampler design after EP-45's optimized whole-runner profile. The sampled
+tuple is now processed, failed, and in-flight only. Any tuple change advances `lastProgress`; an
+observed zero-to-positive in-flight transition also restamps `lastActivity`. An idle interval
+that begins and ends between samples cannot cause false stuck detection because its changed
+completion counters still advance progress. The normal decrement is one fetch-and-add; only an
+invalid underflow performs a compensating increment so sampled in-flight remains floored at
+zero. This supersedes the burst-generation/CAS implementation detail, not EP-39's published
+progress-based health contract.
 
 2026-09-20: Add `dependencyTimeoutMicros` to both health configuration records and add the application lifecycle to `ReadinessStatus`. This deliberately breaks direct record construction but leaves the default at one second per dependency. A timed-out legacy `IO DependencyStatus` cannot reveal its name before returning, so the diagnostic name is `unknown`; changing `DependencyCheck` itself would be a larger compatibility break.
 
@@ -138,6 +159,12 @@ and both GC suites. The focused activity and socket measurements stayed within t
 5% budget without a waiver. CAP-10 now names executable evidence, while IR-5 correctly remains
 open for configurable CORS/Origin policy and broader WebSocket convention alignment. EP-45
 still owns the final paired performance verdict and EP-44 owns integrated release certification.
+
+Post-completion EP-45 profiling refined the internal activity-accounting implementation without
+changing that outcome or the published wire contract. The burst-generation counter and hot-path
+CAS decrement were removed in favor of sampler-observed transitions and a cold underflow repair;
+the original EP-39 regressions and the full core suite remain green. Final acceptance of the
+integrated candidate still depends on EP-45's complete matrix and soak.
 
 
 ## Context and Orientation

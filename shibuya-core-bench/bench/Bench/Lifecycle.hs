@@ -402,7 +402,7 @@ lifecycleResultValue sampleId result@LifecycleResult {scenario} =
   object
     [ "schemaVersion" .= (1 :: Int),
       "sampleId" .= sampleId,
-      "workloadVersion" .= (1 :: Int),
+      "workloadVersion" .= (2 :: Int),
       "scenario" .= scenario.name,
       "configuration" .= scenarioValue scenario,
       "metrics" .= metricsValue result
@@ -465,28 +465,34 @@ benchTime = UTCTime (fromGregorian 2024 1 1) 0
 
 scenarios :: [Scenario]
 scenarios =
-  [ base "serial-small-inbox" Serial Unordered 5_000 16,
-    base "serial-full-inbox" Serial Unordered 5_000 5_000,
+  -- The zero-delay message flows deliberately cross several 32 MiB nursery
+  -- collections. Shorter v1 runs made fixed process/processor acquisition a
+  -- material part of the per-message allocation result and produced the
+  -- opposite allocation ordering when the same flow was extended. Startup is
+  -- measured separately below, so v2 amortizes it before applying hot-path
+  -- allocation and live-heap budgets.
+  [ base "serial-small-inbox" Serial Unordered 50_000 16,
+    base "serial-full-inbox" Serial Unordered 50_000 50_000,
     (base "serial-fixed-rate" Serial Unordered 500 16)
       { handlerDelayMicros = 500,
         arrivalIntervalMicros = 1_000
       },
-    (base "ahead-uniform-keys" (Ahead 4) PartitionedInOrder 5_000 16) {partitions = UniformPartitions 16},
-    (base "async-hot-key" (Async 4) PartitionedInOrder 5_000 16) {partitions = HotKeyPartitions 16},
-    (base "async-high-cardinality" (Async 4) PartitionedInOrder 5_000 16) {partitions = HighCardinalityPartitions},
-    (base "batch-size" (Async 4) Unordered 5_000 16) {batching = SizeBatch 100},
+    (base "ahead-uniform-keys" (Ahead 4) PartitionedInOrder 50_000 16) {partitions = UniformPartitions 16},
+    (base "async-hot-key" (Async 4) PartitionedInOrder 50_000 16) {partitions = HotKeyPartitions 16},
+    (base "async-high-cardinality" (Async 4) PartitionedInOrder 50_000 16) {partitions = HighCardinalityPartitions},
+    (base "batch-size" (Async 4) Unordered 50_000 16) {batching = SizeBatch 100},
     (base "batch-timeout" (Async 2) Unordered 100 16)
       { batching = TimeoutBatch 1_000 10_000,
         arrivalIntervalMicros = 2_000
       },
-    (base "retry-path" Serial Unordered 2_000 16) {decisions = RetryEvery 10},
-    (base "dead-letter-path" Serial Unordered 2_000 16) {decisions = DeadLetterEvery 10},
+    (base "retry-path" Serial Unordered 20_000 16) {decisions = RetryEvery 10},
+    (base "dead-letter-path" Serial Unordered 20_000 16) {decisions = DeadLetterEvery 10},
     (base "idle-worker" Serial Unordered 1 1) {idleBeforeFirstMessageMicros = 1_000_000},
-    (base "metrics-disabled" (Async 4) Unordered 5_000 16) {observer = NoObserver},
-    (base "metrics-enabled" (Async 4) Unordered 5_000 16) {observer = MetricsPolling},
-    (base "health-poll-proxy" (Async 4) Unordered 5_000 16) {observer = HealthPollingProxy},
-    (base "websocket-churn-proxy" (Async 4) Unordered 5_000 16) {observer = WebSocketChurnProxy},
-    (base "startup-shutdown" Serial Unordered 0 1) {startupCycles = 25}
+    (base "metrics-disabled" (Async 4) Unordered 50_000 16) {observer = NoObserver},
+    (base "metrics-enabled" (Async 4) Unordered 50_000 16) {observer = MetricsPolling},
+    (base "health-poll-proxy" (Async 4) Unordered 50_000 16) {observer = HealthPollingProxy},
+    (base "websocket-churn-proxy" (Async 4) Unordered 50_000 16) {observer = WebSocketChurnProxy},
+    (base "startup-shutdown" Serial Unordered 0 1) {startupCycles = 1_000}
   ]
 
 base :: Text -> Concurrency -> OrderingPolicy -> Int -> Int -> Scenario

@@ -28,6 +28,11 @@ provenance:
       at: 2026-09-20T14:43:19Z
       mode: "implement"
       note: "Implemented pass-one lifecycle workloads and paired performance comparator"
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T23:39:00Z
+      mode: "implement"
+      note: "Profiled and remediated candidate hot-path regressions before immutable pass-two capture"
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -75,6 +80,26 @@ absolute limits were therefore calibrated to 4% CPU and 131,072 live bytes, with
 deltas of 1 percentage point and 32,768 bytes. The raw artifacts retain the measurements and
 the budget file records the derivation.
 
+2026-09-20: The first pass-two comparison was not valid release evidence. Version 1's
+zero-delay scenarios were short enough that fixed process and nursery costs dominated
+`allocatedBytesPerMessage` and `maxLiveBytes`; several runs did not cross enough 32 MiB nursery
+collections for a stable ratio. Workload version 2 increases only the zero-delay message and
+startup-cycle counts while preserving each scenario's queue, ordering, key distribution,
+handler, and RTS configuration. Fixed-rate, timeout, and idle scenarios retain their original
+durations.
+
+2026-09-20: Optimized ticky profiles separated a real serial hot-path regression from the
+short-run noise. Capturing the signal, intake wake cell, and full ingested envelope in nested
+message closures added 72 bytes per message. An opaque boxed terminal publisher and direct
+`MessageId` capture removed that cost without weakening the mandatory wake of idle intake.
+The remaining 32 bytes per message and roughly 9-10% serial throughput loss came from EP-39's
+per-burst atomic counter and CAS decrement. Sampler-observed idle-to-active transitions now
+restamp `lastActivity`, all changed aggregate counters advance `lastProgress`, and the valid
+completion path uses one fetch-and-add with a cold underflow repair. The final focused
+20-pair N1 serial-full comparison measured a 0.99866 throughput adverse ratio and a 0.97588
+allocation ratio; p95 and p99 ratios were 0.9985 and 0.9987. Live-heap and shutdown results
+were too noisy at this scale and remain obligations of the full matrix and soak.
+
 
 ## Decision Log
 
@@ -96,6 +121,19 @@ but final release evidence must rebuild this exact production/harness identity a
 runs with the candidate. The comparator rejects calibration artifacts marked
 `pairedComparisonEligible: false` so they cannot accidentally certify a release.
 
+2026-09-20: Revise the workload catalog to version 2 before freezing the pass-two candidate.
+Both baseline and candidate use the same revised harness, so this is a measurement correction,
+not a post-failure budget change. Require zero-delay scenarios to amortize process startup and
+cross multiple configured nurseries; reject all version-1 pass-two artifacts rather than mixing
+workload versions or presenting them as final evidence.
+
+2026-09-20: Preserve terminal wakeup correctness while reducing closure retention. The hot read
+remains a raw `ProcessorSignal`; terminal message actions retain one opaque
+`ProcessorExitPublisher`, which owns publication plus the STM intake wake. A no-wake serial
+experiment improved the same benchmark but failed the existing halt-wakes-idle-intake
+regression, so it was discarded before candidate capture. Performance remediation may change
+representation and cold-path placement, but may not restore an audited lifecycle defect.
+
 
 ## Outcomes & Retrospective
 
@@ -107,6 +145,12 @@ comparator's seven synthetic tests prove pass, fail, inconclusive, environment-m
 dropped-work, absolute-budget, deterministic-seed, and calibration-misuse behavior. No candidate
 performance verdict exists yet; pass two must recapture this baseline in alternating order with
 the integrated candidate.
+
+Pass two is active. Profiling-driven changes have passed the 236-example core suite and the
+process-isolated core GC suite, and the corrected focused serial comparison is inside the
+precommitted throughput, latency, and allocation limits. These focused results select the
+candidate implementation; they do not replace the complete N1/N4 matrix, live-adapter runs, or
+30-minute retained-memory soak required by Milestones 4 and 5.
 
 
 ## Context and Orientation
@@ -212,3 +256,10 @@ SHA `886f5910a5f1a47b5465dce9380bce831467fe2b`, and solver hash
 `47f9680ce1ad6be1220c85dfc30c850d097e20d4e97bef9d4394cbce30ec4dc4`; calibrated the
 absolute idle budgets from those results; and marked the raw data ineligible for the later final
 paired verdict so pass two must alternate baseline and candidate processes.
+
+2026-09-20 UTC: During pass-two candidate selection, rejected version-1 measurements whose
+short zero-delay runs made fixed allocation and live-heap costs dominate. Version 2 lengthens
+those workloads symmetrically for baseline and candidate. Optimized ticky profiles then found
+and removed per-message closure retention and EP-39 activity-accounting atomics while preserving
+idle-intake wakeup correctness. A 20-pair focused N1 serial-full comparison passes the original
+budgets; the immutable all-scenario N1/N4 capture, live services, and soak remain open.

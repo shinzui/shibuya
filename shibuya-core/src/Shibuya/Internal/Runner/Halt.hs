@@ -9,11 +9,12 @@ module Shibuya.Internal.Runner.Halt
     ProcessorFailure (..),
     ProcessorExit (..),
     ProcessorSignal,
+    ProcessorExitPublisher,
     newProcessorSignal,
-    isProcessorStopping,
+    newProcessorExitPublisher,
+    newProcessorExitPublisherWithWake,
     readProcessorExit,
     requestProcessorExit,
-    requestProcessorExitWithWake,
     throwProcessorExit,
   )
 where
@@ -50,38 +51,46 @@ data ProcessorExit
   | ProcessorFailed !Text !(Maybe MessageId)
   deriving stock (Eq, Show, Generic)
 
--- | A cheap hot-path stop observation. Supervised runners publish a separate
--- STM wake after recording an exit so empty intake can observe the request.
+-- | A cheap hot-path stop observation. The corresponding publisher is kept
+-- separate so message actions retain one opaque cold-path pointer rather than
+-- capturing and field-splitting the signal and its STM wake cell.
 newtype ProcessorSignal = ProcessorSignal
   { terminalExit :: IORef (Maybe ProcessorExit)
   }
 
+-- | Opaque cold-path terminal publisher. The function closure may retain both
+-- the signal and an intake wake cell, but hot message closures retain only this
+-- single pointer. The box prevents GHC from field-splitting those two captured
+-- cells back into every nested per-message closure.
+data ProcessorExitPublisher = ProcessorExitPublisher (ProcessorExit -> IO ())
+
 newProcessorSignal :: IO ProcessorSignal
 newProcessorSignal = ProcessorSignal <$> newIORef Nothing
 
-isProcessorStopping :: ProcessorSignal -> IO Bool
-isProcessorStopping signal = do
-  current <- readIORef signal.terminalExit
-  pure $ case current of
-    Nothing -> False
-    Just _ -> True
-{-# INLINE isProcessorStopping #-}
+newProcessorExitPublisher :: ProcessorSignal -> ProcessorExitPublisher
+newProcessorExitPublisher signal =
+  ProcessorExitPublisher $ \requested ->
+    mask_ $ publishProcessorExit signal requested
+{-# OPAQUE newProcessorExitPublisher #-}
+
+newProcessorExitPublisherWithWake :: ProcessorSignal -> TVar Bool -> ProcessorExitPublisher
+newProcessorExitPublisherWithWake signal intakeWake =
+  ProcessorExitPublisher $ \requested ->
+    -- Publish the terminal outcome before the STM wakeup. Masking prevents
+    -- cancellation from leaving only the outcome set; this path runs once per
+    -- terminal request, not once per message.
+    mask_ $ do
+      publishProcessorExit signal requested
+      atomically $ writeTVar intakeWake True
+{-# OPAQUE newProcessorExitPublisherWithWake #-}
 
 readProcessorExit :: ProcessorSignal -> IO (Maybe ProcessorExit)
 readProcessorExit = readIORef . (.terminalExit)
 {-# INLINE readProcessorExit #-}
 
-requestProcessorExit :: ProcessorSignal -> ProcessorExit -> IO ()
-requestProcessorExit signal requested = mask_ $ publishProcessorExit signal requested
-
-requestProcessorExitWithWake :: ProcessorSignal -> TVar Bool -> ProcessorExit -> IO ()
-requestProcessorExitWithWake signal intakeWake requested =
-  -- Publish the terminal outcome before the STM wakeup. Masking prevents
-  -- cancellation from leaving only the outcome set; this path runs once per
-  -- terminal request, not once per message.
-  mask_ $ do
-    publishProcessorExit signal requested
-    atomically $ writeTVar intakeWake True
+requestProcessorExit :: ProcessorExitPublisher -> ProcessorExit -> IO ()
+requestProcessorExit (ProcessorExitPublisher publish) = publish
+{-# OPAQUE requestProcessorExit #-}
 
 publishProcessorExit :: ProcessorSignal -> ProcessorExit -> IO ()
 publishProcessorExit signal requested =

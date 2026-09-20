@@ -273,6 +273,15 @@ after the adapter failure hook runs. The candidate proves that ordinary and auto
 failure preserve the source and produce EP-38's retained `LifecycleFailed` outcome after the
 source has ended.
 
+**Performance evidence must amortize process startup and compiler closure shape (2026-09-20
+UTC, EP-45 pass two).** The first final-capture attempt used zero-delay workloads too short to
+stabilize allocation and live-heap ratios. A symmetric workload-version increase made an
+optimized ticky profile actionable: terminal signal/wake/envelope retention added 72 bytes per
+message, and EP-39's burst atomic plus CAS decrement added another 32 bytes and about 9-10%
+serial time. Opaque boxed cold-path publication and sampler-side transition detection recover
+the original hot path while retaining the idle-intake wake and health regressions. Version-1
+pass-two artifacts are rejected, not reinterpreted.
+
 
 ## Decision Log
 
@@ -328,6 +337,12 @@ plan after Milestone 3. The capture fixes the absolute idle budgets before candi
 but is marked ineligible for final paired comparison, because a candidate did not yet exist to
 alternate with it. Each remediation child can now use the committed harness for focused
 before/after evidence; EP-45 pass two rebuilds the same baseline for the final paired verdict.
+
+2026-09-20: Accept EP-45 workload version 2 and the profiling-driven internal remediation as
+candidate-selection work, not final evidence or a budget revision. Baseline and candidate run
+the identical revised workload; the existing 5%/10% budgets and minimum ten alternating pairs
+remain unchanged. Correctness takes precedence over a faster unsafe variant: every supervised
+strategy retains terminal publication plus an STM wake for idle intake.
 
 
 ## Outcomes & Retrospective
@@ -441,3 +456,10 @@ error, and closes the store bridge's subscribe-to-monitor handoff. Deterministic
 prove AckHalt and pre-save replay, existing and missing checkpoint policies, idempotent bridge
 cancellation, and empty registry cleanup. All five Kiroku cells and REV-13 entries are closed;
 focused performance passes, so EP-45 resumes for its final candidate matrix.
+
+2026-09-20 UTC: EP-45 pass-two candidate selection rejected short version-1 final-capture data,
+introduced a symmetric version-2 workload, and profiled the optimized production runner. The
+selected implementation removes terminal closure retention and activity-accounting atomics
+without losing idle-intake wakeup or health behavior. The focused 20-pair N1 serial-full result
+passes the original throughput, tail-latency, and allocation budgets; the immutable full N1/N4
+matrix, live adapters, and 30-minute soak remain open.

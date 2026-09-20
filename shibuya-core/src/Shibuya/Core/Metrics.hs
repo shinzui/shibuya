@@ -218,8 +218,7 @@ data HotCounters = HotCounters
   { received :: !AtomicCounter,
     processed :: !AtomicCounter,
     failed :: !AtomicCounter,
-    inFlight :: !AtomicCounter,
-    burstSequence :: !AtomicCounter
+    inFlight :: !AtomicCounter
   }
 
 -- | Write-side metrics handle for one processor.
@@ -231,7 +230,7 @@ data MetricsHandle = MetricsHandle
     progressOriginNs :: !Word64,
     progressOriginTime :: !UTCTime,
     progressClock :: !(IO Word64),
-    lastObservedProgress :: !(IORef (Int, Int, Int, Int)),
+    lastObservedProgress :: !(IORef (Int, Int, Int)),
     stateActiveRef :: !(IORef Bool),
     cold :: !(TVar ProcessorMetrics)
   }
@@ -249,11 +248,10 @@ newMetricsHandleWithClock clock now = do
   processed <- Counter.newCounter 0
   failed <- Counter.newCounter 0
   inFlight <- Counter.newCounter 0
-  burstSequence <- Counter.newCounter 0
   maxConcurrencyRef <- newIORef 1
   burstStartedRef <- newIORef now
   lastProgressRef <- newIORef progressOriginNs
-  lastObservedProgress <- newIORef (0, 0, 0, 0)
+  lastObservedProgress <- newIORef (0, 0, 0)
   stateActiveRef <- newIORef False
   cold <- newTVarIO (emptyProcessorMetrics now)
   pure
@@ -263,8 +261,7 @@ newMetricsHandleWithClock clock now = do
             { received = received,
               processed = processed,
               failed = failed,
-              inFlight = inFlight,
-              burstSequence = burstSequence
+              inFlight = inFlight
             },
         maxConcurrencyRef = maxConcurrencyRef,
         burstStartedRef = burstStartedRef,
@@ -284,9 +281,8 @@ sampleMetrics handle = do
   processed <- readCounter handle.hot.processed
   failed <- readCounter handle.hot.failed
   inFlight <- readCounter handle.hot.inFlight
-  burstSequence <- readCounter handle.hot.burstSequence
   maxConcurrency <- readIORef handle.maxConcurrencyRef
-  observeProgress handle processed failed inFlight burstSequence
+  observeProgress handle processed failed inFlight
   burstStartedAt <- readIORef handle.burstStartedRef
   lastProgressNs <- readIORef handle.lastProgressRef
   let lastProgressAt = monotonicToUTC handle lastProgressNs
@@ -311,7 +307,6 @@ beginProcessing :: MetricsHandle -> Int -> IO Int
 beginProcessing handle maxConcurrency = do
   currentInflight <- incrCounter 1 handle.hot.inFlight
   when (currentInflight == 1) $ do
-    Counter.incrCounter_ 1 handle.hot.burstSequence
     writeIORef handle.maxConcurrencyRef maxConcurrency
     writeIORef handle.stateActiveRef True
   pure currentInflight
@@ -398,15 +393,19 @@ recordBatchOutcomeMetrics handle trigger size handlerThrew partialInc decisions 
     Just _ -> writeIORef handle.stateActiveRef False
     Nothing -> when (remaining == 0) $ writeIORef handle.stateActiveRef False
 
-observeProgress :: MetricsHandle -> Int -> Int -> Int -> Int -> IO ()
-observeProgress handle processed failed inFlight burstSequence = do
-  let current = (processed, failed, inFlight, burstSequence)
-  previous@(_, _, _, previousBurstSequence) <- readIORef handle.lastObservedProgress
+observeProgress :: MetricsHandle -> Int -> Int -> Int -> IO ()
+observeProgress handle processed failed inFlight = do
+  let current = (processed, failed, inFlight)
+  previous@(_, _, previousInFlight) <- readIORef handle.lastObservedProgress
   when (current /= previous) $ do
     progressNs <- handle.progressClock
     atomicWriteIORef handle.lastProgressRef progressNs
     atomicWriteIORef handle.lastObservedProgress current
-    when (inFlight > 0 && burstSequence /= previousBurstSequence) $
+    -- Burst boundaries are sampled observations: an observed idle-to-active
+    -- transition restamps lastActivity, while a continuously active processor
+    -- only advances lastProgress. An idle gap wholly between samples cannot
+    -- affect stuck detection because changed counters still advance progress.
+    when (inFlight > 0 && previousInFlight == 0) $
       atomicWriteIORef handle.burstStartedRef (monotonicToUTC handle progressNs)
 
 monotonicToUTC :: MetricsHandle -> Word64 -> UTCTime
@@ -418,14 +417,16 @@ monotonicToUTC handle progressNs =
    in addUTCTime elapsedSeconds handle.progressOriginTime
 
 decrementCounterFloorZero :: AtomicCounter -> IO Int
-decrementCounterFloorZero counter = Counter.readCounterForCAS counter >>= go
-  where
-    go ticket
-      | Counter.peekCTicket ticket <= 0 = pure 0
-      | otherwise = do
-          let next = Counter.peekCTicket ticket - 1
-          (succeeded, current) <- Counter.casCounter counter ticket next
-          if succeeded then pure next else go current
+decrementCounterFloorZero counter = do
+  remaining <- incrCounter (-1) counter
+  if remaining >= 0
+    then pure remaining
+    else do
+      -- Underflow means a caller completed work it did not begin. Repair the
+      -- decrement so externally sampled in-flight never remains below zero;
+      -- the valid hot path stays one fetch-and-add operation.
+      Counter.incrCounter_ 1 counter
+      pure 0
 
 data BatchTriggerMetric
   = CountTriggerSize

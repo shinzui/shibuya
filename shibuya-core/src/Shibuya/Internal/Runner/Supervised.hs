@@ -83,13 +83,14 @@ import Shibuya.Internal.Runner.Batcher (runBatcher)
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt
   ( ProcessorExit (..),
+    ProcessorExitPublisher,
     ProcessorFailure (..),
     ProcessorHalt (..),
     ProcessorSignal,
-    isProcessorStopping,
+    newProcessorExitPublisherWithWake,
     newProcessorSignal,
     readProcessorExit,
-    requestProcessorExitWithWake,
+    requestProcessorExit,
     throwProcessorExit,
   )
 import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics)
@@ -449,6 +450,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
   inbox <- liftIO $ newBoundedInbox inboxSize
   streamDoneVar <- liftIO $ newTVarIO False
   stopSignal <- liftIO newProcessorSignal
+  let exitPublisher = newProcessorExitPublisherWithWake stopSignal streamDoneVar
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
@@ -467,7 +469,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
                 batchHandler
                 readyBatchStream
                 stopSignal
-                (Just streamDoneVar)
+                exitPublisher
               maybeExit <- liftIO (readProcessorExit stopSignal)
               maybe (pure ()) (liftIO . throwProcessorExit) maybeExit
       batchProcessor `catchAny` \processorErr -> do
@@ -499,10 +501,10 @@ inboxToStream ::
 inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
   where
     step _ = do
-      stopping <- isProcessorStopping stopSignal
-      if stopping
-        then pure Nothing
-        else do
+      terminal <- readProcessorExit stopSignal
+      case terminal of
+        Just _ -> pure Nothing
+        Nothing -> do
           result <-
             atomically $
               (Just <$> receiveSTM inbox)
@@ -530,6 +532,7 @@ processUntilDrained ::
   Eff es ()
 processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
   stopSignal <- liftIO newProcessorSignal
+  let exitPublisher = newProcessorExitPublisherWithWake stopSignal streamDoneVar
 
   let maxConc = case concurrency of
         Serial -> 1
@@ -546,7 +549,7 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
-        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal streamDoneVar handler
+        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -595,12 +598,11 @@ processOne ::
   Text ->
   HashMap.HashMap Text Attribute ->
   Int ->
-  ProcessorSignal ->
-  TVar Bool ->
+  ProcessorExitPublisher ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal streamDoneVar handler ingested = do
+processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
 
@@ -613,7 +615,7 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal stre
       -- the precedence rule local and obvious instead of relying on
       -- the order of repeated 'addAttribute' / 'addAttributes' calls
       -- against the underlying mutable Span.
-      let MessageId msgIdText = ingested.envelope.messageId
+      let messageId@(MessageId msgIdText) = ingested.envelope.messageId
           frameworkAttrs =
             HashMap.insert attrMessagingMessageId (toAttribute msgIdText) $
               case ingested.envelope.partition of
@@ -711,13 +713,10 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc stopSignal stre
       case finalizeResult of
         Left _ ->
           liftIO $
-            requestProcessorExitWithWake
-              stopSignal
-              streamDoneVar
-              (ProcessorFailed (finalizationFailureText msgIdText) (Just ingested.envelope.messageId))
+            requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
         Right () -> case result of
           Right (AckHalt reason) ->
-            liftIO $ requestProcessorExitWithWake stopSignal streamDoneVar (ProcessorHalted reason)
+            liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
           _ -> pure ()
   where
     isLeft :: Either a b -> Bool

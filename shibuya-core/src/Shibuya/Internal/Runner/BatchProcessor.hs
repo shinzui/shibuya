@@ -33,7 +33,6 @@ module Shibuya.Internal.Runner.BatchProcessor
 where
 
 import Control.Applicative ((<|>))
-import Control.Concurrent.STM (TVar)
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty (NonEmpty)
@@ -73,12 +72,12 @@ import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt
   ( ProcessorExit (..),
+    ProcessorExitPublisher,
     ProcessorSignal,
-    isProcessorStopping,
+    newProcessorExitPublisher,
     newProcessorSignal,
     readProcessorExit,
     requestProcessorExit,
-    requestProcessorExitWithWake,
     throwProcessorExit,
   )
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
@@ -126,11 +125,11 @@ processOneBatch ::
   ProcessorId ->
   Int ->
   ProcessorSignal ->
-  Maybe (TVar Bool) ->
+  ProcessorExitPublisher ->
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler (info, batch) = do
+processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -160,14 +159,14 @@ processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler (info
 
       addEvent traceSpan (mkEvent eventBatchStarted [])
 
-      alreadyHalted <- liftIO $ isProcessorStopping stopSignal
+      terminal <- liftIO $ readProcessorExit stopSignal
 
       -- Run the handler under exception isolation. On any exception, record it
       -- on the span and substitute the whole-batch retry default.
       (handlerResult, skippedAfterHalt) <-
-        if alreadyHalted
-          then pure (Left (), True)
-          else do
+        case terminal of
+          Just _ -> pure (Left (), True)
+          Nothing -> do
             result <-
               catchAny
                 (Right <$> handler info (toMessage <$> batch))
@@ -247,10 +246,7 @@ processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler (info
 
       -- Halt: set the shared flag; do NOT throw (let the stream drain).
       for_ requestedExit $ \processorExit ->
-        liftIO $
-          case intakeWake of
-            Nothing -> requestProcessorExit stopSignal processorExit
-            Just wake -> requestProcessorExitWithWake stopSignal wake processorExit
+        liftIO $ requestProcessorExit exitPublisher processorExit
   where
     isFailing :: AckDecision -> Bool
     isFailing (AckDeadLetter _) = True
@@ -297,16 +293,16 @@ processBatchesUntilDrained ::
   BatchHandler es msg ->
   Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
   ProcessorSignal ->
-  Maybe (TVar Bool) ->
+  ProcessorExitPublisher ->
   Eff es ()
-processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal intakeWake = do
+processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
         Async n -> n
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal intakeWake handler
+    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
@@ -335,9 +331,10 @@ runBatchesWithMetrics procId concurrency handler batches = do
   now <- liftIO getCurrentTime
   metricsHandle <- liftIO $ newMetricsHandle now
   stopSignal <- liftIO newProcessorSignal
+  let exitPublisher = newProcessorExitPublisher stopSignal
 
   let batchesStream = Stream.fromList batches
-  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal Nothing
+  processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher
 
   maybeExit <- liftIO $ readProcessorExit stopSignal
   case maybeExit of
