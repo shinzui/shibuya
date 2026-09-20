@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-09-20
+* **Addition**: Add IR-6 for the confirmed lifecycle, concurrency, and health audit gaps.
+
 ## 2026-08-19
 * **Addition**: Harden shibuya-metrics for browser clients - CORS, tests, and WS convention alignment (IR-5) filed from keiro-ui
 * **Addition**: Implement designed processor pause/resume and expose gated control endpoints (IR-4) filed from keiro-ui
