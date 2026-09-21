@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes
 
@@ -37,6 +37,9 @@
 
 - `shibuya-metrics`: add a release-gated Hspec suite covering every published HTTP
   route and WebSocket frame plus exact JSON and Prometheus golden contracts.
+- `shibuya-metrics`: make the test package metadata sdist-safe by declaring its generated
+  `Paths_shibuya_metrics` module, and give the release-only wire-load dependencies explicit
+  upper bounds.
 
 ## 0.9.0.3 — 2026-09-20
 

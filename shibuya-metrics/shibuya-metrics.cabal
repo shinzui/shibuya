@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: shibuya-metrics
-version: 0.9.0.3
+version: 0.10.0.0
 synopsis: Metrics web server for Shibuya queue processing framework
 description:
   Provides HTTP/JSON, Prometheus, and WebSocket endpoints for
@@ -49,7 +49,7 @@ library
     containers ^>=0.7,
     http-types ^>=0.12,
     prometheus-client ^>=1.1,
-    shibuya-core ^>=0.9.0.3,
+    shibuya-core ^>=0.10.0.0,
     stm ^>=2.5,
     text ^>=2.1,
     time ^>=1.14,
@@ -91,6 +91,9 @@ test-suite shibuya-metrics-test
     Shibuya.Metrics.TypesSpec
     Shibuya.Metrics.WebSocketSpec
 
+  autogen-modules:
+    Paths_shibuya_metrics
+
   build-depends:
     aeson,
     async,
@@ -98,10 +101,10 @@ test-suite shibuya-metrics-test
     base ^>=4.21.0.0,
     bytestring,
     containers,
-    effectful,
+    effectful >=2.6.1 && <2.8,
     hspec ^>=2.11.17,
     http-types,
-    nqe,
+    nqe ^>=0.6,
     shibuya-core,
     shibuya-metrics,
     stm,
@@ -137,10 +140,10 @@ executable metrics-wire-load
     aeson,
     base ^>=4.21.0.0,
     bytestring,
-    effectful,
+    effectful >=2.6.1 && <2.8,
     http-client ^>=0.7.19,
     http-types,
-    nqe,
+    nqe ^>=0.6,
     shibuya-core,
     shibuya-metrics,
     stm,

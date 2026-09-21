@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes
 
@@ -24,6 +24,9 @@
 
 - Add `shibuya-metrics-test`, a release-gated Hspec suite covering every published
   HTTP route and WebSocket frame plus exact JSON and Prometheus golden contracts.
+- Declare the generated `Paths_shibuya_metrics` test module and bound the wire-load
+  executable's Effectful and NQE dependencies so `cabal check` accepts the source
+  distribution.
 
 ### Bug Fixes
 

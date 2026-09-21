@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes
 
