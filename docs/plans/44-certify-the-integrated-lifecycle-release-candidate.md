@@ -176,3 +176,10 @@ tests, examples, and benchmark components depend directly on `effectful-core` an
 metrics suites, package check, formatting, and flake checks pass. The release skill now runs
 performance comparison for any runtime-bound change, including a patch. EP-34 publication and
 EP-35's adapter bounds remain coordinated with the candidate version decision.
+
+2026-09-21 UTC: Completed EP-35's version-neutral adapter compatibility gates. Kafka
+`1c455b5`, PGMQ `9247388`, and Kiroku `0dcd092` plus `f91bb05` admit effectful-core 2.6.1.0
+and 2.7.1.2 while rejecting 2.7.1.0. Their live-service suites, Kiroku's store suite, package
+checks, formatting, and flakes pass. A combined local-source cohort solve proves the same
+accepted/rejected families. Publications remain pending and do not block source assembly once
+the candidate Core version is fixed.
