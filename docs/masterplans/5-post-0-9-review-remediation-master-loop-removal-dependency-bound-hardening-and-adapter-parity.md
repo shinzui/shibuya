@@ -138,7 +138,7 @@ dependency bumps) still require ADR records when their owning work completes.
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | Complete |
-| 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | Not Started |
+| 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | In Progress (M1-M3 complete; release pending version coordination) |
 | 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | Not Started |
 | 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Not Started |
 
@@ -202,9 +202,9 @@ dependency bump is benchmark-gated regardless of PVP bump level.
 
 ## Progress
 
-- [ ] EP-2: effectful-core exclusion bound applied to shibuya-core, shibuya-example, and shibuya-core-bench; both effectful families still build
-- [ ] EP-2: release skill gates runtime-dependency bumps on the benchmark regardless of bump level
-- [ ] EP-2: 2.6.1-versus-2.7.1 and 2.7.1.0-versus-2.7.1.2 benchmark evidence recorded in the plan
+- [x] (2026-09-21 UTC) EP-2: effectful-core exclusion bound applied to shibuya-core, shibuya-example, and shibuya-core-bench; both effectful families still build
+- [x] (2026-09-21 UTC) EP-2: release skill gates runtime-dependency bumps on the benchmark regardless of bump level
+- [x] (2026-09-21 UTC) EP-2: 2.6.1-versus-2.7.1 and 2.7.1.0-versus-2.7.1.2 benchmark evidence recorded in the plan
 - [x] (2026-09-20 UTC) EP-1: dedicated garbage-collection regression test compiles and fails with the linked STM exception on 0.9.0.1
 - [x] (2026-09-20 UTC) EP-1: master loop, mailbox, and `MasterMessage` removed; suite green
 - [x] (2026-09-20 UTC) EP-1: documentation no longer describes the master as an actor

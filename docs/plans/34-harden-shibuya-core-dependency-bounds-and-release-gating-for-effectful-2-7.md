@@ -22,6 +22,11 @@ provenance:
       at: 2026-09-20T13:46:21Z
       mode: "update"
       note: "Provisional release target moves from 0.9.0.3 to 0.9.0.4; no scope change"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-21T05:00:00Z
+      mode: "implement"
+      note: "Completed bound hardening, solver verification, and the dependency-sensitive release benchmark policy; publication remains pending release-owner coordination."
 ---
 
 # Harden shibuya-core dependency bounds and release gating for effectful 2.7
@@ -60,9 +65,9 @@ version is published first, use the next free patch and synchronize the parent a
 
 ## Progress
 
-- [ ] Milestone 1: `effectful-core` exclusion bound in shibuya-core, shibuya-example, and shibuya-core-bench; three dry-run solves recorded.
-- [ ] Milestone 2: release skill gates runtime-dependency changes on the benchmark regardless of bump level and documents the one-tree comparison procedure.
-- [ ] Milestone 3: benchmark evidence for the 0.9.0.1 swap recorded in this plan, including the 2.7.1.0 measurement.
+- [x] (2026-09-21 UTC) Milestone 1: `effectful-core` exclusion bound in shibuya-core, shibuya-example, and shibuya-core-bench; 2.6.1.0 and 2.7.1.2 solve, while 2.7.1.0 is rejected by the declared core bound.
+- [x] (2026-09-21 UTC) Milestone 2: release skill gates runtime-dependency changes on the benchmark regardless of bump level and documents the one-tree comparison procedure.
+- [x] (2026-09-21 UTC) Milestone 3: benchmark evidence for the 0.9.0.1 swap recorded in this plan, including the 2.7.1.0 measurement.
 - [ ] Milestone 4: release shibuya-core and shibuya-metrics with the hardened bounds, provisionally as 0.9.0.4.
 
 
@@ -119,6 +124,12 @@ version is published first, use the next free patch and synchronize the parent a
   it has to come from an adapter benchmark (for example the pgmq adapter's
   `shibuya-pgmq-adapter-bench` built against 2.7.1.0 and 2.7.1.1), which is optional and
   outside this plan.
+
+- 2026-09-21: The repository gained two process-isolated core test suites and EP-45's
+  `lifecycle-load` executable after this plan was drafted. They also import only modules
+  provided by `effectful-core`, so the implementation applies the exclusion range to all ten
+  current dependency stanzas rather than the six originally enumerated. The complete build,
+  ordinary core suite, both GC suites, metrics suite, `cabal check`, and flake checks pass.
 
 
 ## Decision Log
@@ -177,7 +188,19 @@ version is published first, use the next free patch and synchronize the parent a
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Milestones 1 through 3 are complete. Commit `16625ff` replaces the umbrella `effectful`
+dependency in every current core, test, example, and benchmark component with the direct
+`effectful-core` range. Dry-run solves accept 2.6.1.0 and 2.7.1.2 and reject 2.7.1.0 with
+`shibuya-core => effectful-core>=2.6.1 && <2.7 || >=2.7.1.1 && <2.8`. A real all-package build,
+all core/GC/metrics suites, `cabal check`, formatting, and flake checks pass. Commit `a1bf986`
+makes the release benchmark gate depend on runtime-bound changes even for patch releases and
+documents the same-tree, separate-build-directory comparison.
+
+Milestone 4 remains open. This repository is simultaneously preparing the breaking lifecycle
+candidate under docs/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance.md,
+so choosing a separate 0.9.0.4 publication versus carrying these already-tested bounds into
+that major release requires the release owner's version decision. No tag or publication is
+claimed here.
 
 
 ## Context and Orientation
@@ -454,3 +477,8 @@ urgent runtime fix. This plan now owns the following bound-changing core/metrics
 provisionally 0.9.0.4, and applies its new benchmark gate to that release.
 
 2026-09-20 UTC: Moved the provisional release target from 0.9.0.3 to 0.9.0.4 throughout, because 0.9.0.3 was published by the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md. The earlier Decision Log entry naming 0.9.0.3 is kept as history and superseded by the new one. No scope, bound or milestone changed.
+
+2026-09-21 UTC: Completed Milestones 1 through 3 against the repository's current component
+set. The accepted solver families, explicit rejection, full build/test/package checks, and
+dependency-sensitive benchmark policy all pass. Milestone 4 remains pending coordinated
+version selection; nothing was tagged or published.
