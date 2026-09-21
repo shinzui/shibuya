@@ -23,6 +23,11 @@ provenance:
       at: 2026-09-20T04:46:05Z
       mode: "update"
       note: "Three-adapter candidate without MessageDB or plan 36; plan 46 prerequisite and GC suite cell; Milestone 1 fixes the core version and verifies adapter bounds."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T03:00:00Z
+      mode: "implement"
+      note: "Started candidate certification and made the property and schedule execution budgets mechanically enforceable."
 ---
 
 # Certify the integrated lifecycle release candidate
@@ -50,13 +55,21 @@ Produce a defensible release decision for one exact set of core, metrics, and ad
 ## Surprises & Discoveries
 
 
-None yet; implementation has not started.
+2026-09-21: Two core property workloads imposed local `withMaxSuccess` caps of 30 and 50.
+Those caps take precedence over Hspec's release-run `--qc-max-success=1000` option, so an
+apparently compliant command would have executed fewer cases than the evidence budget. The
+local caps are removed for the candidate harness; ordinary runs use Hspec's normal default,
+while the release command supplies and records 1,000 cases and its seed.
 
 
 ## Decision Log
 
 
 2026-09-19: Certify only a frozen, fully evidenced candidate; publishing and claims of universal bug freedom are outside the plan.
+
+2026-09-21: Control property-case counts at the test-runner boundary and remove lower
+per-property caps. Candidate evidence uses `--ignore-dot-hspec --qc-max-success=1000` with an
+explicit seed, so user configuration cannot silently lower the release budget.
 
 
 ## Outcomes & Retrospective
@@ -127,3 +140,9 @@ Hard dependencies: docs/plans/37-establish-lifecycle-assurance-coverage-and-evid
 
 
 2026-09-20 UTC: Revised after a pre-implementation review of the parent MasterPlan. Removed the MessageDB adapter, its cancelled remediation plan and its compatibility plan 36 from the candidate and the dependency list at the project owner's direction, while requiring the verdict to name that adapter as uncertified. Added the standalone plan 46 as an external prerequisite and its finished-application GC suite as a mandatory matrix cell. Made Milestone 1 responsible for fixing the candidate core version with the release owner and for checking that the adapters' committed bounds admit it, because all three currently pin the 0.9 series and the drafted plan would have discovered that only when the candidate failed to solve. Noted the repository's new first ADR.
+
+2026-09-21 UTC: Started implementation after EP-45 completed. Removed two local QuickCheck case
+caps that would have silently overridden the 1,000-case release command, and added a deterministic
+runner that records every one of the eight schedule-sensitive selectors across 100 seeds under
+both N1 and N4. The normal core suite and both isolated GC suites pass after the harness change.
+Candidate version/bound edits remain pending the explicit release-owner version decision.

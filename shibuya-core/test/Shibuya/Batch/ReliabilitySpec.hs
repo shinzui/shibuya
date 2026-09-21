@@ -214,27 +214,26 @@ spec :: Spec
 spec = describe "Shibuya.Batch reliability" $ do
   describe "successful-finalization property" $ do
     it "finalizes every normal-path message once with the intended decision" $
-      withMaxSuccess 50 $
-        forAll genScenario $ \s -> monadicIO $ do
-          (tracked, metrics) <- run (runScenario s)
-          let expected = scenarioIntended s
-          case finalizedExactlyOnce tracked expected of
-            Left err -> do
-              monitor (counterexample ("successful-finalization violated: " <> err))
-              assert False
-            Right () -> pure ()
-          monitor
-            ( counterexample
-                ( "accounting: processed="
-                    <> show metrics.stats.processed
-                    <> " failed="
-                    <> show metrics.stats.failed
-                    <> " n="
-                    <> show s.msgCount
-                )
-            )
-          assert (metrics.stats.processed + metrics.stats.failed == s.msgCount)
-          assert (metrics.batch.batchedMessages == s.msgCount)
+      forAll genScenario $ \s -> monadicIO $ do
+        (tracked, metrics) <- run (runScenario s)
+        let expected = scenarioIntended s
+        case finalizedExactlyOnce tracked expected of
+          Left err -> do
+            monitor (counterexample ("successful-finalization violated: " <> err))
+            assert False
+          Right () -> pure ()
+        monitor
+          ( counterexample
+              ( "accounting: processed="
+                  <> show metrics.stats.processed
+                  <> " failed="
+                  <> show metrics.stats.failed
+                  <> " n="
+                  <> show s.msgCount
+              )
+          )
+        assert (metrics.stats.processed + metrics.stats.failed == s.msgCount)
+        assert (metrics.batch.batchedMessages == s.msgCount)
 
   -- Non-vacuity of the checker itself: feed it perturbed tracked lists and prove
   -- it fires. Without these, a checker that always returns Right () would pass

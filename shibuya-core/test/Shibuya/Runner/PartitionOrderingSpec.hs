@@ -58,28 +58,27 @@ instance Arbitrary PartitionCase where
 spec :: Spec
 spec = describe "Shibuya.Runner.PartitionOrdering" $ do
   it "finalizes each partition in arrival order and exactly once" $
-    property $
-      withMaxSuccess 30 $ \(PartitionCase messages concurrency) ->
-        ioProperty $ do
-          finalized <- runPartitioned messages concurrency
-          let ids = makeIds (length messages)
-              partitionById = Map.fromList (zip ids (map fst messages))
-              finalizedIds = map fst finalized
-              partitions = nub [p | Just p <- map fst messages]
-              finalizedFor p =
-                [ msgId
-                | msgId <- finalizedIds,
-                  Map.lookup msgId partitionById == Just (Just p)
-                ]
-              arrivedFor p =
-                [ msgId
-                | (msgId, Just p') <- zip ids (map fst messages),
-                  p == p'
-                ]
-          pure $
-            counterexample ("finalized=" <> show finalizedIds) $
-              sort finalizedIds === sort ids
-                .&&. conjoin [finalizedFor p === arrivedFor p | p <- partitions]
+    property $ \(PartitionCase messages concurrency) ->
+      ioProperty $ do
+        finalized <- runPartitioned messages concurrency
+        let ids = makeIds (length messages)
+            partitionById = Map.fromList (zip ids (map fst messages))
+            finalizedIds = map fst finalized
+            partitions = nub [p | Just p <- map fst messages]
+            finalizedFor p =
+              [ msgId
+              | msgId <- finalizedIds,
+                Map.lookup msgId partitionById == Just (Just p)
+              ]
+            arrivedFor p =
+              [ msgId
+              | (msgId, Just p') <- zip ids (map fst messages),
+                p == p'
+              ]
+        pure $
+          counterexample ("finalized=" <> show finalizedIds) $
+            sort finalizedIds === sort ids
+              .&&. conjoin [finalizedFor p === arrivedFor p | p <- partitions]
 
   it "respects the global concurrency bound" $ do
     maxInFlightRef <- newIORef (0 :: Int)
