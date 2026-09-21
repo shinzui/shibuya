@@ -46,8 +46,8 @@ Produce a defensible release decision for one exact set of core, metrics, and ad
 ## Progress
 
 
-- [ ] Milestone 1: Freeze an exact compatible candidate manifest.
-- [ ] Milestone 2: Execute the full fault, restart and soak matrix.
+- [x] (2026-09-21 13:41Z) Milestone 1: Freeze an exact compatible candidate manifest.
+- [x] (2026-09-21 13:41Z) Milestone 2: Execute the full fault, restart and soak matrix.
 - [ ] Milestone 3: Verify performance evidence and obtain independent review.
 - [ ] Milestone 4: Validate and publish the release-readiness verdict without releasing packages.
 
@@ -69,6 +69,20 @@ packages. Pinning their authoritative Hackage releases makes `nix build .#defaul
 Shibuya 0.10 remains unpublished; the separate cross-repository candidate project owns and
 has passed the tests against the unreleased lifecycle API.
 
+2026-09-21: The unified production cohort solves at the exact frozen versions, but enabling
+every repository's test helpers in one Cabal plan introduces a test-only `pg-migrate` conflict:
+Kiroku selects the authoritative 1.2 release while `pgmq-migration` still pins 1.1. Mori source
+inspection confirmed that the 1.2 core release has no API or behavior change. Certification
+therefore uses one unified production solve plus the owning repositories' exact local-source
+test projects; it does not weaken either test dependency bound merely to make an artificial
+all-tests plan solve.
+
+2026-09-21: Release preparation changes after EP-45 touched no production source tree in Core,
+Metrics, Kafka, PGMQ, Kiroku Store, or the Kiroku adapter. EP-45's matched performance verdict
+is therefore carried forward under Milestone 3's explicit no-hot-path-change rule. The
+candidate-bound attestation records both the measured and frozen SHAs and both solver hashes;
+it does not rewrite the identity embedded in the original measurements.
+
 
 ## Decision Log
 
@@ -84,6 +98,17 @@ distinct release gates until the candidate core is published. The flake must use
 content-addressed Hackage inputs and prove the distributable library builds; the candidate
 Cabal project must compile and run the adapter tests against the exact local core. Neither
 gate substitutes for the other.
+
+2026-09-21: Release Core and Metrics as 0.10.0.0 because exported lifecycle error constructors
+make the accumulated change PVP-major. Coordinate adapter patch releases at Kafka 0.9.0.2,
+PGMQ 0.16.0.1, Kiroku Store 0.8.0.2, and the Kiroku adapter 0.5.1.3, with committed Core 0.10
+bounds. This decision freezes source candidates; Hackage uploads, tags, and pushes remain
+outside this certification plan.
+
+2026-09-21: Carry forward the completed EP-45 measurements because byte-level production-tree
+diff checks are empty between every measured revision and frozen release revision. Bind that
+decision to the new solver-plan hash in a separate attestation, while retaining the original
+measurement hash and raw artifacts unchanged.
 
 
 ## Outcomes & Retrospective
@@ -183,3 +208,17 @@ and 2.7.1.2 while rejecting 2.7.1.0. Their live-service suites, Kiroku's store s
 checks, formatting, and flakes pass. A combined local-source cohort solve proves the same
 accepted/rejected families. Publications remain pending and do not block source assembly once
 the candidate Core version is fixed.
+
+2026-09-21 UTC: Froze the release candidate at Core/Metrics
+`ecccecce14e9a9d4a2a6dd4c31efcad74d0ce67c`, Kafka
+`74fed7e8df366072b0587c4bdae8d4e92317c8a3`, PGMQ
+`9c709d76b8c1e66a45148888970d5518cc3c0d7e`, and Kiroku
+`246a27b6e7ac55fbd7c7a66e8ad84a3b3f46237e`. The unified production solve has SHA-256
+`847a62275e285f674d42a4203b4ec05fd4f7b1e3f4972bcbae1cacf8264f4d56`. Exact frozen-source
+N1/N4 runs pass 236 Core examples with eight 1,000-case models, 48 Metrics examples, both
+process-isolated GC suites, 53 Kafka tests against Redpanda, 177 PGMQ tests against ephemeral
+PostgreSQL, and 308 Kiroku Store plus 38 Kiroku adapter examples. The deterministic scheduler
+artifact passes all 1,600 executions. All 70 mandatory matrix cells and 47 in-scope finding
+records are present in `docs/audits/lifecycle-release/candidates/release-candidate.json`.
+The validator reports exactly one remaining error: REV-15-L1 lacks its named human disposition.
+Independent review is also still required before Milestones 3 and 4 can close.

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "decision": "carry-forward-no-hot-path-change",
+  "candidateSolverPlanHash": "847a62275e285f674d42a4203b4ec05fd4f7b1e3f4972bcbae1cacf8264f4d56",
+  "measuredSolverPlanHash": "abf44e86737d45737804d0391ccb67af16153b5b0340b9f4469500300015f9dd",
+  "candidateSourceShas": {
+    "mori://shinzui/shibuya/packages/shibuya-core": "ecccecce14e9a9d4a2a6dd4c31efcad74d0ce67c",
+    "mori://shinzui/shibuya/packages/shibuya-metrics": "ecccecce14e9a9d4a2a6dd4c31efcad74d0ce67c",
+    "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter": "74fed7e8df366072b0587c4bdae8d4e92317c8a3",
+    "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter": "9c709d76b8c1e66a45148888970d5518cc3c0d7e",
+    "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter": "246a27b6e7ac55fbd7c7a66e8ad84a3b3f46237e"
+  },
+  "measuredSourceShas": {
+    "mori://shinzui/shibuya/packages/shibuya-core": "6461c74cda5235e292d221f36621d09910b3b6f0",
+    "mori://shinzui/shibuya/packages/shibuya-metrics": "6461c74cda5235e292d221f36621d09910b3b6f0",
+    "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter": "0e2764571a7256279f47db286156e67c26142b79",
+    "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter": "7a47ab7a6015e62b9ec932595129b9ccd4e1a3c6",
+    "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter": "a1de2bf7dbb8b3209bda248a4cb29e071f85526e"
+  },
+  "productionDiffChecks": [
+    {
+      "project": "mori://shinzui/shibuya",
+      "command": "git diff --quiet 6461c74cda5235e292d221f36621d09910b3b6f0..ecccecce14e9a9d4a2a6dd4c31efcad74d0ce67c -- shibuya-core/src shibuya-metrics/src",
+      "exitCode": 0
+    },
+    {
+      "project": "mori://shinzui/shibuya-kafka-adapter",
+      "command": "git diff --quiet 0e2764571a7256279f47db286156e67c26142b79..74fed7e8df366072b0587c4bdae8d4e92317c8a3 -- shibuya-kafka-adapter/src",
+      "exitCode": 0
+    },
+    {
+      "project": "mori://shinzui/shibuya-pgmq-adapter",
+      "command": "git diff --quiet 7a47ab7a6015e62b9ec932595129b9ccd4e1a3c6..9c709d76b8c1e66a45148888970d5518cc3c0d7e -- shibuya-pgmq-adapter/src",
+      "exitCode": 0
+    },
+    {
+      "project": "mori://shinzui/kiroku",
+      "command": "git diff --quiet a1de2bf7dbb8b3209bda248a4cb29e071f85526e..246a27b6e7ac55fbd7c7a66e8ad84a3b3f46237e -- kiroku-store/src shibuya-kiroku-adapter/src shibuya-kiroku-adapter/internal",
+      "exitCode": 0
+    }
+  ],
+  "rationale": "EP-44 requires a performance rerun only after a hot-path change. Every production source-tree comparison is byte-identical between the measured revisions and the frozen release revisions. Intervening changes are release metadata, dependency bounds, Nix configuration, tests, benchmark/evidence harnesses, and documentation. The exact frozen candidate was rebuilt and its complete N1/N4 correctness matrix rerun under the candidate solver plan. Therefore the matched EP-45 production measurements are carried forward without claiming that their original solver hash changed.",
+  "artifacts": [
+    "docs/audits/lifecycle-release/artifacts/ep45-performance/candidate-performance-verdict.json",
+    "docs/audits/lifecycle-release/artifacts/ep45-performance/final-verdict-n1.json",
+    "docs/audits/lifecycle-release/artifacts/ep45-performance/final-verdict-n4.json",
+    "docs/audits/lifecycle-release/artifacts/ep45-performance/high-cardinality-envelope.json",
+    "docs/audits/lifecycle-release/artifacts/ep45-performance/README.md"
+  ],
+  "residualFinding": "REV-15-L1 remains subject to a named human release-owner disposition; this carry-forward does not accept or waive that risk."
+}
