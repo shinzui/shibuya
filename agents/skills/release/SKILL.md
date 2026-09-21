@@ -115,9 +115,14 @@ Show the user ALL changes (version bumps, dependency bounds, changelog entries) 
   - Note: newly created files must be `git add`-ed before nix evaluation will see them, since nix uses the git tree.
   - If any check fails, fix the issue before proceeding.
 
-### 5. Check for performance regressions (non-patch releases only)
+### 5. Check for performance regressions
 
-**Skip this step for `patch` (bug-fix) releases.** For `minor` and `major` releases, run the benchmark suite and compare against the previous release to catch performance/allocation regressions before publishing. This guards the ~4x-vs-streamly overhead and per-message allocation budget that EP-30/EP-31 established.
+Run this step for `minor` and `major` releases, and for **any** release — including a
+`patch` — whose diff changes the admitted versions of a runtime dependency: `effectful-core`,
+`effectful`, `streamly`, `streamly-core`, `nqe`, `stm`, or any `hs-opentelemetry-*` package.
+Skip it only for a `patch` release that touches none of those bounds. The gate guards the
+~4x-vs-streamly overhead and per-message allocation budget that EP-30/EP-31 established; a
+dependency swap can move both without any Shibuya source change.
 
 The benchmark package is `shibuya-core-bench` (not released to Hackage; uses [tasty-bench](https://hackage.haskell.org/package/tasty-bench), which supports CSV baselines and `--fail-if-slower`). See `shibuya-core-bench/README.md` for full details.
 
@@ -153,6 +158,23 @@ Procedure:
    ```
 
 If there is no previous release tag (first release), note that no baseline comparison is possible and just record the current numbers for future comparison.
+
+For a dependency-bound change, a worktree of the last tag can resolve to the same dependency
+version as the current tree and therefore fail to measure the bound change. Compare the old
+and new dependency versions on the current tree instead, using separate build directories:
+
+```bash
+nix develop -c cabal build --builddir=dist-dep-old --constraint='<pkg>==<old>' shibuya-core-bench:bench:shibuya-core-bench
+nix develop -c cabal build --builddir=dist-dep-new --constraint='<pkg>==<new>' shibuya-core-bench:bench:shibuya-core-bench
+OLD=$(find dist-dep-old/build -type f -name shibuya-core-bench -perm -u+x | head -1)
+NEW=$(find dist-dep-new/build -type f -name shibuya-core-bench -perm -u+x | head -1)
+PAT='/processing/ || /comparison/ || /noop-handler/ || /concurrency-levels/ || /hot-path/ || /cpu-bound-serial/ || /io-handler/'
+$OLD -p "$PAT" --stdev 5 --timeout 120 --csv /tmp/shibuya-dep-old.csv
+$NEW -p "$PAT" --stdev 5 --timeout 120 --baseline /tmp/shibuya-dep-old.csv --fail-if-slower 10
+```
+
+Interpret the result exactly as above, retain the evidence with the release record, and remove
+the two explicit build directories after the candidate has been accepted.
 
 ### 6. Commit, tag, and push
 
@@ -210,7 +232,9 @@ EOF
 - Always ask the user to confirm the version bump and changelogs before committing.
 - Always publish in dependency order: shibuya-core → shibuya-metrics.
 - Never skip `cabal check`, tests, or `nix flake check`.
-- For `minor` and `major` releases, never skip the benchmark regression check (step 5). If a genuine regression is found, stop and get the user's decision before releasing. It is only skipped for `patch` (bug-fix) releases.
+- Never skip the benchmark regression check (step 5) for `minor` and `major` releases, or for
+  any release that changes a runtime dependency bound. If a genuine regression is found, stop
+  and get the user's decision before releasing.
 - If any step fails (including `nix flake check`), stop and report the error rather than continuing.
 - If a Hackage upload fails for a package, do NOT continue uploading subsequent packages that depend on it.
 - Run `nix fmt` before committing to ensure proper formatting.
