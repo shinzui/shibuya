@@ -28,6 +28,11 @@ provenance:
       at: 2026-09-20T14:55:33Z
       mode: "implement"
       note: "Begin implementation from audited lifecycle defects; add deterministic regressions before changing ownership, termination, and snapshot contracts."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:37:40Z
+      mode: "update"
+      note: "Narrow whole-child unmasking to owned adapter and handler actions after EP-45 performance evidence."
 ---
 
 # Make core processor ownership and termination exception safe
@@ -71,6 +76,15 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: A 100-pair retry-path sample exposed a masking-state bug hidden by the shorter noisy runs. `runSupervised` and `runSupervisedBatch` protected registration and child creation with `mask_`, but the NQE child inherited `MaskedInterruptible` for its entire lifetime. Both functions now use `mask` and apply its restore function inside the child action: registration, spawn, linking, and handle publication remain masked ownership transfers, while ingesters, handlers, finalizers, and waits execute in the caller's original interruptibility state.
 
+2026-09-20: EP-45's complete version-3 N1 capture refined that masking fix after finding a
+consistent 6.2% allocation and 7-8% throughput regression in every unordered `Async 4`
+scenario. Restoring the whole NQE child made Streamly's scheduler itself unmasked and imposed
+per-item exception bookkeeping. The follow-up keeps framework coordination
+`MaskedInterruptible` and applies `unsafeUnmask` only to the owned adapter source and individual
+message/batch action. Handlers and finalizers still observe `Unmasked`, as the existing
+regression requires, while registration, linking, handle publication, and scheduler ownership
+remain protected. Forty O2 N1 pairs across the affected scenarios pass all 20 focused cells.
+
 2026-09-20: After restoring interruptibility, the N4 retry path still carried a reproducible tail-latency penalty even though throughput and long-workload probes matched baseline. A controlled build without lifecycle observation removed it. The cause was `Effectful.Exception.catch` wrapping the full processor computation, which installed an unlift layer across every effect. Terminal classification now performs one `Control.Exception.try` at the already-unlifted IO child boundary and uses IO lifecycle-transition helpers. The retained snapshot and failure classification are unchanged, while a 50-pair N4 probe brought retry p95/p99 back within the 10% budget.
 
 2026-09-20: Thirty-pair shutdown measurements on sub-millisecond paths were too noisy to accept, and the N1 retry throughput confidence interval still crossed its 5% limit after 1,000 pairs even though the estimate remained inside budget. The precommitted budgets were not changed. Increasing only the unresolved cells produced passing 300-pair active/residual verdicts under N1 and N4 and a passing 2,500-pair N1 retry verdict. The tightest throughput upper bound was 1.0480 against 1.0500; the last idle-shutdown upper bound was 1.0435 against 1.1000.
@@ -93,11 +107,17 @@ Make application startup, failure, halt, and shutdown predictable: no registered
 
 2026-09-20: Export `ProcessorFailure Text (Maybe MessageId)` from the umbrella module so a `StopAllOnFailure` caller can distinguish an infrastructure finalization failure from `ProcessorHalt`. This is additive at the constructor level but deliberately changes the previously incorrect runtime outcome; it ships with the planned major release.
 
+2026-09-20: Refine "restored child interruptibility" to scoped action interruptibility. NQE's
+registration mask remains in force for framework coordination; owned adapter, handler, and
+finalizer actions alone are unmasked. This keeps the ownership-transfer safety contract while
+removing the measured unordered-scheduler regression. The scope is intentional and covered by
+the handler masking-state test plus the cancellation and cleanup suites.
+
 
 ## Outcomes & Retrospective
 
 
-All four milestones are complete at implementation SHA `2108292e15c2cf79e40e8ca09a74604926beaedc`. The ordinary core suite now asserts deterministic cancellation at the startup ownership-transfer barrier; duplicate and policy rejection before acquisition; idle halt across Serial, Ahead, Async, partitioned and batch paths; traced and untraced finalizer failure; supervision-specific observability; exception-safe and bounded adapter shutdown; cancellation during drain; repeated/concurrent stop; prompt keyed failure with infinite input; and ticker failure. The implementation uses a wakeable terminal outcome, separate graceful and infrastructure exceptions, masked ownership transfers with restored child interruptibility, immediate keyed failure propagation, coordinated shutdown, checked capacities, and a retained bounded lifecycle snapshot.
+All four milestones are complete at implementation SHA `2108292e15c2cf79e40e8ca09a74604926beaedc`. The ordinary core suite now asserts deterministic cancellation at the startup ownership-transfer barrier; duplicate and policy rejection before acquisition; idle halt across Serial, Ahead, Async, partitioned and batch paths; traced and untraced finalizer failure; supervision-specific observability; exception-safe and bounded adapter shutdown; cancellation during drain; repeated/concurrent stop; prompt keyed failure with infinite input; and ticker failure. The implementation uses a wakeable terminal outcome, separate graceful and infrastructure exceptions, masked ownership transfers with scoped adapter and handler interruptibility, immediate keyed failure propagation, coordinated shutdown, checked capacities, and a retained bounded lifecycle snapshot.
 
 The accepted evidence is indexed by `docs/audits/lifecycle-release/artifacts/ep38-core-lifecycle/README.md`: the baseline probe reproduces the audited failures, the candidate probe demonstrates the intended outcomes, all 236 ordinary examples and both isolated GC suites pass, and eight schedule-sensitive selectors pass 100/100 recorded seeds. Focused paired performance evidence passes every measured cell under N1 and N4 without a waiver or budget change. All EP-38-owned finding records are fixed or accepted and all 45 owned lifecycle-boundary cells are passed. EP-39 may now consume `LifecycleSnapshot`; EP-40 and EP-41 may rely on infrastructure finalization being observable as failure rather than Halt.
 
@@ -217,3 +237,8 @@ This plan is a soft dependency of the metrics plan above and of docs/plans/40-pr
 2026-09-20 UTC: Added the obligation to keep the metrics plan's golden wire fixtures in step with any encoder-visible change made here, because that plan now characterizes the metrics package's published output before anything changes it and gates releases on it.
 
 2026-09-20 UTC: Completed implementation and acceptance. Added structured configuration and policy rejection, exception-safe startup and shutdown ownership, total shutdown coordination, wakeable terminal outcomes, distinct infrastructure failure, prompt keyed and ticker failure propagation, restored child interruptibility, checked capacity arithmetic, and the retained lifecycle snapshot. Bound the red/green probes, 236-example core run, both isolated GC suites, eight 100-seed repetitions, and passing N1/N4 paired performance comparisons to the implementation SHA; updated all owned findings and 45 lifecycle-boundary cells without a waiver or budget change.
+
+2026-09-20 UTC: EP-45 follow-up narrowed whole-child interruptibility to the owned adapter source
+and message/batch actions after the complete workload exposed Streamly scheduler overhead. The
+core lifecycle contract and tests remain unchanged; all core, isolated-GC, and metrics suites
+pass, and 40-pair O2 N1 evidence clears every affected cell under the original budgets.

@@ -47,6 +47,11 @@ provenance:
       at: 2026-09-20T21:45:00Z
       mode: "implement"
       note: "Completed EP-43 Kiroku ownership and checkpoint-recovery remediation; resume EP-45 pass two."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:37:40Z
+      mode: "implement"
+      note: "Refined supervised masking after EP-45 exposed unordered scheduler overhead; focused O2 candidate evidence passes."
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -290,6 +295,16 @@ the raw observation but gates shutdown only through repeated cold startup/stop a
 unchanged, all work must still acknowledge, and the comparator now rejects a mutually omitted
 mandatory scenario.
 
+**Restoring an entire NQE child can penalize Streamly's unordered scheduler (2026-09-20 UTC,
+EP-45 pass two).** The first complete version-3 N1 capture found the same 6.2% allocation and
+7-8% throughput regression in all four `Async 4`/`Unordered` scenarios. A history bisect and
+optimized ticky profiles traced it to whole-child unmasking: NQE 0.6.6 registers the child under
+a mask, while restoring the entire computation makes Streamly install per-item exception
+bookkeeping. Keeping framework coordination `MaskedInterruptible` and unmasking only the owned
+adapter source and individual message/batch action preserves handler/finalizer cancellation and
+the lifecycle ownership guarantees. Forty alternating O2 N1 pairs pass all 20 affected cells;
+the tightest throughput upper bound is 1.04655 against the unchanged 1.05 limit.
+
 
 ## Decision Log
 
@@ -357,6 +372,13 @@ relative shutdown budget to one post-drain cancellation did not test the intende
 produced confident percentage changes from three-microsecond absolute differences. Final
 evidence instead applies the same 10% limit to repeated startup/stop and graceful drain under a
 live bounded backlog; no threshold, confidence level, or minimum pair count changed.
+
+2026-09-20: Accept scoped action unmasking for the EP-45 candidate. Registration, linking,
+publication, scheduler coordination, and cleanup remain masked; only owned adapter source and
+message/batch actions use `unsafeUnmask`. This is the narrowest boundary that keeps the existing
+handler interruptibility and cancellation regressions green without imposing Streamly's
+whole-scheduler cost. No performance budget changed. The four near-boundary N1 scenarios use 40
+pairs because 20 pairs left two throughput intervals inconclusive.
 
 
 ## Outcomes & Retrospective
@@ -483,3 +505,11 @@ shutdown cells timed only post-drain cancellation. Workload version 3 adds a mea
 graceful-drain scenario, retains repeated cold startup/stop, and makes all 17 scenarios
 mandatory in the comparator. Baseline and candidate compile and complete the new workload with
 1,000/1,000 acknowledgements; immutable N1/N4 recapture remains open.
+
+2026-09-20 UTC: EP-45 rejected the first full version-3 N1 candidate after all four unordered
+`Async 4` scenarios exposed the same allocation and throughput regression. A bisect and ticky
+profiles traced the cost to whole-child unmasking. The revised candidate keeps framework
+coordination masked and unmasks only owned adapter and handler/finalizer actions. All core,
+isolated-GC, metrics, and comparator tests pass; a 40-pair O2 N1 focused comparison passes all 20
+affected cells under the original limits. The full N1/N4 matrix, live adapters, and soak remain
+open, so EP-45 Milestones 4 and 5 are not complete.

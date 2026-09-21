@@ -38,6 +38,11 @@ provenance:
       at: 2026-09-20T23:59:46Z
       mode: "implement"
       note: "Replace post-drain microtiming with mandatory public graceful-drain evidence"
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:37:40Z
+      mode: "implement"
+      note: "Scope unmasking to owned actions and pass the affected 40-pair O2 candidate selection matrix."
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -116,6 +121,21 @@ shutdown budget applies to that scenario and repeated `startup-shutdown`; post-d
 retain their raw stop measurement but exclude it from verdicts. A smoke run measured a
 meaningful 1.36-second drain in both baseline and candidate instead of microsecond noise.
 
+2026-09-20: The first full version-3 N1 capture exposed one remaining real hot-path regression.
+All eight failures had the same `Async 4`/`Unordered` shape across metrics-disabled,
+metrics-enabled, health-poll-proxy, and websocket-churn-proxy: allocation was about 6.2% above
+baseline and throughput was 7-8% lower. Optimized ticky profiles and a history bisect placed the
+regression at the lifecycle masking change. NQE 0.6.6 registers children while masked; restoring
+the whole processor made Streamly's unordered scheduler run unmasked and add per-item exception
+bookkeeping. The selected implementation instead keeps framework coordination
+`MaskedInterruptible` and uses `GHC.IO.unsafeUnmask` only around the owned adapter source and
+message or batch action. The existing handler masking-state regression still observes
+`Unmasked`, and all core, isolated-GC, and metrics tests pass. Forty alternating O2 N1 pairs for
+the four affected scenarios pass all 20 measured cells: allocation adverse upper bounds are
+1.03468-1.03662, and the tightest throughput upper bound is 1.04655 against the unchanged 1.05
+limit. The rejected initial version-3 artifacts are not release evidence; the complete matrix
+must be recaptured against the committed candidate.
+
 
 ## Decision Log
 
@@ -157,6 +177,15 @@ measurements: 1,000 repeated cold startup/stops and a public graceful drain with
 The comparator now rejects even a mutually omitted baseline/candidate scenario, closing the
 possibility that matching partial datasets could certify a release.
 
+2026-09-20: Keep the supervisor's framework scheduler masked and restore normal interruptibility
+only at owned user/adapter action boundaries. This preserves exception-safe registration,
+linking, publication, and cleanup while avoiding the Streamly unordered scheduler's unmasked
+per-item cost. `unsafeUnmask` is confined to the ingester source and individual message/batch
+actions; it does not surround ownership transfer or the scheduler. The original budgets remain
+unchanged. Because 20 pairs left two affected throughput intervals barely inconclusive, use 40
+pairs for candidate selection and the final near-boundary N1 cells rather than weakening the 5%
+gate.
+
 
 ## Outcomes & Retrospective
 
@@ -170,11 +199,13 @@ behavior. No candidate
 performance verdict exists yet; pass two must recapture this baseline in alternating order with
 the integrated candidate.
 
-Pass two is active. Profiling-driven changes have passed the 236-example core suite and the
-process-isolated core GC suite, and the corrected focused serial comparison is inside the
-precommitted throughput, latency, and allocation limits. These focused results select the
-candidate implementation; they do not replace the complete N1/N4 matrix, live-adapter runs, or
-30-minute retained-memory soak required by Milestones 4 and 5.
+Pass two is active. Profiling-driven changes have passed the 236-example core suite, both
+process-isolated core GC suites, and the 48-example metrics suite. The corrected focused serial
+comparison is inside the precommitted limits, and the final 40-pair O2 N1 comparison for all
+four affected unordered scenarios passes every throughput, tail-latency, allocation,
+live-memory, and shutdown cell. These focused results select the candidate implementation; they
+do not replace the complete N1/N4 matrix, live-adapter runs, or 30-minute retained-memory soak
+required by Milestones 4 and 5.
 
 
 ## Context and Orientation
@@ -295,3 +326,12 @@ backlog, keeps repeated startup/stop coverage, excludes the inapplicable one-sho
 other scenario verdicts, and requires the complete 17-scenario catalog. The 10% shutdown budget
 is unchanged; both baseline and candidate compile and acknowledge all 1,000 messages in the new
 smoke workload.
+
+2026-09-20 UTC: Rejected the first full version-3 N1 candidate after it exposed a consistent
+unordered `Async 4` regression rather than measurement noise. A bisect and optimized ticky
+profiles traced it to restoring the whole NQE child to `Unmasked`, which made Streamly pay
+exception bookkeeping per item. The candidate now keeps framework coordination masked and
+unmasks only adapter and message/batch actions. The 236-example core suite, both isolated GC
+suites, the 48-example metrics suite, and all eight comparator tests pass. Forty alternating O2
+N1 pairs across the four affected scenarios pass all 20 focused cells without a budget change;
+the complete N1/N4 recapture, live services, and soak remain open.

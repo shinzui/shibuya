@@ -49,6 +49,7 @@ import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception qualified as Exception
+import GHC.IO (unsafeUnmask)
 import OpenTelemetry.Attributes (Attribute, toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
@@ -189,7 +190,7 @@ runSupervised ::
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask $ \restore -> do
+runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
   -- Initialize state
@@ -201,11 +202,14 @@ runSupervised master inboxSize procId ordering concurrency adapter handler = Exc
 
   -- Add as supervised child using NQE's Supervisor
   -- ConcUnlift Persistent allows the runInIO function to be used in the async child
+  -- NQE 0.6.6 masks its child-registration transfer, so this action starts in
+  -- MaskedInterruptible. Keep framework coordination in that state and unmask
+  -- only the owned adapter and message actions below: a whole-runner restore
+  -- makes Streamly add exception bookkeeping to every unordered item.
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     let processorAction =
           runInIO $
-            restore $
-              runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
+            runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
         unregisterAction = runInIO $ unregisterProcessor master procId
      in addChild master.state.supervisor $
           superviseProcessorLifecycleIO master procId processorAction
@@ -283,8 +287,10 @@ runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adap
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     -- Ingester: run until stream exhausts, then signal done
     -- Use finally to ensure streamDoneVar is always set, even if ingester fails
+    -- 'unsafeUnmask' is scoped inside the surrounding withAsync/finally owner;
+    -- cancellation therefore reaches adapter code without bypassing cleanup.
     let ingesterWithSignal =
-          runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox)
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
@@ -321,7 +327,7 @@ runSupervisedBatch ::
   -- | Batch handler
   BatchHandler es msg ->
   Eff es SupervisedProcessor
-runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask $ \restore -> do
+runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
   metricsHandle <- liftIO $ newMetricsHandle now
@@ -332,15 +338,14 @@ runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batch
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     let processorAction =
           runInIO $
-            restore $
-              runIngesterAndProcessorBatch
-                metricsHandle
-                procId
-                inboxSize
-                concurrency
-                batchConfig
-                adapter
-                batchHandler
+            runIngesterAndProcessorBatch
+              metricsHandle
+              procId
+              inboxSize
+              concurrency
+              batchConfig
+              adapter
+              batchHandler
         unregisterAction = runInIO $ unregisterProcessor master procId
      in addChild master.state.supervisor $
           superviseProcessorLifecycleIO master procId processorAction
@@ -454,7 +459,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
-          runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox)
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
@@ -549,7 +554,12 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
-        processAction = runInIO . processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler
+        -- Restore normal interruptibility for handlers and finalizers while the
+        -- framework-owned Streamly scheduler retains its inherited mask.
+        processAction ingested =
+          unsafeUnmask $
+            runInIO $
+              processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
         partitioned n =
           runKeyedScheduler
             (max 1 n)

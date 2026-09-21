@@ -41,6 +41,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
+import GHC.IO (unsafeUnmask)
 import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Batch
@@ -302,7 +303,12 @@ processBatchesUntilDrained metricsHandle procId concurrency handler batchesStrea
         Async n -> n
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
-    let batchAction = runInIO . processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler
+    -- The supervisor keeps framework coordination masked; only the owned batch
+    -- action is unmasked so user code and finalizers remain cancellable.
+    let batchAction batch =
+          unsafeUnmask $
+            runInIO $
+              processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler batch
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
