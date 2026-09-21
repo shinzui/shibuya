@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "findingId": "REV-15-L1",
+  "status": "accepted",
+  "acceptedBy": {
+    "kind": "human",
+    "name": "Nadeem Bitar"
+  },
+  "acceptedAt": "2026-09-21T20:30:04Z",
+  "scope": "Shibuya 0.10.x",
+  "expiry": {
+    "calendar": "2026-12-31T23:59:59Z",
+    "beforeVersion": "0.11.0.0",
+    "rule": "whichever occurs first"
+  },
+  "risk": "Distinct in-progress batch keys are not bounded by inbox capacity, so an unbounded or attacker-controlled key stream can retain increasing memory.",
+  "measuredEnvelope": {
+    "testedDistinctKeyRange": [1000, 50000],
+    "iterationsPerCell": 5,
+    "upperBytesPerAdditionalKey": {
+      "N1": 692,
+      "N4": 703
+    },
+    "artifact": "docs/audits/lifecycle-release/artifacts/ep45-performance/high-cardinality-envelope.json",
+    "limitation": "The measurement is an empirical finite-source envelope and is not an implementation-enforced production bound."
+  },
+  "controls": [
+    "Callers must bound caller-controlled distinct in-progress batch-key cardinality.",
+    "The 0.10.x release documentation must state the observed 703-byte-per-key upper envelope and the tested range.",
+    "REV-15-L1 must be reopened before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+  ],
+  "decisionSource": "The release owner explicitly approved this stated scope, expiry, and controls in the implementation session on 2026-09-21."
+}

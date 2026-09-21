@@ -1,0 +1,90 @@
+-- Exact cross-repository candidate project for
+-- mori://shinzui/shibuya/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance
+-- Package paths are relative to this repository; canonical ownership is recorded
+-- beside each external group.
+packages:
+  shibuya-core
+  shibuya-core-bench
+  shibuya-metrics
+
+  -- mori://shinzui/shibuya-kafka-adapter
+  ../shibuya-kafka-adapter/shibuya-kafka-adapter
+  ../shibuya-kafka-adapter/shibuya-kafka-adapter-bench
+  ../shibuya-kafka-adapter/shibuya-kafka-adapter-jitsurei
+
+  -- mori://shinzui/shibuya-pgmq-adapter
+  ../shibuya-pgmq-adapter/shibuya-pgmq-adapter
+  ../shibuya-pgmq-adapter/shibuya-pgmq-adapter-bench
+  ../shibuya-pgmq-adapter/shibuya-pgmq-example
+
+  -- mori://shinzui/kiroku
+  ../../kiroku-project/kiroku/kiroku-store
+  ../../kiroku-project/kiroku/kiroku-store-migrations
+  ../../kiroku-project/kiroku/kiroku-test-support
+  ../../kiroku-project/kiroku/shibuya-kiroku-adapter
+
+with-compiler: ghc-9.12.4
+tests: True
+benchmarks: True
+
+package codd
+  tests: False
+  benchmarks: False
+
+package pgmq-hasql
+  tests: False
+package pgmq-core
+  tests: False
+package pgmq-effectful
+  tests: False
+package pgmq-migration
+  tests: False
+
+source-repository-package
+  type: git
+  location: https://github.com/iand675/hs-opentelemetry
+  tag: hs-opentelemetry-api-types-1.0.0.0
+  subdir:
+    api
+    api-types
+    sdk
+    otlp
+    propagators/w3c
+    semantic-conventions
+    instrumentation/hw-kafka-client
+    exporters/in-memory
+    exporters/otlp
+
+source-repository-package
+  type: git
+  location: https://github.com/shinzui/codd-project.git
+  tag: d176b3088f23ef2218c7a1f31835e8ee0c0601aa
+  subdir: codd
+
+source-repository-package
+  type: git
+  location: https://github.com/shinzui/hasql-project.git
+  tag: 2bc7ace5db942d87962990bba0b2323ec4c67770
+  subdir: hasql-notifications
+
+source-repository-package
+  type: git
+  location: https://github.com/shinzui/pg-migrate.git
+  tag: v1.2.0.0
+  subdir:
+    pg-migrate
+    pg-migrate-embed
+    pg-migrate-cli
+    pg-migrate-import-codd
+    pg-migrate-test-support
+
+allow-newer:
+  haxl:time,
+  pgmq-migration:pg-migrate,
+  pgmq-migration:pg-migrate-embed,
+  pgmq-migration:pg-migrate-import-hasql-migration,
+  proto-lens:base,
+  proto-lens:ghc-prim,
+  proto-lens-runtime:base,
+  proto-lens-protobuf-types:base,
+  proto-lens-protobuf-types:ghc-prim

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 export interface Options {
   input: string;
+  ledger: string;
   output?: string;
   adapter: string;
   scenario: "sustainable" | "saturation" | "soak";
@@ -20,6 +21,19 @@ interface Sample {
   backlog: number;
   retainedBytes: number;
   maxLiveBytes: number;
+}
+
+export interface DeliveryLedger {
+  schemaVersion: number;
+  adapter: string;
+  runId: string;
+  status: string;
+  producedIds: number[];
+  processedIds: number[];
+  duplicateIds: number[];
+  missingIds: number[];
+  unexpectedIds: number[];
+  malformedDeliveries: number;
 }
 
 function parseInteger(value: string, label: string): number {
@@ -47,12 +61,44 @@ function parseOptions(args: string[]): Options {
   }
   return {
     input: required("input"),
+    ledger: required("ledger"),
     output: values.get("output"),
     adapter: required("adapter"),
     scenario,
     durationSeconds: parseInteger(required("duration-seconds"), "--duration-seconds"),
     restartAtSeconds: parseInteger(required("restart-at-seconds"), "--restart-at-seconds"),
     targetRate: parseInteger(required("target-rate"), "--target-rate"),
+  };
+}
+
+export function parseDeliveryLedger(input: string): DeliveryLedger {
+  const value = JSON.parse(input) as Partial<DeliveryLedger>;
+  const integerArray = (field: keyof DeliveryLedger): number[] => {
+    const values = value[field];
+    if (!Array.isArray(values) || values.some((item) => !Number.isSafeInteger(item) || item < 0)) {
+      throw new Error(`ledger.${field}: expected non-negative integer array`);
+    }
+    if (new Set(values).size !== values.length) throw new Error(`ledger.${field}: duplicate identities`);
+    return values;
+  };
+  if (value.schemaVersion !== 1) throw new Error("ledger.schemaVersion: expected 1");
+  if (typeof value.adapter !== "string" || !value.adapter) throw new Error("ledger.adapter: expected nonempty string");
+  if (typeof value.runId !== "string" || !value.runId) throw new Error("ledger.runId: expected nonempty string");
+  if (value.status !== "pass" && value.status !== "fail") throw new Error("ledger.status: expected pass or fail");
+  if (!Number.isSafeInteger(value.malformedDeliveries) || (value.malformedDeliveries ?? -1) < 0) {
+    throw new Error("ledger.malformedDeliveries: expected non-negative integer");
+  }
+  return {
+    schemaVersion: 1,
+    adapter: value.adapter,
+    runId: value.runId,
+    status: value.status,
+    producedIds: integerArray("producedIds"),
+    processedIds: integerArray("processedIds"),
+    duplicateIds: integerArray("duplicateIds"),
+    missingIds: integerArray("missingIds"),
+    unexpectedIds: integerArray("unexpectedIds"),
+    malformedDeliveries: value.malformedDeliveries!,
   };
 }
 
@@ -103,7 +149,7 @@ function slopePerMinute(samples: Sample[], select: (sample: Sample) => number): 
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
-export function analyze(samples: Sample[], options: Options) {
+export function analyze(samples: Sample[], options: Options, ledger?: DeliveryLedger) {
   const errors: string[] = [];
   if (samples.length === 0) throw new Error("CSV contains no samples");
   for (let index = 1; index < samples.length; index += 1) {
@@ -131,6 +177,29 @@ export function analyze(samples: Sample[], options: Options) {
     errors.push(`final processed ${final.processed} does not equal produced ${final.produced}`);
   }
   if (final.backlog !== 0) errors.push(`final service backlog is ${final.backlog}, expected 0 after drain`);
+  if (!ledger) {
+    errors.push("external per-delivery ledger is missing");
+  } else {
+    if (ledger.adapter !== options.adapter) errors.push(`ledger adapter ${ledger.adapter} does not match ${options.adapter}`);
+    if (ledger.status !== "pass") errors.push(`delivery ledger status is ${ledger.status}, expected pass`);
+    if (ledger.producedIds.length !== final.produced) {
+      errors.push(`ledger produced identity count ${ledger.producedIds.length} does not equal CSV total ${final.produced}`);
+    }
+    if (ledger.processedIds.length !== final.processed) {
+      errors.push(`ledger processed identity count ${ledger.processedIds.length} does not equal CSV total ${final.processed}`);
+    }
+    if (ledger.duplicateIds.length > 0) errors.push(`delivery ledger contains ${ledger.duplicateIds.length} duplicate identities`);
+    if (ledger.missingIds.length > 0) errors.push(`delivery ledger contains ${ledger.missingIds.length} missing identities`);
+    if (ledger.unexpectedIds.length > 0) errors.push(`delivery ledger contains ${ledger.unexpectedIds.length} unexpected identities`);
+    if (ledger.malformedDeliveries !== 0) {
+      errors.push(`delivery ledger contains ${ledger.malformedDeliveries} malformed deliveries`);
+    }
+    const producedIds = new Set(ledger.producedIds);
+    const processedIds = new Set(ledger.processedIds);
+    if (producedIds.size !== processedIds.size || [...producedIds].some((id) => !processedIds.has(id))) {
+      errors.push("produced and processed delivery identity sets do not match");
+    }
+  }
   if (options.scenario === "soak" && options.durationSeconds < 1800) {
     errors.push("soak duration is below the mandatory 1,800 seconds");
   }
@@ -171,6 +240,18 @@ export function analyze(samples: Sample[], options: Options) {
     adapter: options.adapter,
     scenario: options.scenario,
     input: options.input,
+    deliveryLedger: ledger
+      ? {
+          input: options.ledger,
+          runId: ledger.runId,
+          producedIdentityCount: ledger.producedIds.length,
+          processedIdentityCount: ledger.processedIds.length,
+          duplicateIdentityCount: ledger.duplicateIds.length,
+          missingIdentityCount: ledger.missingIds.length,
+          unexpectedIdentityCount: ledger.unexpectedIds.length,
+          malformedDeliveries: ledger.malformedDeliveries,
+        }
+      : { input: options.ledger, status: "missing" },
     scheduledDurationSeconds: options.durationSeconds,
     restartAtSeconds: options.restartAtSeconds,
     targetRatePerSecond: options.targetRate,
@@ -207,7 +288,8 @@ export function analyze(samples: Sample[], options: Options) {
 function main(): void {
   const options = parseOptions(process.argv.slice(2));
   const samples = parseCsv(readFileSync(options.input, "utf8"));
-  const report = analyze(samples, options);
+  const ledger = parseDeliveryLedger(readFileSync(options.ledger, "utf8"));
+  const report = analyze(samples, options, ledger);
   const output = `${JSON.stringify(report, null, 2)}\n`;
   if (options.output) writeFileSync(options.output, output);
   process.stdout.write(output);

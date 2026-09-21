@@ -110,6 +110,12 @@ diff checks are empty between every measured revision and frozen release revisio
 decision to the new solver-plan hash in a separate attestation, while retaining the original
 measurement hash and raw artifacts unchanged.
 
+2026-09-21: Accept REV-15-L1 as a named, bounded residual risk for Shibuya 0.10.x. Release
+owner Nadeem Bitar accepted the risk through 2026-12-31 or before 0.11.0.0, whichever occurs
+first, provided callers bound caller-controlled distinct batch-key cardinality and release
+documentation states the measured finite-range 703-byte-per-key envelope. This is an
+acceptance, not a waiver or an implementation-enforced key limit.
+
 
 ## Outcomes & Retrospective
 
@@ -220,5 +226,9 @@ process-isolated GC suites, 53 Kafka tests against Redpanda, 177 PGMQ tests agai
 PostgreSQL, and 308 Kiroku Store plus 38 Kiroku adapter examples. The deterministic scheduler
 artifact passes all 1,600 executions. All 70 mandatory matrix cells and 47 in-scope finding
 records are present in `docs/audits/lifecycle-release/candidates/release-candidate.json`.
-The validator reports exactly one remaining error: REV-15-L1 lacks its named human disposition.
-Independent review is also still required before Milestones 3 and 4 can close.
+Release owner Nadeem Bitar subsequently accepted REV-15-L1 for Shibuya 0.10.x through
+2026-12-31 or before 0.11.0.0, whichever occurs first, with the recorded caller-side cardinality
+control and release-note disclosure. The release validator then passed all 52 findings, 15
+boundaries, and 70 mandatory cells. A deliberately stale candidate SHA fails all five evidence
+runs, proving the negative control. Independent review is still required before Milestones 3
+and 4 can close.

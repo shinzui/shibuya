@@ -1,6 +1,6 @@
 module Shibuya.Metrics.ServerSpec (spec) where
 
-import Control.Exception (throwIO)
+import Control.Exception (SomeException, throwIO)
 import Data.Aeson (decode, object, (.=))
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as LBS
@@ -11,17 +11,25 @@ import Shibuya.App (Master)
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Health (DependencyCheck, DependencyStatus (..))
-import Shibuya.Metrics.Server (combinedApp)
+import Shibuya.Metrics.Server (combinedApp, startMetricsServer)
 import Shibuya.Metrics.TestSupport
   ( getResponse,
     registerIdleProcessor,
     withMaster,
   )
 import Shibuya.Metrics.WebSocket (newWebSocketState)
-import Test.Hspec (Spec, around, describe, it, shouldBe, shouldSatisfy)
+import Test.Hspec (Spec, anyException, around, describe, it, shouldBe, shouldSatisfy, shouldThrow)
 
 spec :: Spec
 spec = around withMaster $ do
+  describe "built-in server configuration" $ do
+    it "defaults to a loopback-only listener" $ \_ ->
+      defaultConfig.host `shouldBe` "127.0.0.1"
+
+    it "rejects nonpositive WebSocket resource limits" $ \master ->
+      startMetricsServer defaultConfig {wsMaxSubscriptions = 0} master
+        `shouldThrow` (anyException :: SomeException -> Bool)
+
   describe "combinedApp HTTP routes" $ do
     it "serves every enabled JSON, health, Prometheus, and WebSocket path" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "known")

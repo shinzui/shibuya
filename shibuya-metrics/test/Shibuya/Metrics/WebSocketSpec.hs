@@ -120,6 +120,22 @@ spec = around withMaster $ do
         (WS.runClient "127.0.0.1" port "/ws" $ \conn -> receiveServer conn)
           `shouldThrow` (anyException :: SomeException -> Bool)
 
+    it "closes clients that exceed the retained processor subscription limit" $ \master ->
+      withServer fastConfig {wsMaxSubscriptions = 2} master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          WS.sendTextData conn $ encode $ Subscribe [ProcessorId "one", ProcessorId "two", ProcessorId "three"]
+          (WS.receiveData conn :: IO ByteString)
+            `shouldThrow` (anyException :: SomeException -> Bool)
+
+    it "also bounds subscribe-all exclusion state" $ \master ->
+      withServer fastConfig {wsMaxSubscriptions = 1} master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "one", ProcessorId "two"]
+          (WS.receiveData conn :: IO ByteString)
+            `shouldThrow` (anyException :: SomeException -> Bool)
+
     it "excludes processors unsubscribed from subscribe-all" $ \master -> do
       alpha <- registerIdleProcessor master (ProcessorId "alpha")
       beta <- registerIdleProcessor master (ProcessorId "beta")

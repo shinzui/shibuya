@@ -7,6 +7,9 @@
 - `MetricsServerConfig` and `HealthConfig` gain `dependencyTimeoutMicros`; direct record
   construction must choose a per-check deadline. `ReadinessStatus` gains `application`, and
   its JSON object gains the corresponding lifecycle status field.
+- `MetricsServerConfig` gains `host` and `wsMaxSubscriptions`. The built-in server now
+  defaults to loopback instead of all interfaces, validates resource limits, and bounds
+  retained WebSocket processor selections and exclusions.
 - The processing-state JSON object gains `lastProgress`, paired with the new third field of
   `shibuya-core`'s `ProcessorState.Processing` constructor.
 - `ServerMessage` gains `ProcessorTerminal`, with the new public
@@ -36,6 +39,8 @@
 - Release WebSocket connection slots on every setup and connection exit, reject upgrades
   when WebSockets are disabled, support exclusions from subscribe-all, and deliver `goodbye`
   when server shutdown begins.
+- Close WebSocket clients with policy code 1008 before their retained processor subscription
+  or subscribe-all exclusion set can exceed `wsMaxSubscriptions`.
 
 ## 0.9.0.3 — 2026-09-20
 

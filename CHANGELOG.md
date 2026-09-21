@@ -13,6 +13,8 @@
 - `shibuya-metrics`: add `ServerMessage.ProcessorTerminal` and
   `ProcessorTerminalStatus`, and extend the public `WebSocketState` record with shutdown
   state.
+- `shibuya-metrics`: add `host` and `wsMaxSubscriptions` to `MetricsServerConfig`; the
+  built-in server now defaults to loopback and validates bounded resource settings.
 
 ### Bug Fixes
 
@@ -24,6 +26,8 @@
   synchronous exceptions as unhealthy.
 - `shibuya-metrics`: make WebSocket slot ownership exception-safe, honor the enable flag for
   upgrades, define subscribe-all exclusions, and signal active clients during shutdown.
+- `shibuya-metrics`: bound retained processor selections and exclusions per connection,
+  closing clients that exceed `wsMaxSubscriptions` with policy code 1008.
 
 ### New Features
 
@@ -35,6 +39,11 @@
 
 ### Other Changes
 
+- `shibuya-core`: document that `inboxSize` does not bound the number of distinct
+  in-progress batch keys. Callers must bound externally controlled key cardinality. The
+  release evidence observed a conservative upper envelope of 703 bytes per additional key
+  over 1,000 to 50,000 keys; this finite measurement is not an implementation-enforced
+  production limit.
 - `shibuya-metrics`: add a release-gated Hspec suite covering every published HTTP
   route and WebSocket frame plus exact JSON and Prometheus golden contracts.
 - `shibuya-metrics`: make the test package metadata sdist-safe by declaring its generated

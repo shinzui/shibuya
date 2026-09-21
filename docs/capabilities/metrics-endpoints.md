@@ -69,6 +69,15 @@ pipeline uses CAP-9 directly and never depends on this.
 
 ## Limits
 
+- The built-in server binds to `127.0.0.1` by default. Setting `host = "*"` exposes
+  metrics, processor IDs, message IDs, and terminal failure text; do so only behind an
+  authentication and authorization boundary. The server does not implement authentication
+  or WebSocket `Origin` validation itself.
+- WebSocket connection state is bounded by `wsMaxConnections` and
+  `wsMaxSubscriptions` (1,000 retained processor IDs per connection by default). A client
+  that would exceed the subscription or subscribe-all exclusion limit is closed with policy
+  violation code 1008. Nonpositive resource limits and timeouts are rejected when the
+  built-in server starts.
 - The release-gated `shibuya-metrics-test` suite exercises every published HTTP route,
   including enable flags and 404/503 paths, exact JSON and Prometheus golden output, every
   client/server frame encoding, and the WebSocket protocol over real loopback connections.

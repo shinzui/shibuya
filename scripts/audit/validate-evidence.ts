@@ -127,6 +127,37 @@ function completeWaiver(value: unknown): boolean {
   );
 }
 
+function completeAcceptance(value: unknown): boolean {
+  const acceptance = record(value);
+  const acceptedBy = record(acceptance?.acceptedBy);
+  return Boolean(
+    acceptance &&
+      acceptedBy?.kind === "human" &&
+      string(acceptedBy.name) &&
+      string(acceptance.acceptedAt) &&
+      string(acceptance.scope) &&
+      string(acceptance.expiresAt) &&
+      string(acceptance.expiresBeforeVersion) &&
+      (strings(acceptance.compensatingControls).length > 0 || strings(acceptance.controls).length > 0),
+  );
+}
+
+function completeReleaseAcceptance(value: unknown): boolean {
+  const acceptance = record(value);
+  const acceptedBy = record(acceptance?.acceptedBy);
+  return Boolean(
+    acceptance &&
+      string(acceptance.findingId) &&
+      acceptedBy?.kind === "human" &&
+      string(acceptedBy.name) &&
+      string(acceptance.acceptedAt) &&
+      string(acceptance.scope) &&
+      string(acceptance.expiresAt) &&
+      string(acceptance.expiresBeforeVersion) &&
+      string(acceptance.controlsArtifact),
+  );
+}
+
 function sameStringMap(leftValue: unknown, right: Map<string, string>): boolean {
   const left = record(leftValue);
   if (!left) return false;
@@ -255,6 +286,11 @@ export function validateInventory(value: unknown, options: ValidationOptions = {
         errors.push(`${label}: defects and concerns cannot use accepted; use fixed, disproved, waived, or out-of-scope`);
       }
       if (!string(disposition?.rationale)) errors.push(`${label}: accepted disposition requires rationale`);
+      if (!completeAcceptance(disposition)) {
+        errors.push(
+          `${label}: acceptance requires a named human approver, timestamp, scope, calendar and version expiry, and compensating controls`,
+        );
+      }
     }
     if (status === "waived" && !completeWaiver(disposition?.waiver)) {
       errors.push(`${label}: waiver requires a named human approver, rationale, expiry, scope, and compensating controls`);
@@ -455,6 +491,38 @@ export function validateRelease(
   for (const id of resultIds) {
     if (!candidateFindings.some((finding) => finding.id === id)) {
       errors.push(`release.findingResults: unknown or excluded findingId ${id}`);
+    }
+  }
+
+  const acceptanceRecords = array(release.riskAcceptances).map(record).filter(Boolean) as JsonRecord[];
+  const acceptedFindings = candidateFindings.filter((finding) => record(finding.disposition)?.status === "accepted");
+  const acceptanceIds = acceptanceRecords.map((item) => string(item.findingId)).filter(Boolean) as string[];
+  for (const duplicate of duplicateValues(acceptanceIds)) {
+    errors.push(`release.riskAcceptances: duplicate findingId ${duplicate}`);
+  }
+  for (const finding of acceptedFindings) {
+    const id = string(finding.id) ?? "unknown finding";
+    const disposition = record(finding.disposition);
+    const acceptance = acceptanceRecords.find((item) => item.findingId === id);
+    if (!acceptance || !completeReleaseAcceptance(acceptance)) {
+      errors.push(`${id}: release acceptance lacks named human approval, scope, both expiry conditions, or controls artifact`);
+      continue;
+    }
+    requireLocalPath(errors, root, `${id}.riskAcceptance.controlsArtifact`, acceptance.controlsArtifact);
+    if (
+      JSON.stringify(acceptance.acceptedBy) !== JSON.stringify(disposition?.acceptedBy) ||
+      acceptance.acceptedAt !== disposition?.acceptedAt ||
+      acceptance.scope !== disposition?.scope ||
+      acceptance.expiresAt !== disposition?.expiresAt ||
+      acceptance.expiresBeforeVersion !== disposition?.expiresBeforeVersion
+    ) {
+      errors.push(`${id}: release acceptance does not match the inventory disposition`);
+    }
+  }
+  for (const acceptance of acceptanceRecords) {
+    const findingId = string(acceptance.findingId);
+    if (!findingId || !acceptedFindings.some((finding) => finding.id === findingId)) {
+      errors.push(`release.riskAcceptances: acceptance does not correspond to an accepted finding: ${findingId ?? "missing ID"}`);
     }
   }
 

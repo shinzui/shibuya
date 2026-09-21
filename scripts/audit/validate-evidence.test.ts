@@ -210,6 +210,54 @@ describe("release validation", () => {
     );
   });
 
+  test("requires candidate-bound human acceptance with matching scope, expiry, and controls", () => {
+    const inventory = inventoryFixture();
+    inventory.findings[0].kind = "limitation";
+    inventory.findings[0].fixSha = null;
+    inventory.findings[0].disposition = {
+      status: "accepted",
+      rationale: "The fixture risk is explicitly bounded.",
+      acceptedBy: { kind: "human", name: "fixture owner" },
+      acceptedAt: "2026-09-21T21:01:49Z",
+      scope: "fixture 1.x",
+      expiresAt: "2026-12-31T23:59:59Z",
+      expiresBeforeVersion: "2.0.0",
+      compensatingControls: ["Keep the fixture regression evidence."],
+    };
+    const release = releaseFixture();
+    release.findingResults[0].status = "acknowledged";
+    release.riskAcceptances = [
+      {
+        findingId: "REV-1-F1",
+        acceptedBy: { kind: "human", name: "fixture owner" },
+        acceptedAt: "2026-09-21T21:01:49Z",
+        scope: "fixture 1.x",
+        expiresAt: "2026-12-31T23:59:59Z",
+        expiresBeforeVersion: "2.0.0",
+        controlsArtifact: "scripts/audit/fixtures/release-evidence.txt",
+      },
+    ];
+    expect(validateRelease(inventory, release, { root }).errors).toEqual([]);
+
+    const missing = clone(release);
+    delete missing.riskAcceptances;
+    expect(errorText(validateRelease(inventory, missing, { root }))).toContain(
+      "release acceptance lacks named human approval",
+    );
+
+    const mismatched = clone(release);
+    mismatched.riskAcceptances[0].scope = "unspecified";
+    expect(errorText(validateRelease(inventory, mismatched, { root }))).toContain(
+      "does not match the inventory disposition",
+    );
+
+    const incompleteInventory = clone(inventory);
+    delete incompleteInventory.findings[0].disposition.compensatingControls;
+    expect(errorText(validateRelease(incompleteInventory, release, { root }))).toContain(
+      "acceptance requires a named human approver",
+    );
+  });
+
   test("rejects a candidate that includes an excluded component", () => {
     const release = releaseFixture();
     release.projects.push({
@@ -237,7 +285,7 @@ describe("release validation", () => {
     const stderr = process.stderr.toString();
     expect(process.exitCode).toBe(1);
     expect(stdout).toContain("UNCERTIFIED: REV-12-F1");
-    expect(stderr).toContain("REV-15-L1: open finding blocks release");
+    expect(stderr).toContain("REV-15-L1: missing candidate-bound finding result");
     expect(stderr).toContain("startup-registration:normal: missing mandatory matrix run");
   });
 });

@@ -37,6 +37,11 @@
 
 ### Other Changes
 
+- Document the accepted batching resource boundary: `inboxSize` does not cap distinct
+  in-progress batch keys, so callers must bound externally controlled key cardinality. The
+  release evidence observed a conservative upper envelope of 703 bytes per additional key
+  over 1,000 to 50,000 keys; this finite measurement is not an implementation-enforced
+  production limit.
 - Depend directly on `effectful-core`, which provides every Effectful module used by the core,
   tests, examples, and benchmarks. The accepted range keeps the 2.6 family and 2.7.1.1 or
   later while excluding 2.7.0.0 through 2.7.1.0, whose upstream changelog records a

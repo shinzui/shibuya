@@ -18,6 +18,7 @@ where
 import Control.Concurrent.Async (async, cancel)
 import Control.Exception (bracket, finally)
 import Data.Aeson (encode, object, (.=))
+import Data.String (fromString)
 import Data.Text (Text)
 import Network.HTTP.Types (hContentType, status404)
 import Network.Wai (Application, Response, pathInfo, responseLBS)
@@ -45,12 +46,13 @@ startMetricsServerWithDeps ::
   [DependencyCheck] ->
   IO MetricsServer
 startMetricsServerWithDeps config master depChecks = do
+  validateConfig config
   wsState <- newWebSocketState config.wsMaxConnections
   let app = combinedApp config master wsState depChecks
       settings =
         Warp.setPort config.port $
           Warp.setHost
-            "*"
+            (fromString config.host)
             Warp.defaultSettings
   serverAsync <- async $ Warp.runSettings settings app `finally` shutdownWebSockets wsState
   pure
@@ -58,6 +60,18 @@ startMetricsServerWithDeps config master depChecks = do
       { serverThread = serverAsync,
         serverPort = config.port
       }
+
+validateConfig :: MetricsServerConfig -> IO ()
+validateConfig config
+  | null config.host = fail "MetricsServerConfig.host must not be empty"
+  | config.port < 0 = fail "MetricsServerConfig.port must be non-negative"
+  | config.wsPushIntervalUs <= 0 = fail "MetricsServerConfig.wsPushIntervalUs must be positive"
+  | config.wsMaxConnections <= 0 = fail "MetricsServerConfig.wsMaxConnections must be positive"
+  | config.wsMaxSubscriptions <= 0 = fail "MetricsServerConfig.wsMaxSubscriptions must be positive"
+  | config.livenessTimeoutMicros <= 0 = fail "MetricsServerConfig.livenessTimeoutMicros must be positive"
+  | config.dependencyTimeoutMicros <= 0 = fail "MetricsServerConfig.dependencyTimeoutMicros must be positive"
+  | config.stuckThreshold <= 0 = fail "MetricsServerConfig.stuckThreshold must be positive"
+  | otherwise = pure ()
 
 -- | Stop the metrics server.
 stopMetricsServer :: MetricsServer -> IO ()

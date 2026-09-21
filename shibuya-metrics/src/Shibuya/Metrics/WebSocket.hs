@@ -28,6 +28,7 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
+import Data.Text qualified as Text
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master, getAllMetricsIO)
 import Shibuya.Core.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics)
@@ -160,7 +161,7 @@ serveConnection config master wsState pending = do
     WS.sendTextData conn $ encode $ MetricsSnapshot metrics
     atomically $ writeTVar connState.lastMetrics metrics
     race_
-      (receiveLoop master connState conn)
+      (receiveLoop config master connState conn)
       (pushLoop config master wsState connState conn)
 
 --------------------------------------------------------------------------------
@@ -168,21 +169,22 @@ serveConnection config master wsState pending = do
 --------------------------------------------------------------------------------
 
 -- | Handle incoming messages from client.
-receiveLoop :: Master -> ConnectionState -> WS.Connection -> IO ()
-receiveLoop master connState conn = forever $ do
+receiveLoop :: MetricsServerConfig -> Master -> ConnectionState -> WS.Connection -> IO ()
+receiveLoop config master connState conn = forever $ do
   msg <- WS.receiveData conn
   case decode msg of
     Nothing -> pure () -- Ignore invalid messages
-    Just clientMsg -> handleClientMessage master connState conn clientMsg
+    Just clientMsg -> handleClientMessage config.wsMaxSubscriptions master connState conn clientMsg
 
 -- | Handle a client message.
 handleClientMessage ::
+  Int ->
   Master ->
   ConnectionState ->
   WS.Connection ->
   ClientMessage ->
   IO ()
-handleClientMessage master connState conn = \case
+handleClientMessage maxSubscriptions master connState conn = \case
   SubscribeAll -> do
     atomically $ writeTVar connState.subscriptions $ AllProcessors Set.empty
     -- Send snapshot of all metrics
@@ -195,22 +197,41 @@ handleClientMessage master connState conn = \case
       let newSubs = case current of
             AllProcessors _ -> SelectedProcessors $ Set.fromList pids
             SelectedProcessors existing -> SelectedProcessors $ existing <> Set.fromList pids
-      writeTVar connState.subscriptions newSubs
-      pure newSubs
-    allMetrics <- getAllMetricsIO master
-    let filtered = filterMetrics subscription allMetrics
-    WS.sendTextData conn $ encode $ MetricsSnapshot filtered
-    atomically $ writeTVar connState.lastMetrics filtered
+      if subscriptionSize newSubs > maxSubscriptions
+        then pure Nothing
+        else writeTVar connState.subscriptions newSubs >> pure (Just newSubs)
+    case subscription of
+      Nothing -> rejectOversizedSubscription conn maxSubscriptions
+      Just accepted -> do
+        allMetrics <- getAllMetricsIO master
+        let filtered = filterMetrics accepted allMetrics
+        WS.sendTextData conn $ encode $ MetricsSnapshot filtered
+        atomically $ writeTVar connState.lastMetrics filtered
   Unsubscribe pids -> do
-    atomically $ do
+    accepted <- atomically $ do
       current <- readTVar connState.subscriptions
       let removed = Set.fromList pids
           newSubs = case current of
             AllProcessors excluded -> AllProcessors $ excluded <> removed
             SelectedProcessors existing -> SelectedProcessors $ Set.difference existing removed
-      writeTVar connState.subscriptions newSubs
+      if subscriptionSize newSubs > maxSubscriptions
+        then pure False
+        else writeTVar connState.subscriptions newSubs >> pure True
+    when (not accepted) $ rejectOversizedSubscription conn maxSubscriptions
   Ping ->
     WS.sendTextData conn $ encode Pong
+
+subscriptionSize :: Subscription -> Int
+subscriptionSize = \case
+  AllProcessors excluded -> Set.size excluded
+  SelectedProcessors selected -> Set.size selected
+
+rejectOversizedSubscription :: WS.Connection -> Int -> IO ()
+rejectOversizedSubscription conn limit =
+  WS.sendCloseCode conn 1008 $
+    "WebSocket processor subscription limit exceeded (maximum "
+      <> Text.pack (show limit)
+      <> ")"
 
 --------------------------------------------------------------------------------
 -- Push Loop
