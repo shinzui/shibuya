@@ -1,0 +1,32 @@
+Using saved setting for 'extra-substituters = https://shinzui.cachix.org' from ~/.local/share/nix/trusted-settings.json.
+Using saved setting for 'extra-trusted-public-keys = shinzui.cachix.org-1:QEmAoJrA9WwLP0uxfDgktLi2BRrcvQQWdz8NzcMg4/E=' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-trusted-public-keys'.
+Pass '--accept-flake-config' to trust it
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.10.0.0 (test:shibuya-core-gc-finished-test) (ephemeral targets)
+ - shibuya-core-0.10.0.0 (test:shibuya-core-gc-test) (ephemeral targets)
+Preprocessing test suite 'shibuya-core-gc-test' for shibuya-core-0.10.0.0...
+Building test suite 'shibuya-core-gc-test' for shibuya-core-0.10.0.0...
+Preprocessing test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.10.0.0...
+Building test suite 'shibuya-core-gc-finished-test' for shibuya-core-0.10.0.0...
+Running 1 test suites...
+Test suite shibuya-core-gc-test: RUNNING...
+Running 1 test suites...
+Test suite shibuya-core-gc-finished-test: RUNNING...
+PASS: bare waitApp survives major collections
+Test suite shibuya-core-gc-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/t/shibuya-core-gc-test/test/shibuya-core-0.10.0.0-shibuya-core-gc-test.log
+1 of 1 test suites (1 of 1 test cases) passed.
+PASS [finite source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [finite source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [failed source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [serial, concurrent and batch processors together, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful
+Test suite shibuya-core-gc-finished-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/t/shibuya-core-gc-finished-test/test/shibuya-core-0.10.0.0-shibuya-core-gc-finished-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

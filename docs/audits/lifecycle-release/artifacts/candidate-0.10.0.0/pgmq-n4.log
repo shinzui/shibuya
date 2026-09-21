@@ -1,0 +1,263 @@
+Using saved setting for 'extra-substituters = ' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-substituters'.
+Pass '--accept-flake-config' to trust it
+Using saved setting for 'extra-trusted-public-keys = ' from ~/.local/share/nix/trusted-settings.json.
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-pgmq-adapter-0.16.0.1 (test:shibuya-pgmq-adapter-test) (first run)
+Preprocessing test suite 'shibuya-pgmq-adapter-test' for shibuya-pgmq-adapter-0.16.0.1...
+Building test suite 'shibuya-pgmq-adapter-test' for shibuya-pgmq-adapter-0.16.0.1...
+Running 1 test suites...
+Test suite shibuya-pgmq-adapter-test: RUNNING...
+
+Unit Tests
+  Shibuya.Adapter.Pgmq.Convert
+    messageIdToShibuya
+      converts positive Int64 to Text [✔]
+      converts zero [✔]
+      converts negative Int64 [✔]
+      converts Int64 max bound [✔]
+      converts Int64 min bound [✔]
+    messageIdToPgmq
+      parses valid positive number [✔]
+      parses valid negative number [✔]
+      rejects empty string [✔]
+      rejects non-numeric text [✔]
+      rejects mixed text [✔]
+      rejects trailing whitespace [✔]
+      handles leading whitespace (reads accepts it) [✔]
+      rejects decimal numbers [✔]
+      handles overflow values (implementation wraps) [✔]
+      roundtrips correctly [✔]
+        +++ OK, passed 100 tests.
+    pgmqMessageIdToCursor
+      creates CursorInt from MessageId [✔]
+      handles zero [✔]
+      handles large values [✔]
+    extractPartition via pgmqMessageToEnvelope
+      extracts x-pgmq-group from headers object [✔]
+      returns Nothing when headers is Nothing [✔]
+      returns Nothing when headers is not an object [✔]
+      returns Nothing when x-pgmq-group key is missing [✔]
+      returns Nothing when x-pgmq-group is not a string [✔]
+      handles empty string partition [✔]
+    extractTraceHeaders
+      extracts traceparent header only [✔]
+      extracts both traceparent and tracestate headers [✔]
+      returns Nothing when headers is Nothing [✔]
+      returns Nothing when headers is not an object [✔]
+      returns Nothing when traceparent is missing [✔]
+      returns Nothing when traceparent is not a string [✔]
+      ignores tracestate when it's not a string [✔]
+      handles empty traceparent string [✔]
+      preserves traceparent with other headers present [✔]
+    pgmqMessageToEnvelope
+      sets messageId from pgmq message [✔]
+      sets cursor from messageId [✔]
+      sets enqueuedAt from pgmq message [✔]
+      extracts payload from body [✔]
+      extracts partition from headers [✔]
+      sets partition to Nothing when no headers [✔]
+      extracts traceContext from headers with traceparent [✔]
+      extracts traceContext with both traceparent and tracestate [✔]
+      sets traceContext to Nothing when no headers [✔]
+      sets traceContext to Nothing when no traceparent in headers [✔]
+      does not surface broker headers (headers is Nothing) when no headers [✔]
+      leaves headers Nothing even when the JSONB headers object is non-empty [✔]
+      attempt field
+        first delivery (readCount=1) -> Attempt 0 [✔]
+        first retry (readCount=2) -> Attempt 1 [✔]
+        fifth read (readCount=5) -> Attempt 4 [✔]
+        boundary readCount=0 clamps to Attempt 0 [✔]
+    mkDlqPayload
+      without metadata
+        includes original_message [✔]
+        includes dead_letter_reason [✔]
+        always includes structured reason fields [✔]
+        does not include original_message_id [✔]
+        does not include read_count [✔]
+      with metadata
+        includes original_message_id [✔]
+        includes original_enqueued_at [✔]
+        includes read_count [✔]
+        includes original_headers [✔]
+        includes last_read_at [✔]
+        retains all reason fields unchanged [✔]
+      reason fields
+        writes the exact PoisonPill object [✔]
+        writes the exact InvalidPayload object [✔]
+        writes the exact MaxRetriesExceeded object with null detail [✔]
+        writes the exact ApplicationFailure object [✔]
+        preserves empty application detail as an empty string [✔]
+        preserves Unicode, quotes, backslashes, and colons in structured detail [✔]
+  Shibuya.Adapter.Pgmq.Config
+    defaultConfig
+      sets queueName from parameter [✔]
+      sets visibilityTimeout to 30 [✔]
+      sets batchSize to 1 [✔]
+      uses StandardPolling with 1 second interval [✔]
+      uses the default poll retry policy [✔]
+      uses the default ack retry policy [✔]
+      sets deadLetterConfig to Nothing [✔]
+      sets haltVisibilityTimeout to Nothing [✔]
+      sets maxRetries to 3 [✔]
+      sets fifoConfig to Nothing [✔]
+    defaultPollingConfig
+      is StandardPolling [✔]
+      has 1 second interval [✔]
+    defaultPollRetryConfig
+      retries five total attempts by default [✔]
+      starts with a 100ms backoff [✔]
+      caps backoff at five seconds [✔]
+    validateConfig
+      accepts the default config [✔]
+      rejects batchSize below one [✔]
+      rejects visibilityTimeout below one [✔]
+      rejects non-positive standard polling interval [✔]
+      rejects invalid long polling fields [✔]
+      rejects negative maxRetries but accepts zero [✔]
+      rejects invalid halt visibility timeout [✔]
+      rejects invalid retry policies [✔]
+    DeadLetterTarget
+      DirectQueue holds a queue name [✔]
+      TopicRoute holds a routing key [✔]
+      DirectQueue and TopicRoute are not equal [✔]
+    Smart constructors
+      directDeadLetter
+        creates a DeadLetterConfig with DirectQueue target [✔]
+        sets includeMetadata correctly [✔]
+      topicDeadLetter
+        creates a DeadLetterConfig with TopicRoute target [✔]
+        sets includeMetadata correctly [✔]
+    parseQueueName
+      accepts lowercase names and rejects uppercase and empty names [✔]
+  Shibuya.Adapter.Pgmq.Internal
+    nominalToSeconds
+      converts whole seconds [✔]
+      rounds up fractional seconds [✔]
+      rounds up small fractions [✔]
+      handles zero [✔]
+      handles negative (rounds toward positive infinity) [✔]
+      clamping
+        exact 30 seconds passes through [✔]
+        rounds up subsecond [✔]
+        clamps a 100-year delay to maxBound :: Int32 [✔]
+        clamps a very large negative delay to minBound :: Int32 [✔]
+    mkReadMessage
+      sets queueName from config [✔]
+      sets delay to visibilityTimeout [✔]
+      sets batchSize from config [✔]
+      sets conditional to Nothing [✔]
+    mkReadWithPoll
+      sets queueName from config [✔]
+      sets delay to visibilityTimeout [✔]
+      sets batchSize from config [✔]
+      sets maxPollSeconds from parameter [✔]
+      sets pollIntervalMs from parameter [✔]
+      sets conditional to Nothing [✔]
+    mkReadGrouped
+      sets queueName from config [✔]
+      sets visibilityTimeout from config [✔]
+      sets qty to batchSize [✔]
+    pgmqChunks FIFO dispatch
+      selects throughput standard [✔]
+      selects round-robin standard [✔]
+      selects head-per-group standard [✔]
+      selects throughput long poll [✔]
+      selects round-robin long poll [✔]
+      selects head-per-group long poll [✔]
+    pgmqChunks poll retry
+      retries transient poll errors and returns the successful batch [✔]
+      does not retry permanent poll errors [✔]
+      stops retrying after maxAttempts is exhausted [✔]
+    lease renewal retry
+      recovers from a transient renewal outage within the configured budget [✔]
+    finalizeAutoDeadLetter
+      calls the auto-DLQ hook only after finalize succeeds [✔]
+      calls the ack-failure hook without reporting auto-DLQ success when finalize fails [✔]
+    mergeDlqHeaders
+      with no consumer headers, forwards original headers verbatim [✔]
+      with no consumer headers and no original, returns Nothing [✔]
+      consumer's traceparent overrides original's, original moves under x-shibuya-upstream-traceparent [✔]
+      consumer's headers carry through when original headers are absent [✔]
+      original's tracestate is stashed even when consumer has no tracestate [✔]
+      leniently decodes non-UTF8 trace headers [✔]
+Property Tests
+  Shibuya.Adapter.Pgmq Properties
+    MessageId conversion properties
+      roundtrips all Int64 values [✔]
+        +++ OK, passed 100 tests.
+      messageIdToShibuya is injective [✔]
+        +++ OK, passed 100 tests.
+    Cursor conversion properties
+      preserves value for positive Int64 [✔]
+        +++ OK, passed 100 tests.
+    Envelope construction properties
+      preserves messageId [✔]
+        +++ OK, passed 100 tests.
+      always sets cursor to Just [✔]
+        +++ OK, passed 100 tests.
+      always sets enqueuedAt to Just [✔]
+        +++ OK, passed 100 tests.
+    DLQ payload properties
+      always includes original_message key [✔]
+        +++ OK, passed 100 tests.
+      always includes dead_letter_reason key [✔]
+        +++ OK, passed 100 tests.
+      writes all reason fields from Shibuya's total public projections [✔]
+        +++ OK, passed 100 tests.
+      metadata keys present iff includeMeta is True [✔]
+        +++ OK, passed 100 tests.
+Integration Tests
+  Integration
+    Basic message processing
+      can send and read messages directly via session [✔]
+      can send and read messages directly via effectful [✔]
+      processes a single message and deletes it [✔]
+      processes multiple messages in order [✔]
+    Visibility timeout
+      message reappears after visibility timeout [✔]
+      lease extension is a no-op after the message is deleted [✔]
+    Retry handling
+      set_vt extends visibility timeout (simulating AckRetry) [✔]
+    Grouped-head FIFO reads
+      leases at most one absolute head per group and advances only a settled group [✔]
+      lets another group advance while a delayed absolute head blocks its successor [✔]
+Chaos Tests
+  Chaos
+    Poison messages
+      handler exception causes message to be retried [✔]
+      AckDeadLetter sends message to DLQ when configured [✔]
+DLQ-PAYLOAD-SIZE-DIAG: dualWriteJsonb=321B legacyJsonb=168B delta=153B
+      preserves an application reason as queryable JSONB fields [✔]
+      preserves trace headers when moving to DLQ [✔]
+      AckDeadLetter is idempotent after a successful finalize [✔]
+      a discarded DLQ commit confirmation can be retried without creating a second copy [✔]
+      concurrent finalization of one delivery converges on one durable DLQ move [✔]
+      cancellation releases finalizer ownership so the same handle can retry [✔]
+      a failed DLQ move remains recoverable and reaches the core lifecycle [✔]
+      a failed automatic DLQ move calls the failure hook and remains visible [✔]
+      AckOk is idempotent after a successful finalize [✔]
+      AckHalt uses haltVisibilityTimeout when configured [✔]
+    Long-running handlers
+      message stays invisible while being processed [✔]
+    Graceful shutdown
+      drains an idle queue instead of waiting for the timeout [✔]
+      returns the same completed result for a repeated shutdown [✔]
+      processes in-flight messages during shutdown [✔]
+      stops accepting new messages after shutdown signal [✔]
+    Prefetch
+      drains the queue under concurrent prefetch without deadlocking [✔]
+PREFETCH-SHUTDOWN-DIAG: off(total=40 processed=3 visible=34 held=3) on(total=40 processed=3 visible=26 held=11)
+      strands only a bounded (<= one prefetch buffer) number of extra messages invisible on shutdown [✔]
+PREFETCH-NOLOSS-DIAG: total=20 processed=0 recoverableAfterVT=20
+      loses no messages under prefetch: stranded messages are all redelivered after the VT [✔]
+  Database restart
+    reconnects and redelivers an unacknowledged message after its lease expires [✔]
+
+Finished in 55.5372 seconds
+177 examples, 0 failures
+Test suite shibuya-pgmq-adapter-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/test/shibuya-pgmq-adapter-0.16.0.1-shibuya-pgmq-adapter-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

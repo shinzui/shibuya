@@ -1,0 +1,166 @@
+Using saved setting for 'extra-substituters = https://shinzui.cachix.org' from ~/.local/share/nix/trusted-settings.json.
+Using saved setting for 'extra-trusted-public-keys = shinzui.cachix.org-1:QEmAoJrA9WwLP0uxfDgktLi2BRrcvQQWdz8NzcMg4/E=' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-trusted-public-keys'.
+Pass '--accept-flake-config' to trust it
+Resolving dependencies...
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.10.0.0 (lib) (first run)
+ - shibuya-kafka-adapter-0.9.0.2 (lib) (first run)
+ - shibuya-kafka-adapter-0.9.0.2 (test:shibuya-kafka-adapter-test) (first run)
+Configuring library for shibuya-core-0.10.0.0...
+Preprocessing library for shibuya-core-0.10.0.0...
+Building library for shibuya-core-0.10.0.0...
+[ 1 of 31] Compiling Shibuya.Core.Lease ( src/Shibuya/Core/Lease.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Lease.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Lease.dyn_o )
+[ 2 of 31] Compiling Shibuya.Internal.Runner.KeyedScheduler ( src/Shibuya/Internal/Runner/KeyedScheduler.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/KeyedScheduler.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/KeyedScheduler.dyn_o )
+[ 3 of 31] Compiling Shibuya.Prelude  ( src/Shibuya/Prelude.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Prelude.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Prelude.dyn_o )
+[ 4 of 31] Compiling Shibuya.Core.Types ( src/Shibuya/Core/Types.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Types.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Types.dyn_o )
+[ 5 of 31] Compiling Shibuya.Core.Metrics ( src/Shibuya/Core/Metrics.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Metrics.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Metrics.dyn_o )
+[ 6 of 31] Compiling Shibuya.Internal.Runner.Master ( src/Shibuya/Internal/Runner/Master.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Master.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Master.dyn_o )
+[ 7 of 31] Compiling Shibuya.Core.Error ( src/Shibuya/Core/Error.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Error.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Error.dyn_o )
+[ 8 of 31] Compiling Shibuya.Policy   ( src/Shibuya/Policy.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Policy.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Policy.dyn_o )
+[ 9 of 31] Compiling Shibuya.Core.Ack ( src/Shibuya/Core/Ack.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ack.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ack.dyn_o )
+[10 of 31] Compiling Shibuya.Internal.Runner.Halt ( src/Shibuya/Internal/Runner/Halt.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Halt.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Halt.dyn_o )
+[11 of 31] Compiling Shibuya.Core.Retry ( src/Shibuya/Core/Retry.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Retry.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Retry.dyn_o )
+[12 of 31] Compiling Shibuya.Core.AckHandle ( src/Shibuya/Core/AckHandle.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/AckHandle.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/AckHandle.dyn_o )
+[13 of 31] Compiling Shibuya.Core.Ingested ( src/Shibuya/Core/Ingested.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ingested.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ingested.dyn_o )
+[14 of 31] Compiling Shibuya.Internal.Runner.Ingester ( src/Shibuya/Internal/Runner/Ingester.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Ingester.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Ingester.dyn_o )
+[15 of 31] Compiling Shibuya.Handler  ( src/Shibuya/Handler.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Handler.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Handler.dyn_o )
+[16 of 31] Compiling Shibuya.Adapter  ( src/Shibuya/Adapter.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter.dyn_o )
+[17 of 31] Compiling Shibuya.Adapter.Mock ( src/Shibuya/Adapter/Mock.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter/Mock.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter/Mock.dyn_o )
+[18 of 31] Compiling Shibuya.Batch    ( src/Shibuya/Batch.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Batch.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Batch.dyn_o )
+[19 of 31] Compiling Shibuya.Internal.Runner.Batcher ( src/Shibuya/Internal/Runner/Batcher.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Batcher.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Batcher.dyn_o )
+[20 of 31] Compiling Shibuya.Stream   ( src/Shibuya/Stream.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Stream.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Stream.dyn_o )
+[21 of 31] Compiling Shibuya.Telemetry.Effect ( src/Shibuya/Telemetry/Effect.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Effect.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Effect.dyn_o )
+[22 of 31] Compiling Shibuya.Internal.Runner.Finalize ( src/Shibuya/Internal/Runner/Finalize.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Finalize.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Finalize.dyn_o )
+[23 of 31] Compiling Shibuya.Telemetry.Propagation ( src/Shibuya/Telemetry/Propagation.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Propagation.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Propagation.dyn_o )
+[24 of 31] Compiling Shibuya.Telemetry.Semantic ( src/Shibuya/Telemetry/Semantic.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Semantic.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Semantic.dyn_o )
+[25 of 31] Compiling Shibuya.Telemetry ( src/Shibuya/Telemetry.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry.dyn_o )
+[26 of 31] Compiling Shibuya.Internal.Runner.BatchProcessor ( src/Shibuya/Internal/Runner/BatchProcessor.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/BatchProcessor.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/BatchProcessor.dyn_o )
+[27 of 31] Compiling Shibuya.Internal.Runner.Supervised ( src/Shibuya/Internal/Runner/Supervised.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Supervised.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Supervised.dyn_o )
+[28 of 31] Compiling Shibuya.Internal.App ( src/Shibuya/Internal/App.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/App.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/App.dyn_o )
+[29 of 31] Compiling Shibuya.App      ( src/Shibuya/App.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/App.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/App.dyn_o )
+[30 of 31] Compiling Shibuya          ( src/Shibuya.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya.dyn_o )
+[31 of 31] Compiling Shibuya.Core     ( src/Shibuya/Core.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core.dyn_o )
+Configuring library for shibuya-kafka-adapter-0.9.0.2...
+Preprocessing library for shibuya-kafka-adapter-0.9.0.2...
+Building library for shibuya-kafka-adapter-0.9.0.2...
+[1 of 4] Compiling Shibuya.Adapter.Kafka.Config
+[2 of 4] Compiling Shibuya.Adapter.Kafka.Convert
+[3 of 4] Compiling Shibuya.Adapter.Kafka.Internal
+[4 of 4] Compiling Shibuya.Adapter.Kafka
+Configuring test suite 'shibuya-kafka-adapter-test' for shibuya-kafka-adapter-0.9.0.2...
+Preprocessing test suite 'shibuya-kafka-adapter-test' for shibuya-kafka-adapter-0.9.0.2...
+Building test suite 'shibuya-kafka-adapter-test' for shibuya-kafka-adapter-0.9.0.2...
+[1 of 6] Compiling Kafka.TestEnv
+[2 of 6] Compiling Shibuya.Adapter.Kafka.AckHandleTest
+[3 of 6] Compiling Shibuya.Adapter.Kafka.AdapterTest
+[4 of 6] Compiling Shibuya.Adapter.Kafka.ConvertTest
+[5 of 6] Compiling Shibuya.Adapter.Kafka.IntegrationTest
+[6 of 6] Compiling Main
+[7 of 7] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-0.9.0.2/t/shibuya-kafka-adapter-test/build/shibuya-kafka-adapter-test/shibuya-kafka-adapter-test
+Running 1 test suites...
+Test suite shibuya-kafka-adapter-test: RUNNING...
+[shibuya-kafka-adapter] rebalance: shibuya-kafka-adapter
+  AckHandle
+    transient store failures retry and then succeed:                     RebalanceRevoke [(TopicName {unTopicName = "orders"},PartitionId {unPartitionId = 0})]
+OK (0.11s)
+    persistent transient store failure records fatal slot and throws:    OK (0.10s)
+    fatal store failure records fatal slot and throws after one attempt: OK
+    AckHalt pause failure records fatal slot and throws:                 OK (0.11s)
+    AckRetry seeks exact failed offset and does not store:               OK
+    AckRetry caps the consumer-lock seek timeout:                        OK
+    seek barrier prevents stale successor store:                         OK
+    earliest retry survives later retry and acknowledgement:             OK
+    one delivery cannot resolve its own retry:                           OK
+    repeated retry on one delivery is idempotent:                        OK
+    fixed-seed sequences match the earliest-unresolved reference model:  OK
+    exhausted acknowledgement throws immediately:                        OK (0.11s)
+    revocation fences an old delivery callback:                          OK
+    cancellation releases finalizer and consumer ownership:              OK
+    terminal acknowledgement failure reaches the core lifecycle:         OK (0.32s)
+    source observes fatal slot before polling:                           OK
+  Adapter
+    fatal KafkaError surfaces via Error effect:                          OK
+    non-empty prefix of Rights then Left still surfaces fatal:           OK
+  Convert
+    consumerRecordToEnvelope
+      messageId is topic-partition-offset:                               OK
+      cursor is CursorInt of offset:                                     OK
+      partition is show of partitionId:                                  OK
+      enqueuedAt from CreateTime:                                        OK
+      enqueuedAt Nothing for NoTimestamp:                                OK
+      payload is crValue:                                                OK
+      payload Nothing when crValue is Nothing:                           OK
+      traceContext extracted from headers:                               OK
+      headers surfaced verbatim (order and duplicates preserved):        OK
+      empty headers surface as Just []:                                  OK
+      attributes carry messaging.system=kafka:                           OK
+      attributes carry typed messaging.kafka.destination.partition:      OK
+      attributes carry typed messaging.kafka.message.offset:             OK
+    extractTraceHeaders
+      extracts traceparent only:                                         OK
+      extracts traceparent and tracestate:                               OK
+      returns Nothing when no traceparent:                               OK
+      returns Nothing for empty headers:                                 OK
+      extracts from materialized header list:                            OK
+    timestampToUTCTime
+      CreateTime converts to UTCTime:                                    OK
+      LogAppendTime converts to UTCTime:                                 OK
+      NoTimestamp returns Nothing:                                       OK
+      zero millis converts to epoch:                                     OK
+  Integration
+    Basic produce-consume:                                               TOPIC             STATUS
+1qjie42ygs-topic  OK
+TOPIC             STATUS
+gzg8z3mg55-topic  OK
+TOPIC             STATUS
+w4pa4gfw2p-topic  OK
+TOPIC             STATUS
+p65y81spww-topic  OK
+TOPIC             STATUS
+50trctqii6-topic  OK
+TOPIC             STATUS
+h7zuugo43x-topic  OK
+TOPIC             STATUS
+54vhjt389p-topic  OK
+TOPIC             STATUS
+9efo3ohb2o-topic  OK
+TOPIC             STATUS
+xkb9kgyciu-topic  OK
+TOPIC             STATUS
+s8zavs7n38-topic  OK
+TOPIC             STATUS
+z4yolv1ppo-topic  OK
+TOPIC             STATUS
+t1q1f4jh1y-topic  OK
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeAssign [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceAssign [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 1})]
+OK (1.10s)
+    Offset commit verification:                                          [shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "z4yolv1ppo-topic"},PartitionId {unPartitionId = 0})]
+TOPIC             STATUS
+ur7gv4qjin-topic  OK
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeRevoke [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeAssign [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0})]
+[shibuya-kafka-adapter] rebalance: RebalanceAssign [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0})]
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeRevoke [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0})]
+[shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "t1q1f4jh1y-topic"},PartitionId {unPartitionId = 0})]
+OK (10.54s)
+    Multi-partition distribution:                                        OK (1.01s)
+    Batch polling:                                                       OK (1.01s)
+    Graceful shutdown:                                                   OK (1.00s)
+    Idle graceful shutdown completes promptly:                           OK (0.45s)
+    Repeated shutdown is idempotent:                                     OK (0.45s)
+    AckRetry redelivers within the same session:                         OK (3.55s)
+    later buffered retry cannot replace the earliest recovery boundary:  OK (3.55s)
+    AckRetry is not committed past when session exits:                   OK (1.23s)
+    late callback after revocation cannot advance the broker offset:     OK (1.24s)
+    actual reassignment fences a late callback from the old owner:       OK (7.30s)
+    Handler exception redelivers instead of skipping:                    OK (1.77s)
+
+All 53 tests passed (10.54s)
+Test suite shibuya-kafka-adapter-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-0.9.0.2/t/shibuya-kafka-adapter-test/test/shibuya-kafka-adapter-0.9.0.2-shibuya-kafka-adapter-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

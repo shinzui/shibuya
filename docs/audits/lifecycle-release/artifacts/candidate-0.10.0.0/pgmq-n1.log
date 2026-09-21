@@ -1,0 +1,322 @@
+Using saved setting for 'extra-substituters = ' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-substituters'.
+Pass '--accept-flake-config' to trust it
+Using saved setting for 'extra-trusted-public-keys = ' from ~/.local/share/nix/trusted-settings.json.
+Resolving dependencies...
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.10.0.0 (lib) (first run)
+ - shibuya-pgmq-adapter-0.16.0.1 (lib) (first run)
+ - shibuya-pgmq-adapter-0.16.0.1 (test:shibuya-pgmq-adapter-test) (first run)
+Configuring library for shibuya-core-0.10.0.0...
+Preprocessing library for shibuya-core-0.10.0.0...
+Building library for shibuya-core-0.10.0.0...
+[ 1 of 31] Compiling Shibuya.Core.Lease ( src/Shibuya/Core/Lease.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Lease.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Lease.dyn_o )
+[ 2 of 31] Compiling Shibuya.Internal.Runner.KeyedScheduler ( src/Shibuya/Internal/Runner/KeyedScheduler.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/KeyedScheduler.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/KeyedScheduler.dyn_o )
+[ 3 of 31] Compiling Shibuya.Prelude  ( src/Shibuya/Prelude.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Prelude.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Prelude.dyn_o )
+[ 4 of 31] Compiling Shibuya.Core.Types ( src/Shibuya/Core/Types.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Types.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Types.dyn_o )
+[ 5 of 31] Compiling Shibuya.Core.Metrics ( src/Shibuya/Core/Metrics.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Metrics.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Metrics.dyn_o )
+[ 6 of 31] Compiling Shibuya.Internal.Runner.Master ( src/Shibuya/Internal/Runner/Master.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Master.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Master.dyn_o )
+[ 7 of 31] Compiling Shibuya.Core.Error ( src/Shibuya/Core/Error.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Error.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Error.dyn_o )
+[ 8 of 31] Compiling Shibuya.Policy   ( src/Shibuya/Policy.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Policy.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Policy.dyn_o )
+[ 9 of 31] Compiling Shibuya.Core.Ack ( src/Shibuya/Core/Ack.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ack.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ack.dyn_o )
+[10 of 31] Compiling Shibuya.Internal.Runner.Halt ( src/Shibuya/Internal/Runner/Halt.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Halt.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Halt.dyn_o )
+[11 of 31] Compiling Shibuya.Core.Retry ( src/Shibuya/Core/Retry.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Retry.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Retry.dyn_o )
+[12 of 31] Compiling Shibuya.Core.AckHandle ( src/Shibuya/Core/AckHandle.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/AckHandle.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/AckHandle.dyn_o )
+[13 of 31] Compiling Shibuya.Core.Ingested ( src/Shibuya/Core/Ingested.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ingested.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core/Ingested.dyn_o )
+[14 of 31] Compiling Shibuya.Internal.Runner.Ingester ( src/Shibuya/Internal/Runner/Ingester.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Ingester.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Ingester.dyn_o )
+[15 of 31] Compiling Shibuya.Handler  ( src/Shibuya/Handler.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Handler.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Handler.dyn_o )
+[16 of 31] Compiling Shibuya.Adapter  ( src/Shibuya/Adapter.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter.dyn_o )
+[17 of 31] Compiling Shibuya.Adapter.Mock ( src/Shibuya/Adapter/Mock.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter/Mock.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Adapter/Mock.dyn_o )
+[18 of 31] Compiling Shibuya.Batch    ( src/Shibuya/Batch.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Batch.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Batch.dyn_o )
+[19 of 31] Compiling Shibuya.Internal.Runner.Batcher ( src/Shibuya/Internal/Runner/Batcher.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Batcher.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Batcher.dyn_o )
+[20 of 31] Compiling Shibuya.Stream   ( src/Shibuya/Stream.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Stream.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Stream.dyn_o )
+[21 of 31] Compiling Shibuya.Telemetry.Effect ( src/Shibuya/Telemetry/Effect.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Effect.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Effect.dyn_o )
+[22 of 31] Compiling Shibuya.Internal.Runner.Finalize ( src/Shibuya/Internal/Runner/Finalize.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Finalize.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Finalize.dyn_o )
+[23 of 31] Compiling Shibuya.Telemetry.Propagation ( src/Shibuya/Telemetry/Propagation.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Propagation.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Propagation.dyn_o )
+[24 of 31] Compiling Shibuya.Telemetry.Semantic ( src/Shibuya/Telemetry/Semantic.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Semantic.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry/Semantic.dyn_o )
+[25 of 31] Compiling Shibuya.Telemetry ( src/Shibuya/Telemetry.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Telemetry.dyn_o )
+[26 of 31] Compiling Shibuya.Internal.Runner.BatchProcessor ( src/Shibuya/Internal/Runner/BatchProcessor.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/BatchProcessor.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/BatchProcessor.dyn_o )
+[27 of 31] Compiling Shibuya.Internal.Runner.Supervised ( src/Shibuya/Internal/Runner/Supervised.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Supervised.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/Runner/Supervised.dyn_o )
+[28 of 31] Compiling Shibuya.Internal.App ( src/Shibuya/Internal/App.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/App.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Internal/App.dyn_o )
+[29 of 31] Compiling Shibuya.App      ( src/Shibuya/App.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/App.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/App.dyn_o )
+[30 of 31] Compiling Shibuya          ( src/Shibuya.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya.dyn_o )
+[31 of 31] Compiling Shibuya.Core     ( src/Shibuya/Core.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/build/Shibuya/Core.dyn_o )
+Configuring library for shibuya-pgmq-adapter-0.16.0.1...
+Preprocessing library for shibuya-pgmq-adapter-0.16.0.1...
+Building library for shibuya-pgmq-adapter-0.16.0.1...
+[1 of 4] Compiling Shibuya.Adapter.Pgmq.Config ( src/Shibuya/Adapter/Pgmq/Config.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Config.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Config.dyn_o )
+[2 of 4] Compiling Shibuya.Adapter.Pgmq.Convert ( src/Shibuya/Adapter/Pgmq/Convert.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Convert.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Convert.dyn_o )
+[3 of 4] Compiling Shibuya.Adapter.Pgmq.Internal ( src/Shibuya/Adapter/Pgmq/Internal.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Internal.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq/Internal.dyn_o )
+[4 of 4] Compiling Shibuya.Adapter.Pgmq ( src/Shibuya/Adapter/Pgmq.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/build/Shibuya/Adapter/Pgmq.dyn_o )
+Configuring test suite 'shibuya-pgmq-adapter-test' for shibuya-pgmq-adapter-0.16.0.1...
+Preprocessing test suite 'shibuya-pgmq-adapter-test' for shibuya-pgmq-adapter-0.16.0.1...
+Building test suite 'shibuya-pgmq-adapter-test' for shibuya-pgmq-adapter-0.16.0.1...
+[ 1 of 13] Compiling Shibuya.Adapter.Pgmq.Config ( src/Shibuya/Adapter/Pgmq/Config.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Config.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Config.dyn_o )
+[ 2 of 13] Compiling Shibuya.Adapter.Pgmq.Convert ( src/Shibuya/Adapter/Pgmq/Convert.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Convert.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Convert.dyn_o )
+[ 3 of 13] Compiling Shibuya.Adapter.Pgmq.ConvertSpec ( test/Shibuya/Adapter/Pgmq/ConvertSpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ConvertSpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ConvertSpec.dyn_o )
+[ 4 of 13] Compiling Shibuya.Adapter.Pgmq.Internal ( src/Shibuya/Adapter/Pgmq/Internal.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Internal.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/Internal.dyn_o )
+[ 5 of 13] Compiling Shibuya.Adapter.Pgmq ( src/Shibuya/Adapter/Pgmq.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq.dyn_o )
+[ 6 of 13] Compiling Shibuya.Adapter.Pgmq.ConfigSpec ( test/Shibuya/Adapter/Pgmq/ConfigSpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ConfigSpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ConfigSpec.dyn_o )
+[ 7 of 13] Compiling Shibuya.Adapter.Pgmq.InternalSpec ( test/Shibuya/Adapter/Pgmq/InternalSpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/InternalSpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/InternalSpec.dyn_o )
+[ 8 of 13] Compiling Shibuya.Adapter.Pgmq.PropertySpec ( test/Shibuya/Adapter/Pgmq/PropertySpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/PropertySpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/PropertySpec.dyn_o )
+[ 9 of 13] Compiling TmpPostgres      ( test/TmpPostgres.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/TmpPostgres.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/TmpPostgres.dyn_o )
+[10 of 13] Compiling TestUtils        ( test/TestUtils.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/TestUtils.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/TestUtils.dyn_o )
+[11 of 13] Compiling Shibuya.Adapter.Pgmq.IntegrationSpec ( test/Shibuya/Adapter/Pgmq/IntegrationSpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/IntegrationSpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/IntegrationSpec.dyn_o )
+[12 of 13] Compiling Shibuya.Adapter.Pgmq.ChaosSpec ( test/Shibuya/Adapter/Pgmq/ChaosSpec.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ChaosSpec.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Shibuya/Adapter/Pgmq/ChaosSpec.dyn_o )
+[13 of 13] Compiling Main             ( test/Main.hs, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Main.o, /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test-tmp/Main.dyn_o )
+[14 of 14] Linking /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/build/shibuya-pgmq-adapter-test/shibuya-pgmq-adapter-test
+Running 1 test suites...
+Test suite shibuya-pgmq-adapter-test: RUNNING...
+
+Unit Tests
+  Shibuya.Adapter.Pgmq.Convert
+    messageIdToShibuya
+      converts positive Int64 to Text [✔]
+      converts zero [✔]
+      converts negative Int64 [✔]
+      converts Int64 max bound [✔]
+      converts Int64 min bound [✔]
+    messageIdToPgmq
+      parses valid positive number [✔]
+      parses valid negative number [✔]
+      rejects empty string [✔]
+      rejects non-numeric text [✔]
+      rejects mixed text [✔]
+      rejects trailing whitespace [✔]
+      handles leading whitespace (reads accepts it) [✔]
+      rejects decimal numbers [✔]
+      handles overflow values (implementation wraps) [✔]
+      roundtrips correctly [✔]
+        +++ OK, passed 100 tests.
+    pgmqMessageIdToCursor
+      creates CursorInt from MessageId [✔]
+      handles zero [✔]
+      handles large values [✔]
+    extractPartition via pgmqMessageToEnvelope
+      extracts x-pgmq-group from headers object [✔]
+      returns Nothing when headers is Nothing [✔]
+      returns Nothing when headers is not an object [✔]
+      returns Nothing when x-pgmq-group key is missing [✔]
+      returns Nothing when x-pgmq-group is not a string [✔]
+      handles empty string partition [✔]
+    extractTraceHeaders
+      extracts traceparent header only [✔]
+      extracts both traceparent and tracestate headers [✔]
+      returns Nothing when headers is Nothing [✔]
+      returns Nothing when headers is not an object [✔]
+      returns Nothing when traceparent is missing [✔]
+      returns Nothing when traceparent is not a string [✔]
+      ignores tracestate when it's not a string [✔]
+      handles empty traceparent string [✔]
+      preserves traceparent with other headers present [✔]
+    pgmqMessageToEnvelope
+      sets messageId from pgmq message [✔]
+      sets cursor from messageId [✔]
+      sets enqueuedAt from pgmq message [✔]
+      extracts payload from body [✔]
+      extracts partition from headers [✔]
+      sets partition to Nothing when no headers [✔]
+      extracts traceContext from headers with traceparent [✔]
+      extracts traceContext with both traceparent and tracestate [✔]
+      sets traceContext to Nothing when no headers [✔]
+      sets traceContext to Nothing when no traceparent in headers [✔]
+      does not surface broker headers (headers is Nothing) when no headers [✔]
+      leaves headers Nothing even when the JSONB headers object is non-empty [✔]
+      attempt field
+        first delivery (readCount=1) -> Attempt 0 [✔]
+        first retry (readCount=2) -> Attempt 1 [✔]
+        fifth read (readCount=5) -> Attempt 4 [✔]
+        boundary readCount=0 clamps to Attempt 0 [✔]
+    mkDlqPayload
+      without metadata
+        includes original_message [✔]
+        includes dead_letter_reason [✔]
+        always includes structured reason fields [✔]
+        does not include original_message_id [✔]
+        does not include read_count [✔]
+      with metadata
+        includes original_message_id [✔]
+        includes original_enqueued_at [✔]
+        includes read_count [✔]
+        includes original_headers [✔]
+        includes last_read_at [✔]
+        retains all reason fields unchanged [✔]
+      reason fields
+        writes the exact PoisonPill object [✔]
+        writes the exact InvalidPayload object [✔]
+        writes the exact MaxRetriesExceeded object with null detail [✔]
+        writes the exact ApplicationFailure object [✔]
+        preserves empty application detail as an empty string [✔]
+        preserves Unicode, quotes, backslashes, and colons in structured detail [✔]
+  Shibuya.Adapter.Pgmq.Config
+    defaultConfig
+      sets queueName from parameter [✔]
+      sets visibilityTimeout to 30 [✔]
+      sets batchSize to 1 [✔]
+      uses StandardPolling with 1 second interval [✔]
+      uses the default poll retry policy [✔]
+      uses the default ack retry policy [✔]
+      sets deadLetterConfig to Nothing [✔]
+      sets haltVisibilityTimeout to Nothing [✔]
+      sets maxRetries to 3 [✔]
+      sets fifoConfig to Nothing [✔]
+    defaultPollingConfig
+      is StandardPolling [✔]
+      has 1 second interval [✔]
+    defaultPollRetryConfig
+      retries five total attempts by default [✔]
+      starts with a 100ms backoff [✔]
+      caps backoff at five seconds [✔]
+    validateConfig
+      accepts the default config [✔]
+      rejects batchSize below one [✔]
+      rejects visibilityTimeout below one [✔]
+      rejects non-positive standard polling interval [✔]
+      rejects invalid long polling fields [✔]
+      rejects negative maxRetries but accepts zero [✔]
+      rejects invalid halt visibility timeout [✔]
+      rejects invalid retry policies [✔]
+    DeadLetterTarget
+      DirectQueue holds a queue name [✔]
+      TopicRoute holds a routing key [✔]
+      DirectQueue and TopicRoute are not equal [✔]
+    Smart constructors
+      directDeadLetter
+        creates a DeadLetterConfig with DirectQueue target [✔]
+        sets includeMetadata correctly [✔]
+      topicDeadLetter
+        creates a DeadLetterConfig with TopicRoute target [✔]
+        sets includeMetadata correctly [✔]
+    parseQueueName
+      accepts lowercase names and rejects uppercase and empty names [✔]
+  Shibuya.Adapter.Pgmq.Internal
+    nominalToSeconds
+      converts whole seconds [✔]
+      rounds up fractional seconds [✔]
+      rounds up small fractions [✔]
+      handles zero [✔]
+      handles negative (rounds toward positive infinity) [✔]
+      clamping
+        exact 30 seconds passes through [✔]
+        rounds up subsecond [✔]
+        clamps a 100-year delay to maxBound :: Int32 [✔]
+        clamps a very large negative delay to minBound :: Int32 [✔]
+    mkReadMessage
+      sets queueName from config [✔]
+      sets delay to visibilityTimeout [✔]
+      sets batchSize from config [✔]
+      sets conditional to Nothing [✔]
+    mkReadWithPoll
+      sets queueName from config [✔]
+      sets delay to visibilityTimeout [✔]
+      sets batchSize from config [✔]
+      sets maxPollSeconds from parameter [✔]
+      sets pollIntervalMs from parameter [✔]
+      sets conditional to Nothing [✔]
+    mkReadGrouped
+      sets queueName from config [✔]
+      sets visibilityTimeout from config [✔]
+      sets qty to batchSize [✔]
+    pgmqChunks FIFO dispatch
+      selects throughput standard [✔]
+      selects round-robin standard [✔]
+      selects head-per-group standard [✔]
+      selects throughput long poll [✔]
+      selects round-robin long poll [✔]
+      selects head-per-group long poll [✔]
+    pgmqChunks poll retry
+      retries transient poll errors and returns the successful batch [✔]
+      does not retry permanent poll errors [✔]
+      stops retrying after maxAttempts is exhausted [✔]
+    lease renewal retry
+      recovers from a transient renewal outage within the configured budget [✔]
+    finalizeAutoDeadLetter
+      calls the auto-DLQ hook only after finalize succeeds [✔]
+      calls the ack-failure hook without reporting auto-DLQ success when finalize fails [✔]
+    mergeDlqHeaders
+      with no consumer headers, forwards original headers verbatim [✔]
+      with no consumer headers and no original, returns Nothing [✔]
+      consumer's traceparent overrides original's, original moves under x-shibuya-upstream-traceparent [✔]
+      consumer's headers carry through when original headers are absent [✔]
+      original's tracestate is stashed even when consumer has no tracestate [✔]
+      leniently decodes non-UTF8 trace headers [✔]
+Property Tests
+  Shibuya.Adapter.Pgmq Properties
+    MessageId conversion properties
+      roundtrips all Int64 values [✔]
+        +++ OK, passed 100 tests.
+      messageIdToShibuya is injective [✔]
+        +++ OK, passed 100 tests; 1 discarded.
+    Cursor conversion properties
+      preserves value for positive Int64 [✔]
+        +++ OK, passed 100 tests.
+    Envelope construction properties
+      preserves messageId [✔]
+        +++ OK, passed 100 tests.
+      always sets cursor to Just [✔]
+        +++ OK, passed 100 tests.
+      always sets enqueuedAt to Just [✔]
+        +++ OK, passed 100 tests.
+    DLQ payload properties
+      always includes original_message key [✔]
+        +++ OK, passed 100 tests.
+      always includes dead_letter_reason key [✔]
+        +++ OK, passed 100 tests.
+      writes all reason fields from Shibuya's total public projections [✔]
+        +++ OK, passed 100 tests.
+      metadata keys present iff includeMeta is True [✔]
+        +++ OK, passed 100 tests.
+Integration Tests
+  Integration
+    Basic message processing
+      can send and read messages directly via session [✔]
+      can send and read messages directly via effectful [✔]
+      processes a single message and deletes it [✔]
+      processes multiple messages in order [✔]
+    Visibility timeout
+      message reappears after visibility timeout [✔]
+      lease extension is a no-op after the message is deleted [✔]
+    Retry handling
+      set_vt extends visibility timeout (simulating AckRetry) [✔]
+    Grouped-head FIFO reads
+      leases at most one absolute head per group and advances only a settled group [✔]
+      lets another group advance while a delayed absolute head blocks its successor [✔]
+Chaos Tests
+  Chaos
+    Poison messages
+      handler exception causes message to be retried [✔]
+      AckDeadLetter sends message to DLQ when configured [✔]
+DLQ-PAYLOAD-SIZE-DIAG: dualWriteJsonb=321B legacyJsonb=168B delta=153B
+      preserves an application reason as queryable JSONB fields [✔]
+      preserves trace headers when moving to DLQ [✔]
+      AckDeadLetter is idempotent after a successful finalize [✔]
+      a discarded DLQ commit confirmation can be retried without creating a second copy [✔]
+      concurrent finalization of one delivery converges on one durable DLQ move [✔]
+      cancellation releases finalizer ownership so the same handle can retry [✔]
+      a failed DLQ move remains recoverable and reaches the core lifecycle [✔]
+      a failed automatic DLQ move calls the failure hook and remains visible [✔]
+      AckOk is idempotent after a successful finalize [✔]
+      AckHalt uses haltVisibilityTimeout when configured [✔]
+    Long-running handlers
+      message stays invisible while being processed [✔]
+    Graceful shutdown
+      drains an idle queue instead of waiting for the timeout [✔]
+      returns the same completed result for a repeated shutdown [✔]
+      processes in-flight messages during shutdown [✔]
+      stops accepting new messages after shutdown signal [✔]
+    Prefetch
+      drains the queue under concurrent prefetch without deadlocking [✔]
+PREFETCH-SHUTDOWN-DIAG: off(total=40 processed=3 visible=34 held=3) on(total=40 processed=3 visible=26 held=11)
+      strands only a bounded (<= one prefetch buffer) number of extra messages invisible on shutdown [✔]
+PREFETCH-NOLOSS-DIAG: total=20 processed=0 recoverableAfterVT=20
+      loses no messages under prefetch: stranded messages are all redelivered after the VT [✔]
+  Database restart
+    reconnects and redelivers an unacknowledged message after its lease expires [✔]
+
+Finished in 55.2058 seconds
+177 examples, 0 failures
+Test suite shibuya-pgmq-adapter-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-0.16.0.1/t/shibuya-pgmq-adapter-test/test/shibuya-pgmq-adapter-0.16.0.1-shibuya-pgmq-adapter-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

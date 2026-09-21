@@ -1,0 +1,114 @@
+Using saved setting for 'extra-substituters = https://shinzui.cachix.org' from ~/.local/share/nix/trusted-settings.json.
+Using saved setting for 'extra-trusted-public-keys = shinzui.cachix.org-1:QEmAoJrA9WwLP0uxfDgktLi2BRrcvQQWdz8NzcMg4/E=' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-trusted-public-keys'.
+Pass '--accept-flake-config' to trust it
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-kafka-adapter-0.9.0.2 (test:shibuya-kafka-adapter-test) (first run)
+Preprocessing test suite 'shibuya-kafka-adapter-test' for shibuya-kafka-adapter-0.9.0.2...
+Building test suite 'shibuya-kafka-adapter-test' for shibuya-kafka-adapter-0.9.0.2...
+Running 1 test suites...
+Test suite shibuya-kafka-adapter-test: RUNNING...
+[shshibuya-kafka-adapter
+ib  AckHandle
+uya-k    transient store failures retry and then succeed:                     afka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "orders"},PartitionId {unPartitionId = 0})]
+OK (0.10s)
+    persistent transient store failure records fatal slot and throws:    OK (0.10s)
+    fatal store failure records fatal slot and throws after one attempt: OK
+    AckHalt pause failure records fatal slot and throws:                 OK (0.10s)
+    AckRetry seeks exact failed offset and does not store:               OK
+    AckRetry caps the consumer-lock seek timeout:                        OK
+    seek barrier prevents stale successor store:                         OK
+    earliest retry survives later retry and acknowledgement:             OK
+    one delivery cannot resolve its own retry:                           OK
+    repeated retry on one delivery is idempotent:                        OK
+    fixed-seed sequences match the earliest-unresolved reference model:  OK
+    exhausted acknowledgement throws immediately:                        OK (0.10s)
+    revocation fences an old delivery callback:                          OK
+    cancellation releases finalizer and consumer ownership:              OK
+    terminal acknowledgement failure reaches the core lifecycle:         OK (0.31s)
+    source observes fatal slot before polling:                           OK
+  Adapter
+    fatal KafkaError surfaces via Error effect:                          OK
+    non-empty prefix of Rights then Left still surfaces fatal:           OK
+  Convert
+    consumerRecordToEnvelope
+      messageId is topic-partition-offset:                               OK
+      cursor is CursorInt of offset:                                     OK
+      partition is show of partitionId:                                  OK
+      enqueuedAt from CreateTime:                                        OK
+      enqueuedAt Nothing for NoTimestamp:                                OK
+      payload is crValue:                                                OK
+      payload Nothing when crValue is Nothing:                           OK
+      traceContext extracted from headers:                               OK
+      headers surfaced verbatim (order and duplicates preserved):        OK
+      empty headers surface as Just []:                                  OK
+      attributes carry messaging.system=kafka:                           OK
+      attributes carry typed messaging.kafka.destination.partition:      OK
+      attributes carry typed messaging.kafka.message.offset:             OK
+    extractTraceHeaders
+      extracts traceparent only:                                         OK
+      extracts traceparent and tracestate:                               OK
+      returns Nothing when no traceparent:                               OK
+      returns Nothing for empty headers:                                 OK
+      extracts from materialized header list:                            OK
+    timestampToUTCTime
+      CreateTime converts to UTCTime:                                    OK
+      LogAppendTime converts to UTCTime:                                 OK
+      NoTimestamp returns Nothing:                                       OK
+      zero millis converts to epoch:                                     OK
+  Integration
+    Basic produce-consume:                                               TOPIC             STATUS
+ddebpr4ixw-topic  OK
+TOPIC             STATUS
+7itqoikjb6-topic  OK
+TOPIC             STATUS
+qt6hkd2l8x-topic  OK
+TOPIC             STATUS
+2o19h36a5k-topic  OK
+TOPIC             STATUS
+jdlaabcwhd-topic  OK
+TOPIC             STATUS
+s7zb1qgxyb-topic  OK
+TOPIC             STATUS
+igohyi4qxz-topic  OK
+TOPIC             STATUS
+m7zeyfyeqc-topic  OK
+TOPIC             STATUS
+ov0utwozbl-topic  OK
+TOPIC             STATUS
+nmf05hy8n8-topic  OK
+TOPIC             STATUS
+gktm8fvhae-topic  OK
+TOPIC             STATUS
+su4x75v8lt-topic  OK
+OK (0.88s)
+    Offset commit verification:                                          [shibuya-kafka-adapter] rebalance: RebalanceBeforeAssign [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceAssign [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+TOPIC             STATUS
+eob6vkakff-topic  OK
+[shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "gktm8fvhae-topic"},PartitionId {unPartitionId = 0})]
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeRevoke [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 0}),(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeAssign [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceAssign [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceBeforeRevoke [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+[shibuya-kafka-adapter] rebalance: RebalanceRevoke [(TopicName {unTopicName = "su4x75v8lt-topic"},PartitionId {unPartitionId = 1})]
+OK (10.42s)
+    Multi-partition distribution:                                        OK (0.88s)
+    Batch polling:                                                       OK (0.88s)
+    Graceful shutdown:                                                   OK (0.88s)
+    Idle graceful shutdown completes promptly:                           OK (0.42s)
+    Repeated shutdown is idempotent:                                     OK (0.42s)
+    AckRetry redelivers within the same session:                         OK (3.51s)
+    later buffered retry cannot replace the earliest recovery boundary:  OK (3.49s)
+    AckRetry is not committed past when session exits:                   OK (1.24s)
+    late callback after revocation cannot advance the broker offset:     OK (1.24s)
+    actual reassignment fences a late callback from the old owner:       OK (7.29s)
+    Handler exception redelivers instead of skipping:                    OK (1.75s)
+
+All 53 tests passed (10.43s)
+Test suite shibuya-kafka-adapter-test: PASS
+Test suite logged to:
+/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-0.9.0.2/t/shibuya-kafka-adapter-test/test/shibuya-kafka-adapter-0.9.0.2-shibuya-kafka-adapter-test.log
+1 of 1 test suites (1 of 1 test cases) passed.
