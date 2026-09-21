@@ -148,9 +148,9 @@ function empiricalEnvelope(summaries: ReturnType<typeof summarize>[], rts: strin
     );
   }
   bytesPerAdditionalKey = Math.max(0, Math.ceil(bytesPerAdditionalKey));
-  const fixedBytes = Math.ceil(
+  const fixedBytes = Math.max(0, Math.ceil(
     Math.max(...selected.map((summary) => summary.maxLiveBytes.maximum - bytesPerAdditionalKey * summary.messages)),
-  );
+  ));
   return {
     rtsFlags: `-${rts} -T -A32m`,
     testedMessageRange: [selected[0]!.messages, selected[selected.length - 1]!.messages],
