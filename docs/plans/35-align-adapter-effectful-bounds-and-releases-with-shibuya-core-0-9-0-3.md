@@ -27,6 +27,11 @@ provenance:
       at: 2026-09-20T13:46:21Z
       mode: "update"
       note: "Target core release moves to provisional 0.9.0.4; title and file name kept for stable identity"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-09-21T06:00:00Z
+      mode: "implement"
+      note: "Completed source bounds, dual-family tests, explicit rejection, and the combined solve; adapter publications remain coordinated with the lifecycle candidate version."
 ---
 
 # Align adapter effectful bounds and releases with shibuya-core 0.9.0.3
@@ -65,10 +70,10 @@ required no adapter change.
 
 ## Progress
 
-- [ ] Milestone 1: shibuya-pgmq-adapter widened to admit effectful-core 2.7.1.1 and later, tested on both families, released as 0.16.0.1.
-- [ ] Milestone 2: shibuya-kafka-adapter tightened to exclude effectful-core 2.7.0.x and 2.7.1.0, tested, released as 0.9.0.2.
-- [ ] Milestone 3: shibuya-kiroku-adapter widened, or the kiroku-store blocker recorded with the exact bound to apply when it lifts.
-- [ ] Milestone 4: combined-solve proof recorded for both families and the rejected version.
+- [ ] Milestone 1: shibuya-pgmq-adapter source and dual-family tests complete at `9247388`; release remains pending coordinated candidate versioning.
+- [ ] Milestone 2: shibuya-kafka-adapter source and dual-family tests complete at `1c455b5`; release remains pending coordinated candidate versioning.
+- [ ] Milestone 3: kiroku-store and shibuya-kiroku-adapter source and dual-family tests complete at `0dcd092` plus `f91bb05`; release remains pending coordinated candidate versioning.
+- [x] (2026-09-21 UTC) Milestone 4: combined local-source solve accepts effectful-core 2.6.1.0 and 2.7.1.2 and rejects 2.7.1.0 at kiroku-store's bound.
 
 
 ## Surprises & Discoveries
@@ -76,7 +81,16 @@ required no adapter change.
 Document unexpected behaviors, bugs, optimizations, or insights discovered during
 implementation. Provide concise evidence.
 
-(None yet.)
+- 2026-09-21: Kiroku's initial widening removed the transitive `<2.7` blocker in both
+  `kiroku-store` and `shibuya-kiroku-adapter`, but the broad `>=2.6 && <2.8` range also admitted
+  the two releases this plan exists to exclude. A follow-up applies the cohort's disjoint range
+  to every store/adapter component and adds a direct `effectful-core` constraint to the adapter
+  test stanza, whose umbrella `effectful` dependency alone could not express the exclusion.
+
+- 2026-09-21: The PGMQ example's `effectful ^>=2.6.1.0` constraints meant “2.6 only” and
+  prevented its first 2.7.1.2 solve even though every direct core bound was correct. Widening
+  the umbrella package to `>=2.6.1 && <2.8` while retaining the direct disjoint core constraint
+  produces the intended two-family solve.
 
 
 ## Decision Log
@@ -96,7 +110,22 @@ implementation. Provide concise evidence.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+The version-neutral compatibility work is complete. PGMQ commit `9247388`, Kafka commit
+`1c455b5`, and Kiroku commits `0dcd092` plus `f91bb05` apply the safe Effectful ranges across
+their current library, test, example, benchmark, and lifecycle-fixture components. Kafka and
+PGMQ pass their full live-service adapter suites under effectful-core 2.7.1.2. Kiroku's adapter
+and 42-module store suites pass under 2.7.1.2. Formatting, package checks, and all three flake
+checks pass; Kafka's distributable default Nix package also builds.
+
+A single local-source project containing Shibuya Core, all three adapters, kiroku-store, and
+the Kiroku support packages accepts effectful-core 2.6.1.0 and 2.7.1.2. Its 2.7.1.0 solve is
+rejected by `kiroku-store => effectful-core>=2.6.1 && <2.7 || >=2.7.1.1 && <2.8`, proving the
+cohort cannot silently select the regressed release.
+
+No package was tagged or published. The three publication milestones remain open because the
+same repositories must next admit the breaking Shibuya lifecycle candidate; issuing separate
+patch releases immediately before that coordinated candidate requires the release owner's
+version decision.
 
 
 ## Context and Orientation
@@ -380,3 +409,7 @@ release to shibuya-core 0.9.0.3. Plan 33 now ships the urgent runtime fix alone 
 plan 34 owns the following dependency-bound patch.
 
 2026-09-20 UTC: Moved the target core release from 0.9.0.3 to the provisional 0.9.0.4, because 0.9.0.3 was published by the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md and plan 34's dependency-bound release now follows it. The title, file name and earlier revision notes keep 0.9.0.3 for stable identity and as history.
+
+2026-09-21 UTC: Completed all source, solver, test, package, and flake compatibility gates for
+the three adapters and closed the former kiroku-store blocker. Publications remain deliberately
+open and are coordinated with EP-44's candidate version; no tag or upload is claimed.

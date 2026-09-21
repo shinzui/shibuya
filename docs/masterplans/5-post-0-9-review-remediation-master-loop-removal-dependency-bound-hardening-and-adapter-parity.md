@@ -139,7 +139,7 @@ dependency bumps) still require ADR records when their owning work completes.
 |---|-------|------|-----------|-----------|--------|
 | 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | Complete |
 | 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | In Progress (M1-M3 complete; release pending version coordination) |
-| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | Not Started |
+| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | In Progress (compatibility gates pass; releases pending version coordination) |
 | 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Not Started |
 
 Status values: Not Started, In Progress, Complete, Cancelled; parenthetical notes describe the current milestone.
@@ -210,10 +210,10 @@ dependency bump is benchmark-gated regardless of PVP bump level.
 - [x] (2026-09-20 UTC) EP-1: documentation no longer describes the master as an actor
 - [x] (2026-09-20 UTC) EP-1: shibuya-core and shibuya-metrics 0.9.0.2 released with the runtime fix
 - [x] (2026-09-20 UTC) EP-1: `mls-service-v2` single-processor subcommands run past the crash point
-- [ ] EP-3: shibuya-pgmq-adapter bound widened and released
-- [ ] EP-3: shibuya-kafka-adapter bound tightened and released
-- [ ] EP-3: shibuya-kiroku-adapter bound widened and released, or its blocker on kiroku-store recorded
-- [ ] EP-3: combined solve of core plus adapters proven on effectful 2.6.1 and 2.7.1.2, and rejected on 2.7.1.0
+- [ ] EP-3: shibuya-pgmq-adapter bound widened and tested at `9247388`; release pending
+- [ ] EP-3: shibuya-kafka-adapter bound tightened and tested at `1c455b5`; release pending
+- [ ] EP-3: kiroku-store and shibuya-kiroku-adapter widened and tested at `0dcd092` plus `f91bb05`; release pending
+- [x] (2026-09-21 UTC) EP-3: combined solve of core plus adapters proven on effectful 2.6.1 and 2.7.1.2, and rejected on 2.7.1.0
 - [ ] EP-4: message-db adapter builds against shibuya-core 0.9
 - [ ] EP-4: dead-letter metadata carries structured code and detail; `ApplicationFailure` round-trips through a real database
 - [ ] EP-4: examples and tests migrated; 0.2.0.0 tagged
