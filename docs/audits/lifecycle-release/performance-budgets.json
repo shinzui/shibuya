@@ -4,6 +4,25 @@
   "confidenceLevel": 0.95,
   "bootstrapIterations": 10000,
   "resamplingSeed": 20260920,
+  "requiredScenarios": [
+    "serial-small-inbox",
+    "serial-full-inbox",
+    "serial-fixed-rate",
+    "ahead-uniform-keys",
+    "async-hot-key",
+    "async-high-cardinality",
+    "batch-size",
+    "batch-timeout",
+    "retry-path",
+    "dead-letter-path",
+    "idle-worker",
+    "metrics-disabled",
+    "metrics-enabled",
+    "health-poll-proxy",
+    "websocket-churn-proxy",
+    "graceful-shutdown-drain",
+    "startup-shutdown"
+  ],
   "calibration": {
     "date": "2026-09-20",
     "sourceArtifacts": [
@@ -13,6 +32,9 @@
     "idleCpuPercentObservedRange": [2.2562517224438934, 3.712247903603686],
     "idleMaxLiveBytesObservedRange": [53184, 87552],
     "rationale": "Absolute idle limits were calibrated from ten pre-remediation samples under both -N1 and -N4 before any candidate measurement. The CPU maximum rounds the observed 3.71% ceiling up to 4%; the live-memory maximum is the next power-of-two ceiling above the observed 87,552 bytes."
+  },
+  "applicability": {
+    "shutdownLatencyMs": "The 10% relative gate applies to startup-shutdown and graceful-shutdown-drain. Other scenarios stop only after all work has drained, producing a single 8-90 microsecond cancellation observation rather than a shutdown-under-workload measurement."
   },
   "metrics": {
     "throughputPerSecond": {
@@ -57,7 +79,21 @@
     }
   },
   "scenarioExclusions": {
-    "idle-worker": ["throughputPerSecond"],
-    "startup-shutdown": ["throughputPerSecond", "latencyP95Ms", "latencyP99Ms"]
+    "ahead-uniform-keys": ["shutdownLatencyMs"],
+    "async-high-cardinality": ["shutdownLatencyMs"],
+    "async-hot-key": ["shutdownLatencyMs"],
+    "batch-size": ["shutdownLatencyMs"],
+    "batch-timeout": ["shutdownLatencyMs"],
+    "dead-letter-path": ["shutdownLatencyMs"],
+    "health-poll-proxy": ["shutdownLatencyMs"],
+    "idle-worker": ["throughputPerSecond", "shutdownLatencyMs"],
+    "metrics-disabled": ["shutdownLatencyMs"],
+    "metrics-enabled": ["shutdownLatencyMs"],
+    "retry-path": ["shutdownLatencyMs"],
+    "serial-fixed-rate": ["shutdownLatencyMs"],
+    "serial-full-inbox": ["shutdownLatencyMs"],
+    "serial-small-inbox": ["shutdownLatencyMs"],
+    "startup-shutdown": ["throughputPerSecond", "latencyP95Ms", "latencyP99Ms"],
+    "websocket-churn-proxy": ["shutdownLatencyMs"]
   }
 }

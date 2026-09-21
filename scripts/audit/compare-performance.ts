@@ -61,6 +61,7 @@ export interface PerformanceBudgets {
   confidenceLevel: number;
   bootstrapIterations: number;
   resamplingSeed: number;
+  requiredScenarios?: string[];
   metrics: Record<string, MetricPolicy>;
   scenarioMetrics?: Record<string, Record<string, MetricPolicy>>;
   scenarioExclusions?: Record<string, string[]>;
@@ -395,6 +396,10 @@ export function comparePerformance(
   if (baseline.source.solverPlanHash !== candidate.source.solverPlanHash) errors.push("solver plan hash mismatch");
 
   const pairsByScenario = pairSamples(baseline, candidate, budgets.minimumPairs, errors);
+  const requiredScenarios = budgets.requiredScenarios ?? [];
+  for (const scenario of new Set(requiredScenarios)) {
+    if (!pairsByScenario.has(scenario)) errors.push(`required scenario missing: ${scenario}`);
+  }
   const results: MetricVerdict[] = [];
   let seedOffset = 0;
   for (const [scenario, pairs] of [...pairsByScenario.entries()].sort(([left], [right]) => left.localeCompare(right))) {

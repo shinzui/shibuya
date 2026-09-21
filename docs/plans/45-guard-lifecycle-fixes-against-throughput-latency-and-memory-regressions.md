@@ -33,6 +33,11 @@ provenance:
       at: 2026-09-20T23:39:00Z
       mode: "implement"
       note: "Profiled and remediated candidate hot-path regressions before immutable pass-two capture"
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-20T23:59:46Z
+      mode: "implement"
+      note: "Replace post-drain microtiming with mandatory public graceful-drain evidence"
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -100,6 +105,17 @@ completion path uses one fetch-and-add with a cold underflow repair. The final f
 allocation ratio; p95 and p99 ratios were 0.9985 and 0.9987. Live-heap and shutdown results
 were too noisy at this scale and remain obligations of the full matrix and soak.
 
+2026-09-20: The first full version-2 N1 capture exposed a second measurement defect. With 30
+pairs, 80 cells passed, 12 remained inconclusive, and `serial-small-inbox` shutdown failed the
+relative gate; however, the apparent 23.7% regression was a difference between one post-drain
+`stopMaster` observation of roughly 11 and 14 microseconds. Every message-flow scenario waited
+for completion before starting that timer, so none measured draining work. Workload version 3
+adds `graceful-shutdown-drain`, which invokes public `runApp` and `stopAppGracefully` with a
+bounded backlog and requires all 1,000 messages to finish and acknowledge. The unchanged 10%
+shutdown budget applies to that scenario and repeated `startup-shutdown`; post-drain scenarios
+retain their raw stop measurement but exclude it from verdicts. A smoke run measured a
+meaningful 1.36-second drain in both baseline and candidate instead of microsecond noise.
+
 
 ## Decision Log
 
@@ -134,6 +150,13 @@ experiment improved the same benchmark but failed the existing halt-wakes-idle-i
 regression, so it was discarded before candidate capture. Performance remediation may change
 representation and cold-path placement, but may not restore an audited lifecycle defect.
 
+2026-09-20: Use workload version 3 for final evidence and make its complete 17-scenario catalog
+mandatory in the comparator. This does not change the 5%/10% limits or excuse the observed
+version-2 result. It replaces an inapplicable post-drain timing with two stricter shutdown
+measurements: 1,000 repeated cold startup/stops and a public graceful drain with live backlog.
+The comparator now rejects even a mutually omitted baseline/candidate scenario, closing the
+possibility that matching partial datasets could certify a release.
+
 
 ## Outcomes & Retrospective
 
@@ -141,8 +164,9 @@ representation and cold-path placement, but may not restore an audited lifecycle
 Pass one is complete and paused. It has a compiled production-runner workload catalog, a
 deterministic paired bootstrap comparator, and 320 raw pre-remediation samples: ten runs for
 each of 16 scenarios under both `-N1` and `-N4`, with zero dropped acknowledgements. The
-comparator's seven synthetic tests prove pass, fail, inconclusive, environment-mismatch,
-dropped-work, absolute-budget, deterministic-seed, and calibration-misuse behavior. No candidate
+comparator's eight synthetic tests prove pass, fail, inconclusive, environment-mismatch,
+dropped-work, mandatory-scenario, absolute-budget, deterministic-seed, and calibration-misuse
+behavior. No candidate
 performance verdict exists yet; pass two must recapture this baseline in alternating order with
 the integrated candidate.
 
@@ -208,7 +232,7 @@ bun test scripts/audit/compare-performance.test.ts
 bun scripts/audit/compare-performance.ts --baseline baseline.json --candidate candidate.json --budgets docs/audits/lifecycle-release/performance-budgets.json
 ```
 
-The first build command succeeds under GHC 9.12.4. The comparator test command reports seven
+The first build command succeeds under GHC 9.12.4. The comparator test command reports eight
 passing tests. The smoke command emits one JSON object whose `expected`, `completed`, and
 `acknowledged` values are all 200. The two capture commands, differing only in `--rts`,
 `--capabilities`, `--label`, and output name, wrote 160 samples each and no sample lost work.
@@ -263,3 +287,11 @@ those workloads symmetrically for baseline and candidate. Optimized ticky profil
 and removed per-message closure retention and EP-39 activity-accounting atomics while preserving
 idle-intake wakeup correctness. A 20-pair focused N1 serial-full comparison passes the original
 budgets; the immutable all-scenario N1/N4 capture, live services, and soak remain open.
+
+2026-09-20 UTC: Rejected the first full version-2 N1 capture after 30 pairs showed that ordinary
+scenario shutdown values were single post-drain 8-90 microsecond observations, not drain
+latency. Version 3 adds a public `runApp`/`stopAppGracefully` workload with a bounded live
+backlog, keeps repeated startup/stop coverage, excludes the inapplicable one-shot values from
+other scenario verdicts, and requires the complete 17-scenario catalog. The 10% shutdown budget
+is unchanged; both baseline and candidate compile and acknowledge all 1,000 messages in the new
+smoke workload.

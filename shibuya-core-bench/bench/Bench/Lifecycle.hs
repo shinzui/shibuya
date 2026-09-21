@@ -19,7 +19,7 @@ where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
-import Control.Monad (replicateM, replicateM_, when)
+import Control.Monad (replicateM, replicateM_, unless, when)
 import Data.Aeson (Value, object, (.=))
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Int (Int64)
@@ -35,6 +35,7 @@ import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc (getNumCapabilities)
 import GHC.Stats (RTSStats (..), getRTSStats, getRTSStatsEnabled)
 import Shibuya.Adapter (Adapter (..))
+import Shibuya.App qualified as App
 import Shibuya.Batch (BatchConfig (..), BatchHandler, BatchKey (..), ackAll, ackAllOk, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), RetryDelay (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
@@ -82,6 +83,11 @@ data ObserverFixture
   | WebSocketChurnProxy
   deriving stock (Eq, Show)
 
+data ShutdownFixture
+  = StopAfterDrain
+  | GracefulDrainAfter !Int
+  deriving stock (Eq, Show)
+
 data Scenario = Scenario
   { name :: !Text,
     concurrency :: !Concurrency,
@@ -94,6 +100,7 @@ data Scenario = Scenario
     decisions :: !DecisionFixture,
     batching :: !BatchFixture,
     observer :: !ObserverFixture,
+    shutdown :: !ShutdownFixture,
     startupCycles :: !Int,
     idleBeforeFirstMessageMicros :: !Int
   }
@@ -179,9 +186,11 @@ runLifecycleScenario scenario = do
   shutdownSamples <-
     if scenario.startupCycles > 0
       then runStartupCycles scenario.startupCycles
-      else do
-        shutdown <- runMessageFlow scenario counters started
-        pure [shutdown]
+      else
+        (: []) <$> case scenario.shutdown of
+          StopAfterDrain -> runMessageFlow scenario counters started
+          GracefulDrainAfter completedCount ->
+            runGracefulDrainFlow scenario counters started completedCount
   finished <- getMonotonicTimeNSec
   performMajorGC
   after <- getRTSStats
@@ -270,6 +279,61 @@ runMessageFlow scenario counters runStarted =
     stopMaster master
     shutdownFinished <- liftIO getMonotonicTimeNSec
     pure (shutdownFinished - shutdownStarted)
+
+-- | Measure the public graceful-shutdown path while the processor still has a
+-- bounded backlog. Post-drain 'stopMaster' calls take only a few microseconds
+-- and are useful correctness checks, but one observation per process is not a
+-- statistically meaningful 10% shutdown-latency gate. This fixture times the
+-- actual drain contract and still requires every delivery to be acknowledged.
+runGracefulDrainFlow :: Scenario -> Counters -> Word64 -> Int -> IO Word64
+runGracefulDrainFlow scenario counters runStarted stopAfter =
+  runEff $ runTracingNoop $ do
+    messages <- liftIO $ createMessages scenario counters runStarted
+    let pacedSource = Stream.mapM (paceMessage scenario) (Stream.fromList messages)
+        adapter =
+          Adapter
+            { adapterName = "bench:lifecycle:" <> scenario.name,
+              source = pacedSource,
+              shutdown = pure ()
+            }
+        processor =
+          App.QueueProcessor
+            adapter
+            (messageHandler scenario counters)
+            scenario.ordering
+            scenario.concurrency
+        appConfig = App.defaultAppConfig {App.inboxSize = scenario.inboxSize}
+    appResult <- App.runApp appConfig [(ProcessorId scenario.name, processor)]
+    app <-
+      case appResult of
+        Left err -> liftIO $ ioError (userError ("lifecycle app startup failed: " <> show err))
+        Right handle -> pure handle
+    waitForCompletions counters stopAfter
+    shutdownStarted <- liftIO getMonotonicTimeNSec
+    drained <-
+      App.stopAppGracefully
+        (App.defaultShutdownConfig {App.drainTimeout = 5})
+        app
+    shutdownFinished <- liftIO getMonotonicTimeNSec
+    unless drained $ liftIO $ ioError (userError "graceful shutdown did not drain the lifecycle backlog")
+    pure (shutdownFinished - shutdownStarted)
+
+waitForCompletions :: (IOE :> es) => Counters -> Int -> Eff es ()
+waitForCompletions counters target = do
+  started <- liftIO getMonotonicTimeNSec
+  go started
+  where
+    go started = do
+      completed <- liftIO $ readIORef counters.completed
+      if completed >= target
+        then pure ()
+        else do
+          now <- liftIO getMonotonicTimeNSec
+          when (now - started > 10_000_000_000) $
+            liftIO $
+              ioError (userError "lifecycle scenario did not reach the graceful-shutdown barrier")
+          liftIO $ threadDelay 250
+          go started
 
 batchConfig :: Int -> Double -> BatchConfig es BenchMessage
 batchConfig size timeoutSeconds =
@@ -402,7 +466,7 @@ lifecycleResultValue sampleId result@LifecycleResult {scenario} =
   object
     [ "schemaVersion" .= (1 :: Int),
       "sampleId" .= sampleId,
-      "workloadVersion" .= (2 :: Int),
+      "workloadVersion" .= (3 :: Int),
       "scenario" .= scenario.name,
       "configuration" .= scenarioValue scenario,
       "metrics" .= metricsValue result
@@ -421,6 +485,7 @@ scenarioValue scenario =
       "decisions" .= show scenario.decisions,
       "batching" .= show scenario.batching,
       "observer" .= show scenario.observer,
+      "shutdown" .= show scenario.shutdown,
       "observerFidelity"
         .= case scenario.observer of
           HealthPollingProxy -> ("core-proxy; HTTP fixture belongs to EP-39" :: Text)
@@ -492,6 +557,10 @@ scenarios =
     (base "metrics-enabled" (Async 4) Unordered 50_000 16) {observer = MetricsPolling},
     (base "health-poll-proxy" (Async 4) Unordered 50_000 16) {observer = HealthPollingProxy},
     (base "websocket-churn-proxy" (Async 4) Unordered 50_000 16) {observer = WebSocketChurnProxy},
+    (base "graceful-shutdown-drain" Serial Unordered 1_000 16)
+      { handlerDelayMicros = 1_000,
+        shutdown = GracefulDrainAfter 10
+      },
     (base "startup-shutdown" Serial Unordered 0 1) {startupCycles = 1_000}
   ]
 
@@ -509,6 +578,7 @@ base name concurrency ordering messageCount inboxSize =
       decisions = AllAckOk,
       batching = NoBatch,
       observer = NoObserver,
+      shutdown = StopAfterDrain,
       startupCycles = 0,
       idleBeforeFirstMessageMicros = 0
     }

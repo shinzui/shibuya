@@ -282,6 +282,14 @@ serial time. Opaque boxed cold-path publication and sampler-side transition dete
 the original hot path while retaining the idle-intake wake and health regressions. Version-1
 pass-two artifacts are rejected, not reinterpreted.
 
+**A post-drain cancellation is not a graceful-shutdown benchmark (2026-09-20 UTC, EP-45 pass
+two).** The first full version-2 N1 matrix timed one `stopMaster` only after each processor had
+finished, yielding 8-90 microsecond values and a misleading relative failure. Version 3 retains
+the raw observation but gates shutdown only through repeated cold startup/stop and a new public
+`runApp`/`stopAppGracefully` scenario with 1,000 messages and bounded backlog. The 10% budget is
+unchanged, all work must still acknowledge, and the comparator now rejects a mutually omitted
+mandatory scenario.
+
 
 ## Decision Log
 
@@ -343,6 +351,12 @@ candidate-selection work, not final evidence or a budget revision. Baseline and 
 the identical revised workload; the existing 5%/10% budgets and minimum ten alternating pairs
 remain unchanged. Correctness takes precedence over a faster unsafe variant: every supervised
 strategy retains terminal publication plus an STM wake for idle intake.
+
+2026-09-20: Accept EP-45 workload version 3 as a measurement-correctness refinement. Applying a
+relative shutdown budget to one post-drain cancellation did not test the intended contract and
+produced confident percentage changes from three-microsecond absolute differences. Final
+evidence instead applies the same 10% limit to repeated startup/stop and graceful drain under a
+live bounded backlog; no threshold, confidence level, or minimum pair count changed.
 
 
 ## Outcomes & Retrospective
@@ -463,3 +477,9 @@ selected implementation removes terminal closure retention and activity-accounti
 without losing idle-intake wakeup or health behavior. The focused 20-pair N1 serial-full result
 passes the original throughput, tail-latency, and allocation budgets; the immutable full N1/N4
 matrix, live adapters, and 30-minute soak remain open.
+
+2026-09-20 UTC: EP-45 rejected the initial full version-2 N1 result because its ordinary
+shutdown cells timed only post-drain cancellation. Workload version 3 adds a meaningful public
+graceful-drain scenario, retains repeated cold startup/stop, and makes all 17 scenarios
+mandatory in the comparator. Baseline and candidate compile and complete the new workload with
+1,000/1,000 acknowledgements; immutable N1/N4 recapture remains open.

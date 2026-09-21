@@ -112,6 +112,16 @@ describe("paired performance comparator", () => {
     expect(verdict.errors.join("\n")).toContain("dropped work");
   });
 
+  test("rejects a dataset that omits a mandatory scenario from both variants", () => {
+    const requiredBudgets: PerformanceBudgets = {
+      ...budgets,
+      requiredScenarios: ["serial-small-inbox", "graceful-shutdown-drain"],
+    };
+    const verdict = comparePerformance(dataset("baseline"), dataset("candidate"), requiredBudgets);
+    expect(verdict.status).toBe("fail");
+    expect(verdict.errors).toContain("required scenario missing: graceful-shutdown-drain");
+  });
+
   test("uses calibrated absolute limits when a baseline is near zero", () => {
     const absoluteBudgets: PerformanceBudgets = {
       ...budgets,
