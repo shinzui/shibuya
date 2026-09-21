@@ -33,6 +33,11 @@ provenance:
       at: 2026-09-21T00:37:40Z
       mode: "update"
       note: "Narrow whole-child unmasking to owned adapter and handler actions after EP-45 performance evidence."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:47:40Z
+      mode: "update"
+      note: "Unmask serial processing once while retaining per-action unmasking for concurrent schedulers."
 ---
 
 # Make core processor ownership and termination exception safe
@@ -85,6 +90,13 @@ message/batch action. Handlers and finalizers still observe `Unmasked`, as the e
 regression requires, while registration, linking, handle publication, and scheduler ownership
 remain protected. Forty O2 N1 pairs across the affected scenarios pass all 20 focused cells.
 
+2026-09-21: Applying `unsafeUnmask` around every action was still too broad for the serial hot
+path, where 40-pair full-catalog evidence measured confident 9.7% and 11.7% throughput losses.
+Serial message and batch processing now unmask their region once; they have no concurrent
+scheduler whose mask must be retained. Ahead, Async, and partitioned schedulers keep the
+per-action boundary. Forty fresh O2 N1 pairs pass all ten affected serial cells without changing
+the interruptibility regression or lifecycle contract.
+
 2026-09-20: After restoring interruptibility, the N4 retry path still carried a reproducible tail-latency penalty even though throughput and long-workload probes matched baseline. A controlled build without lifecycle observation removed it. The cause was `Effectful.Exception.catch` wrapping the full processor computation, which installed an unlift layer across every effect. Terminal classification now performs one `Control.Exception.try` at the already-unlifted IO child boundary and uses IO lifecycle-transition helpers. The retained snapshot and failure classification are unchanged, while a 50-pair N4 probe brought retry p95/p99 back within the 10% budget.
 
 2026-09-20: Thirty-pair shutdown measurements on sub-millisecond paths were too noisy to accept, and the N1 retry throughput confidence interval still crossed its 5% limit after 1,000 pairs even though the estimate remained inside budget. The precommitted budgets were not changed. Increasing only the unresolved cells produced passing 300-pair active/residual verdicts under N1 and N4 and a passing 2,500-pair N1 retry verdict. The tightest throughput upper bound was 1.0480 against 1.0500; the last idle-shutdown upper bound was 1.0435 against 1.1000.
@@ -112,6 +124,11 @@ registration mask remains in force for framework coordination; owned adapter, ha
 finalizer actions alone are unmasked. This keeps the ownership-transfer safety contract while
 removing the measured unordered-scheduler regression. The scope is intentional and covered by
 the handler masking-state test plus the cancellation and cleanup suites.
+
+2026-09-21: Specialize the scoped boundary by concurrency shape: unmask a serial processing
+region once, but keep a concurrent scheduler masked and unmask each action it owns. This avoids
+per-message serial transitions and concurrent Streamly exception bookkeeping while keeping user
+handlers and finalizers interruptible in both cases.
 
 
 ## Outcomes & Retrospective
@@ -242,3 +259,8 @@ This plan is a soft dependency of the metrics plan above and of docs/plans/40-pr
 and message/batch actions after the complete workload exposed Streamly scheduler overhead. The
 core lifecycle contract and tests remain unchanged; all core, isolated-GC, and metrics suites
 pass, and 40-pair O2 N1 evidence clears every affected cell under the original budgets.
+
+2026-09-21 UTC: A full EP-45 recapture found that per-message unmasking regressed serial
+throughput. Serial regions are now unmasked once; concurrent schedulers retain per-action
+unmasking. The 236-example core suite and both isolated-GC suites pass, and 40-pair O2 N1
+evidence clears all ten serial cells under the original budgets.

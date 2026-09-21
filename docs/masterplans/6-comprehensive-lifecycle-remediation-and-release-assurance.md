@@ -52,6 +52,11 @@ provenance:
       at: 2026-09-21T00:37:40Z
       mode: "implement"
       note: "Refined supervised masking after EP-45 exposed unordered scheduler overhead; focused O2 candidate evidence passes."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:47:40Z
+      mode: "implement"
+      note: "Rejected per-message serial unmasking and selected one unmasked serial region from 40-pair O2 evidence."
 ---
 
 # Comprehensive lifecycle remediation and release assurance
@@ -305,6 +310,14 @@ adapter source and individual message/batch action preserves handler/finalizer c
 the lifecycle ownership guarantees. Forty alternating O2 N1 pairs pass all 20 affected cells;
 the tightest throughput upper bound is 1.04655 against the unchanged 1.05 limit.
 
+**Unmasking per item is itself a serial hot-path cost (2026-09-21 UTC, EP-45 pass two).** The
+first complete recapture against `c25a9188` passed the repaired unordered paths but rejected both
+serial burst scenarios: throughput was 9.7% and 11.7% worse, with confidence intervals wholly
+beyond the 5% gate. Serial processing has no concurrent scheduler to protect, so unmasking its
+region once removes the per-message transition while Ahead, Async, and partitioned schedulers
+retain scoped action unmasking. Forty fresh O2 N1 pairs pass all ten serial cells; the adverse
+throughput upper bounds are 0.98674 and 1.02400.
+
 
 ## Decision Log
 
@@ -379,6 +392,12 @@ message/batch actions use `unsafeUnmask`. This is the narrowest boundary that ke
 handler interruptibility and cancellation regressions green without imposing Streamly's
 whole-scheduler cost. No performance budget changed. The four near-boundary N1 scenarios use 40
 pairs because 20 pairs left two throughput intervals inconclusive.
+
+2026-09-21: Refine scoped action unmasking by concurrency shape. Serial message and batch
+processing regions are unmasked once; concurrent schedulers remain masked and unmask each owned
+action. The distinction preserves handler/finalizer interruptibility without paying either
+Streamly's unmasked concurrent bookkeeping or a serial per-message masking transition. The
+original budgets remain unchanged.
 
 
 ## Outcomes & Retrospective
@@ -513,3 +532,9 @@ coordination masked and unmasks only owned adapter and handler/finalizer actions
 isolated-GC, metrics, and comparator tests pass; a 40-pair O2 N1 focused comparison passes all 20
 affected cells under the original limits. The full N1/N4 matrix, live adapters, and soak remain
 open, so EP-45 Milestones 4 and 5 are not complete.
+
+2026-09-21 UTC: EP-45 rejected the full N1 recapture against `c25a9188` after it exposed
+confident 9.7% and 11.7% serial throughput regressions from per-message unmasking. Unmasking each
+serial region once passes all ten cells in a fresh 40-pair O2 N1 selection run while the
+concurrent scheduler boundary remains unchanged. Core and isolated-GC tests pass; a new
+committed candidate and complete N1/N4 recapture are still required.

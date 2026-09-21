@@ -43,6 +43,11 @@ provenance:
       at: 2026-09-21T00:37:40Z
       mode: "implement"
       note: "Scope unmasking to owned actions and pass the affected 40-pair O2 candidate selection matrix."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T00:47:40Z
+      mode: "implement"
+      note: "Reject per-message serial unmasking and pass a 40-pair O2 serial-region selection matrix."
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -136,6 +141,16 @@ the four affected scenarios pass all 20 measured cells: allocation adverse upper
 limit. The rejected initial version-3 artifacts are not release evidence; the complete matrix
 must be recaptured against the committed candidate.
 
+2026-09-21: The first complete recapture against candidate `c25a9188` rejected a second
+over-broad boundary in the opposite direction. Unmasking every serial message separately made
+`serial-small-inbox` and `serial-full-inbox` throughput 9.7% and 11.7% worse than baseline;
+their confidence intervals were wholly beyond the 5% gate. Serial execution has no concurrent
+Streamly scheduler to protect, so the next candidate unmasks that processing region once and
+uses per-action unmasking only for concurrent schedulers. A fresh 40-pair O2 N1 selection run
+passes all ten serial cells: throughput adverse upper bounds are 0.98674 and 1.02400, allocation
+is about 3.7% below baseline, and both live-heap intervals pass. The `c25a9188` full artifacts
+remain rejected and must be replaced after the refined implementation is committed.
+
 
 ## Decision Log
 
@@ -186,6 +201,12 @@ unchanged. Because 20 pairs left two affected throughput intervals barely inconc
 pairs for candidate selection and the final near-boundary N1 cells rather than weakening the 5%
 gate.
 
+2026-09-21: Unmask each serial processing region once, because it has no concurrent scheduler
+whose exception bookkeeping must remain masked. Ahead, Async, and partitioned schedulers stay
+masked and unmask only individual actions; the adapter source remains an owned unmasked region.
+This concurrency-specific boundary passes the two 40-pair serial scenarios while retaining the
+four 40-pair concurrent results. It changes neither the lifecycle contract nor any budget.
+
 
 ## Outcomes & Retrospective
 
@@ -203,8 +224,10 @@ Pass two is active. Profiling-driven changes have passed the 236-example core su
 process-isolated core GC suites, and the 48-example metrics suite. The corrected focused serial
 comparison is inside the precommitted limits, and the final 40-pair O2 N1 comparison for all
 four affected unordered scenarios passes every throughput, tail-latency, allocation,
-live-memory, and shutdown cell. These focused results select the candidate implementation; they
-do not replace the complete N1/N4 matrix, live-adapter runs, or 30-minute retained-memory soak
+live-memory, and shutdown cell. A subsequent 40-pair O2 N1 comparison passes all ten cells for
+the two serial burst scenarios after their region was unmasked once. Together these focused
+results select the candidate implementation; they do not replace the complete N1/N4 matrix,
+live-adapter runs, or 30-minute retained-memory soak
 required by Milestones 4 and 5.
 
 
@@ -335,3 +358,9 @@ unmasks only adapter and message/batch actions. The 236-example core suite, both
 suites, the 48-example metrics suite, and all eight comparator tests pass. Forty alternating O2
 N1 pairs across the four affected scenarios pass all 20 focused cells without a budget change;
 the complete N1/N4 recapture, live services, and soak remain open.
+
+2026-09-21 UTC: Rejected the first full recapture against `c25a9188` because per-message
+unmasking introduced confident 9.7% and 11.7% serial throughput regressions. The refined
+candidate unmasks each serial region once while leaving concurrent schedulers masked and their
+owned actions unmasked. All core and isolated-GC tests pass, and a fresh 40-pair O2 N1 focused
+comparison passes all ten serial cells; the full committed-candidate recapture remains open.

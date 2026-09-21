@@ -305,15 +305,16 @@ processBatchesUntilDrained metricsHandle procId concurrency handler batchesStrea
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     -- The supervisor keeps framework coordination masked; only the owned batch
     -- action is unmasked so user code and finalizers remain cancellable.
-    let batchAction batch =
-          unsafeUnmask $
-            runInIO $
-              processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler batch
+    let runBatchAction batch =
+          runInIO $
+            processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler batch
+        batchAction = unsafeUnmask . runBatchAction
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
       Serial ->
-        Stream.fold Fold.drain $
-          Stream.mapM batchAction batchesStream
+        unsafeUnmask $
+          Stream.fold Fold.drain $
+            Stream.mapM runBatchAction batchesStream
       Ahead n ->
         runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchesStream
       Async n ->

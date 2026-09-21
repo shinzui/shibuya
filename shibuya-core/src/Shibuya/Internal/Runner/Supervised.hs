@@ -554,12 +554,12 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
+        runProcessAction ingested =
+          runInIO $
+            processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
         -- Restore normal interruptibility for handlers and finalizers while the
-        -- framework-owned Streamly scheduler retains its inherited mask.
-        processAction ingested =
-          unsafeUnmask $
-            runInIO $
-              processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
+        -- concurrent Streamly scheduler retains its inherited mask.
+        processAction = unsafeUnmask . runProcessAction
         partitioned n =
           runKeyedScheduler
             (max 1 n)
@@ -570,8 +570,11 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
 
     case (ordering, concurrency) of
       (_, Serial) ->
-        Stream.fold Fold.drain $
-          Stream.mapM processAction inboxStream
+        -- Unmask the serial region once. Unmasking each message is measurable
+        -- overhead, while this path has no concurrent scheduler to protect.
+        unsafeUnmask $
+          Stream.fold Fold.drain $
+            Stream.mapM runProcessAction inboxStream
       (PartitionedInOrder, Ahead n) ->
         partitioned n
       (PartitionedInOrder, Async n) ->
