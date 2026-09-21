@@ -169,3 +169,10 @@ subdirectory and pins the released dependency compatibility set. `nix build .#de
 `nix flake check`, and formatting pass. This closes the pre-existing broken-default-output
 obligation, but does not freeze Milestone 1: the core version and all three committed adapter
 bounds still require the release owner's decision.
+
+2026-09-21 UTC: Completed the version-neutral EP-34 compatibility gates. The current core,
+tests, examples, and benchmark components depend directly on `effectful-core` and accept
+2.6.1.0 plus 2.7.1.1 or later while rejecting 2.7.1.0. The all-package build, all core/GC and
+metrics suites, package check, formatting, and flake checks pass. The release skill now runs
+performance comparison for any runtime-bound change, including a patch. EP-34 publication and
+EP-35's adapter bounds remain coordinated with the candidate version decision.
