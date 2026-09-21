@@ -550,6 +550,15 @@ scenarios =
       { batching = TimeoutBatch 1_000 10_000,
         arrivalIntervalMicros = 2_000
       },
+    -- Diagnostic envelope for REV-15-L1. Every message has a distinct batch
+    -- key, so the batcher retains one in-progress batch per message until the
+    -- finite source closes. It is intentionally outside EP-45's paired
+    -- regression catalog: bounded captures at several message counts quantify
+    -- the supported memory envelope of this documented limitation.
+    (base "batch-high-cardinality-envelope" (Async 4) Unordered 50_000 16)
+      { batching = SizeBatch 1_000,
+        partitions = HighCardinalityPartitions
+      },
     (base "retry-path" Serial Unordered 20_000 16) {decisions = RetryEvery 10},
     (base "dead-letter-path" Serial Unordered 20_000 16) {decisions = DeadLetterEvery 10},
     (base "idle-worker" Serial Unordered 1 1) {idleBeforeFirstMessageMicros = 1_000_000},

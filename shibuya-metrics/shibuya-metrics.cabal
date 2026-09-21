@@ -111,3 +111,39 @@ test-suite shibuya-metrics-test
     wai-extra ^>=3.1.18,
     warp,
     websockets,
+
+-- EP-45 real-wire HTTP health polling and WebSocket churn fixture.
+executable metrics-wire-load
+  import: warnings
+  default-language: GHC2024
+  hs-source-dirs: bench
+  main-is: WireLoad.hs
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    LambdaCase
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N4 -T -A32m"
+    -O2
+
+  build-depends:
+    aeson,
+    base ^>=4.21.0.0,
+    bytestring,
+    effectful,
+    http-client ^>=0.7.19,
+    http-types,
+    nqe,
+    shibuya-core,
+    shibuya-metrics,
+    stm,
+    time,
+    warp,
+    websockets,
