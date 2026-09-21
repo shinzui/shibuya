@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kafka",
+  "scenario": "saturation",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-saturation.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 20,
+  "sampleCount": 30,
+  "postRestartTrendSampleCount": 8,
+  "errors": [],
+  "totals": {
+    "produced": 2321,
+    "processed": 2321,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.341666666666665,
+    "achievedProcessRatePerSecond": 19.341666666666665
+  },
+  "backlog": {
+    "maximum": 124,
+    "firstPostRestartWindowMedian": 100,
+    "lastPostRestartWindowMedian": 95,
+    "tolerance": 40,
+    "slopePerMinute": 2.118758434547918
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 460428,
+    "lastPostRestartWindowMedianBytes": 444972,
+    "growthBytes": -15456,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -23545.695006747635,
+    "slopeAllowanceBytesPerMinute": 436906.6666666667,
+    "maximumLiveBytes": 512776
+  }
+}

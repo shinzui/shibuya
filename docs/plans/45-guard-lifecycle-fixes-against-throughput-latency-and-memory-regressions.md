@@ -48,6 +48,11 @@ provenance:
       at: 2026-09-21T00:47:40Z
       mode: "implement"
       note: "Reject per-message serial unmasking and pass a 40-pair O2 serial-region selection matrix."
+    - model: "gpt-5.6-sol"
+      harness: "codex-cli"
+      at: 2026-09-21T03:00:00Z
+      mode: "implement"
+      note: "Completed live-adapter soaks, real-wire stress, high-cardinality measurement, and the aggregate candidate performance verdict."
 ---
 
 # Guard lifecycle fixes against throughput latency and memory regressions
@@ -69,8 +74,8 @@ Catch performance regressions before release using reproducible baseline/candida
 - [x] (2026-09-20 14:48Z) Milestone 1: Capture matched baseline data before remediation.
 - [x] (2026-09-20 14:43Z) Milestone 2: Extend production-runner and lifecycle performance workloads.
 - [x] (2026-09-20 14:43Z) Milestone 3: Implement and test the statistical performance comparator.
-- [ ] Milestone 4: Measure fixed adapters and candidate soaks.
-- [ ] Milestone 5: Publish raw data and the candidate-bound performance verdict.
+- [x] (2026-09-21 02:50Z) Milestone 4: Measure fixed adapters and candidate soaks.
+- [x] (2026-09-21 03:00Z) Milestone 5: Publish raw data and the candidate-bound performance verdict.
 
 
 ## Surprises & Discoveries
@@ -151,6 +156,22 @@ passes all ten serial cells: throughput adverse upper bounds are 0.98674 and 1.0
 is about 3.7% below baseline, and both live-heap intervals pass. The `c25a9188` full artifacts
 remain rejected and must be replaced after the refined implementation is committed.
 
+2026-09-21: Short live-service calibration exposed two harness concerns before final capture.
+Comparing final process high-water heap to startup heap is not a retained-memory test: even an
+eight-second healthy PGMQ run crossed additional nurseries and made that ratio exceed two. The
+shared analyzer now forces a major collection at each sample, ignores the restart warmup, and
+gates both first-versus-last retained-heap medians and the fitted retained-heap slope. Kafka's
+first producer loop also unwound one blocking flush per produced message after stopping. Making
+the stop branch perform exactly one flush removed the artificial post-run delay without changing
+the recorded production or consumption workload.
+
+2026-09-21: The open REV-15-L1 limitation is measurable but not removed. Fifty fresh
+high-cardinality batch processes covering 1,000 through 50,000 distinct in-progress keys under
+N1 and N4 completed exactly. Over that finite range a conservative observed upper envelope is
+692 bytes/key under N1 and 703 bytes/key under N4, but key count is still not bounded by inbox
+capacity. The finding therefore remains open for explicit human release-owner acceptance or a
+future implementation limit; the performance verdict does not silently waive it.
+
 
 ## Decision Log
 
@@ -207,6 +228,20 @@ masked and unmask only individual actions; the adapter source remains an owned u
 This concurrency-specific boundary passes the two 40-pair serial scenarios while retaining the
 four 40-pair concurrent results. It changes neither the lifecycle contract nor any budget.
 
+2026-09-21: Use one common live-adapter evidence schema and analyze current retained heap after
+forced major collections, not the monotonic process high-water mark, for sustained-growth
+decisions. Keep `max_live_bytes` as a reported ceiling. The precommitted retained tolerance is
+the larger of 262,144 bytes and 5% of the first post-restart window median; both net median growth
+and linear slope across the remaining window must fit that tolerance. Sustainable and saturation
+runs last 120 seconds with a midpoint restart; every adapter also gets its own 1,800-second soak.
+Calibration selected 2/20 msg/s for Kafka and 20/200 msg/s for PGMQ and Kiroku as the respective
+sustainable/saturation targets. These choices and exact fixture identities were recorded before
+the retained captures.
+
+2026-09-21: Treat the high-cardinality result as an empirical finite-source envelope, not a
+production resource bound. Record every raw sample and the conservative upper envelope, keep
+REV-15-L1 open, and require EP-44 to obtain the human disposition demanded by the release plan.
+
 
 ## Outcomes & Retrospective
 
@@ -220,15 +255,15 @@ behavior. No candidate
 performance verdict exists yet; pass two must recapture this baseline in alternating order with
 the integrated candidate.
 
-Pass two is active. Profiling-driven changes have passed the 236-example core suite, both
-process-isolated core GC suites, and the 48-example metrics suite. The corrected focused serial
-comparison is inside the precommitted limits, and the final 40-pair O2 N1 comparison for all
-four affected unordered scenarios passes every throughput, tail-latency, allocation,
-live-memory, and shutdown cell. A subsequent 40-pair O2 N1 comparison passes all ten cells for
-the two serial burst scenarios after their region was unmasked once. Together these focused
-results select the candidate implementation; they do not replace the complete N1/N4 matrix,
-live-adapter runs, or 30-minute retained-memory soak
-required by Milestones 4 and 5.
+Pass two is complete. The immutable full N1 and N4 datasets pass all 84 measured cells in each
+verdict without a threshold change or waiver. Kafka, PGMQ, and Kiroku each pass sustainable,
+saturation, and 1,800-second stop/restart runs against live ephemeral services; their soak totals
+are respectively 3,593, 34,653, and 34,605 messages with exact completion, zero failures, zero
+final durable backlog, and no retained-heap growth. Real-wire stress completes 100,000 readiness
+requests and 10,000 WebSocket connection cycles with zero errors or leaked connection slots.
+The 50-process high-cardinality capture reports the finite memory envelope while preserving the
+unbounded-key limitation as an explicit open release disposition. The indexed machine-readable
+result is `docs/audits/lifecycle-release/artifacts/ep45-performance/candidate-performance-verdict.json`.
 
 
 ## Context and Orientation
@@ -358,6 +393,13 @@ unmasks only adapter and message/batch actions. The 236-example core suite, both
 suites, the 48-example metrics suite, and all eight comparator tests pass. Forty alternating O2
 N1 pairs across the four affected scenarios pass all 20 focused cells without a budget change;
 the complete N1/N4 recapture, live services, and soak remain open.
+
+2026-09-21 UTC: Completed pass two. Published the passing complete N1/N4 paired verdicts, nine
+passing live-service summaries including one 1,800-second restart soak per adapter, real HTTP and
+WebSocket stress artifacts, the REV-15-L1 high-cardinality envelope, and one indexed aggregate
+performance verdict. No threshold changed and no waiver was used. REV-15-L1 remains open because
+measurement does not bound the implementation's distinct in-progress key count; EP-44 owns its
+human release disposition.
 
 2026-09-21 UTC: Rejected the first full recapture against `c25a9188` because per-message
 unmasking introduced confident 9.7% and 11.7% serial throughput regressions. The refined

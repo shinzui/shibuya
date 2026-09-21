@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "pgmq",
+  "scenario": "saturation",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-saturation.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 200,
+  "sampleCount": 25,
+  "postRestartTrendSampleCount": 9,
+  "errors": [],
+  "totals": {
+    "produced": 18483,
+    "processed": 18483,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 154.025,
+    "achievedProcessRatePerSecond": 154.025
+  },
+  "backlog": {
+    "maximum": 153,
+    "firstPostRestartWindowMedian": 65,
+    "lastPostRestartWindowMedian": 106,
+    "tolerance": 400,
+    "slopePerMinute": 70.99999999999997
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 1166344,
+    "lastPostRestartWindowMedianBytes": 1166872,
+    "growthBytes": 528,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -31470.399999999998,
+    "slopeAllowanceBytesPerMinute": 393216,
+    "maximumLiveBytes": 1205184
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kiroku",
+  "scenario": "soak",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-soak.csv",
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 20,
+  "sampleCount": 60,
+  "postRestartTrendSampleCount": 29,
+  "errors": [],
+  "totals": {
+    "produced": 34605,
+    "processed": 34605,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.225,
+    "achievedProcessRatePerSecond": 19.225
+  },
+  "backlog": {
+    "maximum": 1,
+    "firstPostRestartWindowMedian": 0,
+    "lastPostRestartWindowMedian": 0,
+    "tolerance": 40,
+    "slopePerMinute": -0.010837438423645318
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 727848,
+    "lastPostRestartWindowMedianBytes": 726216,
+    "growthBytes": -1632,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -1883.8226600985222,
+    "slopeAllowanceBytesPerMinute": 18724.571428571428,
+    "maximumLiveBytes": 846200
+  }
+}

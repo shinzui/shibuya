@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "pgmq",
+  "scenario": "soak",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-soak.csv",
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 20,
+  "sampleCount": 61,
+  "postRestartTrendSampleCount": 29,
+  "errors": [],
+  "totals": {
+    "produced": 34653,
+    "processed": 34653,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.251666666666665,
+    "achievedProcessRatePerSecond": 19.251666666666665
+  },
+  "backlog": {
+    "maximum": 19,
+    "firstPostRestartWindowMedian": 9,
+    "lastPostRestartWindowMedian": 5,
+    "tolerance": 40,
+    "slopePerMinute": -0.3261083743842365
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 647816,
+    "lastPostRestartWindowMedianBytes": 648240,
+    "growthBytes": 424,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": 127.76354679802955,
+    "slopeAllowanceBytesPerMinute": 18724.571428571428,
+    "maximumLiveBytes": 648792
+  }
+}

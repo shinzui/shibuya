@@ -871,12 +871,14 @@
       "candidateScope": "in-scope",
       "source": { "path": "docs/reviews/REV-15-batcher-lifecycle-audit.md", "reviewedSha": "851c7c9db5d47593e2bd2899802c23bb06a231f7" },
       "claim": "Distinct in-progress batch keys are not bounded by inbox capacity and can retain substantial memory.",
-      "confirmation": "source",
+      "confirmation": "runtime",
       "owner": "docs/plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md",
       "invariant": "Candidate soak evidence measures high-cardinality batching and reports the supported memory envelope.",
-      "regressionTests": [],
+      "regressionTests": ["shibuya-core-bench/bench/Bench/Lifecycle.hs"],
       "fixSha": null,
-      "evidence": [],
+      "evidence": [
+        { "path": "docs/audits/lifecycle-release/artifacts/ep45-performance/high-cardinality-envelope.json" }
+      ],
       "disposition": { "status": "open" }
     },
     {

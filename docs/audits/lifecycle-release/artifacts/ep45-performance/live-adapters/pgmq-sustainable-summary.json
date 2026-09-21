@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "pgmq",
+  "scenario": "sustainable",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-sustainable.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 20,
+  "sampleCount": 25,
+  "postRestartTrendSampleCount": 9,
+  "errors": [],
+  "totals": {
+    "produced": 2274,
+    "processed": 2274,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 18.95,
+    "achievedProcessRatePerSecond": 18.95
+  },
+  "backlog": {
+    "maximum": 19,
+    "firstPostRestartWindowMedian": 5,
+    "lastPostRestartWindowMedian": 3,
+    "tolerance": 40,
+    "slopePerMinute": 6.8
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 505680,
+    "lastPostRestartWindowMedianBytes": 505704,
+    "growthBytes": 24,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -2215.9999999999986,
+    "slopeAllowanceBytesPerMinute": 393216,
+    "maximumLiveBytes": 506016
+  }
+}

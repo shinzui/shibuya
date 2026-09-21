@@ -1,0 +1,1 @@
+{"completed":100000,"elapsedSeconds":7.155709,"errors":0,"finalWebSocketConnections":0,"iterations":100000,"latencyP50Micros":69,"latencyP95Micros":98,"latencyP99Micros":119,"maxLiveBytes":4220416,"operationsPerSecond":13974.855601310786,"retainedBytes":4220416,"scenario":"health-polling","schemaVersion":1}

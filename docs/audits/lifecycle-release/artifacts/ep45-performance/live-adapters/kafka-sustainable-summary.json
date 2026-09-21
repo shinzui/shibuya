@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kafka",
+  "scenario": "sustainable",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-sustainable.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 2,
+  "sampleCount": 25,
+  "postRestartTrendSampleCount": 8,
+  "errors": [],
+  "totals": {
+    "produced": 240,
+    "processed": 240,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 2,
+    "achievedProcessRatePerSecond": 2
+  },
+  "backlog": {
+    "maximum": 5,
+    "firstPostRestartWindowMedian": 4,
+    "lastPostRestartWindowMedian": 5,
+    "tolerance": 5,
+    "slopePerMinute": 1.6714631057902614
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 344136,
+    "lastPostRestartWindowMedianBytes": 345492,
+    "growthBytes": 1356,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": 770.8622078968566,
+    "slopeAllowanceBytesPerMinute": 436906.6666666667,
+    "maximumLiveBytes": 501936
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kiroku",
+  "scenario": "saturation",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-saturation.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 200,
+  "sampleCount": 24,
+  "postRestartTrendSampleCount": 9,
+  "errors": [],
+  "totals": {
+    "produced": 17917,
+    "processed": 17917,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 149.30833333333334,
+    "achievedProcessRatePerSecond": 149.30833333333334
+  },
+  "backlog": {
+    "maximum": 0,
+    "firstPostRestartWindowMedian": 0,
+    "lastPostRestartWindowMedian": 0,
+    "tolerance": 400,
+    "slopePerMinute": 0
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 1655984,
+    "lastPostRestartWindowMedianBytes": 1673816,
+    "growthBytes": 17832,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -102364.79999999999,
+    "slopeAllowanceBytesPerMinute": 393216,
+    "maximumLiveBytes": 1719848
+  }
+}

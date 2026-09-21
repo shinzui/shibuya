@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kafka",
+  "scenario": "soak",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-soak.csv",
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 2,
+  "sampleCount": 60,
+  "postRestartTrendSampleCount": 28,
+  "errors": [],
+  "totals": {
+    "produced": 3593,
+    "processed": 3593,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 1.9961111111111112,
+    "achievedProcessRatePerSecond": 1.9961111111111112
+  },
+  "backlog": {
+    "maximum": 9,
+    "firstPostRestartWindowMedian": 6,
+    "lastPostRestartWindowMedian": 8,
+    "tolerance": 5,
+    "slopePerMinute": 0.21346971369990808
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 354688,
+    "lastPostRestartWindowMedianBytes": 350656,
+    "growthBytes": -4032,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -183.56025552776106,
+    "slopeAllowanceBytesPerMinute": 19346.420664206642,
+    "maximumLiveBytes": 359776
+  }
+}

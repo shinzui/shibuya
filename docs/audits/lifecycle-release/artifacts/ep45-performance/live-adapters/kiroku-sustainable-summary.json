@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kiroku",
+  "scenario": "sustainable",
+  "input": "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-sustainable.csv",
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 20,
+  "sampleCount": 24,
+  "postRestartTrendSampleCount": 9,
+  "errors": [],
+  "totals": {
+    "produced": 2251,
+    "processed": 2251,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 18.758333333333333,
+    "achievedProcessRatePerSecond": 18.758333333333333
+  },
+  "backlog": {
+    "maximum": 0,
+    "firstPostRestartWindowMedian": 0,
+    "lastPostRestartWindowMedian": 0,
+    "tolerance": 40,
+    "slopePerMinute": 0
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 592728,
+    "lastPostRestartWindowMedianBytes": 590984,
+    "growthBytes": -1744,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -108905.59999999998,
+    "slopeAllowanceBytesPerMinute": 393216,
+    "maximumLiveBytes": 596600
+  }
+}

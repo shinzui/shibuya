@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "candidateProductionSha": "6461c74cda5235e292d221f36621d09910b3b6f0",
+  "solverPlanHash": "abf44e86737d45737804d0391ccb67af16153b5b0340b9f4469500300015f9dd",
+  "gates": [
+    {
+      "id": "core-paired-n1",
+      "status": "pass",
+      "artifact": "docs/audits/lifecycle-release/artifacts/ep45-performance/final-verdict-n1.json",
+      "passedCells": 84
+    },
+    {
+      "id": "core-paired-n4",
+      "status": "pass",
+      "artifact": "docs/audits/lifecycle-release/artifacts/ep45-performance/final-verdict-n4.json",
+      "passedCells": 84
+    },
+    {
+      "id": "live-adapter-sustainable-saturation-and-soak",
+      "status": "pass",
+      "artifacts": [
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-sustainable-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-saturation-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kafka-soak-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-sustainable-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-saturation-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/pgmq-soak-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-sustainable-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-saturation-summary.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/live-adapters/kiroku-soak-summary.json"
+      ]
+    },
+    {
+      "id": "metrics-real-wire",
+      "status": "pass",
+      "artifacts": [
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/wire/health.json",
+        "docs/audits/lifecycle-release/artifacts/ep45-performance/wire/websocket.json",
+        "docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/websocket-snapshot-hyperfine.json"
+      ]
+    },
+    {
+      "id": "batch-high-cardinality-envelope",
+      "status": "measured",
+      "artifact": "docs/audits/lifecycle-release/artifacts/ep45-performance/high-cardinality-envelope.json"
+    }
+  ],
+  "lossOrLeakFailures": 0,
+  "budgetChanges": [],
+  "waivers": [],
+  "residualLimitations": [
+    {
+      "findingId": "REV-15-L1",
+      "description": "Distinct in-progress batch keys remain unbounded by inbox capacity.",
+      "releaseDisposition": "open-pending-human-acceptance",
+      "testedDistinctKeyRange": [1000, 50000],
+      "observedUpperEnvelopeBytesPerKey": {
+        "N1": 692,
+        "N4": 703
+      }
+    }
+  ]
+}
