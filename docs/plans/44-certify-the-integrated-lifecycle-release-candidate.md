@@ -61,6 +61,14 @@ apparently compliant command would have executed fewer cases than the evidence b
 local caps are removed for the candidate harness; ordinary runs use Hspec's normal default,
 while the release command supplies and records 1,000 cases and its seed.
 
+2026-09-21: The Kafka flake's generated default package pointed `callCabal2nix` at the
+multi-package repository root, which contains no Cabal file. Correcting the package path then
+exposed stale nixpkgs selections for the released Kafka, Shibuya, Streamly, and OpenTelemetry
+packages. Pinning their authoritative Hackage releases makes `nix build .#default` and
+`nix flake check` pass. The flake builds the distributable library without its tests while
+Shibuya 0.10 remains unpublished; the separate cross-repository candidate project owns and
+has passed the tests against the unreleased lifecycle API.
+
 
 ## Decision Log
 
@@ -70,6 +78,12 @@ while the release command supplies and records 1,000 cases and its seed.
 2026-09-21: Control property-case counts at the test-runner boundary and remove lower
 per-property caps. Candidate evidence uses `--ignore-dot-hspec --qc-max-success=1000` with an
 explicit seed, so user configuration cannot silently lower the release budget.
+
+2026-09-21: Treat Kafka's portable flake build and its cross-repository candidate tests as
+distinct release gates until the candidate core is published. The flake must use released,
+content-addressed Hackage inputs and prove the distributable library builds; the candidate
+Cabal project must compile and run the adapter tests against the exact local core. Neither
+gate substitutes for the other.
 
 
 ## Outcomes & Retrospective
@@ -146,3 +160,12 @@ caps that would have silently overridden the 1,000-case release command, and add
 runner that records every one of the eight schedule-sensitive selectors across 100 seeds under
 both N1 and N4. The normal core suite and both isolated GC suites pass after the harness change.
 Candidate version/bound edits remain pending the explicit release-owner version decision.
+
+2026-09-21 UTC: Repaired the Kafka release gates in
+`mori://shinzui/shibuya-kafka-adapter`. Commit `d2725ba` raises its deterministic
+acknowledgement reference model from 10 to 1,000 replayable seeds; the full candidate-core suite
+passes against live Kafka. Commit `35a3e41` points the default Nix package at the actual adapter
+subdirectory and pins the released dependency compatibility set. `nix build .#default`,
+`nix flake check`, and formatting pass. This closes the pre-existing broken-default-output
+obligation, but does not freeze Milestone 1: the core version and all three committed adapter
+bounds still require the release owner's decision.

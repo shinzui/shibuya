@@ -269,11 +269,13 @@ synchronous exception: the Kafka `Error` effect sits outside core's finalizer bo
 cannot by itself produce the retained `LifecycleFailed` result after ingestion ends.
 
 **The Kafka adapter's Nix default package was already unevaluable as a build (2026-09-20 UTC,
-EP-40).** `nix flake check` reaches a generated `callCabal2nix` invocation at the repository
-root, where no Cabal file exists; the real package is one directory below. EP-40's formatting,
-Cabal, live-broker, and strict OKF checks pass, but the Nix package output does not. This is
-preserved as an EP-44 candidate-build obligation rather than silently omitted or conflated with
-the acknowledgement fix.
+EP-40; closed 2026-09-21 UTC, EP-44).** `nix flake check` reached a generated
+`callCabal2nix` invocation at the repository root, where no Cabal file exists; the real package
+is one directory below. EP-44 corrected that path and pinned the authoritative released Kafka,
+Shibuya, Streamly, and OpenTelemetry compatibility set in
+`mori://shinzui/shibuya-kafka-adapter` commit `35a3e41`. The repaired output passes
+`nix build .#default` and `nix flake check`; candidate-only tests remain a separate passing
+cross-repository Cabal gate until the new core is published.
 
 **PGMQ dead-letter idempotence can use the source row as the durable claim (2026-09-20 UTC,
 EP-41).** The dependency's delete statement already returns whether it removed the source row.
@@ -469,6 +471,13 @@ batch keys without pretending the implementation now bounds that key count. EP-4
 the candidate version, this residual limitation's human disposition, and independent review
 remain explicit certification prerequisites.
 
+EP-44 release-gate preparation repaired Kafka's default Nix package in
+`mori://shinzui/shibuya-kafka-adapter` commit `35a3e41` and raised its acknowledgement model
+budget to 1,000 deterministic seeds in commit `d2725ba`. The adapter passes its full
+candidate-core suite against live Kafka, and the portable released-dependency flake passes both
+its default build and flake checks. Candidate freeze remains blocked on the release-owner
+version and residual-risk decisions; independent review also remains outstanding.
+
 
 ## Revision Notes
 
@@ -559,3 +568,9 @@ confident 9.7% and 11.7% serial throughput regressions from per-message unmaskin
 serial region once passes all ten cells in a fresh 40-pair O2 N1 selection run while the
 concurrent scheduler boundary remains unchanged. Core and isolated-GC tests pass; a new
 committed candidate and complete N1/N4 recapture are still required.
+
+2026-09-21 UTC: EP-44 repaired Kafka's previously broken Nix default package and raised its
+deterministic acknowledgement reference-model gate to 1,000 seeds. The live candidate-core
+suite, `nix build .#default`, `nix flake check`, and formatting all pass at Kafka commits
+`d2725ba` and `35a3e41`. The candidate is not frozen: version/bound changes, the release-owner
+disposition of REV-15-L1, and independent review remain mandatory.
