@@ -35,6 +35,13 @@
   completions at zero in-flight, and track progress during metrics sampling without adding a
   clock read to the handler hot path.
 
+### Other Changes
+
+- Depend directly on `effectful-core`, which provides every Effectful module used by the core,
+  tests, examples, and benchmarks. The accepted range keeps the 2.6 family and 2.7.1.1 or
+  later while excluding 2.7.0.0 through 2.7.1.0, whose upstream changelog records a
+  per-operation performance regression for dynamically dispatched effects.
+
 ## 0.9.0.3 — 2026-09-20
 
 ### Bug Fixes

@@ -73,7 +73,7 @@ library
     bytestring ^>=0.12.2.0,
     containers ^>=0.7,
     deepseq ^>=1.5,
-    effectful >=2.6.1 && <2.8,
+    effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
     hs-opentelemetry-api ^>=1.0,
     hs-opentelemetry-propagator-w3c ^>=1.0,
     hs-opentelemetry-semantic-conventions ^>=1.40,
@@ -138,7 +138,7 @@ test-suite shibuya-core-test
     base ^>=4.21.0.0,
     bytestring,
     containers,
-    effectful,
+    effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
     hs-opentelemetry-api,
     hs-opentelemetry-exporter-in-memory ^>=1.0,
     hspec ^>=2.11,
@@ -167,7 +167,7 @@ test-suite shibuya-core-gc-test
 
   build-depends:
     base ^>=4.21.0.0,
-    effectful,
+    effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
     shibuya-core,
     streamly-core,
     unliftio,
@@ -185,7 +185,7 @@ test-suite shibuya-core-gc-finished-test
 
   build-depends:
     base ^>=4.21.0.0,
-    effectful,
+    effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
     nqe,
     shibuya-core,
     streamly-core,
