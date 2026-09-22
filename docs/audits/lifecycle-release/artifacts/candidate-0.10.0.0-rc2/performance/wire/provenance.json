@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "shibuya-lifecycle-0.10.0.0-rc2",
+  "capturedAt": "2026-09-22T02:48:23Z",
+  "sourceSha": "e28a95893a534a15302529850eea54f6e0682de0",
+  "solverPlanHash": "1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+  "compiler": "ghc-9.12.4",
+  "optimization": "O2",
+  "executable": "dist-release-plan/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.0/x/metrics-wire-load/opt/build/metrics-wire-load/metrics-wire-load",
+  "executableSha256": "9c4e415b34ee1f99ad531d202c54b56062ff2ea0a99f6cf052787661a6b904a0",
+  "runs": [
+    {
+      "scenario": "health-polling",
+      "environment": {"SCENARIO": "health", "ITERATIONS": "100000"},
+      "rts": "-N4 -T -A32m",
+      "artifact": "health.json",
+      "artifactSha256": "f8c6d25695d2f5f17416eb01594bbbdbc5a48c3f10c34d2d14c41e9b5f181eca",
+      "completed": 100000,
+      "errors": 0,
+      "finalWebSocketConnections": 0,
+      "status": "pass"
+    },
+    {
+      "scenario": "websocket-churn",
+      "environment": {"SCENARIO": "websocket", "ITERATIONS": "10000"},
+      "rts": "-N4 -T -A32m",
+      "artifact": "websocket.json",
+      "artifactSha256": "a310de2d7ea904e017f35652c997b5d79c7124c2335d0a5f7ac7b35bcea51484",
+      "completed": 10000,
+      "errors": 0,
+      "finalWebSocketConnections": 0,
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "status": "fail",
+  "baselineLabel": "released-0.9.0.3-current-solver-h6f5-n1",
+  "candidateLabel": "candidate-0.10.0.0-rc2-h6f5-n1",
+  "confidenceLevel": 0.95,
+  "resamplingSeed": 20260920,
+  "errors": [],
+  "results": [
+    {
+      "scenario": "async-high-cardinality",
+      "metric": "allocatedBytesPerMessage",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 1.0175910207971812,
+      "lower95": 1.0173274573212425,
+      "upper95": 1.017873092279197,
+      "threshold": 1.05,
+      "message": "allocatedBytesPerMessage adverse ratio 1.0176 (CI 1.0173..1.0179, limit 1.0500)"
+    },
+    {
+      "scenario": "async-high-cardinality",
+      "metric": "latencyP95Ms",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 0.9993778615647925,
+      "lower95": 0.9910058017978894,
+      "upper95": 1.0076218294823847,
+      "threshold": 1.1,
+      "message": "latencyP95Ms adverse ratio 0.9994 (CI 0.9910..1.0076, limit 1.1000)"
+    },
+    {
+      "scenario": "async-high-cardinality",
+      "metric": "latencyP99Ms",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 0.9978694653760998,
+      "lower95": 0.9892994986835765,
+      "upper95": 1.0061744951826006,
+      "threshold": 1.1,
+      "message": "latencyP99Ms adverse ratio 0.9979 (CI 0.9893..1.0062, limit 1.1000)"
+    },
+    {
+      "scenario": "async-high-cardinality",
+      "metric": "maxLiveBytes",
+      "status": "fail",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 1.0539730772717564,
+      "lower95": 1.0503499700320376,
+      "upper95": 1.0573418299297492,
+      "threshold": 1.05,
+      "message": "maxLiveBytes adverse ratio 1.0540 (CI 1.0503..1.0573, limit 1.0500)"
+    },
+    {
+      "scenario": "async-high-cardinality",
+      "metric": "throughputPerSecond",
+      "status": "pass",
+      "pairCount": 300,
+      "method": "paired-ratio",
+      "estimate": 0.996358405816688,
+      "lower95": 0.9879586715673866,
+      "upper95": 1.004768764960444,
+      "threshold": 1.05,
+      "message": "throughputPerSecond adverse ratio 0.9964 (CI 0.9880..1.0048, limit 1.0500)"
+    }
+  ]
+}

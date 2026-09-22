@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kiroku",
+  "scenario": "soak",
+  "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak.csv",
+  "deliveryLedger": {
+    "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak-ledger.json",
+    "runId": "rc2-e28-kiroku-soak-20260922",
+    "producedIdentityCount": 34671,
+    "processedIdentityCount": 34671,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0
+  },
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 20,
+  "sampleCount": 60,
+  "postRestartTrendSampleCount": 29,
+  "errors": [],
+  "totals": {
+    "produced": 34671,
+    "processed": 34671,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.261666666666667,
+    "achievedProcessRatePerSecond": 19.261666666666667
+  },
+  "backlog": {
+    "maximum": 1,
+    "firstPostRestartWindowMedian": 0,
+    "lastPostRestartWindowMedian": 0,
+    "tolerance": 40,
+    "slopePerMinute": 0
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 835856,
+    "lastPostRestartWindowMedianBytes": 835600,
+    "growthBytes": -256,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -2281.576354679803,
+    "slopeAllowanceBytesPerMinute": 18724.571428571428,
+    "maximumLiveBytes": 957144
+  }
+}

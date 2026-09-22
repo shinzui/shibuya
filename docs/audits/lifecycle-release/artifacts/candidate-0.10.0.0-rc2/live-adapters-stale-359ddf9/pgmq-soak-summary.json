@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "pgmq",
+  "scenario": "soak",
+  "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-soak.csv",
+  "deliveryLedger": {
+    "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-soak-ledger.json",
+    "runId": "rc2-pgmq-soak-final",
+    "producedIdentityCount": 34525,
+    "processedIdentityCount": 34525,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0
+  },
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 20,
+  "sampleCount": 61,
+  "postRestartTrendSampleCount": 29,
+  "errors": [],
+  "totals": {
+    "produced": 34525,
+    "processed": 34525,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.180555555555557,
+    "achievedProcessRatePerSecond": 19.180555555555557
+  },
+  "backlog": {
+    "maximum": 19,
+    "firstPostRestartWindowMedian": 10,
+    "lastPostRestartWindowMedian": 11,
+    "tolerance": 40,
+    "slopePerMinute": -0.12906403940886702
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 727080,
+    "lastPostRestartWindowMedianBytes": 723136,
+    "growthBytes": -3944,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -575.1487684729065,
+    "slopeAllowanceBytesPerMinute": 18724.571428571428,
+    "maximumLiveBytes": 727736
+  }
+}

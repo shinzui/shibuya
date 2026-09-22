@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kiroku",
+  "scenario": "soak",
+  "input": "/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak.csv",
+  "deliveryLedger": {
+    "input": "/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak-ledger.json",
+    "runId": "rc2-kiroku-soak-final",
+    "producedIdentityCount": 34583,
+    "processedIdentityCount": 34583,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0
+  },
+  "scheduledDurationSeconds": 1800,
+  "restartAtSeconds": 900,
+  "targetRatePerSecond": 20,
+  "sampleCount": 60,
+  "postRestartTrendSampleCount": 29,
+  "errors": [],
+  "totals": {
+    "produced": 34583,
+    "processed": 34583,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.212777777777777,
+    "achievedProcessRatePerSecond": 19.212777777777777
+  },
+  "backlog": {
+    "maximum": 1,
+    "firstPostRestartWindowMedian": 0,
+    "lastPostRestartWindowMedian": 0,
+    "tolerance": 40,
+    "slopePerMinute": 0
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 831472,
+    "lastPostRestartWindowMedianBytes": 837136,
+    "growthBytes": 5664,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -2072.985221674877,
+    "slopeAllowanceBytesPerMinute": 18724.571428571428,
+    "maximumLiveBytes": 960232
+  }
+}

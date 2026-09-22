@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "pgmq",
+  "scenario": "saturation",
+  "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-saturation.csv",
+  "deliveryLedger": {
+    "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-saturation-ledger.json",
+    "runId": "rc2-pgmq-saturation-final",
+    "producedIdentityCount": 18634,
+    "processedIdentityCount": 18634,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0
+  },
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 200,
+  "sampleCount": 25,
+  "postRestartTrendSampleCount": 9,
+  "errors": [],
+  "totals": {
+    "produced": 18634,
+    "processed": 18634,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 155.28333333333333,
+    "achievedProcessRatePerSecond": 155.28333333333333
+  },
+  "backlog": {
+    "maximum": 155,
+    "firstPostRestartWindowMedian": 73,
+    "lastPostRestartWindowMedian": 129,
+    "tolerance": 400,
+    "slopePerMinute": 48.2
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 1258080,
+    "lastPostRestartWindowMedianBytes": 1217328,
+    "growthBytes": -40752,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": -80817.59999999999,
+    "slopeAllowanceBytesPerMinute": 393216,
+    "maximumLiveBytes": 1265544
+  }
+}

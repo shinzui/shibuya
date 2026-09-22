@@ -108,7 +108,7 @@ No local docs/adr corpus existed during discovery. The repository's first record
 | 41 | Verify PGMQ acknowledgement and dead-letter recovery under faults | [EP-41](../plans/41-verify-pgmq-acknowledgement-and-dead-letter-recovery-under-faults.md) | EP-37 | EP-38 Milestone 3 failure contract gates exhausted-finalization acceptance; EP-45 measurements | Complete |
 | 42 | Repair MessageDB checkpoint and shutdown lifecycle semantics | [EP-42](../plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md) | None | None | Cancelled (MessageDB adapter deprecated; owner decision 2026-09-19) |
 | 43 | Make Kiroku subscription ownership exception safe | [EP-43](../plans/43-make-kiroku-subscription-ownership-exception-safe.md) | EP-37 | EP-38 integration only, no gated milestone; EP-45 measurements | Complete |
-| 44 | Certify the integrated lifecycle release candidate | [EP-44](../plans/44-certify-the-integrated-lifecycle-release-candidate.md) | EP-37, EP-38, EP-39, EP-40, EP-41, EP-43, EP-45; existing standalone EP-46; existing EP-34 and EP-35 compatibility gates | None | In Progress (matrix complete; human risk disposition and independent review pending) |
+| 44 | Certify the integrated lifecycle release candidate | [EP-44](../plans/44-certify-the-integrated-lifecycle-release-candidate.md) | EP-37, EP-38, EP-39, EP-40, EP-41, EP-43, EP-45; existing standalone EP-46; existing EP-34 and EP-35 compatibility gates | None | In Progress (RC2 matrix, performance, risk disposition, and validation complete; independent review pending) |
 
 Existing EP-34, EP-35 and EP-46 are not children of this MasterPlan. EP-46 is docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, the urgent standalone fix for REV-16, which ships as its own patch release and is expected to complete before any child here starts. The exact paths and compatibility responsibilities of all three are recorded in EP-44; their completion must be checked rather than inferred from old status prose. EP-34 Milestones 1 through 3 and EP-35's complete source/test/combined-solve gates passed on 2026-09-21; their publication milestones await the same release-owner version coordination as EP-44. EP-46 is Complete: its fix was published as shibuya-core and shibuya-metrics 0.9.0.3 on 2026-09-20, which makes 0.9.0.3 the released baseline for this initiative and moves EP-34's provisional release to 0.9.0.4. Existing EP-36 concerns only the MessageDB adapter and is no longer a prerequisite of anything here.
 
@@ -325,6 +325,13 @@ region once removes the per-message transition while Ahead, Async, and partition
 retain scoped action unmasking. Forty fresh O2 N1 pairs pass all ten serial cells; the adverse
 throughput upper bounds are 0.98674 and 1.02400.
 
+**Candidate identity must be recaptured after a hot-path refinement (2026-09-22 UTC, EP-44).**
+The initial certification manifest attempted to carry performance evidence across a later Core
+scheduler-loop masking optimization. RC2 instead rebuilt the released baseline and exact
+candidate from clean worktrees and reran every functional, paired-performance, live-service,
+wire, and high-cardinality gate. The resulting dossier binds all evidence to Core/Metrics
+`e28a958`, Kafka `adadf9f`, PGMQ `6ce44ab`, Kiroku `407cb22`, and solver hash `1ebf23d5`.
+
 
 ## Decision Log
 
@@ -461,22 +468,22 @@ and passes all five Kiroku persistence cells with 38 adapter and 308 store examp
 ephemeral PostgreSQL. The focused shutdown latency interval is -3.373% to +4.294%, inside the
 inherited 10% budget. All Phase B remediation children are complete, so EP-45 pass two resumes.
 
-EP-45 completed pass two at candidate production SHA
-`6461c74cda5235e292d221f36621d09910b3b6f0`. Its full paired N1 and N4 core matrices pass all
+EP-45's final RC2 capture uses candidate production SHA
+`e28a95893a534a15302529850eea54f6e0682de0`. Its full paired N1 and N4 core matrices pass all
 168 measured cells, and Kafka, PGMQ, and Kiroku pass sustainable, saturation, and 30-minute
-midpoint-restart captures with exact terminal counts, zero failures, zero final backlog, and
-bounded retained heaps. Real-wire stress adds 100,000 successful readiness requests and 10,000
-successful WebSocket cycles. A 50-process diagnostic quantifies REV-15-L1 through 50,000 distinct
-batch keys without pretending the implementation now bounds that key count. EP-44 is active;
-the candidate version, this residual limitation's human disposition, and independent review
-remain explicit certification prerequisites.
+midpoint-restart captures with exact identity-ledger completion, zero discrepancies, zero
+failures, zero final backlog, and bounded retained heaps. Real-wire stress adds 100,000
+successful readiness requests and 10,000 successful WebSocket cycles. A 50-process diagnostic
+quantifies REV-15-L1 through 50,000 distinct batch keys without pretending the implementation
+now bounds that key count; the release owner accepted the residual limitation with explicit
+calendar and version expiry. EP-44's independent review remains the certification prerequisite.
 
 EP-44 release-gate preparation repaired Kafka's default Nix package in
 `mori://shinzui/shibuya-kafka-adapter` commit `35a3e41` and raised its acknowledgement model
 budget to 1,000 deterministic seeds in commit `d2725ba`. The adapter passes its full
 candidate-core suite against live Kafka, and the portable released-dependency flake passes both
-its default build and flake checks. Candidate freeze remains blocked on the release-owner
-version and residual-risk decisions; independent review also remains outstanding.
+its default build and flake checks. RC2 is frozen and machine-valid; independent review remains
+outstanding.
 
 
 ## Revision Notes
@@ -574,3 +581,10 @@ deterministic acknowledgement reference-model gate to 1,000 seeds. The live cand
 suite, `nix build .#default`, `nix flake check`, and formatting all pass at Kafka commits
 `d2725ba` and `35a3e41`. The candidate is not frozen: version/bound changes, the release-owner
 disposition of REV-15-L1, and independent review remain mandatory.
+
+2026-09-22 UTC: Superseded RC1 with exact-candidate RC2 after the final Core hot-path change.
+Fresh functional N1/N4 runs, 1,600 schedule repetitions, 168 paired performance cells, nine
+live-adapter cells, real-wire stress, and the high-cardinality envelope pass against one source
+map and solver hash. All 14 accepted findings have a distinct, named, time- and version-bounded
+human decision. The release validator passes all 52 findings and 70 mandatory cells and rejects
+a stale-SHA mutation. The independent rereview is the only remaining certification gate.

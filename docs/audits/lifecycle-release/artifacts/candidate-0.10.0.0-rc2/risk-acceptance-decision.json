@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "shibuya-lifecycle-0.10.0.0-rc2",
+  "decisionRecordedAt": "2026-09-21T22:07:41Z",
+  "decisionSource": "The release owner explicitly approved the named human dispositions, scope, expiries, and compensating controls in the implementation session on 2026-09-21.",
+  "scope": "Shibuya 0.10.x",
+  "acceptances": [
+    {
+      "findingId": "REV-1-L1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The broader initiative supplies the missing matrix and preserves the original review boundary.",
+      "controls": [
+        "Preserve the complete candidate matrix and narrow review boundary in retained release evidence.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-1-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "ADR 0001 makes this a durable test-design constraint.",
+      "controls": [
+        "Keep the ADR-backed lifecycle test design and regression evidence release-gated.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-7-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "This is an intentional sampling contract, not evidence of durable acknowledgement.",
+      "controls": [
+        "Document sampling as observability-only and keep acknowledgement correctness in adapter evidence.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-7-A2",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The distinction is a documented semantic boundary.",
+      "controls": [
+        "Keep the semantic boundary documented and covered by exact metrics and health fixtures.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-10-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "Serial processing and the absence of a DLQ producer remain explicit boundaries. The prior lack of cooperative-rebalance fencing is remediated when callers install kafkaRebalanceHandler; live two-consumer evidence proves the old owner's callback is rejected.",
+      "controls": [
+        "Document serial processing and missing DLQ production, and require the rebalance fencing helper where cooperative rebalancing is used.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-10-A2",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "Live buffered-retry, restart, idle-shutdown, and repeated-shutdown cases preserve the documented close-time commit contract without skipping unresolved work.",
+      "controls": [
+        "Retain live buffered-retry, restart, idle-shutdown, and repeated-shutdown evidence for each candidate.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-11-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "Ephemeral PostgreSQL restart preserves the same durable message identity, which becomes readable after the configured visibility lease expires; delayed availability remains the documented at-least-once contract.",
+      "controls": [
+        "Document visibility-timeout delayed redelivery and retain live durable-identity restart evidence.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-13-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "At-least-once replay is an intentional checkpoint contract.",
+      "controls": [
+        "Document at-least-once replay and retain per-delivery restart evidence for Kiroku.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-14-V1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "This is positive historical evidence with an explicitly narrow scope.",
+      "controls": [
+        "Do not generalize historical evidence beyond its recorded candidate and lifecycle boundary.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-14-L1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The MasterPlan explicitly preserves the narrow approval boundary.",
+      "controls": [
+        "Keep the approval boundary explicit in the MasterPlan and release verdict.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-14-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "This is a runtime boundary that must be documented rather than hidden.",
+      "controls": [
+        "Document the uninterruptible-user-code boundary and retain bounded-shutdown regression coverage.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-15-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The bounded overshoot is documented design behavior.",
+      "controls": [
+        "Keep bounded overshoot documented and covered by the keyed-concurrency reference model.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-15-L1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T20:30:04Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The 0.10.x release documents the measured finite-range memory envelope and requires callers to bound caller-controlled distinct batch-key cardinality. This is a time- and version-bounded residual-risk acceptance, not a claim that the implementation enforces a key limit.",
+      "controls": [
+        "Callers bound caller-controlled distinct in-progress batch-key cardinality.",
+        "Release documentation states the observed upper envelope of 703 bytes per additional key over the tested 1,000-to-50,000-key range.",
+        "Reopen REV-15-L1 before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    },
+    {
+      "findingId": "REV-16-A1",
+      "acceptedBy": {
+        "kind": "human",
+        "name": "Nadeem Bitar"
+      },
+      "acceptedAt": "2026-09-21T21:01:49Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0",
+      "rationale": "The two tests prove distinct ownership states.",
+      "controls": [
+        "Retain both ownership-state regression tests and process-isolated GC coverage.",
+        "Reopen this acceptance before 0.11.0.0 or after the calendar expiry, whichever occurs first."
+      ]
+    }
+  ]
+}

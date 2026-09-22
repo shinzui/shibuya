@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "adapter": "kafka",
+  "scenario": "saturation",
+  "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-saturation.csv",
+  "deliveryLedger": {
+    "input": "docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-saturation-ledger.json",
+    "runId": "rc2-e28-kafka-saturation-20260922",
+    "producedIdentityCount": 2360,
+    "processedIdentityCount": 2360,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0
+  },
+  "scheduledDurationSeconds": 120,
+  "restartAtSeconds": 60,
+  "targetRatePerSecond": 20,
+  "sampleCount": 31,
+  "postRestartTrendSampleCount": 8,
+  "errors": [],
+  "totals": {
+    "produced": 2360,
+    "processed": 2360,
+    "failed": 0,
+    "finalBacklog": 0,
+    "achievedProduceRatePerSecond": 19.666666666666668,
+    "achievedProcessRatePerSecond": 19.666666666666668
+  },
+  "backlog": {
+    "maximum": 136,
+    "firstPostRestartWindowMedian": 127,
+    "lastPostRestartWindowMedian": 134,
+    "tolerance": 40,
+    "slopePerMinute": 15.174708818635612
+  },
+  "retainedMemory": {
+    "firstPostRestartWindowMedianBytes": 530240,
+    "lastPostRestartWindowMedianBytes": 531356,
+    "growthBytes": 1116,
+    "toleranceBytes": 262144,
+    "slopeBytesPerMinute": 4306.26289517471,
+    "slopeAllowanceBytesPerMinute": 436906.6666666667,
+    "maximumLiveBytes": 567320
+  }
+}

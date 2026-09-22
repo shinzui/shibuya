@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "shibuya-lifecycle-0.10.0.0-rc2",
+  "capturedAt": "2026-09-22T04:53:09Z",
+  "sourceShas": {
+    "mori://shinzui/shibuya/packages/shibuya-core": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya/packages/shibuya-metrics": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter": "adadf9f52c7ca235fc41f5d7d3e95494735530ab",
+    "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter": "6ce44abb28c983ede774ac8c6a9ada9c96b0a65f",
+    "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter": "407cb223f7ba5007d36cc77550d8489a1ae7206d"
+  },
+  "solverPlanHash": "1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+  "environment": {
+    "machineId": "MacBookPro18,2",
+    "platform": "aarch64-darwin",
+    "compiler": "ghc-9.12.4",
+    "optimization": "O2",
+    "rts": "-N4 -T -A32m",
+    "services": [
+      {"name": "Redpanda", "version": "26.2.1"},
+      {"name": "rpk", "version": "26.2.3"},
+      {"name": "PostgreSQL", "version": "17.11"}
+    ]
+  },
+  "executables": {
+    "kafka": {
+      "path": "dist-release-kafka/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-bench-0.9.1.0/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live",
+      "sha256": "a952d10d8605fab925ff9806300f116f51ed8881c58b077fbaec1910ab004c71"
+    },
+    "pgmq": {
+      "path": "dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-bench-0.1.0.0/x/endurance-test/opt/build/endurance-test/endurance-test",
+      "sha256": "a9dac9c95fc9d40daa7a9419b03319ce6676d60462eab404d302d9ce827907ad"
+    },
+    "kiroku": {
+      "path": "dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-kiroku-adapter-0.5.1.3/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live",
+      "sha256": "9603ff4d8db7c488868db7d5ae4cddaf089a462295583cb12930145e645afb57"
+    }
+  },
+  "runs": [
+    {"adapter":"kafka","scenario":"sustainable","runId":"rc2-e28-kafka-sustainable-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":2,"produced":241,"processed":241,"summary":"kafka-sustainable-summary.json","summarySha256":"d87f7a01880c4390fed64aa0df528249c4ccf32a2e4c2925c667b3744c2ba0ab","status":"pass"},
+    {"adapter":"kafka","scenario":"saturation","runId":"rc2-e28-kafka-saturation-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":20,"produced":2360,"processed":2360,"summary":"kafka-saturation-summary.json","summarySha256":"84a371927b8af37525792468d4c4ab93ed182949e3cbf0acd6cbc536807b1153","status":"pass"},
+    {"adapter":"kafka","scenario":"soak","runId":"rc2-e28-kafka-soak-20260922","durationSeconds":1800,"restartAtSeconds":900,"targetRatePerSecond":2,"produced":3594,"processed":3594,"summary":"kafka-soak-summary.json","summarySha256":"5a7cecc46b8c22fe2049c17641bf9737099fd3aad36f30a55035485740ec05d6","status":"pass"},
+    {"adapter":"pgmq","scenario":"sustainable","runId":"rc2-e28-pgmq-sustainable-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":20,"produced":2319,"processed":2319,"summary":"pgmq-sustainable-summary.json","summarySha256":"4c0620afb87ad65d60856a82e68d1298da22dbf0936150fdebb992d6c46cb7c4","status":"pass"},
+    {"adapter":"pgmq","scenario":"saturation","runId":"rc2-e28-pgmq-saturation-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":200,"produced":19069,"processed":19069,"summary":"pgmq-saturation-summary.json","summarySha256":"8a26af2cb9b35cc38f7e2c3df139ca8be5c32a18dacd1f8817fc010350f24b0a","status":"pass"},
+    {"adapter":"pgmq","scenario":"soak","runId":"rc2-e28-pgmq-soak-20260922","durationSeconds":1800,"restartAtSeconds":900,"targetRatePerSecond":20,"produced":34473,"processed":34473,"summary":"pgmq-soak-summary.json","summarySha256":"0e1f2efa9b36d114f160a093ef39c354e0bf287bf3556cc4f18462af8f875188","status":"pass"},
+    {"adapter":"kiroku","scenario":"sustainable","runId":"rc2-e28-kiroku-sustainable-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":20,"produced":2327,"processed":2327,"summary":"kiroku-sustainable-summary.json","summarySha256":"b8a1d1bdcb1fad73e810e02c46f5c46ec8f8b034da685d2eea05f0e72a775dc9","status":"pass"},
+    {"adapter":"kiroku","scenario":"saturation","runId":"rc2-e28-kiroku-saturation-20260922","durationSeconds":120,"restartAtSeconds":60,"targetRatePerSecond":200,"produced":19878,"processed":19878,"summary":"kiroku-saturation-summary.json","summarySha256":"5da61f527bde1b7703f0e6f1bf6667e5efd5e4828bbec2bee4a96193a76ff4fa","status":"pass"},
+    {"adapter":"kiroku","scenario":"soak","runId":"rc2-e28-kiroku-soak-20260922","durationSeconds":1800,"restartAtSeconds":900,"targetRatePerSecond":20,"produced":34671,"processed":34671,"summary":"kiroku-soak-summary.json","summarySha256":"0acd47f141c1937785849e230b246e9564f399c6278b8098a85104d003d72596","status":"pass"}
+  ],
+  "commands": [
+    "env DURATION_SECS=120 MESSAGES_PER_SECOND=2 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-sustainable.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-sustainable-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kafka-sustainable-20260922 RESTART_AT_SECS=60 dist-release-kafka/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-bench-0.9.1.0/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "env DURATION_SECS=120 MESSAGES_PER_SECOND=20 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-saturation.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-saturation-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kafka-saturation-20260922 RESTART_AT_SECS=60 dist-release-kafka/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-bench-0.9.1.0/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "env DURATION_SECS=1800 MESSAGES_PER_SECOND=2 SAMPLE_INTERVAL_SECS=30 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-soak.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kafka-soak-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kafka-soak-20260922 RESTART_AT_SECS=900 dist-release-kafka/build/aarch64-osx/ghc-9.12.4/shibuya-kafka-adapter-bench-0.9.1.0/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "env PG_CONNECTION_STRING='host=127.0.0.1 port=55432 dbname=shibuya_pgmq_rc2 user=shinzui' DURATION_SECS=120 MESSAGES_PER_SECOND=20 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-sustainable.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-sustainable-ledger.json LIFECYCLE_RUN_ID=rc2-e28-pgmq-sustainable-20260922 RESTART_AT_SECS=60 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-bench-0.1.0.0/x/endurance-test/opt/build/endurance-test/endurance-test +RTS -N4 -T -A32m -RTS",
+    "env PG_CONNECTION_STRING='host=127.0.0.1 port=55432 dbname=shibuya_pgmq_rc2 user=shinzui' DURATION_SECS=120 MESSAGES_PER_SECOND=200 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-saturation.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-saturation-ledger.json LIFECYCLE_RUN_ID=rc2-e28-pgmq-saturation-20260922 RESTART_AT_SECS=60 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-bench-0.1.0.0/x/endurance-test/opt/build/endurance-test/endurance-test +RTS -N4 -T -A32m -RTS",
+    "env PG_CONNECTION_STRING='host=127.0.0.1 port=55432 dbname=shibuya_pgmq_rc2 user=shinzui' DURATION_SECS=1800 MESSAGES_PER_SECOND=20 SAMPLE_INTERVAL_SECS=30 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-soak.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/pgmq-soak-ledger.json LIFECYCLE_RUN_ID=rc2-e28-pgmq-soak-20260922 RESTART_AT_SECS=900 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-pgmq-adapter-bench-0.1.0.0/x/endurance-test/opt/build/endurance-test/endurance-test +RTS -N4 -T -A32m -RTS",
+    "env DURATION_SECS=120 MESSAGES_PER_SECOND=20 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-sustainable.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-sustainable-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kiroku-sustainable-20260922 RESTART_AT_SECS=60 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-kiroku-adapter-0.5.1.3/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "env DURATION_SECS=120 MESSAGES_PER_SECOND=200 SAMPLE_INTERVAL_SECS=5 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-saturation.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-saturation-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kiroku-saturation-20260922 RESTART_AT_SECS=60 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-kiroku-adapter-0.5.1.3/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "env DURATION_SECS=1800 MESSAGES_PER_SECOND=20 SAMPLE_INTERVAL_SECS=30 OUTPUT_CSV=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak.csv OUTPUT_LEDGER=docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak-ledger.json LIFECYCLE_RUN_ID=rc2-e28-kiroku-soak-20260922 RESTART_AT_SECS=900 dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-kiroku-adapter-0.5.1.3/x/lifecycle-live/opt/build/lifecycle-live/lifecycle-live +RTS -N4 -T -A32m -RTS",
+    "bun scripts/audit/analyze-adapter-soak.ts --input docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak.csv --ledger docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak-ledger.json --output docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/live-adapters/kiroku-soak-summary.json --adapter kiroku --scenario soak --duration-seconds 1800 --restart-at-seconds 900 --target-rate 20"
+  ],
+  "integrity": {
+    "allNineSummariesPassed": true,
+    "duplicateIdentityCount": 0,
+    "missingIdentityCount": 0,
+    "unexpectedIdentityCount": 0,
+    "malformedDeliveries": 0,
+    "finalBacklog": 0
+  },
+  "status": "pass"
+}

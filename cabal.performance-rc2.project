@@ -1,0 +1,33 @@
+-- Core-only paired performance project for
+-- mori://shinzui/shibuya/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance
+--
+-- The baseline and candidate use this identical project plus the integrated
+-- candidate freeze. The baseline changes only its local production source and
+-- the dependency-name compatibility patch recorded in the rc2 provenance.
+packages:
+  shibuya-core
+  shibuya-core-bench
+
+with-compiler: ghc-9.12.4
+tests: False
+benchmarks: True
+
+source-repository-package
+  type: git
+  location: https://github.com/iand675/hs-opentelemetry
+  tag: hs-opentelemetry-api-types-1.0.0.0
+  subdir:
+    api
+    api-types
+    sdk
+    otlp
+    propagators/w3c
+    semantic-conventions
+    exporters/in-memory
+
+allow-newer:
+  proto-lens:base,
+  proto-lens:ghc-prim,
+  proto-lens-runtime:base,
+  proto-lens-protobuf-types:base,
+  proto-lens-protobuf-types:ghc-prim

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "shibuya-lifecycle-0.10.0.0-rc2",
+  "status": "pass",
+  "recordedAt": "2026-09-22T04:55:00Z",
+  "sourceShas": {
+    "mori://shinzui/shibuya/packages/shibuya-core": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya/packages/shibuya-metrics": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter": "adadf9f52c7ca235fc41f5d7d3e95494735530ab",
+    "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter": "6ce44abb28c983ede774ac8c6a9ada9c96b0a65f",
+    "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter": "407cb223f7ba5007d36cc77550d8489a1ae7206d"
+  },
+  "solverPlanHash": "1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+  "gates": [
+    {
+      "id": "core-paired-n1",
+      "status": "pass",
+      "artifact": "final-verdict-n1.json",
+      "artifactSha256": "368ecda7c5ed50ec67dae81c92e6738d7c78716a11ecb35621f205796796df22",
+      "passedCells": 84,
+      "failedCells": 0
+    },
+    {
+      "id": "core-paired-n4",
+      "status": "pass",
+      "artifact": "final-verdict-n4.json",
+      "artifactSha256": "7b993cdd9d7bd90cb303460480def2a251c659bddaf4373fab005c11fd405e06",
+      "passedCells": 84,
+      "failedCells": 0
+    },
+    {
+      "id": "live-adapter-sustainable-saturation-and-soak",
+      "status": "pass",
+      "artifact": "../live-adapters/provenance.json",
+      "passedCells": 9,
+      "failedCells": 0,
+      "deliveryDiscrepancies": 0,
+      "finalBacklog": 0
+    },
+    {
+      "id": "metrics-real-wire",
+      "status": "pass",
+      "artifact": "wire/provenance.json",
+      "healthRequests": 100000,
+      "webSocketConnections": 10000,
+      "errors": 0,
+      "residualWebSocketConnections": 0
+    },
+    {
+      "id": "batch-high-cardinality-envelope",
+      "status": "measured-and-accepted",
+      "artifact": "high-cardinality-envelope.json",
+      "artifactSha256": "e4182b752aeef3335a02b35b8901840f66f4c1fb84cee7b93852131082837d5a",
+      "processSamples": 50,
+      "testedDistinctKeyRange": [1000, 50000],
+      "observedUpperEnvelopeBytesPerKey": {"N1": 696, "N4": 649}
+    }
+  ],
+  "lossOrLeakFailures": 0,
+  "budgetChanges": [],
+  "waivers": [],
+  "residualLimitations": [
+    {
+      "findingId": "REV-15-L1",
+      "description": "Distinct in-progress batch keys remain unbounded by inbox capacity.",
+      "releaseDisposition": "accepted-by-release-owner",
+      "acceptanceArtifact": "../risk-acceptance-decision.json",
+      "acceptedBy": {"kind": "human", "name": "Nadeem Bitar"},
+      "acceptedAt": "2026-09-21T20:30:04Z",
+      "scope": "Shibuya 0.10.x",
+      "expiresAt": "2026-12-31T23:59:59Z",
+      "expiresBeforeVersion": "0.11.0.0"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-22T02:43:28Z",
+  "candidate": {
+    "productionSha": "e28a95893a534a15302529850eea54f6e0682de0",
+    "productionSourceClean": true,
+    "worktree": "/tmp/shibuya-rc2-candidate-clean.sSaZ4K/repo",
+    "harnessSha": "6f5f5e237e6f5839b9e4ba2fe1e387e0c6b0bec2",
+    "harnessOverlayOnly": true,
+    "executable": "/private/tmp/shibuya-rc2-candidate-clean.sSaZ4K/repo/dist-rc2-performance-candidate-clean/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/lifecycle-load/opt/build/lifecycle-load/lifecycle-load",
+    "executableSha256": "1ef905fadd7b83bae63c485e0ba6e7060f149cb2ee6d4047ff41a858617f81df",
+    "rawPlan": "performance/candidate-plan.json",
+    "rawPlanSha256": "1fe4f8760d48d0d539b36b24b754efd82720af3b2f8d42998bd3b8638ef799ce"
+  },
+  "baseline": {
+    "productionSha": "7512b5c692af1c005392e4445cfa26a9be41f9ea",
+    "productionSourceDirectoryClean": true,
+    "worktree": "/private/tmp/shibuya-rc2-baseline.XXO8qQ",
+    "harnessSha": "6f5f5e237e6f5839b9e4ba2fe1e387e0c6b0bec2",
+    "compatibilityPatch": {
+      "scope": "shibuya-core/shibuya-core.cabal dependency-name compatibility only",
+      "sha256": "857d79ce6ae258caa87afcbe55b8bf4d8daf86d5a05239481f2fcb990cf55053",
+      "productionSourceChanged": false
+    },
+    "executable": "/private/tmp/shibuya-rc2-baseline.XXO8qQ/dist-rc2-performance-baseline-h6f5/build/aarch64-osx/ghc-9.12.4/shibuya-core-bench-0.1.0.0/x/lifecycle-load/opt/build/lifecycle-load/lifecycle-load",
+    "executableSha256": "dd0de17f37583948009cbcff3729f6d1dc4adb5dd078cdd7b5e5b82419c7a155",
+    "rawPlan": "performance/baseline-plan.json",
+    "rawPlanSha256": "fc7a6930e4104e96e4603b30bae6a0ce21abb6c3c7c4c4331f92d1e640d5a02c"
+  },
+  "solver": {
+    "integratedCandidatePlanHash": "1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+    "performanceProjectSha256": "6f356f416d2dfe56c2a70d3d002c88616410a00db181aac3d46c2c9addfce32e",
+    "performanceFreezeSha256": "e86b8a18e71de5171cb25cb4517f6afb5f1417b3f45197d5423f7b7648e16262",
+    "normalizedExternalSolution": "performance/external-solution.json",
+    "normalizedExternalSolutionSha256": "f98cdcb992aab61786f0778482d8d0bbb0243c118548f7f2529fae1eee77fc42",
+    "normalization": "Remove local shibuya packages and candidate-only effectful umbrella package, retain package names, versions, types, and flags, then sort. Baseline and candidate normalized outputs are byte-identical."
+  },
+  "environment": {
+    "machineId": "MacBookPro18,2",
+    "platform": "Darwin-arm64",
+    "compiler": "ghc-9.12.4",
+    "optimization": "O2",
+    "rtsAllocationArea": "-A32m"
+  },
+  "runs": [
+    {
+      "capabilities": 1,
+      "rts": "-N1 -T -A32m",
+      "segments": [
+        {"scenarios": "16 scenarios other than async-hot-key", "pairs": 40},
+        {"scenarios": "async-hot-key", "pairs": 1000}
+      ],
+      "baseline": "performance/final-baseline-n1.json",
+      "candidate": "performance/final-candidate-n1.json",
+      "verdict": "performance/final-verdict-n1.json",
+      "verdictSha256": "368ecda7c5ed50ec67dae81c92e6738d7c78716a11ecb35621f205796796df22",
+      "status": "pass"
+    },
+    {
+      "capabilities": 4,
+      "rts": "-N4 -T -A32m",
+      "segments": [
+        {"scenarios": "14 scenarios other than ahead-uniform-keys, async-hot-key, and websocket-churn-proxy", "pairs": 40},
+        {"scenarios": "ahead-uniform-keys, websocket-churn-proxy", "pairs": 300},
+        {"scenarios": "async-hot-key", "pairs": 1000}
+      ],
+      "baseline": "performance/final-baseline-n4.json",
+      "candidate": "performance/final-candidate-n4.json",
+      "verdict": "performance/final-verdict-n4.json",
+      "verdictSha256": "7b993cdd9d7bd90cb303460480def2a251c659bddaf4373fab005c11fd405e06",
+      "status": "pass"
+    }
+  ],
+  "budgets": "docs/audits/lifecycle-release/performance-budgets.json",
+  "comparisonCommand": "bun scripts/audit/compare-performance.ts --baseline <final-baseline> --candidate <final-candidate> --budgets docs/audits/lifecycle-release/performance-budgets.json --output <final-verdict>"
+}

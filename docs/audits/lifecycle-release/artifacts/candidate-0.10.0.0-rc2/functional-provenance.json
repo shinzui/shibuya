@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "shibuya-lifecycle-0.10.0.0-rc2",
+  "capturedAt": "2026-09-22T03:01:51Z",
+  "sourceShas": {
+    "mori://shinzui/shibuya/packages/shibuya-core": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya/packages/shibuya-metrics": "e28a95893a534a15302529850eea54f6e0682de0",
+    "mori://shinzui/shibuya-kafka-adapter/packages/shibuya-kafka-adapter": "adadf9f52c7ca235fc41f5d7d3e95494735530ab",
+    "mori://shinzui/shibuya-pgmq-adapter/packages/shibuya-pgmq-adapter": "6ce44abb28c983ede774ac8c6a9ada9c96b0a65f",
+    "mori://shinzui/kiroku/packages/shibuya-kiroku-adapter": "407cb223f7ba5007d36cc77550d8489a1ae7206d"
+  },
+  "solverPlanHash": "1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+  "candidateProject": {
+    "path": "cabal.release-candidate.project",
+    "sha256": "b86c710a697386e00724160e2b9ad1d4d8227021f0e1b2fbb0f0334134b1473a"
+  },
+  "freeze": {
+    "path": "cabal.release-candidate.project.freeze",
+    "sha256": "e86b8a18e71de5171cb25cb4517f6afb5f1417b3f45197d5423f7b7648e16262"
+  },
+  "environment": {
+    "compiler": "ghc-9.12.4",
+    "platform": "aarch64-darwin",
+    "seed": 20260921,
+    "quickCheckSuccesses": 1000
+  },
+  "runs": [
+    {
+      "id": "core-metrics-n1",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-core-test shibuya-metrics-test --test-show-details=direct --test-options='--ignore-dot-hspec --qc-max-success=1000 --seed=20260921 +RTS -N1 -RTS'",
+      "exitCode": 0,
+      "artifact": "core-metrics-n1.log",
+      "result": "236 core examples and 52 metrics examples passed"
+    },
+    {
+      "id": "core-metrics-n4",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-core-test shibuya-metrics-test --test-show-details=direct --test-options='--ignore-dot-hspec --qc-max-success=1000 --seed=20260921 +RTS -N4 -RTS'",
+      "exitCode": 0,
+      "artifact": "core-metrics-n4.log",
+      "result": "236 core examples and 52 metrics examples passed"
+    },
+    {
+      "id": "core-gc-n1",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-core-gc-test shibuya-core-gc-finished-test --test-show-details=direct --test-options='+RTS -N1 -RTS'",
+      "exitCode": 0,
+      "artifact": "core-gc-n1.log",
+      "result": "both process-isolated GC suites passed"
+    },
+    {
+      "id": "core-gc-n4",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-core-gc-test shibuya-core-gc-finished-test --test-show-details=direct --test-options='+RTS -N4 -RTS'",
+      "exitCode": 0,
+      "artifact": "core-gc-n4.log",
+      "result": "both process-isolated GC suites passed"
+    },
+    {
+      "id": "deterministic-schedule-repetitions",
+      "command": "bun scripts/audit/run-lifecycle-schedule-repetitions.ts --executable dist-release-candidate/build/aarch64-osx/ghc-9.12.4/shibuya-core-0.10.0.0/t/shibuya-core-test/build/shibuya-core-test/shibuya-core-test --output docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/schedule-repetitions.json --repetitions 100 --seed-start 20260921 --rts-cells N1,N4 --source-sha e28a95893a534a15302529850eea54f6e0682de0 --solver-plan-hash 1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27",
+      "exitCode": 0,
+      "artifact": "schedule-repetitions.json",
+      "artifactSha256": "b12f15af2467232c478e95fceea6f94fa7492fff0733119f4784f89b787ca017",
+      "result": "1600 of 1600 seeded runs passed"
+    },
+    {
+      "id": "kafka-n1-n4",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-kafka-adapter-test --test-show-details=direct --test-options='+RTS -N1 -RTS'; cabal --project-file=cabal.release-candidate.project test shibuya-kafka-adapter-test --test-show-details=direct --test-options='+RTS -N4 -RTS'",
+      "exitCode": 0,
+      "artifacts": ["kafka-n1.log", "kafka-n4.log"],
+      "result": "53 tests passed in each cell, including the 1000-seed model and live Redpanda integration"
+    },
+    {
+      "id": "pgmq-n1-n4",
+      "command": "cabal --project-file=cabal.release-candidate.project test shibuya-pgmq-adapter-test --enable-tests --test-show-details=direct --test-options='+RTS -N1 -RTS'; cabal --project-file=cabal.release-candidate.project test shibuya-pgmq-adapter-test --enable-tests --test-show-details=direct --test-options='+RTS -N4 -RTS'",
+      "exitCode": 0,
+      "artifacts": ["pgmq-n1.log", "pgmq-n4.log"],
+      "result": "177 examples passed in each cell against ephemeral PostgreSQL"
+    },
+    {
+      "id": "kiroku-n1-n4",
+      "command": "cabal --project-file=cabal.release-candidate.project test kiroku-store-test shibuya-kiroku-adapter-test --test-show-details=direct --test-options='+RTS -N1 -RTS'; cabal --project-file=cabal.release-candidate.project test kiroku-store-test shibuya-kiroku-adapter-test --test-show-details=direct --test-options='+RTS -N4 -RTS'",
+      "exitCode": 0,
+      "artifacts": ["kiroku-n1.log", "kiroku-n4.log"],
+      "result": "308 store examples and 38 adapter examples passed in each cell"
+    }
+  ],
+  "status": "pass"
+}

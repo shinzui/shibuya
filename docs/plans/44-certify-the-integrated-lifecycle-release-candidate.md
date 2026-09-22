@@ -46,8 +46,8 @@ Produce a defensible release decision for one exact set of core, metrics, and ad
 ## Progress
 
 
-- [x] (2026-09-21 13:41Z) Milestone 1: Freeze an exact compatible candidate manifest.
-- [x] (2026-09-21 13:41Z) Milestone 2: Execute the full fault, restart and soak matrix.
+- [x] (2026-09-22 04:56Z) Milestone 1: Freeze an exact compatible candidate manifest.
+- [x] (2026-09-22 04:56Z) Milestone 2: Execute the full fault, restart and soak matrix.
 - [ ] Milestone 3: Verify performance evidence and obtain independent review.
 - [ ] Milestone 4: Validate and publish the release-readiness verdict without releasing packages.
 
@@ -77,11 +77,11 @@ therefore uses one unified production solve plus the owning repositories' exact 
 test projects; it does not weaken either test dependency bound merely to make an artificial
 all-tests plan solve.
 
-2026-09-21: Release preparation changes after EP-45 touched no production source tree in Core,
-Metrics, Kafka, PGMQ, Kiroku Store, or the Kiroku adapter. EP-45's matched performance verdict
-is therefore carried forward under Milestone 3's explicit no-hot-path-change rule. The
-candidate-bound attestation records both the measured and frozen SHAs and both solver hashes;
-it does not rewrite the identity embedded in the original measurements.
+2026-09-22: The original RC1 carry-forward was invalidated when scheduler-loop masking changed
+the Core hot path. RC2 does not reuse that verdict. It rebuilds the released baseline and exact
+candidate from clean worktrees, reruns the complete N1/N4 paired matrix, all nine live-adapter
+cells, real-wire stress, and high-cardinality measurement, and binds them to the same four
+repository SHAs and unified solver hash as the functional evidence.
 
 
 ## Decision Log
@@ -100,27 +100,35 @@ Cabal project must compile and run the adapter tests against the exact local cor
 gate substitutes for the other.
 
 2026-09-21: Release Core and Metrics as 0.10.0.0 because exported lifecycle error constructors
-make the accumulated change PVP-major. Coordinate adapter patch releases at Kafka 0.9.0.2,
-PGMQ 0.16.0.1, Kiroku Store 0.8.0.2, and the Kiroku adapter 0.5.1.3, with committed Core 0.10
+make the accumulated change PVP-major. Coordinate adapter releases at Kafka 0.9.1.0,
+PGMQ 0.16.1.0, Kiroku Store 0.8.0.2, and the Kiroku adapter 0.5.1.3, with committed Core 0.10
 bounds. This decision freezes source candidates; Hackage uploads, tags, and pushes remain
 outside this certification plan.
 
-2026-09-21: Carry forward the completed EP-45 measurements because byte-level production-tree
-diff checks are empty between every measured revision and frozen release revision. Bind that
-decision to the new solver-plan hash in a separate attestation, while retaining the original
-measurement hash and raw artifacts unchanged.
+2026-09-22: Require fresh performance evidence after the final Core hot-path change. RC2 uses
+the exact release source, unified solver hash, and clean-worktree baseline/candidate builds;
+the previous carry-forward artifacts remain historical diagnostics and cannot certify RC2.
 
 2026-09-21: Accept REV-15-L1 as a named, bounded residual risk for Shibuya 0.10.x. Release
 owner Nadeem Bitar accepted the risk through 2026-12-31 or before 0.11.0.0, whichever occurs
 first, provided callers bound caller-controlled distinct batch-key cardinality and release
-documentation states the measured finite-range 703-byte-per-key envelope. This is an
+documentation states the measured finite-range 696-byte-per-key N1 and 649-byte-per-key N4
+envelopes. This is an
 acceptance, not a waiver or an implementation-enforced key limit.
 
 
 ## Outcomes & Retrospective
 
 
-To be filled during implementation. No remediation or certification is claimed by creation of this plan.
+RC2 binds Core/Metrics `e28a95893a534a15302529850eea54f6e0682de0`, Kafka
+`adadf9f52c7ca235fc41f5d7d3e95494735530ab`, PGMQ
+`6ce44abb28c983ede774ac8c6a9ada9c96b0a65f`, and Kiroku
+`407cb223f7ba5007d36cc77550d8489a1ae7206d` to solver hash
+`1ebf23d528595d2fed2b3cf6492a5ca03efeec80229b168edc023122cc730e27`.
+The functional matrix, 1,600 deterministic schedules, 168 paired performance cells, nine live
+adapter cells, real-wire load, and high-cardinality envelope pass. The validator accepts all 52
+findings and 70 mandatory cells and rejects a stale-SHA mutation. The five deprecated MessageDB
+records remain explicitly uncertified. Independent review is the remaining certification gate.
 
 
 ## Context and Orientation
@@ -232,3 +240,12 @@ control and release-note disclosure. The release validator then passed all 52 fi
 boundaries, and 70 mandatory cells. A deliberately stale candidate SHA fails all five evidence
 runs, proving the negative control. Independent review is still required before Milestones 3
 and 4 can close.
+
+2026-09-22 UTC: RC1 was superseded after the final Core scheduler-loop masking optimization
+changed the hot path. Froze RC2 at Core/Metrics `e28a958`, Kafka `adadf9f`, PGMQ `6ce44ab`, and
+Kiroku `407cb22`, with unified solver hash `1ebf23d5`. Fresh exact-source N1/N4 functional runs,
+1,600 deterministic schedules, 168 paired performance cells, nine live-adapter service cells,
+100,000 readiness requests, 10,000 WebSocket cycles, and 50 high-cardinality processes pass.
+The release manifest includes all 14 named human acceptances as a distinct candidate-bound run.
+The validator passes all 52 findings and 70 mandatory cells; an in-memory stale-SHA mutation is
+rejected. Independent review remains the only open certification gate.

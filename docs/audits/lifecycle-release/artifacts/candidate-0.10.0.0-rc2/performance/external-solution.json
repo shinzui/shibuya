@@ -1,0 +1,1267 @@
+[
+  {
+    "flags": {},
+    "pkg-name": "Glob",
+    "pkg-version": "0.10.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "base-ge-4-15": true,
+      "base-ge-4-16": true
+    },
+    "pkg-name": "OneTuple",
+    "pkg-version": "0.4.3",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "old-random": false,
+      "templatehaskell": true
+    },
+    "pkg-name": "QuickCheck",
+    "pkg-version": "2.15.0.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "StateVar",
+    "pkg-version": "1.2.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "usecas": false
+    },
+    "pkg-name": "abstract-deque",
+    "pkg-version": "0.3",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "ordered-keymap": true
+    },
+    "pkg-name": "aeson",
+    "pkg-version": "2.2.5.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "example": false
+    },
+    "pkg-name": "ansi-terminal",
+    "pkg-version": "1.1.5",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ansi-terminal-types",
+    "pkg-version": "1.1.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "appar",
+    "pkg-version": "0.1.8",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "array",
+    "pkg-version": "0.5.8.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "tagged": false
+    },
+    "pkg-name": "assoc",
+    "pkg-version": "1.1.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "bench": false,
+      "debug-auto-label": false
+    },
+    "pkg-name": "async",
+    "pkg-version": "2.2.6",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "debug": false
+    },
+    "pkg-name": "atomic-primops",
+    "pkg-version": "0.8.8",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "developer": false
+    },
+    "pkg-name": "attoparsec",
+    "pkg-version": "0.14.4",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "developer": false
+    },
+    "pkg-name": "attoparsec",
+    "pkg-version": "0.14.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "attoparsec-aeson",
+    "pkg-version": "2.2.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base",
+    "pkg-version": "4.21.2.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base-orphans",
+    "pkg-version": "0.9.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base16",
+    "pkg-version": "1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base16-bytestring",
+    "pkg-version": "1.0.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base64",
+    "pkg-version": "1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "base64-bytestring",
+    "pkg-version": "1.2.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "tagged": true
+    },
+    "pkg-name": "bifunctors",
+    "pkg-version": "5.6.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "binary",
+    "pkg-version": "0.8.9.3",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "simd": true
+    },
+    "pkg-name": "bitvec",
+    "pkg-version": "1.1.6.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "blaze-builder",
+    "pkg-version": "0.4.4.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "byteorder",
+    "pkg-version": "1.0.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "bytestring",
+    "pkg-version": "0.12.2.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "case-insensitive",
+    "pkg-version": "1.2.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "optimize-gmp": true
+    },
+    "pkg-name": "cborg",
+    "pkg-version": "0.2.10.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "bytestring-builder": false
+    },
+    "pkg-name": "cereal",
+    "pkg-version": "0.5.8.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "character-ps",
+    "pkg-version": "0.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "llvm": false
+    },
+    "pkg-name": "clock",
+    "pkg-version": "0.8.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "colour",
+    "pkg-version": "2.3.7",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "containers": true,
+      "distributive": true,
+      "indexed-traversable": true
+    },
+    "pkg-name": "comonad",
+    "pkg-version": "5.0.10",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "conduit",
+    "pkg-version": "1.3.6.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "conduit-extra",
+    "pkg-version": "1.3.8",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "containers",
+    "pkg-version": "0.7",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "statevar": true
+    },
+    "pkg-name": "contravariant",
+    "pkg-version": "1.5.6",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "cookie",
+    "pkg-version": "0.5.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "cryptohash-md5",
+    "pkg-version": "0.11.101.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "check_alignment": false,
+      "integer-gmp": true,
+      "old_toolchain_inliner": false,
+      "support_aesni": true,
+      "support_deepseq": true,
+      "support_pclmuldq": true,
+      "support_rdrand": true,
+      "support_sse": false,
+      "use_target_attributes": true
+    },
+    "pkg-name": "crypton",
+    "pkg-version": "1.1.5",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-asn1-encoding",
+    "pkg-version": "0.10.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-asn1-parse",
+    "pkg-version": "0.10.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-asn1-types",
+    "pkg-version": "0.4.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-connection",
+    "pkg-version": "0.4.6",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-pem",
+    "pkg-version": "0.3.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "example": false,
+      "network-3-0-0-0": true
+    },
+    "pkg-name": "crypton-socks",
+    "pkg-version": "0.6.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-x509",
+    "pkg-version": "1.9.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-x509-store",
+    "pkg-version": "1.9.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-x509-system",
+    "pkg-version": "1.9.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "crypton-x509-validation",
+    "pkg-version": "1.9.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "data-default",
+    "pkg-version": "0.8.0.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "data-default-class",
+    "pkg-version": "0.2.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "data-fix",
+    "pkg-version": "0.3.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "deepseq",
+    "pkg-version": "1.5.1.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "directory",
+    "pkg-version": "1.3.10.1",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "tagged": true
+    },
+    "pkg-name": "distributive",
+    "pkg-version": "0.6.3",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "werror": false
+    },
+    "pkg-name": "dlist",
+    "pkg-version": "1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "devel": false
+    },
+    "pkg-name": "ech-config",
+    "pkg-version": "0.0.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "effectful-core",
+    "pkg-version": "2.7.1.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "exceptions",
+    "pkg-version": "0.10.12",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "file-io",
+    "pkg-version": "0.1.6",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "filepath",
+    "pkg-version": "1.5.5.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "fusion-plugin-types",
+    "pkg-version": "0.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ghc-bignum",
+    "pkg-version": "1.3",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ghc-boot-th",
+    "pkg-version": "9.12.4",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ghc-internal",
+    "pkg-version": "9.1204.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ghc-prim",
+    "pkg-version": "0.13.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "half",
+    "pkg-version": "0.3.3",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "arch-native": false,
+      "random-initial-seed": false
+    },
+    "pkg-name": "hashable",
+    "pkg-version": "1.5.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "heaps",
+    "pkg-version": "0.4.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hpke",
+    "pkg-version": "0.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-api",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-api-types",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-exporter-handle",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-exporter-in-memory",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "grpc": false
+    },
+    "pkg-name": "hs-opentelemetry-exporter-otlp",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-otlp",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-propagator-b3",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-propagator-datadog",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-propagator-jaeger",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-propagator-w3c",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-propagator-xray",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "tls-metadata": true
+    },
+    "pkg-name": "hs-opentelemetry-sdk",
+    "pkg-version": "1.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-semantic-conventions",
+    "pkg-version": "1.40.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "hs-opentelemetry-semantic-conventions",
+    "pkg-version": "1.40.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "in-ghc-tree": false
+    },
+    "pkg-name": "hsc2hs",
+    "pkg-version": "0.68.10",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "network-uri": true
+    },
+    "pkg-name": "http-client",
+    "pkg-version": "0.7.19",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "http-client-tls",
+    "pkg-version": "0.4.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "aeson": true
+    },
+    "pkg-name": "http-conduit",
+    "pkg-version": "2.3.9.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "http-types",
+    "pkg-version": "0.12.6",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "base-ge-4-18": true
+    },
+    "pkg-name": "indexed-traversable",
+    "pkg-version": "0.1.5",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "indexed-traversable-instances",
+    "pkg-version": "0.1.2.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "integer-conversion",
+    "pkg-version": "0.1.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "integer-gmp",
+    "pkg-version": "1.1",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "check-bounds": false,
+      "integer-gmp": true
+    },
+    "pkg-name": "integer-logarithms",
+    "pkg-version": "1.0.5",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "iproute",
+    "pkg-version": "1.7.15",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "lens-family",
+    "pkg-version": "2.1.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "lens-family-core",
+    "pkg-version": "2.1.3",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "no-unicode": false,
+      "system-libyaml": false
+    },
+    "pkg-name": "libyaml",
+    "pkg-version": "0.1.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "libyaml-clib",
+    "pkg-version": "0.2.5",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "lockfree-queue",
+    "pkg-version": "0.2.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "microlens",
+    "pkg-version": "0.5.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "mime-types",
+    "pkg-version": "0.1.2.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "use_crypton": true
+    },
+    "pkg-name": "mlkem",
+    "pkg-version": "0.2.3.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "monad-control",
+    "pkg-version": "1.0.3.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "mono-traversable",
+    "pkg-version": "1.0.21.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "mtl",
+    "pkg-version": "2.3.2",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "devel": false
+    },
+    "pkg-name": "network",
+    "pkg-version": "3.2.9.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "network-bsd",
+    "pkg-version": "2.8.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "network-byte-order",
+    "pkg-version": "0.1.8",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "network-uri",
+    "pkg-version": "2.6.4.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "nqe",
+    "pkg-version": "0.6.6",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "process": true
+    },
+    "pkg-name": "optparse-applicative",
+    "pkg-version": "0.19.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "os-string",
+    "pkg-version": "2.0.10",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "parsec",
+    "pkg-version": "3.1.18.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "pretty",
+    "pkg-version": "1.1.3.6",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "buildreadme": false,
+      "text": true
+    },
+    "pkg-name": "prettyprinter",
+    "pkg-version": "1.7.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "text": true
+    },
+    "pkg-name": "prettyprinter-ansi-terminal",
+    "pkg-version": "1.1.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "primitive",
+    "pkg-version": "0.9.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "process",
+    "pkg-version": "1.6.26.1",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "profunctors",
+    "pkg-version": "5.6.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "proto-lens",
+    "pkg-version": "0.7.1.7",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "proto-lens-runtime",
+    "pkg-version": "0.7.0.8",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "ram",
+    "pkg-version": "0.22.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "random",
+    "pkg-version": "1.2.1.3",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "resourcet",
+    "pkg-version": "1.3.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "rts",
+    "pkg-version": "1.0.3",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "safe-exceptions",
+    "pkg-version": "0.1.7.4",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "integer-simple": false
+    },
+    "pkg-name": "scientific",
+    "pkg-version": "0.3.8.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "semigroupoids": true
+    },
+    "pkg-name": "semialign",
+    "pkg-version": "1.4",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "comonad": true,
+      "containers": true,
+      "contravariant": true,
+      "tagged": true,
+      "unordered-containers": true
+    },
+    "pkg-name": "semigroupoids",
+    "pkg-version": "6.0.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "newtime15": true
+    },
+    "pkg-name": "serialise",
+    "pkg-version": "0.2.6.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "split",
+    "pkg-version": "0.2.5.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "optimised-mixer": false
+    },
+    "pkg-name": "splitmix",
+    "pkg-version": "0.1.3.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "stm",
+    "pkg-version": "2.5.3.1",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "use-bytestring-builder": false
+    },
+    "pkg-name": "streaming-commons",
+    "pkg-version": "0.2.3.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "debug": false,
+      "fusion-plugin": false,
+      "has-llvm": false,
+      "inspection": false,
+      "internal-dev": false,
+      "internal-use-unliftio": false,
+      "limit-build-mem": false,
+      "opt": true
+    },
+    "pkg-name": "streamly",
+    "pkg-version": "0.11.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "debug": false,
+      "force-lstat-readdir": false,
+      "has-llvm": false,
+      "internal-dev": false,
+      "internal-use-unliftio": false,
+      "limit-build-mem": false,
+      "opt": true,
+      "use-folds": false,
+      "use-unfolds": false
+    },
+    "pkg-name": "streamly-core",
+    "pkg-version": "0.3.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "strict",
+    "pkg-version": "0.5.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "strict-mutable-base",
+    "pkg-version": "2.0.0.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "deepseq": true,
+      "template-haskell": true
+    },
+    "pkg-name": "tagged",
+    "pkg-version": "0.8.10",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "unix": true
+    },
+    "pkg-name": "tasty",
+    "pkg-version": "1.5.4",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "tasty": true
+    },
+    "pkg-name": "tasty-bench",
+    "pkg-version": "0.4.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "template-haskell",
+    "pkg-version": "2.23.0.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "text",
+    "pkg-version": "2.1.4",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "text-iso8601",
+    "pkg-version": "0.1.1.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "asserts": false
+    },
+    "pkg-name": "text-short",
+    "pkg-version": "0.1.6.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "th-abstraction",
+    "pkg-version": "0.7.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "th-compat",
+    "pkg-version": "0.1.7",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "these",
+    "pkg-version": "1.2.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "debug": false
+    },
+    "pkg-name": "thread-utils-context",
+    "pkg-version": "0.4.1.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "thread-utils-finalizers",
+    "pkg-version": "0.1.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "time",
+    "pkg-version": "1.14",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "time-compat",
+    "pkg-version": "1.9.9",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "time-hourglass",
+    "pkg-version": "0.3.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "devel": false
+    },
+    "pkg-name": "tls",
+    "pkg-version": "2.4.4",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "transformers",
+    "pkg-version": "0.6.3.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {
+      "orphaninstances": true
+    },
+    "pkg-name": "transformers-base",
+    "pkg-version": "0.4.6.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "five": false,
+      "five-three": true,
+      "four": false,
+      "generic-deriving": true,
+      "mtl": true,
+      "three": false,
+      "two": false
+    },
+    "pkg-name": "transformers-compat",
+    "pkg-version": "0.7.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "typed-process",
+    "pkg-version": "0.2.13.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "compare-benchmarks": false
+    },
+    "pkg-name": "unagi-chan",
+    "pkg-version": "0.4.1.4",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "dev-has-icu": false
+    },
+    "pkg-name": "unicode-data",
+    "pkg-version": "0.8.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unique",
+    "pkg-version": "0.0.2",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unix",
+    "pkg-version": "2.8.8.0",
+    "type": "pre-existing"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unix-compat",
+    "pkg-version": "0.7.4.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unix-time",
+    "pkg-version": "0.5.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unliftio",
+    "pkg-version": "0.2.25.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "unliftio-core",
+    "pkg-version": "0.2.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "debug": false
+    },
+    "pkg-name": "unordered-containers",
+    "pkg-version": "0.2.21",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "uuid-types",
+    "pkg-version": "1.0.6.1",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "useghc": true
+    },
+    "pkg-name": "vault",
+    "pkg-version": "0.3.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "boundschecks": true,
+      "internalchecks": false,
+      "unsafechecks": false,
+      "wall": false
+    },
+    "pkg-name": "vector",
+    "pkg-version": "0.13.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "boundschecks": true,
+      "internalchecks": false,
+      "unsafechecks": false,
+      "wall": false
+    },
+    "pkg-name": "vector",
+    "pkg-version": "0.13.2.0",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "bench": true,
+      "boundschecks": true,
+      "internalchecks": false,
+      "llvm": false,
+      "unsafechecks": false
+    },
+    "pkg-name": "vector-algorithms",
+    "pkg-version": "0.9.1.0",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "vector-builder",
+    "pkg-version": "0.3.8.7",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "vector-stream",
+    "pkg-version": "0.1.0.1",
+    "type": "configured"
+  },
+  {
+    "flags": {},
+    "pkg-name": "witherable",
+    "pkg-version": "0.5",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "no-examples": true,
+      "no-exe": true
+    },
+    "pkg-name": "yaml",
+    "pkg-version": "0.11.11.2",
+    "type": "configured"
+  },
+  {
+    "flags": {
+      "bundled-c-zlib": false,
+      "non-blocking-ffi": true,
+      "pkg-config": true
+    },
+    "pkg-name": "zlib",
+    "pkg-version": "0.7.1.1",
+    "type": "configured"
+  }
+]

@@ -74,8 +74,8 @@ Catch performance regressions before release using reproducible baseline/candida
 - [x] (2026-09-20 14:48Z) Milestone 1: Capture matched baseline data before remediation.
 - [x] (2026-09-20 14:43Z) Milestone 2: Extend production-runner and lifecycle performance workloads.
 - [x] (2026-09-20 14:43Z) Milestone 3: Implement and test the statistical performance comparator.
-- [x] (2026-09-21 02:50Z) Milestone 4: Measure fixed adapters and candidate soaks.
-- [x] (2026-09-21 03:00Z) Milestone 5: Publish raw data and the candidate-bound performance verdict.
+- [x] (2026-09-22 04:53Z) Milestone 4: Measure fixed adapters and candidate soaks.
+- [x] (2026-09-22 04:55Z) Milestone 5: Publish raw data and the candidate-bound performance verdict.
 
 
 ## Surprises & Discoveries
@@ -165,12 +165,20 @@ first producer loop also unwound one blocking flush per produced message after s
 the stop branch perform exactly one flush removed the artificial post-run delay without changing
 the recorded production or consumption workload.
 
-2026-09-21: The open REV-15-L1 limitation is measurable but not removed. Fifty fresh
-high-cardinality batch processes covering 1,000 through 50,000 distinct in-progress keys under
-N1 and N4 completed exactly. Over that finite range a conservative observed upper envelope is
-692 bytes/key under N1 and 703 bytes/key under N4, but key count is still not bounded by inbox
-capacity. The finding therefore remains open for explicit human release-owner acceptance or a
-future implementation limit; the performance verdict does not silently waive it.
+2026-09-22: The first aggregate pass-two result became stale after the final scheduler masking
+refinement. RC2 therefore rebuilt both sides from clean worktrees and recaptured every gate
+rather than carrying the older verdict forward. Against released production SHA
+`7512b5c692af1c005392e4445cfa26a9be41f9ea`, candidate SHA
+`e28a95893a534a15302529850eea54f6e0682de0` passes all 84 N1 and all 84 N4 cells. Near-boundary
+cells received 300 or 1,000 alternating pairs; no threshold changed and no waiver was used.
+
+2026-09-22: REV-15-L1 remains measurable but is not removed. Fifty fresh high-cardinality
+batch processes covering 1,000 through 50,000 distinct in-progress keys under N1 and N4
+completed exactly. Over that finite range the conservative observed upper envelopes are 696
+bytes/key under N1 and 649 bytes/key under N4, but key count is still not bounded by inbox
+capacity. The release owner accepted that limitation for Shibuya 0.10.x with explicit calendar
+and version expiry and caller-side cardinality controls; the performance result still does not
+claim an implementation-enforced bound.
 
 
 ## Decision Log
@@ -242,6 +250,12 @@ the retained captures.
 production resource bound. Record every raw sample and the conservative upper envelope, keep
 REV-15-L1 open, and require EP-44 to obtain the human disposition demanded by the release plan.
 
+2026-09-22: Replace the stale pass-two aggregate with a clean-source RC2 capture. The baseline
+and candidate use the same historical harness overlay, GHC 9.12.4, O2, `-A32m`, and normalized
+external dependency solution. Preserve all rejected diagnostics separately. The release verdict
+may use only the RC2 N1/N4 results, nine RC2 live-adapter summaries, RC2 real-wire captures, and
+RC2 high-cardinality envelope indexed by the RC2 performance verdict.
+
 
 ## Outcomes & Retrospective
 
@@ -255,15 +269,16 @@ behavior. No candidate
 performance verdict exists yet; pass two must recapture this baseline in alternating order with
 the integrated candidate.
 
-Pass two is complete. The immutable full N1 and N4 datasets pass all 84 measured cells in each
-verdict without a threshold change or waiver. Kafka, PGMQ, and Kiroku each pass sustainable,
-saturation, and 1,800-second stop/restart runs against live ephemeral services; their soak totals
-are respectively 3,593, 34,653, and 34,605 messages with exact completion, zero failures, zero
-final durable backlog, and no retained-heap growth. Real-wire stress completes 100,000 readiness
+Pass two is complete for RC2. The clean-worktree N1 and N4 datasets pass all 84 measured cells
+in each verdict without a threshold change or waiver. Kafka, PGMQ, and Kiroku each pass
+sustainable, saturation, and 1,800-second midpoint-restart runs against live services. The soak
+totals are respectively 3,594, 34,473, and 34,671 messages with exact identity-ledger completion,
+zero duplicates, missing, unexpected, or malformed deliveries, zero failures, zero final durable
+backlog, and no sustained retained-heap growth. Real-wire stress completes 100,000 readiness
 requests and 10,000 WebSocket connection cycles with zero errors or leaked connection slots.
 The 50-process high-cardinality capture reports the finite memory envelope while preserving the
-unbounded-key limitation as an explicit open release disposition. The indexed machine-readable
-result is `docs/audits/lifecycle-release/artifacts/ep45-performance/candidate-performance-verdict.json`.
+accepted unbounded-key limitation. The indexed machine-readable result is
+`docs/audits/lifecycle-release/artifacts/candidate-0.10.0.0-rc2/performance/candidate-performance-verdict.json`.
 
 
 ## Context and Orientation
@@ -406,3 +421,10 @@ unmasking introduced confident 9.7% and 11.7% serial throughput regressions. The
 candidate unmasks each serial region once while leaving concurrent schedulers masked and their
 owned actions unmasked. All core and isolated-GC tests pass, and a fresh 40-pair O2 N1 focused
 comparison passes all ten serial cells; the full committed-candidate recapture remains open.
+
+2026-09-22 UTC: Replaced every stale performance artifact with the exact RC2 capture at
+`e28a95893a534a15302529850eea54f6e0682de0`. Both paired matrices pass 84/84 cells; all nine
+live-service cells pass with discrepancy-free external ledgers; real-wire health and WebSocket
+loads pass; and 50 high-cardinality processes establish the finite 696-byte/key N1 and
+649-byte/key N4 envelopes. The aggregate verdict records the release owner's bounded
+REV-15-L1 acceptance. No budget changed and no waiver was used.
