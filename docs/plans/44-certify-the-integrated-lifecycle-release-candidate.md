@@ -48,8 +48,8 @@ Produce a defensible release decision for one exact set of core, metrics, and ad
 
 - [x] (2026-09-22 04:56Z) Milestone 1: Freeze an exact compatible candidate manifest.
 - [x] (2026-09-22 04:56Z) Milestone 2: Execute the full fault, restart and soak matrix.
-- [ ] Milestone 3: Verify performance evidence and obtain independent review.
-- [ ] Milestone 4: Validate and publish the release-readiness verdict without releasing packages.
+- [x] (2026-09-22 05:14Z) Milestone 3: Verify performance evidence and obtain independent review.
+- [x] (2026-09-22 05:15Z) Milestone 4: Validate and publish the release-readiness verdict without releasing packages.
 
 
 ## Surprises & Discoveries
@@ -128,7 +128,9 @@ RC2 binds Core/Metrics `e28a95893a534a15302529850eea54f6e0682de0`, Kafka
 The functional matrix, 1,600 deterministic schedules, 168 paired performance cells, nine live
 adapter cells, real-wire load, and high-cardinality envelope pass. The validator accepts all 52
 findings and 70 mandatory cells and rejects a stale-SHA mutation. The five deprecated MessageDB
-records remain explicitly uncertified. Independent review is the remaining certification gate.
+records remain explicitly uncertified. Independent reviewer `/root/candidate_review` approved
+exact dossier commit `f3de2cd` with no blocking findings; the release-readiness verdict is
+published at `docs/audits/lifecycle-release/release-verdict.md`.
 
 
 ## Context and Orientation
@@ -249,3 +251,10 @@ Kiroku `407cb22`, with unified solver hash `1ebf23d5`. Fresh exact-source N1/N4 
 The release manifest includes all 14 named human acceptances as a distinct candidate-bound run.
 The validator passes all 52 findings and 70 mandatory cells; an in-memory stale-SHA mutation is
 rejected. Independent review remains the only open certification gate.
+
+2026-09-22 UTC: Independent reviewer `/root/candidate_review` approved exact dossier commit
+`f3de2cdbbb1efe1ef984e98cd562d29a5e0edfa3` with no blocking findings after rerunning the
+validators and their negative controls, source/version/bound spot checks, artifact hashes, and
+all nine produced-versus-processed identity-set comparisons. Published REV-17 and the final
+release verdict. EP-44 is complete; package publication remains the separately authorized
+release workflow.
