@@ -595,3 +595,14 @@ a stale-SHA mutation. The independent rereview is the only remaining certificati
 version bounds, provenance hashes, and all live delivery identity sets. Published REV-17 and
 the release-readiness verdict. All active child milestones and the MasterPlan are complete;
 MessageDB remains explicitly deprecated and uncertified.
+
+2026-09-22 UTC: Published the complete certified cohort in dependency order:
+Core and Metrics 0.10.0.0, Kafka 0.9.1.0, PGMQ 0.16.1.0, Kiroku Store 0.8.0.2,
+and the Kiroku adapter 0.5.1.3. Hackage returns HTTP 200 for all six packages,
+all annotated remote tags resolve to the recorded source revisions, and all four
+repository release pages are public. An isolated adapter-sdist rehearsal found
+that Kiroku's live assurance fixture exposed an unpublished test-support
+dependency. `mori://shinzui/kiroku/packages/shibuya-kiroku-adapter` commit
+`c96194c` makes that fixture default-off for consumers while keeping it enabled
+for repository gates. REV-18 independently approved the packaging-only bridge;
+the runtime source tree and public dependency bounds are unchanged.

@@ -258,3 +258,9 @@ validators and their negative controls, source/version/bound spot checks, artifa
 all nine produced-versus-processed identity-set comparisons. Published REV-17 and the final
 release verdict. EP-44 is complete; package publication remains the separately authorized
 release workflow.
+
+2026-09-22 UTC: The separately authorized release workflow published the full
+cohort in prerequisite order. A final isolated source-distribution rehearsal
+found and corrected a Kiroku adapter packaging-only dependency leak; REV-18
+approved the unchanged runtime tree and the Hackage-resolved sdist. All six
+Hackage package pages and all remote release tags were verified after upload.
