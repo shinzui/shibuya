@@ -71,21 +71,20 @@ runKeyedScheduler requestedConcurrency requestedPendingLimit itemKey itemAction 
           StartItem item -> do
             -- Keep worker creation, registration, and gate release in one masked
             -- ownership transfer. The worker cannot pass the gate before its
-            -- handle is present in the cancellation registry. Leave the mask
-            -- before recurring so each item does not retain another restore
-            -- frame on the scheduler's hot path.
-            mask_ $ do
-              workerId <- newUnique
-              startGate <- newEmptyMVar
-              worker <- async $ do
-                takeMVar startGate
-                runWorker scheduler workers workerId itemKey itemAction item
-              atomically $ modifyTVar' workers (Map.insert workerId worker)
-              putMVar startGate ()
+            -- handle is present in the cancellation registry. The loop has one
+            -- surrounding mask, so this path does not allocate a new mask frame
+            -- for every item.
+            workerId <- newUnique
+            startGate <- newEmptyMVar
+            worker <- async $ do
+              takeMVar startGate
+              runWorker scheduler workers workerId itemKey itemAction item
+            atomically $ modifyTVar' workers (Map.insert workerId worker)
+            putMVar startGate ()
             loop
 
   withAsync reader $ \_reader ->
-    loop `finally` cancelWorkers
+    mask_ (loop `finally` cancelWorkers)
 
 data KeyedSchedulerState key item = KeyedSchedulerState
   { inputDone :: !Bool,
