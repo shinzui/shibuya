@@ -17,6 +17,11 @@ provenance:
       at: 2026-09-20T03:15:22Z
       mode: "update"
       note: "Align the core target with 0.9.0.2 and inherit the active intention"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-09-22T17:29:05Z
+      mode: "update"
+      note: "Cancelled: MessageDB adapter deprecated by owner on 2026-09-19"
 ---
 
 # Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons
@@ -24,6 +29,17 @@ provenance:
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
 If durable project context changes, update or create ADRs in docs/adr/ in the same change.
+
+
+**Status: Cancelled on 2026-09-19. Do not implement this plan.** The project owner declared
+the MessageDB adapter deprecated and limited the supported adapters to Kafka, PGMQ, and Kiroku.
+The adapter is unsupported and uncertified at shibuya-core 0.10 (see
+docs/audits/lifecycle-release/release-verdict.md). The companion lifecycle plan
+docs/plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md was cancelled for
+the same reason. The body below is kept unchanged as the migration recipe in case the adapter
+is ever revived. A revival would target the then-current core (0.10 or later), not 0.9, and
+would need to adopt the effectful-core range in
+docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md.
 
 
 ## Purpose / Big Picture
@@ -47,9 +63,9 @@ local database and reading the `$DeadLetter` message's metadata back with `psql`
 
 ## Progress
 
-- [ ] Milestone 1: bounds raised, `Envelope` construction fixed, everything compiles against shibuya-core 0.9 with `-Werror=incomplete-patterns`.
-- [ ] Milestone 2: dead-letter metadata carries `deadLetterReasonCode` and `deadLetterReasonDetail`; legacy `deadLetterReason` string unchanged for the three built-in reasons; `ApplicationFailure` round-trips in a database test.
-- [ ] Milestone 3: examples and README updated; suite green; version 0.2.0.0, changelog, tag.
+- [ ] (Cancelled 2026-09-19) Milestone 1: bounds raised, `Envelope` construction fixed, everything compiles against shibuya-core 0.9 with `-Werror=incomplete-patterns`.
+- [ ] (Cancelled 2026-09-19) Milestone 2: dead-letter metadata carries `deadLetterReasonCode` and `deadLetterReasonDetail`; legacy `deadLetterReason` string unchanged for the three built-in reasons; `ApplicationFailure` round-trips in a database test.
+- [ ] (Cancelled 2026-09-19) Milestone 3: examples and README updated; suite green; version 0.2.0.0, changelog, tag.
 
 
 ## Surprises & Discoveries
@@ -78,6 +94,12 @@ implementation. Provide concise evidence.
   Rationale: The dependency major bump changes the types the adapter exposes to callers through shibuya-core, which is a breaking change under the PVP. The package is not on Hackage (`cabal info shibuya-message-db-adapter` finds nothing) and has no tags today, so the release is a tag on `master`; publishing to Hackage is the maintainer's separate decision.
   Date: 2026-09-16
 
+- Decision: Cancel this plan without implementing any milestone.
+  Rationale: The project owner deprecated the MessageDB adapter on 2026-09-19. Migrating it
+  across four core majors would have cost a database-backed migration for code that will not
+  ship. No other plan depended on this one.
+  Date: 2026-09-19 (recorded 2026-09-22)
+
 - Decision: Target shibuya-core `>=0.9.0.2 && <0.10` for the final release.
   Rationale: Plan 33's internal-only liveness fix is a PVP patch and ships alone as 0.9.0.2;
   this adapter can consume that fix without waiting for plan 34's dependency-bound release.
@@ -86,7 +108,9 @@ implementation. Provide concise evidence.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Cancelled before implementation. No code was changed in the adapter repository. The adapter
+still declares `shibuya-core ^>=0.5.0.0` and cannot build against any current core. The
+unchecked Progress items are abandoned, not pending.
 
 
 ## Context and Orientation
@@ -385,3 +409,7 @@ with `buildDlqMetadata` producing the keys `correlation`, `causation`, `original
 2026-09-20 UTC: Replaced the provisional 0.9.1.0 dependency target with the selected
 shibuya-core 0.9.0.2 patch release and recorded why this adapter need not wait for the later
 dependency-bound hardening release.
+
+2026-09-22 UTC: Marked the plan Cancelled, following the owner's 2026-09-19 deprecation of the
+MessageDB adapter. Added a status banner and the cancellation decision, and filled in Outcomes.
+The rest of the body is unchanged.

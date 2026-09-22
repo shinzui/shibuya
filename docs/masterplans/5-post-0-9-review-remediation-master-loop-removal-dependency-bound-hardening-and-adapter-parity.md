@@ -26,6 +26,11 @@ provenance:
       at: 2026-09-20T13:46:21Z
       mode: "update"
       note: "Move EP-2's provisional release target to 0.9.0.4 after standalone EP-46 published 0.9.0.3"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-09-22T17:29:05Z
+      mode: "update"
+      note: "Refresh to published state: EP-2/EP-3 complete via 0.10 cohort, EP-4 cancelled, ADRs 0005/0006, final retrospective"
 ---
 
 # Post-0.9 review remediation: master loop removal, dependency bound hardening, and adapter parity
@@ -33,6 +38,13 @@ provenance:
 This MasterPlan is a living document. The sections Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds.
 If durable project context changes, update or create ADRs in docs/adr/ in the same change.
+
+**Status as of 2026-09-22: Complete.** EP-1 shipped in shibuya-core 0.9.0.2. EP-2 and EP-3
+shipped in the lifecycle release cohort published on 2026-09-22 (shibuya-core and
+shibuya-metrics 0.10.0.0, shibuya-kafka-adapter 0.9.1.0, shibuya-pgmq-adapter 0.16.1.0,
+kiroku-store 0.8.0.2, shibuya-kiroku-adapter 0.5.1.3), not in the separate patch releases this
+plan originally scheduled. EP-4 is Cancelled because the project owner deprecated the
+MessageDB adapter on 2026-09-19. The durable decisions are recorded in ADRs 0005 and 0006.
 
 
 ## Vision & Scope
@@ -45,47 +57,42 @@ the effectful 2.7 bound, the seihou nix migration), shibuya-pgmq-adapter 0.12.0.
 grouped-head FIFO polling), shibuya-kafka-adapter 0.9.0.0 and 0.9.0.1 (dead-letter rendering,
 effectful-core 2.7 bound, a whitespace-and-comment-only reformat), and the kiroku-hosted
 shibuya-kiroku-adapter 0.5.1.0 and 0.5.1.1 (core 0.9 upgrade with a total reason match). The
-code in those releases is correct as far as the review could determine: the dead-letter changes
+code in those releases was correct as far as the review could determine: the dead-letter changes
 are gated behind the disabled-tracing short circuit, the pgmq shutdown gate reorder is right,
 the grouped-head dispatch is covered by mutation-checked tests, and a hot-path benchmark run
 during the review shows effectful 2.7.1 at parity with 2.6.1 (the numbers are recorded in
 `docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md`).
 
-Four things do need fixing, and this MasterPlan coordinates them.
+The review found four problems. This MasterPlan coordinated the fixes. What happened to each
+is recorded below.
 
-First, before EP-1, a bare `runApp` followed by `waitApp` crashed at the first major garbage
-collection with `ExceptionInLinkedThread ... thread blocked indefinitely in an STM transaction`,
-because the master started a linked actor loop that nothing ever sent to. This was not a
-regression of the 0.9 releases; commit `f364183` first shipped it in 0.8.0.0. EP-1 has now
-removed that actor and made the dedicated regression and existing core suite pass; its release
-and consumer follow-up remain in
-`docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md`.
-That plan becomes a child of this initiative rather than being duplicated.
+First, a bare `runApp` followed by `waitApp` crashed at the first major garbage collection
+with `ExceptionInLinkedThread ... thread blocked indefinitely in an STM transaction`, because
+the master started a linked actor loop that nothing ever sent to. This was not a regression of
+the 0.9 releases; commit `f364183` first shipped it in 0.8.0.0. EP-1
+(`docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md`, an
+existing plan adopted as a child) removed the actor, added a process-isolated regression suite,
+and shipped the fix as 0.9.0.2. Resolved.
 
-Second, the effectful bounds that 0.9.0.1 and the Kafka adapter's 0.9.0.1 widened to `<2.8`
-admit `effectful-core` 2.7.0.0 and 2.7.1.0, the two releases whose changelog records a
-per-operation overhead regression for dynamically dispatched effects, fixed in 2.7.1.1. Every
-adapter's queue effect (`Pgmq`, `KafkaConsumer`) is dynamically dispatched, so a consumer whose
-solver or freeze file lands on those versions pays that cost on the hot path with nothing in
-the cohort's bounds to stop it. The bump was also released as a patch, which under the current
-release rule skips the benchmark regression gate, so the cohort never measured the swap. The
-pgmq adapter has the opposite problem: its `effectful-core ^>=2.6.1.0` bound excludes 2.7
-entirely, so a consumer that follows shibuya-core to effectful 2.7 cannot build the pgmq
-adapter alongside it even though pgmq-hs 0.6.1.0 already supports 2.7. The kiroku adapter
-excludes 2.7 the same way.
+Second, the effectful bounds that core 0.9.0.1 and the Kafka adapter's 0.9.0.1 widened to `<2.8`
+admitted `effectful-core` 2.7.0.0 and 2.7.1.0. Those are the two releases whose changelog
+records a per-operation overhead regression for dynamically dispatched effects, fixed in
+2.7.1.1. Every adapter's queue effect (`Pgmq`, `KafkaConsumer`) is dynamically dispatched. The
+bump also went out as a patch, which skipped the benchmark gate. Meanwhile the pgmq and kiroku
+adapters excluded effectful 2.7 entirely. EP-2 and EP-3 put one exclusion range into every
+package, keyed the release benchmark gate to runtime-dependency changes, and all of it is now
+published. Resolved.
 
-Third, shibuya-message-db-adapter is stranded on `shibuya-core ^>=0.5.0.0`. It constructs
-`Envelope` without the `headers` field added in 0.7, its handlers take the `Ingested` type that
-0.8 replaced with `Message`, and its dead-letter metadata renderer is an exhaustive match over
-the three pre-0.9 constructors, so it cannot build against any current core and would fail at
-runtime on the first `ApplicationFailure` if the match were merely widened.
+Third, shibuya-message-db-adapter was stranded on `shibuya-core ^>=0.5.0.0` and could not build
+against any current core. EP-4 planned the migration. On 2026-09-19 the project owner declared
+that adapter deprecated, so EP-4 was cancelled. The adapter remains unsupported and uncertified
+at core 0.10. Not resolved, by deliberate decision.
 
-After this initiative, an idle single-processor worker runs for as long as its processors do;
-shibuya-core, the pgmq adapter, the Kafka adapter, and the kiroku adapter can all be built
+The target end state, as reached: an idle single-processor worker runs for as long as its
+processors do. shibuya-core, the pgmq adapter, the Kafka adapter, and the kiroku adapter build
 together on effectful 2.6.1 or on effectful 2.7.1.1 and later, and none of them can resolve to
-the regressed effectful-core releases; runtime-dependency bumps are benchmark-gated regardless
-of release level; and the message-db adapter builds against core 0.9, stores dead-letter code
-and detail structurally, and is released.
+the regressed effectful-core releases. Runtime-dependency bumps are benchmark-gated whatever
+their release level.
 
 Deliberately excluded, because each is already documented as accepted or is separately
 planned: the pgmq prefetch buffer stranding up to `bufferSize * batchSize` messages invisible
@@ -99,154 +106,143 @@ feature, not a defect); the residual roughly twenty percent `Async` allocation o
 in `docs/plans/30-investigate-and-reduce-the-async-ahead-concurrency-allocation-regression.md`;
 and a `shibuya.dead_letter.reason.code` attribute on batch spans, which
 `docs/user/migrating-to-0.9.md` states is intentionally absent because one batch can carry
-several different reasons. Consumers other than the `mls-service-v2` follow-up already named in
-plan 33 are also out of scope.
+several different reasons. Consumers other than the `mls-service-v2` follow-up named in plan 33
+are also out of scope. Since 2026-09-19 the MessageDB adapter is out of scope as well (see
+Decision Log).
 
 
 ## Decomposition Strategy
 
-The work splits by functional concern into four child plans: a runtime crash fix in the core
-(the master loop), a dependency-and-process hardening in the core (bounds and the release
-gate), the same hardening propagated to the three maintained adapters, and a multi-version API
-migration of the one adapter that fell behind. Each produces an independently checkable
-result: a garbage-collection regression test that fails today and passes after; a cabal solve
-that rejects the regressed effectful-core versions and accepts the fixed ones; a combined
-dependency solve of core plus adapters on both effectful families; and a message-db adapter
-test suite that passes against core 0.9 with an `ApplicationFailure` round-trip.
+The work split by functional concern into four child plans:
 
-Alternatives considered. Folding the bound change into plan 33 would have kept one release but
-would have widened a plan that was written and scoped to a single defect; instead the two core
-plans are sequenced so that plan 33's release milestone ships both, and plan 34 is forbidden
-from cutting a release of its own. One child plan per adapter repository was rejected because
-each adapter change is a bound edit, a changelog line, and a patch release; a single plan with
-one milestone per adapter keeps the bound expression identical across all three. Folding the
-message-db upgrade into the adapter alignment plan was rejected because it is a four-major-
-version API migration with its own database test harness, a different size and risk from a
-bound edit. Cancelling the message-db adapter instead of upgrading it was considered and
-rejected here because that is the maintainer's call, not a review finding; the plan records
-the cost so the maintainer can make it.
+- a runtime crash fix in the core (the master loop);
+- dependency and release-process hardening in the core (bounds and the release gate);
+- the same hardening applied to the three maintained adapters;
+- a multi-version API migration of the one adapter that had fallen behind.
 
-ADRs: this repository had no `docs/adr/` directory and Mori lists no ADR bundle for it.
-EP-1 created `docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md` using a
-filesystem convention without inventing an OKF identity. The initiative's remaining durable
-decisions (the effectful-core exclusion range and the benchmark-gating rule for runtime
-dependency bumps) still require ADR records when their owning work completes.
+Each had its own acceptance check: a garbage-collection regression test that failed before the
+fix and passed after it; a cabal solve that rejects the regressed effectful-core versions and
+accepts the fixed ones; a combined solve of core plus adapters on both effectful families; and
+a message-db adapter test suite passing against core 0.9 with an `ApplicationFailure` round-trip.
+The first three were met. The fourth was cancelled.
+
+Alternatives considered at creation. Folding the bound change into plan 33 would have kept one
+release but widened a plan scoped to a single defect, so the two core plans were kept separate.
+One child plan per adapter repository was rejected: each adapter change was a bound edit and a
+changelog line, and one plan with a milestone per adapter kept the bound expression identical
+across all three. Folding the message-db upgrade into the adapter alignment plan was rejected
+because it was a four-major-version API migration with its own database test harness.
+Cancelling the message-db adapter was left to the maintainer, who later made that call.
+
+The release plan was not followed as written. Every schedule here assumed patch releases on
+the 0.9 line. In practice the lifecycle initiative,
+`docs/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance.md`, prepared a
+breaking 0.10.0.0 candidate across the same repositories at the same time. EP-2's and EP-3's
+tested bound commits were carried into that candidate rather than published as 0.9.0.4 and
+adapter patches (see Decision Log).
+
+ADRs: this repository had no `docs/adr/` directory when the plan was created, and it still has
+no profile-governed OKF bundle, so ADRs follow the plain filesystem convention of
+`docs/adr/0001-*.md`. Relevant records:
+
+- `docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md`, written by EP-1 and
+  amended by the standalone plan 46, covers the linked-actor and GC-liveness decision.
+- `docs/adr/0002-require-candidate-bound-machine-checkable-release-evidence.md`, written by the
+  lifecycle initiative, governs the candidate that shipped EP-2 and EP-3.
+- `docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md`, written at this
+  plan's completion, records the exclusion range and why every package carries it.
+- `docs/adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md`,
+  written at this plan's completion, records the release-gating rule.
 
 
 ## Exec-Plan Registry
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | Complete |
-| 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | In Progress (M1-M3 complete; release pending version coordination) |
-| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | In Progress (compatibility gates pass; releases pending version coordination) |
-| 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Not Started |
+| 1 | Remove the idle linked master loop that deadlocks bare waitApp callers | docs/plans/33-remove-the-idle-linked-master-loop-that-deadlocks-bare-waitapp-callers.md | None | None | Complete (released 0.9.0.2) |
+| 2 | Harden shibuya-core dependency bounds and release gating for effectful 2.7 | docs/plans/34-harden-shibuya-core-dependency-bounds-and-release-gating-for-effectful-2-7.md | None | None | Complete (released in 0.10.0.0) |
+| 3 | Align adapter effectful bounds and releases with shibuya-core 0.9.0.3 | docs/plans/35-align-adapter-effectful-bounds-and-releases-with-shibuya-core-0-9-0-3.md | None | EP-1, EP-2 | Complete (released in the 0.10 adapter cohort) |
+| 4 | Upgrade shibuya-message-db-adapter to shibuya-core 0.9 and structured dead-letter reasons | docs/plans/36-upgrade-shibuya-message-db-adapter-to-shibuya-core-0-9-and-structured-dead-letter-reasons.md | None | EP-1 | Cancelled (MessageDB adapter deprecated, owner decision 2026-09-19) |
 
 Status values: Not Started, In Progress, Complete, Cancelled; parenthetical notes describe the current milestone.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).
+Plan 35's title and file name still say "0.9.0.3". They are kept so the plan's identity and
+existing references stay stable; its body records the versions that actually shipped.
 
 
 ## Dependency Graph
 
-No child plan is blocked at the compiler level by another, so there are no hard dependencies.
-The ordering constraints are about releases.
+No child plan depended on another at the compiler level, so there were no hard dependencies.
+The constraints were about release order. This is how the releases actually went:
 
-Phase 1 is the core in two patch releases. EP-1 removes the master loop and cuts
-shibuya-core/shibuya-metrics 0.9.0.2. EP-2 then changes the dependency bounds and release skill,
-runs the bound-sensitive benchmark gate it introduces, and owns the following patch release,
-provisionally 0.9.0.4. The standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md, which is not a child of this MasterPlan, took
-0.9.0.3 on 2026-09-20 for an urgent supervisor-link fix. Neither plan has a compiler dependency on the other; the release ordering
-keeps consumers able to identify which patch contains the urgent runtime fix.
+1. 2026-09-20: EP-1 shipped shibuya-core and shibuya-metrics 0.9.0.2, the master-loop fix.
+2. 2026-09-20: the standalone plan
+   `docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md`,
+   which is not a child of this MasterPlan, shipped 0.9.0.3 for an urgent supervisor-link fix.
+3. 2026-09-21: EP-2 finished its bound, benchmark-policy, and evidence milestones (commits
+   `16625ff`, `a1bf986`, `df24b8a`), and EP-3 finished its adapter bounds and combined solve.
+   Neither was published at that point, because the same repositories were about to take the
+   breaking lifecycle candidate.
+4. 2026-09-22: the lifecycle initiative's certification plan,
+   `docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md`, published the
+   cohort in this order: core 0.10.0.0, metrics 0.10.0.0, Kafka 0.9.1.0 and pgmq 0.16.1.0,
+   kiroku-store 0.8.0.2, then shibuya-kiroku-adapter 0.5.1.3. Every one of those packages
+   carries the EP-2 range.
 
-The 0.9.0.2 target was selected after the release diff, live Hackage versions, and upstream
-tags were checked on 2026-09-20. The 0.9.0.4 target remains provisional: EP-2 must select the
-next free patch at its own release time and resynchronize consumers if another release appears.
-
-Phase 2 is the adapters. EP-3 can be developed independently but should release after EP-2 and
-verify against 0.9.0.4 so its copied effectful-core bound is exercised with the owning core
-release. EP-4 can proceed after EP-1 and target 0.9.0.2; it need not wait for the independent
-dependency-bound work.
+EP-4 was cancelled before it started, so it never took part in any release.
 
 
 ## Integration Points
 
-The shibuya-core version, `shibuya-core/shibuya-core.cabal`, and changelog are touched by EP-1
-and EP-2 in sequence. EP-1 owns 0.9.0.2, the matching `shibuya-metrics` tracking bump, and its
-release. EP-2 begins from that published baseline, adds the bound and release-policy changes,
-and owns the following patch, provisionally 0.9.0.4. EP-3 consumes EP-2's released core; EP-4
-may target EP-1's 0.9.0.2 because its API migration does not depend on the bound work.
+The core version, `shibuya-core/shibuya-core.cabal`, and the changelog were touched by EP-1 and
+then EP-2. EP-1 owned 0.9.0.2. EP-2's changelog entry went out under the `## 0.10.0.0` heading
+of `shibuya-core/CHANGELOG.md`, and the version bump was owned by EP-44.
 
-The effectful-core bound expression is defined by EP-2 and consumed verbatim by EP-3 (pgmq,
-Kafka, and kiroku adapters) and EP-4 (message-db adapter). It is written once, in EP-2's
-Interfaces and Dependencies section, as `effectful-core >=2.6.1 && <2.7 || >=2.7.1.1 && <2.8`,
-with the matching `effectful >=2.6.1 && <2.8` where a package depends on the umbrella package.
-Any later change to that range is made in EP-2 first and propagated.
+The effectful-core bound expression is owned by EP-2 and was copied verbatim by EP-3:
 
-The release skill's benchmark gate, `.agents/skills/release/SKILL.md` step 5, is changed by
-EP-2 and applies to EP-2's own bound-changing patch. EP-1's source-only patch uses the current
-skill and requires no benchmark. Adapter releases in EP-3 copy the updated policy where their
-repositories have release skills.
+```text
+effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8)
+effectful >=2.6.1 && <2.8        -- only where a package depends on the umbrella package
+```
 
-EP-1 adds `shibuya-core-gc-test` as a separate test process and updates the release
-skill's core validation command to `cabal test shibuya-core`, selecting both core
-suites. EP-2 must preserve that gate when editing the same skill's benchmark policy.
+It is now present in every released component of shibuya-core, shibuya-example,
+shibuya-core-bench, `mori://shinzui/shibuya-pgmq-adapter`, `mori://shinzui/shibuya-kafka-adapter`,
+and `mori://shinzui/kiroku` (both `kiroku-store` and `shibuya-kiroku-adapter`).
+`docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md` owns it from now
+on. Change the ADR first, then every package.
 
-The structured dead-letter projections `deadLetterReasonCode`, `deadLetterReasonDetail`, and
-`renderDeadLetterReason` in `shibuya-core/src/Shibuya/Core/Ack.hs` are consumed by EP-4. They
-are owned by the already-released core 0.9 and are not changed by any plan here.
+EP-2 changed the release skill's benchmark gate in step 5 of `.agents/skills/release/SKILL.md`.
+EP-1 had already changed the same skill's core test gate to `cabal test shibuya-core`, which
+selects all core suites. EP-2 kept that gate. The rule is recorded in
+`docs/adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md`.
 
-Two cross-plan decisions deserve ADR records at completion: the effectful-core exclusion range
-and why it lives in every package rather than only at the root, and the rule that a runtime
-dependency bump is benchmark-gated regardless of PVP bump level.
+EP-4 was going to consume the structured dead-letter projections `deadLetterReasonCode`,
+`deadLetterReasonDetail`, and `renderDeadLetterReason` in
+`shibuya-core/src/Shibuya/Core/Ack.hs`. It was cancelled, so no plan here consumes them.
 
 
 ## Progress
 
-- [x] (2026-09-21 UTC) EP-2: effectful-core exclusion bound applied to shibuya-core, shibuya-example, and shibuya-core-bench; both effectful families still build
-- [x] (2026-09-21 UTC) EP-2: release skill gates runtime-dependency bumps on the benchmark regardless of bump level
-- [x] (2026-09-21 UTC) EP-2: 2.6.1-versus-2.7.1 and 2.7.1.0-versus-2.7.1.2 benchmark evidence recorded in the plan
 - [x] (2026-09-20 UTC) EP-1: dedicated garbage-collection regression test compiles and fails with the linked STM exception on 0.9.0.1
 - [x] (2026-09-20 UTC) EP-1: master loop, mailbox, and `MasterMessage` removed; suite green
 - [x] (2026-09-20 UTC) EP-1: documentation no longer describes the master as an actor
 - [x] (2026-09-20 UTC) EP-1: shibuya-core and shibuya-metrics 0.9.0.2 released with the runtime fix
 - [x] (2026-09-20 UTC) EP-1: `mls-service-v2` single-processor subcommands run past the crash point
-- [ ] EP-3: shibuya-pgmq-adapter bound widened and tested at `9247388`; release pending
-- [ ] EP-3: shibuya-kafka-adapter bound tightened and tested at `1c455b5`; release pending
-- [ ] EP-3: kiroku-store and shibuya-kiroku-adapter widened and tested at `0dcd092` plus `f91bb05`; release pending
+- [x] (2026-09-21 UTC) EP-2: effectful-core exclusion bound applied to shibuya-core, shibuya-example, and shibuya-core-bench; both effectful families still build
+- [x] (2026-09-21 UTC) EP-2: release skill gates runtime-dependency bumps on the benchmark regardless of bump level
+- [x] (2026-09-21 UTC) EP-2: 2.6.1-versus-2.7.1 and 2.7.1.0-versus-2.7.1.2 benchmark evidence recorded in the plan
+- [x] (2026-09-22 UTC) EP-2: hardened bounds published in shibuya-core and shibuya-metrics 0.10.0.0 (superseding the provisional 0.9.0.4 patch)
+- [x] (2026-09-22 UTC) EP-3: shibuya-pgmq-adapter bound widened and published in 0.16.1.0
+- [x] (2026-09-22 UTC) EP-3: shibuya-kafka-adapter bound tightened and published in 0.9.1.0
+- [x] (2026-09-22 UTC) EP-3: kiroku-store 0.8.0.2 and shibuya-kiroku-adapter 0.5.1.3 widened and published
 - [x] (2026-09-21 UTC) EP-3: combined solve of core plus adapters proven on effectful 2.6.1 and 2.7.1.2, and rejected on 2.7.1.0
-- [ ] EP-4: message-db adapter builds against shibuya-core 0.9
-- [ ] EP-4: dead-letter metadata carries structured code and detail; `ApplicationFailure` round-trips through a real database
-- [ ] EP-4: examples and tests migrated; 0.2.0.0 tagged
+- [ ] EP-4: message-db adapter builds against shibuya-core 0.9 — Cancelled 2026-09-19 (adapter deprecated)
+- [ ] EP-4: dead-letter metadata carries structured code and detail — Cancelled 2026-09-19
+- [ ] EP-4: examples and tests migrated; 0.2.0.0 tagged — Cancelled 2026-09-19
+- [x] (2026-09-22 UTC) ADR distillation: ADRs 0005 and 0006 written
 
 
 ## Surprises & Discoveries
-
-Document cross-plan insights, dependency changes, scope adjustments, or unexpected
-interactions between child plans. Provide concise evidence.
-
-- 2026-09-20 UTC: EP-33's regression is now `shibuya-core/test-gc/Main.hs`, in a
-  dedicated Cabal test executable. Weak-pointer cleanup could lose its target and
-  leak threads into later tests; process isolation avoids retaining the handle to
-  clean up. Normal core/release checks must select both test suites. Removing only
-  the idle master actor makes the test pass repeatedly, and the complete 212-example
-  core suite remains green.
-
-- 2026-09-20 UTC: Live Hackage metadata and upstream tags still stop at 0.9.0.1. EP-1's
-  diff changes only an expressly unstable internal representation and fixes runtime behavior,
-  so the release skill selects patch 0.9.0.2. EP-2 had not started; it now owns the following
-  patch instead of delaying the crash fix.
-
-- 2026-09-20 UTC: EP-1 published shibuya-core and shibuya-metrics 0.9.0.2 with Haddocks,
-  pushed annotated tag `v0.9.0.2`, and published the matching GitHub release. The downstream
-  MLS solver initially observed Hackage's package pages before its package index had advanced;
-  it correctly rejected 0.9.0.2 until the authoritative index includes the release.
-
-- 2026-09-20 UTC: The authoritative Hackage index advanced to `2026-09-20T04:00:02Z` and
-  `mori://tan/mls-service-v2` selected core and metrics 0.9.0.2. Its regenerated freeze and
-  overlay preserve every unrelated version; all 282 tests and flake checks pass. The isolated
-  area-details worker polled its repository-local empty queue every five seconds until a
-  40-second timeout returned 124, with no linked-thread exception. Consumer commit `536b107`
-  is pushed.
 
 - 2026-09-16: The review that produced this plan benchmarked the current tree under effectful
   2.6.1.0 and under effectful 2.7.1.0 with effectful-core 2.7.1.2 (the pair the 0.9.0.1 bound
@@ -254,6 +250,7 @@ interactions between child plans. Provide concise evidence.
   full table is in EP-2. The regression the effectful-core changelog describes is therefore not
   present in the versions the cohort was built with, and the bound work is about what the
   bounds still admit, not about the shipped build.
+
 - 2026-09-16: Two refinements of that measurement, both recorded in EP-2. First, effectful
   2.7.1 is not merely at parity: the `Async` hot-path leaf runs in less than half the time
   (roughly 55 ms against 122 ms) with 17% less allocation, confirmed by alternating re-runs.
@@ -261,24 +258,46 @@ interactions between child plans. Provide concise evidence.
   2.7.1.2 on every leaf. That is expected, because nothing in shibuya-core is dynamically
   dispatched; the exclusion in EP-2 and EP-3 rests on the upstream changelog and on the
   adapters' queue effects being dynamic, and the core suite cannot confirm or refute it.
-- 2026-09-16: The kiroku adapter's widening in EP-3 is conditional. `kiroku-store` declares
-  `effectful-core >=2.4 && <2.7` in `kiroku-store/kiroku-store.cabal`, so the adapter cannot
-  reach effectful 2.7 until kiroku-store does; EP-3 records the blocker rather than forcing a
-  cohort release it does not own.
+
+- 2026-09-16: The kiroku adapter's widening in EP-3 was conditional on `kiroku-store`, which
+  declared `effectful-core >=2.4 && <2.7`. On 2026-09-21 EP-3 widened kiroku-store as well,
+  first to a broad `<2.8` range that admitted the regressed releases, then to the disjoint
+  range. kiroku-store 0.8.0.2 shipped it, which removed the blocker.
+
+- 2026-09-19: The project owner declared the MessageDB adapter deprecated while reviewing the
+  lifecycle MasterPlan. That cancelled
+  `docs/plans/42-repair-messagedb-checkpoint-and-shutdown-lifecycle-semantics.md` and, with it,
+  the only reason to run EP-4.
+
+- 2026-09-20 UTC: EP-1's regression is `shibuya-core/test-gc/Main.hs`, a dedicated Cabal test
+  executable. Weak-pointer cleanup could lose its target and leak threads into later tests;
+  running it in its own process avoids keeping a handle alive just to clean it up. Normal
+  core and release checks must select every core test suite. Removing only the idle master
+  actor makes the test pass repeatedly, and the complete 212-example core suite stays green.
+
+- 2026-09-20 UTC: EP-1 published shibuya-core and shibuya-metrics 0.9.0.2 with Haddocks,
+  the annotated tag `v0.9.0.2`, and a GitHub release. At first the downstream MLS solver saw
+  Hackage's package pages before its package index had caught up, and it correctly rejected
+  0.9.0.2 until the index included the release. After the index advanced,
+  `mori://tan/mls-service-v2` selected 0.9.0.2, passed its 282 tests, and its isolated worker
+  ran past the crash point (consumer commit `536b107`).
+
+- 2026-09-20 UTC: Plan 46's review of EP-1 found that the remaining NQE supervisor link still
+  killed callers of *finished* applications during garbage collection. It shipped separately as
+  0.9.0.3 and amended ADR 0001. EP-1's fix was correct but incomplete for that class of bug.
+
+- 2026-09-21 UTC: The bound and release-policy work finished at the same moment the lifecycle
+  initiative was freezing a breaking candidate across the same four repositories. Publishing
+  0.9.0.4 plus three adapter patches first would have forced consumers through two cohort pin
+  bumps in two days, and every adapter would have needed a fresh candidate. See Decision Log.
+
+- 2026-09-22 UTC: Because the adapters also took core 0.10 bounds and lifecycle fixes, they
+  shipped as minor releases (0.16.1.0, 0.9.1.0), not the patch numbers EP-3 had planned
+  (0.16.0.1, 0.9.0.2). The kiroku adapter went from the planned 0.5.1.2 to 0.5.1.3 because of a
+  packaging fix reviewed in REV-18.
 
 
 ## Decision Log
-
-- Decision: Preserve the existing MLS-only consumer follow-up while refreshing EP-33.
-  Rationale: The user explicitly excluded `mori://tan/registration-service-v2`.
-  Its incident informed the investigation but does not expand implementation scope.
-  Date: 2026-09-20 UTC
-
-- Decision: Run the GC regression as a dedicated test process and preserve its release gate.
-  Rationale: Cleanup must not accidentally keep the master alive. EP-1 owns this
-  gate; EP-2's release-policy edits must keep it. The version target remains
-  provisional until release-time analysis, as detailed in Dependency Graph.
-  Date: 2026-09-20 UTC
 
 - Decision: Adopt the existing `docs/plans/33-…` as EP-1 instead of writing a new plan.
   Rationale: The defect is fully diagnosed there, with a failing-first regression test, and
@@ -291,25 +310,7 @@ interactions between child plans. Provide concise evidence.
   Rationale: Two patch-sized releases a day apart cost consumers two pin bumps for no benefit.
   EP-2 is a bound and a process change; it has no reason to reach Hackage ahead of the crash fix.
   Date: 2026-09-16
-
-- Decision: Move EP-2's provisional release target from 0.9.0.3 to 0.9.0.4.
-  Rationale: shibuya-core and shibuya-metrics 0.9.0.3 were published on 2026-09-20 by the
-  standalone plan docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md. An independent review of EP-1's fix found that the remaining NQE
-  supervisor link still killed callers of finished applications during garbage collection and
-  delivered each StopAllOnFailure failure twice; the owner judged it urgent and released it
-  alone, exactly as EP-1 had taken 0.9.0.2. EP-2 is still unstarted and must, as before, choose
-  the next free patch at its own release time. EP-3's verification target moves with it. The
-  title and file name of plan 35 keep "0.9.0.3" so that its identity and existing references
-  stay stable; its body states the current target.
-  Date: 2026-09-20
-
-- Decision: Supersede the combined 0.9.1.0 release with sequential patches: EP-1 at 0.9.0.2
-  and EP-2 provisionally at 0.9.0.3.
-  Rationale: EP-1 is complete and is the initiative's most serious runtime defect, while EP-2
-  remains unstarted and independent. The release skill classifies the opaque-public/internal-
-  representation fix as a patch. EP-2's later bound-changing patch will exercise the benchmark
-  gate that EP-2 introduces.
-  Date: 2026-09-20 UTC
+  (Superseded 2026-09-20 by the sequential-patch decision below.)
 
 - Decision: Put the effectful-core exclusion in every package's own bounds rather than only in
   shibuya-core or only in `cabal.project` constraints.
@@ -318,7 +319,8 @@ interactions between child plans. Provide concise evidence.
   `effectful-core >=2.7.1.0 && <2.7.2.0`, which spans both the regressed and the fixed core.
   The adapters are the packages whose effects are dynamically dispatched, so they must carry
   the exclusion themselves; the core carries it too so that a consumer depending only on the
-  core is protected.
+  core is protected. Promoted to
+  `docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md`.
   Date: 2026-09-16
 
 - Decision: Exclude the batch-span dead-letter code attribute, the pgmq prefetch shutdown
@@ -331,15 +333,16 @@ interactions between child plans. Provide concise evidence.
 
 - Decision: Include the kiroku-hosted adapter in EP-3 even though its repository has its own
   release cadence and cohort.
-  Rationale: It is one of the four maintained adapters and it excludes effectful 2.7 today; the
-  plan can state the exact bound and the exact blocker (kiroku-store) so the kiroku cohort
-  release that lifts it is a documented follow-up rather than an unknown.
+  Rationale: It is one of the maintained adapters and it excluded effectful 2.7; the plan could
+  state the exact bound and the exact blocker (kiroku-store) so the kiroku cohort release that
+  lifts it would be a documented follow-up rather than an unknown.
   Date: 2026-09-16
 
 - Decision: No Intention ID is linked to this MasterPlan or its new child plans.
   Rationale: The initiative was created in an autonomous session with no user available to
-  supply one. Add `intention:` to the frontmatter of each plan if one is assigned later.
+  supply one.
   Date: 2026-09-16
+  (Superseded 2026-09-20 by the intention link below.)
 
 - Decision: Link the initiative and affected child plans to
   `intention_01m2ycc3fxedxtw5339e0efzy1`.
@@ -347,19 +350,96 @@ interactions between child plans. Provide concise evidence.
   the creation-time absence recorded above.
   Date: 2026-09-20 UTC
 
+- Decision: Preserve the existing MLS-only consumer follow-up while refreshing EP-1.
+  Rationale: The user explicitly excluded `mori://tan/registration-service-v2`.
+  Its incident informed the investigation but does not expand implementation scope.
+  Date: 2026-09-20 UTC
+
+- Decision: Run the GC regression as a dedicated test process and preserve its release gate.
+  Rationale: Cleanup must not accidentally keep the master alive. EP-1 owns this gate; EP-2's
+  release-policy edits must keep it.
+  Date: 2026-09-20 UTC
+
+- Decision: Supersede the combined 0.9.1.0 release with sequential patches: EP-1 at 0.9.0.2
+  and EP-2 provisionally at 0.9.0.3.
+  Rationale: EP-1 was complete and was the initiative's most serious runtime defect, while EP-2
+  had not started and was independent. The release skill classifies the internal-representation
+  fix as a patch.
+  Date: 2026-09-20 UTC
+
+- Decision: Move EP-2's provisional release target from 0.9.0.3 to 0.9.0.4.
+  Rationale: 0.9.0.3 was published on 2026-09-20 by the standalone plan
+  docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md.
+  EP-3's verification target moved with it. Plan 35's title and file name keep "0.9.0.3" for
+  stable identity.
+  Date: 2026-09-20
+  (Superseded 2026-09-21 by the cohort decision below.)
+
+- Decision: Cancel EP-4.
+  Rationale: The project owner declared the MessageDB adapter deprecated on 2026-09-19 and
+  limited supported adapters to Kafka, PGMQ, and Kiroku. Migrating it across four core majors
+  would have cost a database-backed migration for code that will not ship. The lifecycle
+  release verdict names it unsupported and uncertified. EP-4's body is kept as the migration
+  recipe in case the adapter is ever revived. No other child depended on it.
+  Date: 2026-09-19 (recorded here 2026-09-22)
+
+- Decision: Publish EP-2's bounds in the lifecycle cohort (shibuya-core 0.10.0.0) and EP-3's
+  adapter bounds in the matching adapter releases, instead of a separate 0.9.0.4 and adapter
+  patches.
+  Rationale: The bound commits were already tested and were independent of the version number.
+  The lifecycle candidate was being frozen across the same repositories, and ADR 0002 requires
+  a new candidate and fresh evidence for any dependency-solution change after freezing. A
+  separate 0.9.x patch cohort would have cost consumers two pin bumps and re-run certification
+  for no safety gain. EP-2's own benchmark evidence (Milestone 3) already covered the
+  dependency swap. The cohort's paired N1/N4 performance matrix from
+  `docs/plans/45-guard-lifecycle-fixes-against-throughput-latency-and-memory-regressions.md`
+  then passed on the frozen candidate, whose single solver plan includes the bound.
+  Date: 2026-09-21
+
+- Decision: Close the initiative and promote its two durable decisions into ADRs 0005 and 0006.
+  Rationale: Every non-cancelled child is published. The exclusion range and the gating rule
+  will outlive these plans and govern every future bound change.
+  Date: 2026-09-22
+
 
 ## Outcomes & Retrospective
 
-Summarize outcomes, gaps, and lessons learned at major milestones or at completion.
-Compare the result against the original vision. Before marking the MasterPlan complete,
-distill durable project context from this MasterPlan and its child ExecPlans into
-docs/adr/. Keep task-local execution and coordination details here.
+**Final outcome (2026-09-22).** Three of four child plans are complete and published; one was
+cancelled by owner decision. Measured against the vision:
 
-EP-1 is complete. The idle actor is removed, the
-process-isolated GC regression passes repeatedly, the pre-fix tree reproduces the crash, and
-the complete core build/test/flake gates pass. Release 0.9.0.2 is public, and the MLS consumer
-pins it and survives the bounded isolated-worker observation. ADR 0001 records the durable
-linked-actor and GC-liveness decision. EP-2 through EP-4 remain separate initiative work.
+- Idle-worker crash: fixed in 0.9.0.2. The failure class (a linked thread whose only waker is
+  reachable only through a droppable handle) was fully closed by the standalone 0.9.0.3. ADR
+  0001 records both.
+- Effectful bounds: every supported package in the 0.10 cohort accepts effectful-core 2.6.1
+  and 2.7.1.1 or later, and rejects 2.7.0.0 through 2.7.1.0. The rejection is proven by a
+  combined solve and recorded in ADR 0005.
+- Release gating: the release skill runs the benchmark for any runtime-dependency change,
+  including patches, and compares old and new dependency versions on one tree. Recorded in
+  ADR 0006.
+- MessageDB adapter: not upgraded. It is deprecated and unsupported at core 0.10.
+
+Gaps: the MessageDB adapter still declares `shibuya-core ^>=0.5.0.0`, and REV-12's findings
+against it are still true. Its public repository does not yet say it is deprecated; that is
+the owner's call. The exclusion itself is still backed by the upstream changelog and the
+adapters being dynamically dispatched, not by an adapter benchmark on 2.7.1.0 (EP-2 recorded
+that as optional).
+
+Lessons:
+
+- Every release number here was provisional, and three of them moved (0.9.1.0, 0.9.0.3,
+  0.9.0.4, then 0.10.0.0). Plans that separated version-neutral milestones (bounds, tests,
+  solves) from the publication milestone could absorb those moves without rework. The
+  publication step is where the plans went stale.
+- Two MasterPlans shipping through the same repositories need one release owner. This plan
+  and the lifecycle plan each assumed they would own the next core release. The collision was
+  resolved well, but by the candidate rather than by either plan.
+- A crash fix proven by a regression test can still leave the bug class open. Plan 46 found
+  the finished-application case that EP-1's test could not reach. Independent review of a
+  liveness fix is worth its cost.
+
+EP-1 detail: the idle actor is removed, the process-isolated GC regression passes repeatedly,
+the pre-fix tree reproduces the crash, and the core build, test, and flake gates pass. 0.9.0.2
+is public, and the MLS consumer pins it and survives the bounded isolated-worker observation.
 
 Revision 2026-09-20 UTC: Synchronize EP-33's confirmed regression history, completed
 failing-test milestone, isolated-test/release gate, and provisional release-version
@@ -378,3 +458,11 @@ unrelated dependency movement, passed its build/test/flake gates, and survived t
 isolated-worker observation. Added ADR 0001 for the durable concurrency and test decision.
 
 2026-09-20 UTC: Moved EP-2's provisional release target, and EP-3's verification target with it, from 0.9.0.3 to 0.9.0.4, because the standalone supervisor-link fix in docs/plans/46-unlink-the-nqe-supervisor-so-a-finished-app-cannot-kill-its-caller-during-gc.md was published as 0.9.0.3. Historical entries that mention 0.9.0.3 as the then-provisional target are left as written; the new Decision Log entry supersedes them. Cascaded to plans 34 and 35.
+
+Revision 2026-09-22 UTC: Brought the plan up to date with the published state. EP-2 and EP-3 are
+marked Complete: their bounds shipped in the 0.10.0.0 lifecycle cohort, not in 0.9.0.4 and
+adapter patches. EP-4 is marked Cancelled because the MessageDB adapter was deprecated on
+2026-09-19. Rewrote Vision & Scope, Dependency Graph, and Integration Points to describe what
+happened rather than what was scheduled. Put the Decision Log in date order and marked the
+superseded entries. Added the cohort and cancellation decisions, and wrote ADRs 0005 and 0006.
+Filled in the final retrospective. Cascaded the changes to plans 34, 35, and 36.

@@ -27,6 +27,11 @@ provenance:
       at: 2026-09-21T05:00:00Z
       mode: "implement"
       note: "Completed bound hardening, solver verification, and the dependency-sensitive release benchmark policy; publication remains pending release-owner coordination."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-09-22T17:29:05Z
+      mode: "update"
+      note: "Milestone 4 complete: bounds published in 0.10.0.0 instead of 0.9.0.4"
 ---
 
 # Harden shibuya-core dependency bounds and release gating for effectful 2.7
@@ -57,10 +62,13 @@ dependency versions on one tree; and this plan holds the measured comparison of 
 measurement, recorded below, is that effectful 2.7.1 is at parity or better on every leaf, and
 roughly twice as fast on the `Async` hot path.
 
-Plan 33 ships its urgent runtime fix alone as 0.9.0.2. This plan therefore owns the following
-core/metrics patch release, provisionally 0.9.0.4, after the bound, benchmark-policy, and
-evidence milestones are complete. Recheck Hackage and upstream tags before release; if another
-version is published first, use the next free patch and synchronize the parent and consumers.
+Plan 33 shipped its urgent runtime fix alone as 0.9.0.2. This plan was scheduled to own the
+next core/metrics patch, provisionally 0.9.0.4. Instead, its tested bounds shipped on
+2026-09-22 in shibuya-core and shibuya-metrics 0.10.0.0, the lifecycle release cohort certified
+by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md. See the Decision Log.
+The plan is complete. The durable decisions are in
+docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md and
+docs/adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md.
 
 
 ## Progress
@@ -68,7 +76,7 @@ version is published first, use the next free patch and synchronize the parent a
 - [x] (2026-09-21 UTC) Milestone 1: `effectful-core` exclusion bound in shibuya-core, shibuya-example, and shibuya-core-bench; 2.6.1.0 and 2.7.1.2 solve, while 2.7.1.0 is rejected by the declared core bound.
 - [x] (2026-09-21 UTC) Milestone 2: release skill gates runtime-dependency changes on the benchmark regardless of bump level and documents the one-tree comparison procedure.
 - [x] (2026-09-21 UTC) Milestone 3: benchmark evidence for the 0.9.0.1 swap recorded in this plan, including the 2.7.1.0 measurement.
-- [ ] Milestone 4: release shibuya-core and shibuya-metrics with the hardened bounds, provisionally as 0.9.0.4.
+- [x] (2026-09-22 UTC) Milestone 4: shibuya-core and shibuya-metrics published with the hardened bounds as 0.10.0.0 in the lifecycle release cohort, superseding the provisional 0.9.0.4 patch.
 
 
 ## Surprises & Discoveries
@@ -178,6 +186,14 @@ version is published first, use the next free patch and synchronize the parent a
   gate now names.
   Date: 2026-09-20
 
+- Decision: Publish Milestone 4 in the lifecycle cohort as 0.10.0.0 rather than as 0.9.0.4.
+  Rationale: The breaking lifecycle candidate
+  (docs/masterplans/6-comprehensive-lifecycle-remediation-and-release-assurance.md) was being
+  frozen across the same repositories. A separate 0.9.0.4 immediately before it would have cost
+  consumers two pin bumps and forced a fresh candidate. These already-tested bounds went into
+  the candidate's single solver plan and were covered by its performance matrix.
+  Date: 2026-09-21
+
 - Decision: Cut the dependency-bound work as the patch release after 0.9.0.2, provisionally
   0.9.0.3.
   Rationale: Plan 33's crash fix is ready while this plan has not started. Shipping 0.9.0.2
@@ -187,6 +203,16 @@ version is published first, use the next free patch and synchronize the parent a
 
 
 ## Outcomes & Retrospective
+
+**Complete (2026-09-22).** The bounds and release-gate rule are published in shibuya-core and
+shibuya-metrics 0.10.0.0 (https://hackage.haskell.org/package/shibuya-core-0.10.0.0, tag
+`v0.10.0.0`). The `## 0.10.0.0` section of `shibuya-core/CHANGELOG.md` carries this plan's
+entry. The planned separate 0.9.0.4 was never cut. Because the bounds were
+version-independent, Milestones 1 through 3 needed no rework when the version changed. Only
+Milestone 4's version number and release vehicle moved. Durable decisions are in ADRs 0005 and
+0006.
+
+History (2026-09-21):
 
 Milestones 1 through 3 are complete. Commit `16625ff` replaces the umbrella `effectful`
 dependency in every current core, test, example, and benchmark component with the direct
@@ -204,6 +230,9 @@ claimed here.
 
 
 ## Context and Orientation
+
+(Historical: this section describes the repository as it was when the plan was written, on
+0.9.0.1. The dependency lines it names have since been changed as described above.)
 
 shibuya is a supervised queue-processing framework built on the `effectful` effect system. This
 repository, `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya`, contains four packages
@@ -482,3 +511,8 @@ provisionally 0.9.0.4, and applies its new benchmark gate to that release.
 set. The accepted solver families, explicit rejection, full build/test/package checks, and
 dependency-sensitive benchmark policy all pass. Milestone 4 remains pending coordinated
 version selection; nothing was tagged or published.
+
+2026-09-22 UTC: Marked Milestone 4 and the plan complete. The bounds shipped in shibuya-core and
+shibuya-metrics 0.10.0.0 (lifecycle cohort, published 2026-09-22) instead of a separate 0.9.0.4.
+Added the release-vehicle decision, pointed to ADRs 0005 and 0006, and marked Context and
+Orientation as historical.

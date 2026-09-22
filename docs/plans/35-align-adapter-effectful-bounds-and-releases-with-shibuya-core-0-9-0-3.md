@@ -32,6 +32,11 @@ provenance:
       at: 2026-09-21T06:00:00Z
       mode: "implement"
       note: "Completed source bounds, dual-family tests, explicit rejection, and the combined solve; adapter publications remain coordinated with the lifecycle candidate version."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-09-22T17:29:05Z
+      mode: "update"
+      note: "Milestones 1-3 complete: adapters published in the 0.10 lifecycle cohort"
 ---
 
 # Align adapter effectful bounds and releases with shibuya-core 0.9.0.3
@@ -67,12 +72,19 @@ its identity and existing references stay stable, and this paragraph states the 
 All three adapters' existing bounds on shibuya-core already admit 0.9.0.3, so that release
 required no adapter change.
 
+**Status (2026-09-22): Complete.** The adapter bounds did not ship as the patch releases
+described below. They shipped in the lifecycle release cohort alongside shibuya-core 0.10.0.0:
+shibuya-pgmq-adapter 0.16.1.0, shibuya-kafka-adapter 0.9.1.0, kiroku-store 0.8.0.2, and
+shibuya-kiroku-adapter 0.5.1.3, all published on 2026-09-22 and all carrying the range below.
+The range is now owned by docs/adr/0005-exclude-regressed-effectful-core-releases-in-every-package.md.
+The version numbers in Plan of Work and Concrete Steps are the original, superseded targets.
+
 
 ## Progress
 
-- [ ] Milestone 1: shibuya-pgmq-adapter source and dual-family tests complete at `9247388`; release remains pending coordinated candidate versioning.
-- [ ] Milestone 2: shibuya-kafka-adapter source and dual-family tests complete at `1c455b5`; release remains pending coordinated candidate versioning.
-- [ ] Milestone 3: kiroku-store and shibuya-kiroku-adapter source and dual-family tests complete at `0dcd092` plus `f91bb05`; release remains pending coordinated candidate versioning.
+- [x] (2026-09-22 UTC) Milestone 1: shibuya-pgmq-adapter source and dual-family tests complete at `9247388`; published as 0.16.1.0 (tag `v0.16.1.0`) in the lifecycle cohort instead of patch 0.16.0.1.
+- [x] (2026-09-22 UTC) Milestone 2: shibuya-kafka-adapter source and dual-family tests complete at `1c455b5`; published as 0.9.1.0 (tag `v0.9.1.0`) in the lifecycle cohort instead of patch 0.9.0.2.
+- [x] (2026-09-22 UTC) Milestone 3: kiroku-store and shibuya-kiroku-adapter source and dual-family tests complete at `0dcd092` plus `f91bb05`; published as kiroku-store 0.8.0.2 and shibuya-kiroku-adapter 0.5.1.3 in the lifecycle cohort.
 - [x] (2026-09-21 UTC) Milestone 4: combined local-source solve accepts effectful-core 2.6.1.0 and 2.7.1.2 and rejects 2.7.1.0 at kiroku-store's bound.
 
 
@@ -99,7 +111,14 @@ implementation. Provide concise evidence.
   Rationale: The regression is in `effectful-core`, and `effectful` 2.7.1.0 pins `effectful-core >=2.7.1.0 && <2.7.2.0`, which spans both the regressed 2.7.1.0 and the fixed 2.7.1.1. Only a bound on `effectful-core` itself can exclude the regressed release, so every package that has a direct `effectful-core` dependency carries it, and packages that only depend on `effectful` gain a direct `effectful-core` dependency for the bound. The disjunction keeps the 2.6 family available so consumers are not forced to upgrade.
   Date: 2026-09-16
 
-- Decision: Release each adapter as a patch bump.
+- Decision: Publish the adapter bounds in the lifecycle cohort rather than as standalone patches.
+  Rationale: The same adapter repositories had to take the breaking shibuya-core 0.10.0.0
+  candidate immediately afterwards. Patches first would have cost consumers two pin bumps and
+  forced a new candidate. The bound commits were already tested and could not be affected by
+  the version number.
+  Date: 2026-09-21
+
+- Decision: Release each adapter as a patch bump. (Superseded 2026-09-21 by the cohort decision above.)
   Rationale: A bound change with no source change is a patch under the PVP, and shibuya-core did the same for 0.9.0.1.
   Date: 2026-09-16
 
@@ -109,6 +128,17 @@ implementation. Provide concise evidence.
 
 
 ## Outcomes & Retrospective
+
+**Complete (2026-09-22).** All three adapters and kiroku-store were published in the lifecycle
+cohort certified by docs/plans/44-certify-the-integrated-lifecycle-release-candidate.md. Each
+released cabal file carries the disjoint `effectful-core` range in every component, together
+with a `shibuya-core` 0.10 bound. They are minor rather than patch releases because the same
+releases include lifecycle fixes and the new core major bound. The kiroku adapter is 0.5.1.3
+rather than the planned 0.5.1.2 because of a packaging fix reviewed in REV-18. Milestone 4's
+combined local-source solve (below) remains the proof of the accepted and rejected families.
+The cohort's unified solver plan is recorded in docs/audits/lifecycle-release/release-verdict.md.
+
+History (2026-09-21):
 
 The version-neutral compatibility work is complete. PGMQ commit `9247388`, Kafka commit
 `1c455b5`, and Kiroku commits `0dcd092` plus `f91bb05` apply the safe Effectful ranges across
@@ -413,3 +443,8 @@ plan 34 owns the following dependency-bound patch.
 2026-09-21 UTC: Completed all source, solver, test, package, and flake compatibility gates for
 the three adapters and closed the former kiroku-store blocker. Publications remain deliberately
 open and are coordinated with EP-44's candidate version; no tag or upload is claimed.
+
+2026-09-22 UTC: Marked Milestones 1 through 3 and the plan complete. The adapters were published in
+the 0.10 lifecycle cohort (pgmq 0.16.1.0, Kafka 0.9.1.0, kiroku-store 0.8.0.2, kiroku adapter
+0.5.1.3), not as the patches originally planned. Recorded the release-vehicle decision and
+pointed to ADR 0005. The title and file name keep "0.9.0.3" for stable identity.
