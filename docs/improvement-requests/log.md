@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-09-25
+* **Addition**: IR-8 requests a separate retry-decision metric while preserving the documented `processed` counter mapping.
 * **Addition**: IR-7 records the cross-release transient-handler-exception state and readiness failure reproduced by keiro-runtime-kenshou.
 
 ## 2026-09-20
