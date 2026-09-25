@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-09-25
+* **Addition**: IR-7 records the cross-release transient-handler-exception state and readiness failure reproduced by keiro-runtime-kenshou.
+
 ## 2026-09-20
 * **Update**: Mark the route and WebSocket contract test-suite deliverable complete while leaving configurable CORS and broader convention alignment proposed.
 * **Addition**: Add IR-6 for the confirmed lifecycle, concurrency, and health audit gaps.
