@@ -2,6 +2,7 @@
 
 ## 2026-09-27
 
+* **Addition**: BUG-5 records that exhausted finalizer retries were reported as a graceful halt on Shibuya core 0.9.0.3, while 0.10.0.0 passes the fail-loud control.
 * **Addition**: BUG-4 records that a finalized AckHalt cannot wake idle concurrent intake in Shibuya core 0.9.0.3, while 0.10.0.0 controls pass.
 * **Addition**: BUG-3 records nonpositive Ahead/Async values removing the historical concurrency bound in Shibuya core 0.9.0.3 and the verified 0.10.0.0 rejection.
 * **Addition**: BUG-2 records the historical duplicate-ID handle-loss defect in Shibuya core 0.9.0.3 and the verified 0.10.0.0 startup rejection.
