@@ -13,4 +13,5 @@ okf_version: "0.2"
 - [Forced application stop returns while handlers can still finalize](forced-stop-returns-before-handlers-finish.md) - With four handlers blocked in the current batch, a forced application stop returns while those handlers are still active; opening their gate later lets them finalize after the caller was told the application had stopped.
 - [Handler halt does not wake idle intake](halt-does-not-wake-idle-intake.md) - Shibuya core 0.9.0.3 can leave waitApp blocked after AckHalt when concurrent or batch intake is waiting on an idle source.
 - [Nonpositive concurrency removes the handler bound](nonpositive-concurrency-removes-handler-bound.md) - Shibuya core 0.9.0.3 accepts zero and negative Async or Ahead bounds and can run concurrent handlers beyond the configured limit.
+- [Throwing adapter shutdown skips sibling cleanup](throwing-adapter-shutdown-skips-siblings.md) - Shibuya core 0.9.0.3 lets one adapter shutdown exception skip later adapter shutdown actions and supervisor cleanup during graceful stop.
 
