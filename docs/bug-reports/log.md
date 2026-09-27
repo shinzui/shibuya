@@ -2,6 +2,7 @@
 
 ## 2026-09-27
 
+* **Addition**: BUG-4 records that a finalized AckHalt cannot wake idle concurrent intake in Shibuya core 0.9.0.3, while 0.10.0.0 controls pass.
 * **Addition**: BUG-3 records nonpositive Ahead/Async values removing the historical concurrency bound in Shibuya core 0.9.0.3 and the verified 0.10.0.0 rejection.
 * **Addition**: BUG-2 records the historical duplicate-ID handle-loss defect in Shibuya core 0.9.0.3 and the verified 0.10.0.0 startup rejection.
 * **Modification**: BUG-1 now cites clean-tree historical and current cohort runs from harness revision `5a308b6776136a702df834d944a3e770959c44c7`, each with four active handlers after stop and seven late finalizations.
