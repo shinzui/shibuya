@@ -2,6 +2,9 @@
 
 ## 2026-09-27
 
+* **Addition**: BUG-11 records that unsubscribe-after-subscribe-all still delivered excluded processor updates on metrics 0.9.0.3; Hackage 0.10.0.0 passes.
+* **Addition**: BUG-10 records that metrics 0.9.0.3 accepted WebSocket upgrades with the endpoint disabled; Hackage 0.10.0.0 passes.
+* **Addition**: BUG-9 records leaked WebSocket connection slots under disconnect and setup faults on metrics 0.9.0.3; Hackage 0.10.0.0 passes.
 * **Addition**: BUG-8 records historical false-ready and false-live health responses after a required processor fails or the master stops; Hackage 0.10.0.0 controls pass.
 * **Addition**: BUG-7 records stale activity timestamps making healthy processing look stuck and unready on Shibuya 0.9.0.3; Hackage 0.10.0.0 passes.
 * **Addition**: BUG-6 records that a throwing adapter shutdown skipped sibling actions and supervisor cleanup on Shibuya core 0.9.0.3, while 0.10.0.0 passes.
