@@ -38,6 +38,18 @@ workaround: >-
   Keep the handler's side effects idempotent and fence old workers before
   starting a replacement. A process boundary with SIGKILL can enforce the
   stop boundary when an in-process forced stop is insufficient.
+reviews:
+  - kind: model
+    reviewer: openai/codex
+    provider: openai
+    model: gpt-6
+    effort: unspecified
+    reviewed_at: "2026-09-30T20:36:55Z"
+    document_timestamp: "2026-09-27T19:02:09Z"
+    scope: catalog-metadata
+    outcome: approved
+    context: "Status audit of cited sealed Kenshou results, cohort package identities, later local runs, and the 2026-09-29 baseline report. Retain reported: the published 0.10.0.0 run reproduces four active handlers after stop and seven late finalizations; no owning-repository reproduction is recorded, as required for confirmed. Current controls at mori://shinzui/keiro-runtime-kenshou: runs/01a0e44b-aea0-7459-966a-150ea1340c27/run-result.json (project-relative paths; artifact-level URIs pending). Existing evidence was read; scenarios were not rerun."
+
 ---
 
 # Forced application stop returns while handlers can still finalize

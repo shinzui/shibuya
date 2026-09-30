@@ -36,6 +36,18 @@ reproduction:
 workaround: >-
   On 0.9.0.3, arrange an independent stop or cancellation after a halt when the
   source can remain idle; do not rely on waitApp to return on the halt alone.
+reviews:
+  - kind: model
+    reviewer: openai/codex
+    provider: openai
+    model: gpt-6
+    effort: unspecified
+    reviewed_at: "2026-09-30T20:36:55Z"
+    document_timestamp: "2026-09-27T23:31:16Z"
+    scope: catalog-metadata
+    outcome: approved
+    context: "Status audit of cited sealed Kenshou results, cohort package identities, later local runs, and the 2026-09-29 baseline report. Retain fixed and fixedVersion 0.10.0.0: clean published-release controls pass while historical 0.9.0.3 runs reproduce the defect. Current controls at mori://shinzui/keiro-runtime-kenshou: runs/01a0e45d-4a06-738d-a298-3b9f7e4ceba1/run-result.json, runs/01a0e45d-7b99-7793-b4ca-b1419235545f/run-result.json, runs/01a0e45d-b7bb-7518-8a3b-ec91ee765c36/run-result.json (project-relative paths; artifact-level URIs pending). Existing evidence was read; scenarios were not rerun."
+
 ---
 
 # Handler halt does not wake idle intake

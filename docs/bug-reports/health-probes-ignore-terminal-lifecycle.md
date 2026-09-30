@@ -35,6 +35,18 @@ reproduction:
 workaround: >-
   On 0.9.0.3, use an independent supervisor lifecycle signal for health
   decisions rather than treating a successful metrics TVar read as proof of life.
+reviews:
+  - kind: model
+    reviewer: openai/codex
+    provider: openai
+    model: gpt-6
+    effort: unspecified
+    reviewed_at: "2026-09-30T20:36:55Z"
+    document_timestamp: "2026-09-27T23:49:23Z"
+    scope: catalog-metadata
+    outcome: approved
+    context: "Status audit of cited sealed Kenshou results, cohort package identities, later local runs, and the 2026-09-29 baseline report. Retain fixed and fixedVersion 0.10.0.0: clean published-release controls pass while historical 0.9.0.3 runs reproduce the defect. Current controls at mori://shinzui/keiro-runtime-kenshou: runs/01a0e459-1935-7206-baa0-82f79790af66/run-result.json, runs/01a0e458-8a23-7078-b5b3-bc97aaa8e42c/run-result.json (project-relative paths; artifact-level URIs pending). Existing evidence was read; scenarios were not rerun."
+
 ---
 
 # Health probes ignore terminal processor and master state

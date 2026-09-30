@@ -1,5 +1,9 @@
 # Bundle Update Log
 
+## 2026-09-30
+
+* **Modification**: Reviewed the status metadata of all eleven reports against their cited sealed results in `mori://shinzui/keiro-runtime-kenshou`, later local runs, and that project's `docs/reports/2026-09-29-runtime-baseline.md` (artifact-level URI pending). BUG-2 through BUG-11 retain `fixed` with `fixedVersion: 0.10.0.0`: every cited published-release control passes, while historical 0.9.0.3 reproductions fail. BUG-1 retains `reported`: published 0.10.0.0 and pinned-head runs reproduce active handlers and late finalization, and no owning-repository reproduction is recorded to justify `confirmed`. Added review provenance to each report. This audit reads existing evidence; it does not claim new scenario executions.
+
 ## 2026-09-27
 
 * **Addition**: BUG-11 records that unsubscribe-after-subscribe-all still delivered excluded processor updates on metrics 0.9.0.3; Hackage 0.10.0.0 passes.

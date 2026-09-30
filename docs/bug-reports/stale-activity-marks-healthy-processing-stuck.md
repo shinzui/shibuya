@@ -36,6 +36,18 @@ reproduction:
 workaround: >-
   On 0.9.0.3, avoid using the built-in stuck-readiness result alone to restart
   a processor; correlate it with independent progress counters.
+reviews:
+  - kind: model
+    reviewer: openai/codex
+    provider: openai
+    model: gpt-6
+    effort: unspecified
+    reviewed_at: "2026-09-30T20:36:55Z"
+    document_timestamp: "2026-09-27T23:49:23Z"
+    scope: catalog-metadata
+    outcome: approved
+    context: "Status audit of cited sealed Kenshou results, cohort package identities, later local runs, and the 2026-09-29 baseline report. Retain fixed and fixedVersion 0.10.0.0: clean published-release controls pass while historical 0.9.0.3 runs reproduce the defect. Current controls at mori://shinzui/keiro-runtime-kenshou: runs/01a0e458-8d0f-7366-a182-882199a4e398/run-result.json (project-relative paths; artifact-level URIs pending). Existing evidence was read; scenarios were not rerun."
+
 ---
 
 # Stale activity marks healthy processing stuck

@@ -38,6 +38,18 @@ workaround: >-
   On 0.9.0.3, make adapter shutdown actions catch and report their own errors
   while completing cleanup, then independently force-stop the application if
   graceful stop fails.
+reviews:
+  - kind: model
+    reviewer: openai/codex
+    provider: openai
+    model: gpt-6
+    effort: unspecified
+    reviewed_at: "2026-09-30T20:36:55Z"
+    document_timestamp: "2026-09-27T23:41:47Z"
+    scope: catalog-metadata
+    outcome: approved
+    context: "Status audit of cited sealed Kenshou results, cohort package identities, later local runs, and the 2026-09-29 baseline report. Retain fixed and fixedVersion 0.10.0.0: clean published-release controls pass while historical 0.9.0.3 runs reproduce the defect. Current controls at mori://shinzui/keiro-runtime-kenshou: runs/01a0e44f-6085-77a9-8db6-5d165e1201e8/run-result.json (project-relative paths; artifact-level URIs pending). Existing evidence was read; scenarios were not rerun."
+
 ---
 
 # Throwing adapter shutdown skips sibling cleanup
