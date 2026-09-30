@@ -6,10 +6,11 @@ description: >-
   WebSocket frame, and strictly additive alignment with the cross-project WebSocket convention,
   so a browser UI on another origin can consume the server and its contract stops being
   working-but-unproven.
-timestamp: 2026-09-20T19:22:46Z
+timestamp: 2026-09-30T23:43:10Z
 requestId: IR-5
-status: proposed
+status: accepted
 origin: mori://shinzui/keiro-ui
+plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
 
 # Improvement Request: Harden shibuya-metrics for Browser Clients — CORS, Tests, and WS Convention Alignment
@@ -28,8 +29,18 @@ The test-suite deliverable in requested change 2 is complete under
 `shibuya-metrics-test` now covers every published HTTP route, exact JSON and Prometheus
 fixtures, every frame encoding, and real loopback WebSocket behavior, and the release skill
 runs it. CAP-10 no longer calls the endpoints working-but-unproven. Requested changes 1 and
-3—configurable CORS/Origin policy and broader additive convention alignment—remain open, so
-this request stays proposed and its scope is unchanged.
+3—configurable CORS/Origin policy and broader additive convention alignment—remain open; they
+are now planned as described below, and the request's scope is unchanged.
+
+Accepted on 2026-09-30 and planned under
+`docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`. Configurable
+cross-origin access (requested change 1) is delivered by
+`docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`, and the additive
+WebSocket convention alignment with its conformance mapping (requested change 3) by
+`docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md`,
+which also closes this request once both have landed. Shibuya's own wire contract and browser
+posture are recorded in
+`docs/adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`.
 
 ## Context
 

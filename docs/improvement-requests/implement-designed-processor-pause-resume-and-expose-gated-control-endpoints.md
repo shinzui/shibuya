@@ -6,10 +6,11 @@ description: >-
   shibuya-metrics as explicitly gated control operations, disabled by default, so an operator
   can safely stop a processor from taking new work without expiring leases or killing the
   process.
-timestamp: 2026-08-19T00:00:00Z
+timestamp: 2026-09-30T23:43:10Z
 requestId: IR-4
-status: proposed
+status: accepted
 origin: mori://shinzui/keiro-ui
+plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
 
 # Improvement Request: Implement Designed Processor Pause/Resume and Expose Gated Control Endpoints
@@ -21,6 +22,15 @@ Proposed by the keiro runtime UI initiative
 `mori://shinzui/keiro-ui/plans/4-audit-shibuya-and-file-ui-endpoint-improvement-requests`).
 This is the initiative's first control-plane request against shibuya — everything else filed
 from keiro-ui is read-only. Implementation is shibuya's own downstream work.
+
+Accepted on 2026-09-30 and planned under
+`docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`. The core pause
+and resume primitive is delivered by
+`docs/plans/51-implement-source-level-processor-pause-and-resume.md`, and the gated control
+endpoints by `docs/plans/52-expose-gated-pause-and-resume-control-endpoints.md`, which also
+closes this request. The gating posture is recorded in
+`docs/adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`;
+the chosen gating model receives its own ADR when the endpoints land.
 
 ## Context
 

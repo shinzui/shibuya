@@ -6,10 +6,11 @@ description: >-
   cursor progress where the adapter supplies one, and oldest-in-flight visibility — aggregated
   off the hot path — so an inspection UI can answer how fast a processor runs, how far it has
   gotten, and what it is stuck on.
-timestamp: 2026-08-19T00:00:00Z
+timestamp: 2026-09-30T23:43:10Z
 requestId: IR-3
-status: proposed
+status: accepted
 origin: mori://shinzui/keiro-ui
+plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
 
 # Improvement Request: Expose Processor Progress, Latency, and In-Flight Detail for Inspection UIs
@@ -23,6 +24,16 @@ initiative is preparing a browser UI for applications built on the keiro runtime
 processor supervision views belong to shibuya per the initiative's layer-ownership matrix
 (`mori://shinzui/keiro-ui/okf/adrs/concepts/ADR-1`). Implementation is shibuya's own downstream
 work.
+
+Accepted on 2026-09-30 and planned under
+`docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`. The latency
+distribution and oldest-in-flight detail are delivered by
+`docs/plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md`, and
+acknowledged-cursor progress by
+`docs/plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md`, which also
+closes this request. Shibuya's own wire contract for these additions, including its documented
+deviation from the snake_case member naming requested here, is recorded in
+`docs/adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`.
 
 ## Context
 

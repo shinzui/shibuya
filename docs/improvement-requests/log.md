@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-09-30
+* **Update**: Accept IR-3, IR-4, and IR-5 and link them to `docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`; child plans EP-47 through EP-52 deliver them and `docs/adr/0007` records Shibuya's own wire contract.
+
 ## 2026-09-25
 * **Addition**: IR-8 requests a separate retry-decision metric while preserving the documented `processed` counter mapping.
 * **Addition**: IR-7 records the cross-release transient-handler-exception state and readiness failure reproduced by keiro-runtime-kenshou.
