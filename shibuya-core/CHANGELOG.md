@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0.1 — 2026-10-05
+
+### Other Changes
+
+- Admit random 1.3 alongside 1.2 for the existing retry jitter API.
+
 ## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes

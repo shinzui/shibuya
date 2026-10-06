@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0.1 — 2026-10-05
+
+### Other Changes
+
+- Advance the shared release version and require shibuya-core 0.10.0.1, which admits random 1.3.
+
 ## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes

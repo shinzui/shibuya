@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0.1 — 2026-10-05
+
+### Other Changes
+
+- `shibuya-core`: admit random 1.3 alongside 1.2 for retry jitter.
+- `shibuya-metrics`: advance the shared version and require shibuya-core 0.10.0.1.
+
 ## 0.10.0.0 — 2026-09-21
 
 ### Breaking Changes
