@@ -4,7 +4,7 @@ import Control.Concurrent (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Async (async, wait)
 import Control.Concurrent.STM (atomically, check, readTVar)
 import Control.Exception (SomeException, throwIO, try)
-import Data.Aeson (eitherDecode, encode)
+import Data.Aeson (Value, eitherDecode, encode, object, (.=))
 import Data.ByteString.Lazy (ByteString)
 import Data.IORef (atomicModifyIORef', newIORef)
 import Data.Map.Strict qualified as Map
@@ -88,6 +88,24 @@ spec = around withMaster $ do
           receiveServer conn `shouldReturn` expected
 
   describe "WebSocket wire protocol" $ do
+    it "reports invalid client messages and remains usable" $ \master ->
+      withServer defaultConfig master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          WS.sendTextData conn ("{\"type\":\"bogus\"}" :: ByteString)
+          reply <- timeout 1_000_000 (WS.receiveData conn :: IO ByteString)
+          fmap (eitherDecode @Value) reply
+            `shouldBe` Just
+              ( Right $
+                  object
+                    [ "type" .= ("error" :: String),
+                      "code" .= ("invalid_message" :: String),
+                      "message" .= ("Error in $: Unknown message type: bogus" :: String)
+                    ]
+              )
+          WS.sendTextData conn $ encode Ping
+          receiveServer conn `shouldReturn` Pong
+
     it "sends an initial snapshot" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "alpha")
       withServer defaultConfig master $ \port ->
@@ -159,16 +177,25 @@ spec = around withMaster $ do
         WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
           _ <- receiveServer conn
           WS.sendTextData conn $ encode $ Subscribe [ProcessorId "one", ProcessorId "two", ProcessorId "three"]
-          (WS.receiveData conn :: IO ByteString)
-            `shouldThrow` (anyException :: SomeException -> Bool)
+          payload <- timeout 1_000_000 (WS.receiveData conn :: IO ByteString)
+          fmap (eitherDecode @Value) payload
+            `shouldBe` Just
+              ( Right $
+                  object
+                    [ "type" .= ("error" :: String),
+                      "code" .= ("subscription_limit_exceeded" :: String),
+                      "message" .= ("WebSocket processor subscription limit exceeded (maximum 2)" :: String)
+                    ]
+              )
+          (WS.receiveData conn :: IO ByteString) `shouldThrow` isPolicyClose
 
     it "also bounds subscribe-all exclusion state" $ \master ->
       withServer fastConfig {wsMaxSubscriptions = 1} master $ \port ->
         WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
           _ <- receiveServer conn
           WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "one", ProcessorId "two"]
-          (WS.receiveData conn :: IO ByteString)
-            `shouldThrow` (anyException :: SomeException -> Bool)
+          _ <- WS.receiveData conn :: IO ByteString
+          (WS.receiveData conn :: IO ByteString) `shouldThrow` isPolicyClose
 
     it "excludes processors unsubscribed from subscribe-all" $ \master -> do
       alpha <- registerIdleProcessor master (ProcessorId "alpha")
@@ -281,3 +308,7 @@ isForbiddenHandshake (WS.MalformedResponse response _) =
   WS.responseCode response == 403
     && lookup "Content-Type" (WS.responseHeaders response) == Just "application/json"
 isForbiddenHandshake _ = False
+
+isPolicyClose :: WS.ConnectionException -> Bool
+isPolicyClose (WS.CloseRequest 1008 _) = True
+isPolicyClose _ = False

@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-10T20:38:53Z
+      mode: "implement"
+      note: "Implement bounded WebSocket delivery and in-band errors"
 ---
 
 
@@ -81,13 +86,15 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 ## Progress
 
 
-- [ ] Milestone 1: Add the `ServerError` constructor and `error` frame, emit it for invalid client frames and for subscription-limit closes, with round-trip and loopback tests seen failing first.
+- [x] (2026-10-10) Milestone 1: Add the `ServerError` constructor and `error` frame, emit it for invalid client frames and for subscription-limit closes, with round-trip and loopback tests seen failing first.
 - [ ] Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the independent producer and sole writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
 - [ ] Milestone 3: Publish the conformance mapping in `docs/architecture/METRICS.md`, update the package Haddock, CAP-10, changelogs, and ADRs, record wire-load sanity numbers, and close IR-5 after EP-47 is Complete.
 
 
 ## Surprises & Discoveries
 
+
+2026-10-10 implementation: The detached pre-change worktree at `30258cc` failed the new invalid-message test by timing out instead of sending an error. The main-tree suite passes 71 examples after adding the error constructor and ordered subscription-limit response. The decoder reason includes Aeson’s `Error in $:` prefix.
 
 2026-10-10 review: Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load.
 

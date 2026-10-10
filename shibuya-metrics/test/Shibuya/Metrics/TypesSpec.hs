@@ -51,6 +51,8 @@ spec = do
           "error" .= ("boom" :: String),
           "messageId" .= (Just "message-1" :: Maybe String)
         ]
+    messageCase (ServerError "invalid_message" "bad input") $
+      object ["type" .= ("error" :: String), "code" .= ("invalid_message" :: String), "message" .= ("bad input" :: String)]
     messageCase Goodbye $ object ["type" .= ("goodbye" :: String)]
 
     it "rejects an unknown server message tag" $

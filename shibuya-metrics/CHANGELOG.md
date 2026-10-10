@@ -4,10 +4,15 @@
 
 ### Breaking Changes
 
+- `ServerMessage` gains `ServerError`; exhaustive matches must handle this constructor.
+
 - `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
   must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
 
 ### New Features
+
+- Send additive in-band WebSocket `error` frames for invalid messages and before
+  subscription-limit policy closes (1008). Valid existing frames are unchanged.
 
 - add configurable cross-origin HTTP access and preflight handling, plus
   WebSocket upgrade Origin validation before connection-slot acquisition.

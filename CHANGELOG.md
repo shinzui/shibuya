@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Metrics WebSockets send additive `error` frames for malformed messages and before
+  subscription-limit closes; exported `ServerMessage` gains `ServerError`, requiring
+  downstream exhaustive matches to handle it.
+
 ### Breaking Changes
 
 - `shibuya-metrics`: `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction

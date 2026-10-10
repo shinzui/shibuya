@@ -23,7 +23,7 @@ import Control.Concurrent.STM
   )
 import Control.Exception (catch, finally, mask, throwIO)
 import Control.Monad (forever, when)
-import Data.Aeson (decode, encode)
+import Data.Aeson (eitherDecode, encode)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -172,9 +172,9 @@ serveConnection config master wsState pending = do
 receiveLoop :: MetricsServerConfig -> Master -> ConnectionState -> WS.Connection -> IO ()
 receiveLoop config master connState conn = forever $ do
   msg <- WS.receiveData conn
-  case decode msg of
-    Nothing -> pure () -- Ignore invalid messages
-    Just clientMsg -> handleClientMessage config.wsMaxSubscriptions master connState conn clientMsg
+  case eitherDecode msg of
+    Left reason -> WS.sendTextData conn $ encode $ ServerError "invalid_message" (Text.pack reason)
+    Right clientMsg -> handleClientMessage config.wsMaxSubscriptions master connState conn clientMsg
 
 -- | Handle a client message.
 handleClientMessage ::
@@ -227,11 +227,10 @@ subscriptionSize = \case
   SelectedProcessors selected -> Set.size selected
 
 rejectOversizedSubscription :: WS.Connection -> Int -> IO ()
-rejectOversizedSubscription conn limit =
-  WS.sendCloseCode conn 1008 $
-    "WebSocket processor subscription limit exceeded (maximum "
-      <> Text.pack (show limit)
-      <> ")"
+rejectOversizedSubscription conn limit = do
+  let reason = "WebSocket processor subscription limit exceeded (maximum " <> Text.pack (show limit) <> ")"
+  WS.sendTextData conn $ encode $ ServerError "subscription_limit_exceeded" reason
+  WS.sendCloseCode conn 1008 reason
 
 --------------------------------------------------------------------------------
 -- Push Loop

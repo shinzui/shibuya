@@ -68,6 +68,8 @@ data ServerMessage
     Pong
   | -- | A formerly visible processor reached a retained terminal state
     ProcessorTerminal !ProcessorId !ProcessorTerminalStatus
+  | -- | In-band failure: stable code followed by human-readable message
+    ServerError !Text !Text
   | -- | Server is shutting down
     Goodbye
   deriving stock (Eq, Show, Generic)
@@ -98,6 +100,8 @@ instance ToJSON ServerMessage where
         "error" .= failure,
         "messageId" .= messageId
       ]
+  toJSON (ServerError code message) =
+    object ["type" .= ("error" :: Text), "code" .= code, "message" .= message]
   toJSON Goodbye = object ["type" .= ("goodbye" :: Text)]
 
 instance FromJSON ServerMessage where
@@ -115,6 +119,7 @@ instance FromJSON ServerMessage where
           "failed" -> TerminalFailed <$> v .: "error" <*> v .:? "messageId"
           other -> fail $ "Unknown terminal status: " <> Text.unpack other
         pure $ ProcessorTerminal pid terminal
+      "error" -> ServerError <$> v .: "code" <*> v .: "message"
       "goodbye" -> pure Goodbye
       other -> fail $ "Unknown message type: " <> Text.unpack other
 

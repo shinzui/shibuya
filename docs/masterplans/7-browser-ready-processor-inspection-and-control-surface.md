@@ -150,7 +150,7 @@ binds this repository, and children cite only ADR-0007 for the contract.
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 47 | Add configurable cross-origin access to the metrics server | [EP-47](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md) | None | None | Complete |
-| 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | Not Started |
+| 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | In Progress |
 | 49 | Expose per-processor latency distribution and oldest in-flight detail | [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md) | None | None | Not Started |
 | 50 | Expose acknowledged cursor progress per processor and partition | [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md) | EP-49 | None | Not Started |
 | 51 | Implement source-level processor pause and resume | [EP-51](../plans/51-implement-source-level-processor-pause-and-resume.md) | None | None | Not Started |
@@ -392,7 +392,7 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-10 20:07 UTC) EP-47 M2: Configurable cross-origin policy for HTTP responses and preflight requests.
 - [x] (2026-10-10 20:08 UTC) EP-47 M3: Validate the WebSocket upgrade `Origin` header by the same policy.
 - [x] (2026-10-10 20:14 UTC) EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
-- [ ] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.
+- [x] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.
 - [ ] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
 - [ ] EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
 - [ ] EP-49 M1: Prototype synchronized detailed accounting, prove cancellation cleanup, measure both levels, and retain the basic default.
