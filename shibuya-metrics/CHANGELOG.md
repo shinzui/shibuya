@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+- add stable `code` members to existing error bodies, preserving their
+  `error` text, context, status, and content type (additive wire change).
+
 ## 0.10.0.1 — 2026-10-05
 
 ### Other Changes

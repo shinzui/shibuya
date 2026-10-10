@@ -17,16 +17,15 @@ where
 
 import Control.Concurrent.Async (async, cancel)
 import Control.Exception (bracket, finally)
-import Data.Aeson (encode, object, (.=))
 import Data.String (fromString)
-import Data.Text (Text)
-import Network.HTTP.Types (hContentType, status404)
-import Network.Wai (Application, Response, pathInfo, responseLBS)
+import Network.HTTP.Types (status404)
+import Network.Wai (Application, pathInfo)
 import Network.Wai.Handler.Warp qualified as Warp
 import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
+import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
 import Shibuya.Metrics.Prometheus (prometheusApp)
@@ -141,13 +140,6 @@ httpApp config master depChecks req respond = do
     -- WebSocket path info (for documentation, actual upgrade handled above)
     ["ws"]
       | config.enableWebSocket ->
-          respond $ notFoundResponse "WebSocket endpoint - use ws:// protocol"
+          respond $ errorResponse status404 "WebSocket endpoint - use ws:// protocol" "websocket_upgrade_required" []
     -- Not found
-    _ -> respond $ notFoundResponse "Not found"
-
-notFoundResponse :: Text -> Response
-notFoundResponse msg =
-  responseLBS
-    status404
-    [(hContentType, "application/json")]
-    (encode $ object ["error" .= msg])
+    _ -> respond $ errorResponse status404 "Not found" "not_found" []

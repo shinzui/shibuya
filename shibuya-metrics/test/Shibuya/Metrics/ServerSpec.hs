@@ -4,12 +4,15 @@ import Control.Exception (SomeException, throwIO)
 import Data.Aeson (decode, object, (.=))
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as LBS
+import Data.Char (toLower)
+import Data.List (isInfixOf)
 import Network.HTTP.Types (Status, hContentType, status200, status404, status503)
-import Network.Wai (Application)
-import Network.Wai.Test (SResponse (..))
+import Network.Wai (Application, requestHeaders)
+import Network.Wai.Test (SResponse (..), defaultRequest, request, runSession, setPath)
 import Shibuya.App (Master)
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
+import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, DependencyStatus (..))
 import Shibuya.Metrics.Server (combinedApp, startMetricsServer)
 import Shibuya.Metrics.TestSupport
@@ -30,7 +33,38 @@ spec = around withMaster $ do
       startMetricsServer defaultConfig {wsMaxSubscriptions = 0} master
         `shouldThrow` (anyException :: SomeException -> Bool)
 
+  describe "structured error response" $ do
+    it "protects reserved keys while retaining context and content type" $ \_ -> do
+      let app _ respond =
+            respond $
+              errorResponse
+                status404
+                "Not found"
+                "not_found"
+                ["error" .= ("override" :: String), "code" .= ("override" :: String), "processor" .= ("missing" :: String)]
+      response <- getResponse app "/"
+      response.simpleStatus `shouldBe` status404
+      lookup hContentType response.simpleHeaders `shouldBe` Just "application/json"
+      decode response.simpleBody
+        `shouldBe` Just
+          ( object
+              ["error" .= ("Not found" :: String), "code" .= ("not_found" :: String), "processor" .= ("missing" :: String)]
+          )
+
   describe "combinedApp HTTP routes" $ do
+    it "preserves headerless defaults on every read route with an Origin" $ \master -> do
+      _ <- registerIdleProcessor master (ProcessorId "known")
+      app <- appFor defaultConfig master []
+      mapM_
+        ( \path -> do
+            plain <- getResponse app path
+            origin <- runSession (request $ setPath defaultRequest {requestHeaders = [("Origin", "https://ops.example.com")]} path) app
+            origin.simpleHeaders `shouldBe` plain.simpleHeaders
+            origin.simpleHeaders `shouldSatisfy` (not . any (\(name, _) -> "access-control-" `isInfixOf` map toLower (show name)))
+            lookup "Vary" origin.simpleHeaders `shouldBe` Nothing
+        )
+        ["/metrics", "/metrics/known", "/metrics/missing", "/metrics/prometheus", "/health", "/health/live", "/health/ready", "/ws", "/unknown"]
+
     it "serves every enabled JSON, health, Prometheus, and WebSocket path" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "known")
       app <- appFor defaultConfig master []
@@ -45,7 +79,7 @@ spec = around withMaster $ do
       wsResponse <- getResponse app "/ws"
       wsResponse.simpleStatus `shouldBe` status404
       decode wsResponse.simpleBody
-        `shouldBe` Just (object ["error" .= ("WebSocket endpoint - use ws:// protocol" :: String)])
+        `shouldBe` Just (object ["error" .= ("WebSocket endpoint - use ws:// protocol" :: String), "code" .= ("websocket_upgrade_required" :: String)])
 
     it "returns the published JSON error for an unknown processor" $ \master -> do
       app <- appFor defaultConfig master []
@@ -55,7 +89,8 @@ spec = around withMaster $ do
         `shouldBe` Just
           ( object
               [ "error" .= ("Processor not found" :: String),
-                "processor" .= ("missing" :: String)
+                "processor" .= ("missing" :: String),
+                "code" .= ("processor_not_found" :: String)
               ]
           )
 
@@ -64,7 +99,7 @@ spec = around withMaster $ do
       response <- getResponse app "/unknown"
       response.simpleStatus `shouldBe` status404
       decode response.simpleBody
-        `shouldBe` Just (object ["error" .= ("Not found" :: String)])
+        `shouldBe` Just (object ["error" .= ("Not found" :: String), "code" .= ("not_found" :: String)])
 
     it "returns 404 for every JSON route when JSON endpoints are disabled" $ \master -> do
       app <- appFor defaultConfig {enableJSON = False} master []
@@ -81,7 +116,7 @@ spec = around withMaster $ do
       response <- getResponse app "/ws"
       response.simpleStatus `shouldBe` status404
       decode response.simpleBody
-        `shouldBe` Just (object ["error" .= ("Not found" :: String)])
+        `shouldBe` Just (object ["error" .= ("Not found" :: String), "code" .= ("not_found" :: String)])
 
     it "returns 503 from readiness and detailed health for an unhealthy dependency" $ \master -> do
       app <- appFor defaultConfig master [failingDependency]

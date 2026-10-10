@@ -18,6 +18,7 @@ import Network.HTTP.Types
 import Network.Wai (Application, Response, pathInfo, responseLBS)
 import Shibuya.App (Master, getAllMetricsIO, getProcessorMetricsIO)
 import Shibuya.Core.Metrics (ProcessorId (..))
+import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health
   ( DependencyCheck,
     HealthConfig,
@@ -60,12 +61,7 @@ routeRequest config master depChecks path = case path of
       Just m -> pure $ jsonResponse status200 $ encode m
       Nothing ->
         pure $
-          jsonResponse status404 $
-            encode $
-              object
-                [ "error" .= ("Processor not found" :: Text),
-                  "processor" .= procIdText
-                ]
+          errorResponse status404 "Processor not found" "processor_not_found" ["processor" .= procIdText]
   -- GET /health/live - liveness probe (fast, simple)
   ["health", "live"] -> do
     liveness <- checkLiveness config master
@@ -92,10 +88,7 @@ routeRequest config master depChecks path = case path of
             ]
   -- Not found
   _ ->
-    pure $
-      jsonResponse status404 $
-        encode $
-          object ["error" .= ("Not found" :: Text)]
+    pure $ errorResponse status404 "Not found" "not_found" []
 
 jsonResponse :: Status -> LBS.ByteString -> Response
 jsonResponse status = responseLBS status [(hContentType, "application/json")]

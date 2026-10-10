@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-10T19:58:51Z
+      mode: "implement"
+      note: "Implement EP-47 configurable HTTP and WebSocket origin policy, stable error codes, and acceptance evidence."
 ---
 
 
@@ -69,7 +74,8 @@ and its WebSocket convention item and the closure of the request belong to
 ## Progress
 
 
-- [ ] Milestone 1: Characterize the headerless server in a test, add `Shibuya.Metrics.Error` with `errorResponse`, and retrofit additive `code` members onto the existing 404 bodies.
+- [x] (2026-10-10 20:06 UTC) Milestone 1 implementation and metrics acceptance: Characterize the headerless server in a test, add `Shibuya.Metrics.Error` with `errorResponse`, and retrofit additive `code` members onto the existing 404 bodies.
+- [ ] Milestone 1 remaining acceptance: finish the repository-wide build already running.
 - [ ] Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
 - [ ] Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
 - [ ] Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
@@ -78,6 +84,13 @@ and its WebSocket convention item and the closure of the request belong to
 
 ## Surprises & Discoveries
 
+
+2026-10-10 implementation: Baseline at commit `454257a` completed 5,000 real health polls
+with no errors and p95 104 microseconds (`before.json`). Before any CORS implementation,
+the headerless characterization passed (1 example, 0 failures). After the shared error
+helper and reserved-key test, the full metrics suite passed (54 examples, 0 failures).
+The first repository-wide build is compiling uncached TLS dependencies; it remains an
+acceptance item until that command exits successfully.
 
 2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
@@ -132,7 +145,8 @@ and its WebSocket convention item and the closure of the request belong to
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Milestone 1 provides the shared error renderer and additive codes without changing headers.
+The HTTP and WebSocket origin policies and their documentation remain to be accepted.
 
 
 ## Context and Orientation

@@ -22,6 +22,7 @@ library
   exposed-modules:
     Shibuya.Metrics
     Shibuya.Metrics.Config
+    Shibuya.Metrics.Error
     Shibuya.Metrics.Health
     Shibuya.Metrics.JSON
     Shibuya.Metrics.Prometheus
