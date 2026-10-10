@@ -1,15 +1,19 @@
 module Shibuya.Metrics.WebSocketSpec (spec) where
 
-import Control.Concurrent (MVar, newEmptyMVar, putMVar, takeMVar)
+import Control.Concurrent (MVar, newEmptyMVar, putMVar, takeMVar, threadDelay)
 import Control.Concurrent.Async (async, wait)
-import Control.Concurrent.STM (atomically, check, readTVar)
+import Control.Concurrent.STM (TQueue, TVar, atomically, check, newTQueueIO, newTVarIO, orElse, readTQueue, readTVar, writeTQueue, writeTVar)
 import Control.Exception (SomeException, throwIO, try)
+import Control.Monad (replicateM_, when)
 import Data.Aeson (Value, eitherDecode, encode, object, (.=))
 import Data.ByteString.Lazy (ByteString)
+import Data.ByteString.Lazy qualified as LBS
 import Data.IORef (atomicModifyIORef', newIORef)
 import Data.Map.Strict qualified as Map
+import Data.String (fromString)
 import Effectful (runEff)
 import Network.Wai.Handler.Warp qualified as Warp
+import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master, getAllMetricsIO)
 import Shibuya.Core.Metrics
@@ -23,7 +27,8 @@ import Shibuya.Core.Metrics
   )
 import Shibuya.Internal.Runner.Master (markProcessorFailedIO, registerProcessor, unregisterProcessor)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
-import Shibuya.Metrics.Server (combinedApp)
+import Shibuya.Metrics.Outbound qualified as Out
+import Shibuya.Metrics.Server (combinedApp, stopMetricsServer, withMetricsServer)
 import Shibuya.Metrics.TestSupport
   ( fixedTime,
     registerIdleProcessor,
@@ -35,9 +40,12 @@ import Shibuya.Metrics.Types
     ServerMessage (..),
   )
 import Shibuya.Metrics.WebSocket
-  ( WebSocketState (..),
+  ( WebSocketHooks (..),
+    WebSocketState (..),
+    defaultWebSocketHooks,
     newWebSocketState,
     shutdownWebSockets,
+    websocketAppWithHooks,
   )
 import System.Timeout (timeout)
 import Test.Hspec
@@ -48,6 +56,7 @@ import Test.Hspec
     expectationFailure,
     it,
     shouldBe,
+    shouldSatisfy,
     shouldThrow,
   )
 
@@ -86,6 +95,150 @@ spec = around withMaster $ do
         clientWithOrigin port [("Origin", "https://evil.example.com")] $ \conn -> do
           expected <- MetricsSnapshot <$> currentSnapshot master
           receiveServer conn `shouldReturn` expected
+
+  describe "controlled outbound delivery" $ do
+    it "keeps sampling during a blocked write and sends an adjacent recovery pair" $ \master -> do
+      handle <- registerIdleProcessor master (ProcessorId "alpha")
+      withControlledServer fastConfig {wsMaxQueuedFrames = 2} master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          incrementReceived handle
+          _ <- tick control
+          awaitBlocked control
+          replicateM_ 3 $ incrementReceived handle >> tick control
+          recovery <- tick control
+          Out.queuedFrames recovery `shouldBe` 2
+          map (eitherDecode @ServerMessage . LBS.fromStrict . Out.payload) (Out.entries recovery)
+            `shouldSatisfy` (\case [Right (ServerError "queue_overflow" _), Right (MetricsSnapshot _)] -> True; _ -> False)
+          atomically $ writeTVar control.gate False
+          _ <- receiveServer conn -- the single already-popped update
+          receiveServer conn `shouldReturn` ServerError "queue_overflow" "Updates dropped; replacing metrics snapshot"
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+          WS.sendTextData conn $ encode Ping
+          receiveServer conn `shouldReturn` Pong
+
+    it "closes a malformed-frame flood with bounded required retention and slot recovery" $ \master ->
+      withControlledServer fastConfig {wsMaxQueuedFrames = 2, wsSendTimeoutUs = 50_000} master $ \port control -> do
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          WS.sendTextData conn $ encode Ping
+          awaitBlocked control
+          replicateM_ 8 $ WS.sendTextData conn ("{" :: ByteString)
+          awaitReleased control.state
+        atomically (readTVar control.state.connectionCount) `shouldReturn` 0
+
+    it "refuses an initial snapshot larger than the byte budget and restores its slot" $ \master ->
+      withControlledServer fastConfig {wsMaxQueuedBytes = 1} master $ \port control -> do
+        WS.runClient
+          "127.0.0.1"
+          port
+          "/ws"
+          ( \conn ->
+              (WS.receiveData conn :: IO ByteString) `shouldThrow` isCapacityClose
+          )
+        awaitReleased control.state
+
+    it "flushes shutdown within one deadline even while a write is blocked" $ \master ->
+      withControlledServer fastConfig {wsSendTimeoutUs = 50_000} master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          WS.sendTextData conn $ encode Ping
+          awaitBlocked control
+          shutdownWebSockets control.state
+          awaitReleased control.state
+
+    it "orders shutdown goodbye after admitted errors" $ \master ->
+      withControlledServer fastConfig {wsMaxQueuedFrames = 3} master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          WS.sendTextData conn $ encode Ping
+          awaitBlocked control
+          atomically $ readTQueue control.received
+          replicateM_ 2 $ do
+            WS.sendTextData conn ("{\"type\":\"bogus\"}" :: ByteString)
+            atomically $ readTQueue control.received
+          shutdownWebSockets control.state
+          timeout 1_000_000 (atomically $ readTQueue control.produced) >>= \case
+            Just q -> Out.queuedFrames q `shouldBe` 3
+            Nothing -> expectationFailure "shutdown did not queue goodbye"
+          atomically $ writeTVar control.gate False
+          receiveServer conn `shouldReturn` Pong
+          replicateM_ 2 $ receiveServer conn `shouldReturn` ServerError "invalid_message" "Error in $: Unknown message type: bogus"
+          receiveServer conn `shouldReturn` Goodbye
+          (WS.receiveData conn :: IO ByteString) `shouldThrow` isNormalClose
+
+    it "removes unsent old updates at an unsubscribe snapshot boundary" $ \master -> do
+      handle <- registerIdleProcessor master (ProcessorId "alpha")
+      withControlledServer fastConfig master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          incrementReceived handle
+          _ <- tick control
+          awaitBlocked control
+          incrementReceived handle
+          _ <- tick control
+          WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "alpha"]
+          timeout 1_000_000 (atomically $ readTQueue control.received) `shouldReturn` Just ()
+          WS.sendTextData conn $ encode Ping
+          atomically $ writeTVar control.gate False
+          _ <- receiveServer conn
+          receiveServer conn `shouldReturn` MetricsSnapshot Map.empty
+          receiveServer conn `shouldReturn` Pong
+          _ <- tick control
+          timeout 30_000 (receiveServer conn) `shouldReturn` Nothing
+
+    it "preserves once-only terminal delivery before overflow recovery" $ \master -> do
+      handle <- registerIdleProcessor master (ProcessorId "alpha")
+      withControlledServer fastConfig {wsMaxQueuedFrames = 3} master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          incrementReceived handle
+          _ <- tick control
+          awaitBlocked control
+          replicateM_ 4 $ incrementReceived handle >> tick control
+          markProcessorFailedIO master (ProcessorId "alpha") "boom" Nothing
+          runEff $ unregisterProcessor master (ProcessorId "alpha")
+          q <- tick control
+          Out.queuedFrames q `shouldBe` 3
+          atomically $ writeTVar control.gate False
+          _ <- receiveServer conn
+          receiveServer conn `shouldReturn` ProcessorTerminal (ProcessorId "alpha") (TerminalFailed "boom" Nothing)
+          receiveServer conn `shouldReturn` ServerError "queue_overflow" "Updates dropped; replacing metrics snapshot"
+          receiveServer conn `shouldReturn` MetricsSnapshot Map.empty
+          _ <- tick control
+          timeout 30_000 (receiveServer conn) `shouldReturn` Nothing
+
+    it "bounds stopMetricsServer while a real peer leaves a large snapshot unread" $ \master -> do
+      mapM_ (\n -> registerIdleProcessor master (ProcessorId $ "large-" <> fromString (show n))) [1 .. 30_000 :: Int]
+      wsState <- newWebSocketState 1
+      freePort <- Warp.testWithApplication (pure $ combinedApp defaultConfig master wsState []) pure
+      let config = defaultConfig {port = freePort, wsMaxQueuedBytes = 32_000_000, wsSendTimeoutUs = 100_000}
+      withMetricsServer config master $ \server -> do
+        threadDelay 30_000 -- listener startup; no delay is used to trigger queue overflow
+        WS.runClient "127.0.0.1" freePort "/ws" $ \_ -> do
+          threadDelay 100_000
+          timeout 500_000 (stopMetricsServer server) `shouldReturn` Just ()
+
+    it "produces metrics during a continuous ping stream" $ \master -> do
+      handle <- registerIdleProcessor master (ProcessorId "alpha")
+      withServer fastConfig master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          incrementReceived handle
+          let findUpdate = do
+                WS.sendTextData conn $ encode Ping
+                receiveServer conn >>= \case
+                  ProcessorUpdate _ _ -> pure ()
+                  Pong -> findUpdate
+                  other -> expectationFailure $ "unexpected frame: " <> show other
+          timeout 500_000 findUpdate `shouldReturn` Just ()
 
   describe "WebSocket wire protocol" $ do
     it "reports invalid client messages and remains usable" $ \master ->
@@ -130,6 +283,16 @@ spec = around withMaster $ do
           case selective of
             MetricsSnapshot metrics -> Map.keys metrics `shouldBe` [ProcessorId "alpha"]
             other -> expectationFailure $ "expected selective snapshot, got " <> show other
+
+    it "establishes an unsubscribe snapshot before subsequent replies" $ \master -> do
+      _ <- registerIdleProcessor master (ProcessorId "alpha")
+      withServer defaultConfig master $ \port ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "alpha"]
+          WS.sendTextData conn $ encode Ping
+          receiveServer conn `shouldReturn` MetricsSnapshot Map.empty
+          receiveServer conn `shouldReturn` Pong
 
     it "answers ping with pong" $ \master ->
       withServer defaultConfig master $ \port ->
@@ -204,6 +367,7 @@ spec = around withMaster $ do
         WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
           _ <- receiveServer conn
           WS.sendTextData conn $ encode $ Unsubscribe [ProcessorId "alpha"]
+          _ <- receiveServer conn -- unsubscribe establishes the new generation snapshot
           incrementReceived alpha
           incrementReceived beta
           receiveServer conn >>= \case
@@ -312,3 +476,71 @@ isForbiddenHandshake _ = False
 isPolicyClose :: WS.ConnectionException -> Bool
 isPolicyClose (WS.CloseRequest 1008 _) = True
 isPolicyClose _ = False
+
+data Controlled = Controlled
+  { gate :: TVar Bool,
+    started :: TQueue (),
+    ticks :: TQueue (),
+    produced :: TQueue Out.OutboundQueue,
+    received :: TQueue (),
+    state :: WebSocketState
+  }
+
+withControlledServer :: MetricsServerConfig -> Master -> (Int -> Controlled -> IO a) -> IO a
+withControlledServer config master action = do
+  control <-
+    Controlled
+      <$> newTVarIO False
+      <*> newTQueueIO
+      <*> newTQueueIO
+      <*> newTQueueIO
+      <*> newTQueueIO
+      <*> newWebSocketState config.wsMaxConnections
+  let hooks =
+        defaultWebSocketHooks
+          { beforeWrite = \_ -> do
+              atomically $ readTVar control.gate >>= \blocked -> when blocked (writeTQueue control.started ())
+              atomically $ readTVar control.gate >>= check . not,
+            afterReceive = \q -> do
+              Out.queuedFrames q `shouldSatisfy` (<= config.wsMaxQueuedFrames)
+              Out.queuedBytes q `shouldSatisfy` (<= config.wsMaxQueuedBytes)
+              atomically $ writeTQueue control.received (),
+            afterProduce = \q -> do
+              Out.queuedFrames q `shouldSatisfy` (<= config.wsMaxQueuedFrames)
+              Out.queuedBytes q `shouldSatisfy` (<= config.wsMaxQueuedBytes)
+              atomically $ writeTQueue control.produced q,
+            waitForPush = \_ state ->
+              atomically $
+                (readTVar state.shutdownRequested >>= \requested -> check requested >> pure True)
+                  `orElse` (readTQueue control.ticks >> pure False)
+          }
+      app =
+        WaiWS.websocketsOr
+          WS.defaultConnectionOptions
+          (websocketAppWithHooks hooks config master control.state)
+          (combinedApp config {enableWebSocket = False} master control.state [])
+  Warp.testWithApplication (pure app) $ \port -> action port control
+
+tick :: Controlled -> IO Out.OutboundQueue
+tick control = do
+  atomically $ writeTQueue control.ticks ()
+  timeout 1_000_000 (atomically $ readTQueue control.produced) >>= \case
+    Just queue -> do
+      Out.queuedFrames queue `shouldSatisfy` (<= 64)
+      Out.queuedBytes queue `shouldSatisfy` (<= 1_048_576)
+      pure queue
+    Nothing -> expectationFailure "producer did not complete while writer was blocked" >> fail "producer stalled"
+
+awaitBlocked :: Controlled -> IO ()
+awaitBlocked control = timeout 1_000_000 (atomically $ readTQueue control.started) `shouldReturn` Just ()
+
+awaitReleased :: WebSocketState -> IO ()
+awaitReleased state = timeout 500_000 (atomically $ readTVar state.connectionCount >>= check . (== 0)) `shouldReturn` Just ()
+
+isCapacityClose :: WS.ConnectionException -> Bool
+isCapacityClose (WS.CloseRequest 1013 _) = True
+isCapacityClose _ = False
+
+isNormalClose :: WS.ConnectionException -> Bool
+isNormalClose (WS.CloseRequest 1000 _) = True
+isNormalClose _ = False

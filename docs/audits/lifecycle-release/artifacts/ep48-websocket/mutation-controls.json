@@ -1,0 +1,17 @@
+[
+  {
+    "control": "unlimited-required",
+    "exitCode": 1,
+    "failingTestMatch": "bounded"
+  },
+  {
+    "control": "second-writer",
+    "exitCode": 1,
+    "failingTestMatch": "adjacent"
+  },
+  {
+    "control": "receive-resets-timer",
+    "exitCode": 1,
+    "failingTestMatch": "continuous"
+  }
+]

@@ -4,12 +4,24 @@
 
 ### Breaking Changes
 
+- `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`, and
+  `wsSendTimeoutUs`; direct construction must provide them. `MetricsServer` gains
+  the `serverShutdown` action used before Warp cancellation.
+
 - `ServerMessage` gains `ServerError`; exhaustive matches must handle this constructor.
 
 - `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
   must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
 
 ### New Features
+
+- Bound every queued WebSocket frame and encoded byte with independent sampling
+  and one application writer. Drop oldest updates under pressure, followed by an
+  adjacent `queue_overflow` error and replacement snapshot; close on required-frame
+  saturation or oversized snapshots. Bound individual sends and shutdown flushes.
+- Export the pure `Shibuya.Metrics.Outbound` admission model and optional
+  `WebSocketHooks` instrumentation. Subscription changes, including unsubscribe,
+  establish an ordered snapshot boundary.
 
 - Send additive in-band WebSocket `error` frames for invalid messages and before
   subscription-limit policy closes (1008). Valid existing frames are unchanged.

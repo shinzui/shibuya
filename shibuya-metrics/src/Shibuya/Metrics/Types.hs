@@ -132,6 +132,8 @@ data MetricsServer = MetricsServer
   { -- | Async handle for the server thread
     serverThread :: !(Async ()),
     -- | Port the server is running on
-    serverPort :: !Port
+    serverPort :: !Port,
+    -- | Request and await bounded WebSocket shutdown before stopping Warp.
+    serverShutdown :: !(IO ())
   }
   deriving stock (Generic)

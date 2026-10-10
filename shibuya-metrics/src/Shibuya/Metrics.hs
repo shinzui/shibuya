@@ -77,6 +77,22 @@
 -- * @{"type": "terminal", "processor": "id", "status": "stopped"}@ - Processor left the live registry
 -- * @{"type": "pong"}@ - Response to ping
 -- * @{"type": "goodbye"}@ - Server shutting down
+-- * @{"type": "error", "code": "invalid_message", "message": "..."}@ - Invalid client JSON/tag
+--
+-- Error codes are @invalid_message@ (receive continues), @subscription_limit_exceeded@
+-- (error before close 1008), and @queue_overflow@ (immediately followed by a current
+-- snapshot). Subscribe and unsubscribe changes establish ordered snapshot boundaries.
+-- One writer drains a queue bounded by 'wsMaxQueuedFrames' (64, minimum 2) and
+-- 'wsMaxQueuedBytes' (1 MiB). All queued frames count, including snapshots, errors,
+-- terminal events and goodbye. Oldest expendable updates/pongs may be dropped;
+-- required-frame saturation or oversized snapshots close with 1013. Reconnect and
+-- read a fresh snapshot on close; metrics have no replay cursor.
+-- 'wsSendTimeoutUs' bounds sends and the whole close flush (5 seconds). Responsive
+-- shutdown peers receive goodbye; stalled peers may time out without it. At most
+-- one popped frame is outside the queue; transient encoding and the entire process
+-- heap are not covered by the encoded-payload budget. Closed decoders must add the
+-- new @error@ tag; raw JSON consumers may ignore unknown frame types.
+-- See @docs/architecture/METRICS.md@ for the complete shared-convention mapping.
 module Shibuya.Metrics
   ( -- * Server Lifecycle
     startMetricsServer,

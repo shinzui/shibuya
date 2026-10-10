@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "minimumPairs": 10,
+  "confidenceLevel": 0.95,
+  "bootstrapIterations": 10000,
+  "resamplingSeed": 20260920,
+  "requiredScenarios": [
+    "websocket-observers-1",
+    "websocket-observers-16",
+    "websocket-observers-64"
+  ],
+  "metrics": {
+    "throughputPerSecond": {
+      "direction": "higher-is-better",
+      "relativeLimit": 0.05
+    },
+    "allocatedBytesPerMessage": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.05
+    },
+    "maxLiveBytes": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.05
+    },
+    "latencyP95Ms": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.1
+    },
+    "latencyP99Ms": {
+      "direction": "lower-is-better",
+      "relativeLimit": 0.1
+    },
+    "shutdownLatencyMs": {
+      "direction": "lower-is-better",
+      "absoluteMaximum": 5100
+    }
+  }
+}

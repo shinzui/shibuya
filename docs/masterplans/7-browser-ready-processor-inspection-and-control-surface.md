@@ -393,7 +393,7 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-10 20:08 UTC) EP-47 M3: Validate the WebSocket upgrade `Origin` header by the same policy.
 - [x] (2026-10-10 20:14 UTC) EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
 - [x] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.
-- [ ] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
+- [x] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
 - [ ] EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
 - [ ] EP-49 M1: Prototype synchronized detailed accounting, prove cancellation cleanup, measure both levels, and retain the basic default.
 - [ ] EP-49 M2: Expose the latency summary and oldest in-flight detail in JSON, Prometheus, and WebSocket frames.

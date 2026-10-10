@@ -36,6 +36,13 @@ data MetricsServerConfig = MetricsServerConfig
     -- | Maximum retained processor identifiers per WebSocket connection
     -- (default: 1,000). A client exceeding this policy is disconnected.
     wsMaxSubscriptions :: !Int,
+    -- | Maximum retained outbound frames, including required frames (default: 64; minimum: 2).
+    wsMaxQueuedFrames :: !Int,
+    -- | Maximum retained encoded outbound bytes (default: 1 MiB).
+    -- At most one popped frame and a transient encoding are outside this budget.
+    wsMaxQueuedBytes :: !Int,
+    -- | Deadline for a send and the entire orderly close flush (default: 5 seconds).
+    wsSendTimeoutUs :: !Int,
     -- | Timeout for liveness check in microseconds (default: 1_000_000 = 1s)
     livenessTimeoutMicros :: !Int,
     -- | Timeout for each dependency readiness check in microseconds (default: 1s)
@@ -58,6 +65,9 @@ defaultConfig =
       wsPushIntervalUs = 100_000, -- 100ms
       wsMaxConnections = 100,
       wsMaxSubscriptions = 1_000,
+      wsMaxQueuedFrames = 64,
+      wsMaxQueuedBytes = 1_048_576,
+      wsSendTimeoutUs = 5_000_000,
       livenessTimeoutMicros = 1_000_000, -- 1 second
       dependencyTimeoutMicros = 1_000_000, -- 1 second per dependency
       stuckThreshold = 60 -- 60 seconds

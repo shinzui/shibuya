@@ -87,12 +87,14 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 
 
 - [x] (2026-10-10) Milestone 1: Add the `ServerError` constructor and `error` frame, emit it for invalid client frames and for subscription-limit closes, with round-trip and loopback tests seen failing first.
-- [ ] Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the independent producer and sole writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
+- [x] (2026-10-10) Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the independent producer and sole writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
 - [ ] Milestone 3: Publish the conformance mapping in `docs/architecture/METRICS.md`, update the package Haddock, CAP-10, changelogs, and ADRs, record wire-load sanity numbers, and close IR-5 after EP-47 is Complete.
 
 
 ## Surprises & Discoveries
 
+
+2026-10-10 bounded-delivery evidence: 89 metrics examples pass; the controlled suite passed ten repetitions each under `-N1` and `-N4`. All three isolated regression controls fail behaviorally: unlimited required retention, a second application writer, and resetting the producer timer on receive traffic. The detached M1 baseline fails the new unsubscribe snapshot boundary test (Pong instead of snapshot). The saturation fixture stops production after 45 ticks, retains 14 frames / 59,976 encoded bytes within 64 frames / 65,536 bytes, shows live heap samples 328,080–331,320 bytes, and releases the stalled slot within the one-second send deadline. Evidence is under `docs/audits/lifecycle-release/artifacts/ep48-websocket/`.
 
 2026-10-10 implementation: The detached pre-change worktree at `30258cc` failed the new invalid-message test by timing out instead of sending an error. The main-tree suite passes 71 examples after adding the error constructor and ordered subscription-limit response. The decoder reason includes Aeson’s `Error in $:` prefix.
 
@@ -100,6 +102,9 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 
 
 ## Decision Log
+
+- Decision (2026-10-10): Pongs are expendable without forcing metrics recovery; only evicted updates invalidate the ledger. All errors, terminal events, subscription snapshots, recovery snapshots and goodbye remain required. Unsubscribe now establishes the same ordered snapshot boundary as other subscription mutations. Optional transport hooks expose deterministic stalls and producer ticks without holding the producer lock across socket IO.
+- Decision (2026-10-10): Add an explicit shutdown action to the public server handle. Request WebSocket shutdown before Warp cancellation, wait at most the send deadline plus 100 ms of scheduling allowance, and disable Warp’s otherwise unbounded final connection wait. Document the new record field as source-breaking.
 
 
 - Decision (2026-10-10): Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load.

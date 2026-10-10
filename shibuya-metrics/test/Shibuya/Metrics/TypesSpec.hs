@@ -1,7 +1,9 @@
 module Shibuya.Metrics.TypesSpec (spec) where
 
-import Data.Aeson (FromJSON, ToJSON, Value, eitherDecode, encode, object, toJSON, (.=))
+import Data.Aeson (FromJSON, ToJSON, Value, eitherDecode, encode, object, toJSON, withObject, (.:), (.=))
+import Data.Aeson.Types (parseEither)
 import Data.Map.Strict qualified as Map
+import Data.Text (Text)
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Metrics.TestSupport (fixtureMetrics)
 import Shibuya.Metrics.Types
@@ -54,6 +56,16 @@ spec = do
     messageCase (ServerError "invalid_message" "bad input") $
       object ["type" .= ("error" :: String), "code" .= ("invalid_message" :: String), "message" .= ("bad input" :: String)]
     messageCase Goodbye $ object ["type" .= ("goodbye" :: String)]
+
+    it "characterizes strict legacy decoders and extension-tolerant consumers" $ do
+      let err = ServerError "queue_overflow" "resnapshot"
+          legacy = withObject "LegacyServerMessage" $ \v -> do
+            tag <- v .: "type"
+            if (tag :: Text) `elem` ["snapshot", "update", "terminal", "pong", "goodbye"]
+              then pure tag
+              else fail "unknown legacy tag"
+      parseEither legacy (toJSON err) `shouldSatisfy` isLeft
+      eitherDecode @Value (encode err) `shouldBe` Right (toJSON err)
 
     it "rejects an unknown server message tag" $
       (eitherDecode "{\"type\":\"unknown\"}" :: Either String ServerMessage)

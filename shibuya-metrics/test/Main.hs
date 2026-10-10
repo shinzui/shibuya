@@ -3,6 +3,7 @@ module Main (main) where
 import Shibuya.Metrics.CorsSpec qualified
 import Shibuya.Metrics.HealthSpec qualified
 import Shibuya.Metrics.JSONSpec qualified
+import Shibuya.Metrics.OutboundQueueSpec qualified
 import Shibuya.Metrics.PrometheusSpec qualified
 import Shibuya.Metrics.ServerSpec qualified
 import Shibuya.Metrics.TypesSpec qualified
@@ -14,6 +15,7 @@ main = hspec $ do
   Shibuya.Metrics.CorsSpec.spec
   Shibuya.Metrics.ServerSpec.spec
   Shibuya.Metrics.JSONSpec.spec
+  Shibuya.Metrics.OutboundQueueSpec.spec
   Shibuya.Metrics.PrometheusSpec.spec
   Shibuya.Metrics.TypesSpec.spec
   Shibuya.Metrics.WebSocketSpec.spec

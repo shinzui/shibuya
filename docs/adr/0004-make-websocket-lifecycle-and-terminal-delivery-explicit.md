@@ -2,6 +2,10 @@
 
 Status: Accepted
 
+Partially superseded by [ADR-0008](0008-deliver-websocket-frames-through-one-bounded-outbound-queue-per-connection.md):
+the sender no longer writes directly; independent production feeds one bounded writer, and
+shutdown delivery has a finite deadline. Slot ownership and terminal semantics remain.
+
 Date: 2026-09-20
 
 ## Context

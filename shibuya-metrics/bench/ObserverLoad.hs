@@ -1,0 +1,154 @@
+-- | Sustained real WebSocket observers around the production serial runner.
+-- Copy this harness and its Cabal stanza unchanged to the baseline checkout.
+module Main (main) where
+
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (async, cancel)
+import Control.Concurrent.NQE.Supervisor (Strategy (IgnoreAll))
+import Control.Concurrent.STM (atomically, check, modifyTVar', newTVarIO, readTVar, writeTVar)
+import Control.Exception (bracket, catch, evaluate, throwIO)
+import Control.Monad (forM, forever, unless, when)
+import Data.Aeson (encode, object, (.=))
+import Data.ByteString.Lazy qualified as LBS
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.List (sort)
+import Data.Text qualified as Text
+import Data.Word (Word64)
+import Effectful (liftIO, runEff)
+import GHC.Clock (getMonotonicTimeNSec)
+import GHC.Stats (GCDetails (..), RTSStats (..), getRTSStats)
+import Network.Wai.Handler.Warp qualified as Warp
+import Network.WebSockets qualified as WS
+import Shibuya.Adapter (Adapter (..))
+import Shibuya.Core.Ack (AckDecision (AckOk))
+import Shibuya.Core.AckHandle (AckHandle (..))
+import Shibuya.Core.Ingested (mkIngested)
+import Shibuya.Core.Metrics (ProcessorId (..))
+import Shibuya.Core.Types (MessageId (..), mkEnvelope)
+import Shibuya.Internal.Runner.Master (markMasterRunning, startMaster, stopMaster)
+import Shibuya.Internal.Runner.Supervised (isDone, runSupervised)
+import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
+import Shibuya.Metrics.Server (combinedApp)
+import Shibuya.Metrics.WebSocket (WebSocketState (..), newWebSocketState, shutdownWebSockets)
+import Shibuya.Policy (Concurrency (Serial), OrderingPolicy (Unordered))
+import Shibuya.Telemetry.Effect (runTracingNoop)
+import Streamly.Data.Stream qualified as Stream
+import System.Environment (lookupEnv)
+import System.Mem (performMajorGC)
+import System.Timeout (timeout)
+import Text.Read (readMaybe)
+
+main :: IO ()
+main = do
+  clients <- envInt "CLIENTS" 16
+  count <- envInt "MESSAGES" 2_000_000
+  output <- maybe "observer-load.json" id <$> lookupEnv "OUTPUT_JSON"
+  report <- bracket acquire (runEff . stopMaster) $ \master -> do
+    ready <- newTVarIO False
+    acknowledged <- newIORef ([] :: [Word64])
+    frames <- newIORef (0 :: Int)
+    let source =
+          Stream.mapM
+            ( \n -> do
+                liftIO $ atomically $ readTVar ready >>= check
+                started <- liftIO getMonotonicTimeNSec
+                let envelope = mkEnvelope (MessageId $ Text.pack $ show n) n
+                    ack = AckHandle $ \_ -> liftIO $ do
+                      end <- getMonotonicTimeNSec
+                      atomicModifyIORef' acknowledged (\xs -> ((end - started) : xs, ()))
+                pure $ mkIngested envelope ack
+            )
+            $ Stream.fromList [1 .. count]
+        adapter = Adapter "observer-load" source (pure ())
+    processor <-
+      runEff $
+        runTracingNoop $
+          runSupervised master 16 (ProcessorId "observer-load") Unordered Serial adapter (const $ pure AckOk)
+    wsState <- newWebSocketState defaultConfig.wsMaxConnections
+    let config = defaultConfig {wsPushIntervalUs = 10_000}
+    Warp.testWithApplication (pure $ combinedApp config master wsState []) $ \port -> do
+      connected <- newTVarIO (0 :: Int)
+      let observer index =
+            WS.runClient
+              "127.0.0.1"
+              port
+              "/ws"
+              ( \conn -> do
+                  _ <- WS.receiveData conn :: IO LBS.ByteString
+                  atomically $ modifyTVar' connected (+ 1)
+                  -- A quarter of observers read ten times slower than the producer.
+                  forever $ do
+                    when (index `mod` 4 == 0) $ threadDelay 100_000
+                    bytes <- WS.receiveData conn :: IO LBS.ByteString
+                    _ <- evaluate $ LBS.length bytes
+                    atomicModifyIORef' frames (\n -> (n + 1, ()))
+              )
+              `catch` normalClose
+      bracket (forM [1 .. clients] $ async . observer) (mapM_ cancel) $ \observers -> do
+        connectedAll <- timeout 5_000_000 $ atomically $ readTVar connected >>= check . (== clients)
+        unless (connectedAll == Just ()) $ fail "observers did not connect"
+        performMajorGC
+        before <- getRTSStats
+        start <- getMonotonicTimeNSec
+        atomically $ writeTVar ready True
+        let awaitDone = runEff (isDone processor) >>= \done -> unless done (threadDelay 1_000 >> awaitDone)
+        completed <- timeout 30_000_000 awaitDone
+        unless (completed == Just ()) $ fail "production runner did not drain"
+        end <- getMonotonicTimeNSec
+        -- Keep the latency sample list live through the GC, identically on both builds.
+        samples <- readIORef acknowledged
+        _ <- evaluate $ length samples
+        performMajorGC
+        after <- getRTSStats
+        shutdownStart <- getMonotonicTimeNSec
+        shutdownWebSockets wsState
+        released <- timeout 6_000_000 $ atomically $ readTVar wsState.connectionCount >>= check . (== 0)
+        shutdownEnd <- getMonotonicTimeNSec
+        unless (released == Just ()) $ fail "connection slots were not restored"
+        -- Cancel and join slow readers after server slots are released; buffered
+        -- client data is not part of the server shutdown latency measurement.
+        mapM_ cancel observers
+        actual <- evaluate $ length samples
+        unless (actual == count) $ fail "missing acknowledgements"
+        delivered <- readIORef frames
+        pure $
+          object
+            [ "schemaVersion" .= (1 :: Int),
+              "clients" .= clients,
+              "slowReaders" .= ((clients + 3) `div` 4),
+              "elapsedSeconds" .= (fromIntegral (end - start) / 1e9 :: Double),
+              "messages" .= count,
+              "completed" .= actual,
+              "observerFrames" .= delivered,
+              "throughputPerSecond" .= (fromIntegral count * 1e9 / fromIntegral (end - start) :: Double),
+              "latencyP95Ms" .= percentile 0.95 samples,
+              "latencyP99Ms" .= percentile 0.99 samples,
+              "allocatedBytesPerMessage" .= (fromIntegral (after.allocated_bytes - before.allocated_bytes) / fromIntegral count :: Double),
+              "maxLiveBytes" .= after.max_live_bytes,
+              "liveBytes" .= after.gc.gcdetails_live_bytes,
+              "shutdownLatencyMs" .= (fromIntegral (shutdownEnd - shutdownStart) / 1e6 :: Double),
+              "finalWebSocketConnections" .= (0 :: Int)
+            ]
+  LBS.writeFile output (encode report <> "\n")
+  LBS.putStr $ encode report <> "\n"
+  where
+    acquire = runEff $ do
+      master <- startMaster IgnoreAll
+      markMasterRunning master
+      pure master
+
+normalClose :: WS.ConnectionException -> IO ()
+normalClose = \case
+  WS.ConnectionClosed -> pure ()
+  WS.CloseRequest _ _ -> pure ()
+  other -> throwIO other
+
+envInt :: String -> Int -> IO Int
+envInt key fallback = maybe fallback id . (>>= readMaybe) <$> lookupEnv key
+
+percentile :: Double -> [Word64] -> Double
+percentile _ [] = 0
+percentile fraction samples =
+  let ordered = sort samples
+      index = min (length ordered - 1) (ceiling (fraction * fromIntegral (length ordered)) - 1)
+   in fromIntegral (ordered !! max 0 index) / 1e6

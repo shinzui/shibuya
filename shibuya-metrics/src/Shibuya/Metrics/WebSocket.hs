@@ -1,13 +1,17 @@
--- | WebSocket endpoint for real-time metrics updates.
+-- | Real-time metrics with independent production and one bounded application writer.
 module Shibuya.Metrics.WebSocket
   ( websocketApp,
     WebSocketState (..),
     newWebSocketState,
     shutdownWebSockets,
+    WebSocketHooks (..),
+    defaultWebSocketHooks,
+    websocketAppWithHooks,
   )
 where
 
 import Control.Concurrent.Async (race_)
+import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Control.Concurrent.STM
   ( STM,
     TVar,
@@ -19,132 +23,110 @@ import Control.Concurrent.STM
     readTVar,
     readTVarIO,
     registerDelay,
+    retry,
     writeTVar,
   )
-import Control.Exception (catch, finally, mask, throwIO)
-import Control.Monad (forever, when)
+import Control.Exception (catch, evaluate, finally, mask, throwIO)
+import Control.Monad (forever, unless, when)
 import Data.Aeson (eitherDecode, encode)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Word (Word16, Word64)
+import GHC.Clock (getMonotonicTimeNSec)
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master, getAllMetricsIO)
-import Shibuya.Core.Metrics (MetricsMap, ProcessorId (..), ProcessorMetrics)
+import Shibuya.Core.Metrics (MetricsMap, ProcessorId (..))
 import Shibuya.Core.Types (MessageId (..))
-import Shibuya.Internal.Runner.Master
-  ( ProcessorLifecycle (..),
-    getLifecycleSnapshotIO,
-  )
+import Shibuya.Internal.Runner.Master (ProcessorLifecycle (..), getLifecycleSnapshotIO)
 import Shibuya.Metrics.Config (MetricsServerConfig (..))
-import Shibuya.Metrics.Types
-  ( ClientMessage (..),
-    ProcessorTerminalStatus (..),
-    ServerMessage (..),
-  )
+import Shibuya.Metrics.Outbound qualified as Out
+import Shibuya.Metrics.Types (ClientMessage (..), ProcessorTerminalStatus (..), ServerMessage (..))
+import System.Timeout (timeout)
 
---------------------------------------------------------------------------------
--- WebSocket State
---------------------------------------------------------------------------------
-
--- | Shared state for WebSocket connections.
+-- | Shared connection accounting and idempotent shutdown signal.
 data WebSocketState = WebSocketState
-  { -- | Current number of connections
-    connectionCount :: !(TVar Int),
-    -- | Maximum allowed connections
-    maxConnections :: !Int,
-    -- | Whether server shutdown has begun
-    shutdownRequested :: !(TVar Bool)
-  }
+  {connectionCount :: !(TVar Int), maxConnections :: !Int, shutdownRequested :: !(TVar Bool)}
 
--- | Create new WebSocket state.
 newWebSocketState :: Int -> IO WebSocketState
-newWebSocketState maxConns = do
-  countVar <- newTVarIO 0
-  shutdownVar <- newTVarIO False
-  pure
-    WebSocketState
-      { connectionCount = countVar,
-        maxConnections = maxConns,
-        shutdownRequested = shutdownVar
-      }
+newWebSocketState maxConns = WebSocketState <$> newTVarIO 0 <*> pure maxConns <*> newTVarIO False
 
--- | Ask every active connection to send 'Goodbye' and finish.
+-- | Stop admission and wake every producer to request an orderly, bounded flush.
 shutdownWebSockets :: WebSocketState -> IO ()
-shutdownWebSockets wsState =
-  atomically $ writeTVar wsState.shutdownRequested True
+shutdownWebSockets state = atomically $ writeTVar state.shutdownRequested True
 
-data AcquireResult
-  = Acquired
-  | AtCapacity
-  | ServerShuttingDown
+data AcquireResult = Acquired | AtCapacity | ServerShuttingDown
 
--- | Try to acquire a connection slot.
 acquireConnection :: WebSocketState -> STM AcquireResult
-acquireConnection wsState = do
-  shuttingDown <- readTVar wsState.shutdownRequested
-  count <- readTVar wsState.connectionCount
-  if shuttingDown
+acquireConnection state = do
+  stopping <- readTVar state.shutdownRequested
+  count <- readTVar state.connectionCount
+  if stopping
     then pure ServerShuttingDown
     else
-      if count >= wsState.maxConnections
+      if count >= state.maxConnections
         then pure AtCapacity
-        else do
-          writeTVar wsState.connectionCount (count + 1)
-          pure Acquired
+        else writeTVar state.connectionCount (count + 1) >> pure Acquired
 
--- | Release a connection slot.
 releaseConnection :: WebSocketState -> STM ()
-releaseConnection wsState =
-  modifyTVar' wsState.connectionCount (\c -> max 0 (c - 1))
+releaseConnection state = modifyTVar' state.connectionCount (max 0 . subtract 1)
 
---------------------------------------------------------------------------------
--- Connection State
---------------------------------------------------------------------------------
+data Subscription = AllProcessors !(Set ProcessorId) | SelectedProcessors !(Set ProcessorId)
 
--- | State for a single WebSocket connection.
+-- The lock covers subscription, sampling, ledger and admission. It never covers
+-- socket IO. Only the writer pops the queue; all producers obey the close cell.
 data ConnectionState = ConnectionState
-  { -- | Processor selection, including exclusions from subscribe-all
+  { producerLock :: !(MVar ()),
     subscriptions :: !(TVar Subscription),
-    -- | Last sent metrics for delta detection
-    lastMetrics :: !(TVar MetricsMap)
+    generation :: !(TVar Int),
+    lastMetrics :: !(TVar MetricsMap),
+    outbound :: !(TVar Out.OutboundQueue),
+    resyncPending :: !(TVar Bool),
+    closing :: !(TVar (Maybe CloseControl))
   }
 
-data Subscription
-  = AllProcessors !(Set ProcessorId)
-  | SelectedProcessors !(Set ProcessorId)
+data CloseControl = CloseControl !Word16 !Text !Word64
 
--- | Create new connection state.
 newConnectionState :: IO ConnectionState
-newConnectionState = do
-  subsVar <- newTVarIO $ AllProcessors Set.empty
-  lastVar <- newTVarIO Map.empty
-  pure
-    ConnectionState
-      { subscriptions = subsVar,
-        lastMetrics = lastVar
-      }
+newConnectionState =
+  ConnectionState
+    <$> newMVar ()
+    <*> newTVarIO (AllProcessors Set.empty)
+    <*> newTVarIO 0
+    <*> newTVarIO Map.empty
+    <*> newTVarIO Out.empty
+    <*> newTVarIO False
+    <*> newTVarIO Nothing
 
---------------------------------------------------------------------------------
--- WebSocket Application
---------------------------------------------------------------------------------
+-- | Instrumentation for deterministic transport tests and externally mounted
+-- servers. Hooks run inside the send deadline. Production uses no-op hooks and
+-- an independent interval timer; a custom wait must also observe shutdown.
+data WebSocketHooks = WebSocketHooks
+  { beforeWrite :: !(BS.ByteString -> IO ()),
+    afterReceive :: !(Out.OutboundQueue -> IO ()),
+    afterProduce :: !(Out.OutboundQueue -> IO ()),
+    waitForPush :: !(Int -> WebSocketState -> IO Bool)
+  }
 
--- | WebSocket server application.
-websocketApp ::
-  MetricsServerConfig ->
-  Master ->
-  WebSocketState ->
-  WS.ServerApp
-websocketApp config master wsState pending =
-  mask $ \restore -> do
-    outcome <- atomically $ acquireConnection wsState
-    case outcome of
-      AtCapacity -> restore $ WS.rejectRequest pending "Too many connections"
-      ServerShuttingDown -> restore $ WS.rejectRequest pending "Server shutting down"
-      Acquired ->
-        restore (serveConnection config master wsState pending `catch` normalPeerClosure)
-          `finally` atomically (releaseConnection wsState)
+defaultWebSocketHooks :: WebSocketHooks
+defaultWebSocketHooks = WebSocketHooks (const $ pure ()) (const $ pure ()) (const $ pure ()) waitForPushOrShutdown
+
+websocketApp :: MetricsServerConfig -> Master -> WebSocketState -> WS.ServerApp
+websocketApp = websocketAppWithHooks defaultWebSocketHooks
+
+websocketAppWithHooks :: WebSocketHooks -> MetricsServerConfig -> Master -> WebSocketState -> WS.ServerApp
+websocketAppWithHooks hooks config master state pending = mask $ \restore -> do
+  outcome <- atomically $ acquireConnection state
+  case outcome of
+    AtCapacity -> restore $ WS.rejectRequest pending "Too many connections"
+    ServerShuttingDown -> restore $ WS.rejectRequest pending "Server shutting down"
+    Acquired ->
+      restore (serveConnection hooks config master state pending `catch` normalPeerClosure)
+        `finally` atomically (releaseConnection state)
 
 normalPeerClosure :: WS.ConnectionException -> IO ()
 normalPeerClosure = \case
@@ -152,160 +134,236 @@ normalPeerClosure = \case
   WS.CloseRequest _ _ -> pure ()
   unexpected -> throwIO unexpected
 
-serveConnection :: MetricsServerConfig -> Master -> WebSocketState -> WS.PendingConnection -> IO ()
-serveConnection config master wsState pending = do
+serveConnection :: WebSocketHooks -> MetricsServerConfig -> Master -> WebSocketState -> WS.PendingConnection -> IO ()
+serveConnection hooks config master state pending = do
   conn <- WS.acceptRequest pending
   WS.withPingThread conn 30 (pure ()) $ do
-    connState <- newConnectionState
-    metrics <- getAllMetricsIO master
-    WS.sendTextData conn $ encode $ MetricsSnapshot metrics
-    atomically $ writeTVar connState.lastMetrics metrics
+    cs <- newConnectionState
+    withMVar cs.producerLock $ \() -> subscriptionSnapshot config master cs
+    -- Orderly producers wait rather than returning and cancelling queued data.
+    -- A peer exception, writer timeout or writer completion cancels and joins both.
     race_
-      (receiveLoop config master connState conn)
-      (pushLoop config master wsState connState conn)
+      (writerLoop hooks config cs conn)
+      (race_ (receiveLoop hooks config master state cs conn) (pushLoop hooks config master state cs))
 
---------------------------------------------------------------------------------
--- Receive Loop
---------------------------------------------------------------------------------
+limits :: MetricsServerConfig -> Out.Limits
+limits config = Out.Limits config.wsMaxQueuedFrames config.wsMaxQueuedBytes
 
--- | Handle incoming messages from client.
-receiveLoop :: MetricsServerConfig -> Master -> ConnectionState -> WS.Connection -> IO ()
-receiveLoop config master connState conn = forever $ do
+encoded :: Int -> Out.Retention -> ServerMessage -> IO Out.Frame
+encoded gen keep message = do
+  let bytes = LBS.toStrict $ encode message
+  _ <- evaluate $ BS.length bytes
+  pure $ Out.frame gen keep bytes
+
+-- Called under the producer lock. Encoding is forced before entering STM.
+admit :: MetricsServerConfig -> ConnectionState -> [Out.Frame] -> IO Out.Outcome
+admit config cs frames = do
+  outcome <- atomically $ do
+    stopped <- readTVar cs.closing
+    case stopped of
+      Just _ -> pure Out.MustClose
+      Nothing -> do
+        q <- readTVar cs.outbound
+        let (result, next) = Out.enqueue (limits config) frames q
+        writeTVar cs.outbound next
+        when (result == Out.DroppedUpdates) $ writeTVar cs.resyncPending True
+        pure result
+  when (outcome == Out.MustClose) $ requestClose config cs 1013 "Outbound queue capacity exceeded"
+  pure outcome
+
+requestClose :: MetricsServerConfig -> ConnectionState -> Word16 -> Text -> IO ()
+requestClose config cs code reason = do
+  now <- getMonotonicTimeNSec
+  atomically $ do
+    current <- readTVar cs.closing
+    case current of
+      Just _ -> pure ()
+      Nothing ->
+        writeTVar cs.closing $
+          Just $
+            CloseControl
+              code
+              reason
+              (now + fromIntegral config.wsSendTimeoutUs * 1_000)
+
+awaitWriter :: IO a
+awaitWriter = atomically retry
+
+receiveLoop :: WebSocketHooks -> MetricsServerConfig -> Master -> WebSocketState -> ConnectionState -> WS.Connection -> IO ()
+receiveLoop hooks config master state cs conn = forever $ do
   msg <- WS.receiveData conn
-  case eitherDecode msg of
-    Left reason -> WS.sendTextData conn $ encode $ ServerError "invalid_message" (Text.pack reason)
-    Right clientMsg -> handleClientMessage config.wsMaxSubscriptions master connState conn clientMsg
+  withMVar cs.producerLock $ \() -> do
+    stopped <- readTVarIO cs.closing
+    case stopped of
+      Just _ -> pure ()
+      Nothing -> do
+        shuttingDown <- readTVarIO state.shutdownRequested
+        unless shuttingDown $ case eitherDecode msg of
+          Left reason -> do
+            gen <- readTVarIO cs.generation
+            err <- encoded gen Out.Required $ ServerError "invalid_message" (Text.pack reason)
+            _ <- admit config cs [err]
+            pure ()
+          Right clientMsg -> handleClientMessage config master cs clientMsg
+  readTVarIO cs.outbound >>= hooks.afterReceive
+  stopped <- readTVarIO cs.closing
+  case stopped of Just _ -> awaitWriter; Nothing -> pure ()
 
--- | Handle a client message.
-handleClientMessage ::
-  Int ->
-  Master ->
-  ConnectionState ->
-  WS.Connection ->
-  ClientMessage ->
-  IO ()
-handleClientMessage maxSubscriptions master connState conn = \case
-  SubscribeAll -> do
-    atomically $ writeTVar connState.subscriptions $ AllProcessors Set.empty
-    -- Send snapshot of all metrics
-    metrics <- getAllMetricsIO master
-    WS.sendTextData conn $ encode $ MetricsSnapshot metrics
-    atomically $ writeTVar connState.lastMetrics metrics
-  Subscribe pids -> do
-    subscription <- atomically $ do
-      current <- readTVar connState.subscriptions
-      let newSubs = case current of
+handleClientMessage :: MetricsServerConfig -> Master -> ConnectionState -> ClientMessage -> IO ()
+handleClientMessage config master cs = \case
+  Ping -> do
+    gen <- readTVarIO cs.generation
+    pong <- encoded gen Out.Ephemeral Pong
+    _ <- admit config cs [pong]
+    pure ()
+  message -> do
+    current <- readTVarIO cs.subscriptions
+    let next = case message of
+          SubscribeAll -> AllProcessors Set.empty
+          Subscribe pids -> case current of
             AllProcessors _ -> SelectedProcessors $ Set.fromList pids
             SelectedProcessors existing -> SelectedProcessors $ existing <> Set.fromList pids
-      if subscriptionSize newSubs > maxSubscriptions
-        then pure Nothing
-        else writeTVar connState.subscriptions newSubs >> pure (Just newSubs)
-    case subscription of
-      Nothing -> rejectOversizedSubscription conn maxSubscriptions
-      Just accepted -> do
-        allMetrics <- getAllMetricsIO master
-        let filtered = filterMetrics accepted allMetrics
-        WS.sendTextData conn $ encode $ MetricsSnapshot filtered
-        atomically $ writeTVar connState.lastMetrics filtered
-  Unsubscribe pids -> do
-    accepted <- atomically $ do
-      current <- readTVar connState.subscriptions
-      let removed = Set.fromList pids
-          newSubs = case current of
-            AllProcessors excluded -> AllProcessors $ excluded <> removed
-            SelectedProcessors existing -> SelectedProcessors $ Set.difference existing removed
-      if subscriptionSize newSubs > maxSubscriptions
-        then pure False
-        else writeTVar connState.subscriptions newSubs >> pure True
-    when (not accepted) $ rejectOversizedSubscription conn maxSubscriptions
-  Ping ->
-    WS.sendTextData conn $ encode Pong
+          Unsubscribe pids -> case current of
+            AllProcessors excluded -> AllProcessors $ excluded <> Set.fromList pids
+            SelectedProcessors existing -> SelectedProcessors $ existing `Set.difference` Set.fromList pids
+    if subscriptionSize next > config.wsMaxSubscriptions
+      then rejectOversizedSubscription config cs
+      else do
+        atomically $ do
+          writeTVar cs.subscriptions next
+          modifyTVar' cs.generation (+ 1)
+          modifyTVar' cs.outbound Out.discardUpdates
+        subscriptionSnapshot config master cs
 
 subscriptionSize :: Subscription -> Int
 subscriptionSize = \case
   AllProcessors excluded -> Set.size excluded
   SelectedProcessors selected -> Set.size selected
 
-rejectOversizedSubscription :: WS.Connection -> Int -> IO ()
-rejectOversizedSubscription conn limit = do
-  let reason = "WebSocket processor subscription limit exceeded (maximum " <> Text.pack (show limit) <> ")"
-  WS.sendTextData conn $ encode $ ServerError "subscription_limit_exceeded" reason
-  WS.sendCloseCode conn 1008 reason
+subscriptionSnapshot :: MetricsServerConfig -> Master -> ConnectionState -> IO ()
+subscriptionSnapshot config master cs = do
+  subscription <- readTVarIO cs.subscriptions
+  metrics <- filterMetrics subscription <$> getAllMetricsIO master
+  gen <- readTVarIO cs.generation
+  snapshot <- encoded gen Out.Required $ MetricsSnapshot metrics
+  result <- admit config cs [snapshot]
+  unless (result == Out.MustClose) $ atomically $ do
+    writeTVar cs.lastMetrics metrics
+    writeTVar cs.resyncPending False
 
---------------------------------------------------------------------------------
--- Push Loop
---------------------------------------------------------------------------------
+rejectOversizedSubscription :: MetricsServerConfig -> ConnectionState -> IO ()
+rejectOversizedSubscription config cs = do
+  let reason = "WebSocket processor subscription limit exceeded (maximum " <> Text.pack (show config.wsMaxSubscriptions) <> ")"
+  gen <- readTVarIO cs.generation
+  err <- encoded gen Out.Required $ ServerError "subscription_limit_exceeded" reason
+  -- Set policy close first in the same producer critical section: capacity failure
+  -- cannot override 1008. Admission below is atomic with the close signal.
+  now <- getMonotonicTimeNSec
+  atomically $ do
+    q <- readTVar cs.outbound
+    let (_, next) = Out.enqueue (limits config) [err] q
+    writeTVar cs.outbound next
+    writeTVar cs.closing $ Just $ CloseControl 1008 reason (now + fromIntegral config.wsSendTimeoutUs * 1_000)
 
--- | Push metrics updates to client at configured interval.
-pushLoop ::
-  MetricsServerConfig ->
-  Master ->
-  WebSocketState ->
-  ConnectionState ->
-  WS.Connection ->
-  IO ()
-pushLoop config master wsState connState conn = loop
+pushLoop :: WebSocketHooks -> MetricsServerConfig -> Master -> WebSocketState -> ConnectionState -> IO ()
+pushLoop hooks config master state cs = loop
   where
     loop = do
-      shuttingDown <- waitForPushOrShutdown config.wsPushIntervalUs wsState
-      if shuttingDown
-        then WS.sendTextData conn $ encode Goodbye
-        else pushUpdates master connState conn >> loop
+      shutdown <- hooks.waitForPush config.wsPushIntervalUs state
+      withMVar cs.producerLock $ \() -> do
+        stopped <- readTVarIO cs.closing
+        case stopped of
+          Just _ -> pure ()
+          Nothing -> do
+            requested <- readTVarIO state.shutdownRequested
+            if shutdown || requested then orderlyShutdown else pushUpdates config master cs
+      readTVarIO cs.outbound >>= hooks.afterProduce
+      stopped <- readTVarIO cs.closing
+      case stopped of Just _ -> awaitWriter; Nothing -> loop
+    orderlyShutdown = do
+      gen <- readTVarIO cs.generation
+      goodbye <- encoded gen Out.Required Goodbye
+      atomically $ modifyTVar' cs.outbound Out.discardUpdates
+      _ <- admit config cs [goodbye]
+      requestClose config cs 1000 "Server shutting down"
 
 waitForPushOrShutdown :: Int -> WebSocketState -> IO Bool
-waitForPushOrShutdown intervalUs wsState = do
-  intervalElapsed <- registerDelay intervalUs
+waitForPushOrShutdown intervalUs state = do
+  elapsed <- registerDelay intervalUs
   atomically $
-    (readTVar wsState.shutdownRequested >>= \requested -> check requested >> pure True)
-      `orElse` (readTVar intervalElapsed >>= \elapsed -> check elapsed >> pure False)
+    (readTVar state.shutdownRequested >>= \requested -> check requested >> pure True)
+      `orElse` (readTVar elapsed >>= \ready -> check ready >> pure False)
 
-pushUpdates :: Master -> ConnectionState -> WS.Connection -> IO ()
-pushUpdates master connState conn = do
-  currentMetrics <- getAllMetricsIO master
+pushUpdates :: MetricsServerConfig -> Master -> ConnectionState -> IO ()
+pushUpdates config master cs = do
+  current <- getAllMetricsIO master
   lifecycle <- getLifecycleSnapshotIO master
-  subscription <- readTVarIO connState.subscriptions
-  lastSent <- readTVarIO connState.lastMetrics
-  let filteredMetrics = filterMetrics subscription currentMetrics
-  _ <- Map.traverseWithKey (sendIfChanged lastSent conn) filteredMetrics
-  let removed = Map.keysSet lastSent `Set.difference` Map.keysSet currentMetrics
-  mapM_ (sendTerminal lifecycle conn) $ Set.toList removed
-  atomically $ writeTVar connState.lastMetrics filteredMetrics
+  subscription <- readTVarIO cs.subscriptions
+  previous <- readTVarIO cs.lastMetrics
+  resync <- readTVarIO cs.resyncPending
+  gen <- readTVarIO cs.generation
+  let filtered = filterMetrics subscription current
+      removed = Map.keysSet previous `Set.difference` Map.keysSet current
+      terminals =
+        [ ProcessorTerminal pid status
+        | pid <- Set.toList removed,
+          Just status <- [Map.lookup pid lifecycle >>= terminalStatus]
+        ]
+  terminalFrames <- mapM (encoded gen Out.Required) terminals
+  if resync
+    then do
+      atomically $ modifyTVar' cs.outbound Out.discardUpdates
+      err <- encoded gen Out.Required $ ServerError "queue_overflow" "Updates dropped; replacing metrics snapshot"
+      snapshot <- encoded gen Out.Required $ MetricsSnapshot filtered
+      result <- admit config cs (terminalFrames <> [err, snapshot])
+      unless (result == Out.MustClose) $ atomically $ do
+        writeTVar cs.lastMetrics filtered
+        writeTVar cs.resyncPending False
+    else do
+      -- Required terminal events precede updates and survive eviction.
+      result <- admit config cs terminalFrames
+      unless (result == Out.MustClose) $ do
+        let updates = [ProcessorUpdate pid pm | (pid, pm) <- Map.toList filtered, Map.lookup pid previous /= Just pm]
+        frames <- mapM (encoded gen Out.Update) updates
+        updateResult <- admit config cs frames
+        unless (updateResult == Out.MustClose) $ atomically $ do
+          -- Retain the old live comparison ledger after delta loss, but retire
+          -- admitted terminals so the recovery tick never repeats them.
+          pending <- readTVar cs.resyncPending
+          writeTVar cs.lastMetrics $ if pending then Map.withoutKeys previous removed else filtered
+
+writerLoop :: WebSocketHooks -> MetricsServerConfig -> ConnectionState -> WS.Connection -> IO ()
+writerLoop hooks config cs conn = loop
+  where
+    loop = do
+      next <- atomically $ do
+        q <- readTVar cs.outbound
+        case Out.pop q of
+          Just (value, rest) -> writeTVar cs.outbound rest >> pure (Left value)
+          Nothing -> readTVar cs.closing >>= maybe retry (pure . Right)
+      case next of
+        Left value -> bounded (hooks.beforeWrite (Out.payload value) >> WS.sendTextData conn (Out.payload value)) >> loop
+        Right (CloseControl code reason _) -> bounded $ WS.sendCloseCode conn code reason
+    bounded action = do
+      now <- getMonotonicTimeNSec
+      closing <- readTVarIO cs.closing
+      let remaining = case closing of
+            Nothing -> config.wsSendTimeoutUs
+            Just (CloseControl _ _ deadline) -> if now >= deadline then 0 else fromIntegral ((deadline - now) `div` 1_000)
+      result <- timeout (min config.wsSendTimeoutUs remaining) action
+      case result of Nothing -> throwIO WS.ConnectionClosed; Just () -> pure ()
 
 filterMetrics :: Subscription -> MetricsMap -> MetricsMap
-filterMetrics subscription =
-  Map.filterWithKey $ \pid _ -> case subscription of
-    AllProcessors excluded -> Set.notMember pid excluded
-    SelectedProcessors selected -> Set.member pid selected
-
-sendTerminal :: Map.Map ProcessorId ProcessorLifecycle -> WS.Connection -> ProcessorId -> IO ()
-sendTerminal lifecycle conn pid =
-  case Map.lookup pid lifecycle >>= terminalStatus of
-    Nothing -> pure ()
-    Just status -> WS.sendTextData conn $ encode $ ProcessorTerminal pid status
+filterMetrics subscription = Map.filterWithKey $ \pid _ -> case subscription of
+  AllProcessors excluded -> Set.notMember pid excluded
+  SelectedProcessors selected -> Set.member pid selected
 
 terminalStatus :: ProcessorLifecycle -> Maybe ProcessorTerminalStatus
 terminalStatus = \case
   LifecycleStopped -> Just TerminalStopped
-  LifecycleFailed failure messageId ->
-    Just $ TerminalFailed failure (messageIdText <$> messageId)
+  LifecycleFailed failure messageId -> Just $ TerminalFailed failure (messageIdText <$> messageId)
   LifecycleRunning -> Nothing
   LifecycleDraining -> Nothing
 
 messageIdText :: MessageId -> Text
 messageIdText (MessageId value) = value
-
--- | Send update if metrics have changed.
-sendIfChanged ::
-  MetricsMap ->
-  WS.Connection ->
-  ProcessorId ->
-  ProcessorMetrics ->
-  IO ()
-sendIfChanged lastSent conn pid metrics = do
-  let changed = case Map.lookup pid lastSent of
-        Nothing -> True
-        Just old -> old /= metrics
-  when changed $
-    WS.sendTextData conn $
-      encode $
-        ProcessorUpdate pid metrics

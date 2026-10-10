@@ -236,3 +236,75 @@ data SupervisionStrategy
 | `StopAllOnFailure` | `IgnoreGraceful` | Stop all children on failure, but do not treat graceful exits as failures |
 
 Recommended: `IgnoreFailures` for most queue processing (let individual processors fail without affecting others).
+
+## WebSocket protocol and conformance
+
+`/ws` starts with a snapshot of all live processors. Clients send `subscribe_all`,
+`subscribe` with a `processors` array, `unsubscribe` with a `processors` array, or `ping`.
+Subscribe-all clears exclusions; selective subscribe selects or extends a finite set;
+unsubscribe removes selections or adds exclusions in all mode. Each subscription mutation
+establishes a new snapshot boundary. Updates from the previous selection cannot follow that
+snapshot. The default push interval is 100 ms, independently of receive traffic and writes.
+
+Server frames are `snapshot` (`metrics`), `update` (`processor`, `metrics`), `terminal`
+(`processor`, `status`, and the published failure context), `pong`, `goodbye`, and additive
+`error` (`code`, `message`). Existing frame names, members and types remain unchanged.
+An extension-tolerant consumer can ignore unknown tags; a decoder with a closed tag set must
+add `error`. Adding `ServerError` also requires downstream exhaustive Haskell matches to change.
+
+| Error code | Behavior |
+| --- | --- |
+| `invalid_message` | Invalid JSON, missing members or unknown client tag; receive continues. `message` contains the decoder reason and is not a stable parsing API. |
+| `subscription_limit_exceeded` | Error before policy close 1008, subject to available required-frame capacity and the send deadline. |
+| `queue_overflow` | Deltas were dropped; the very next application frame is a complete replacement snapshot. Replace the client's current map. |
+
+Every connection has one application writer and one bounded outbound queue. Defaults are
+`wsMaxQueuedFrames = 64` (minimum 2), `wsMaxQueuedBytes = 1048576` (positive), and
+`wsSendTimeoutUs = 5000000` (positive). The built-in runner validates these; hosts mounting
+`combinedApp` validate configuration themselves. Counts include snapshots, terminal events,
+errors, recovery snapshots and goodbye. Strict encoded payloads are forced before admission.
+The writer can hold one popped frame outside the queue. The budgets bound retained queue
+payloads, not the whole process heap, decoded input, metrics maps, or one transient encoding.
+Raise the byte budget explicitly if the registry's initial snapshot is larger than 1 MiB.
+
+Updates and pongs are expendable and evicted oldest-first. Losing updates marks recovery
+pending and suppresses ordinary deltas until the next producer sample admits terminal removals
+and an indivisible error/snapshot pair. Earlier required frames retain their order. Required
+saturation or an oversized required payload requests close 1013 instead of increasing either
+budget. Invalid-message floods are subject to the same limits. One close control signal lives
+outside the queue, rather than an unbounded list of close commands.
+
+Shutdown stops admission, discards expendable updates as needed, and queues goodbye after
+admitted required frames. Each write and the entire orderly flush have one finite deadline.
+Responsive shutdown peers receive goodbye before close 1000; stalled peers may time out without
+receiving it. Policy and capacity closes do not promise goodbye. Local connection slots are
+released even after timeout or setup failure. An admitted terminal event appears once on a live
+connection, but neither terminal nor goodbye has a disconnected-peer delivery guarantee.
+Reconnect and fetch current state from a snapshot or `GET /metrics`; this feed is not a replay log.
+
+The shared convention is owned by `mori://shinzui/keiro-ui`,
+`docs/architecture/inspection-api-conventions.md` (artifact-level URI pending), with its durable
+record at `mori://shinzui/keiro-ui/okf/adrs/concepts/ADR-2`. The mapping below keeps each deliberate
+deviation explicit; [ADR-0007](../adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md)
+freezes Shibuya's dialect and [ADR-0008](../adr/0008-deliver-websocket-frames-through-one-bounded-outbound-queue-per-connection.md)
+defines bounded delivery.
+
+| Convention element | Result | Shibuya contract and evidence |
+| --- | --- | --- |
+| Optional sister package, HTTP/JSON and embeddable application | Met | Web dependencies stay in `shibuya-metrics`; `combinedApp` and convenience runners are exported. |
+| Type-tagged JSON frames | Met | Exact objects and round trips in `TypesSpec`. |
+| Explicit subscribe/unsubscribe and snapshot then deltas | Met | Real loopback and controlled generation-boundary tests in `WebSocketSpec`. |
+| Connection initially watches nothing | Documented deviation | The published dialect initially watches all and sends a snapshot immediately. |
+| Client ping/pong and server ping | Met | Application ping/pong plus the existing 30-second protocol ping thread. Expendable pongs may be lost under pressure. |
+| In-band per-connection errors | Additively closed | Stable `invalid_message`, `subscription_limit_exceeded`, and `queue_overflow` codes. |
+| Bounded delivery and drop-oldest overflow signaling | Additively closed | Strict frame/byte bounds, independent producer, sole writer and adjacent error/snapshot recovery. `OutboundQueueSpec` exhaustively checks transition traces. |
+| Goodbye before responsive server shutdown | Met | Ordered required goodbye followed by close 1000, verified on loopback. |
+| Goodbye before every server-initiated close | Documented deviation | Policy/capacity refusal and stalled sends may close without goodbye; required-frame limits and finite deadlines win over undeliverable promises. |
+| Replay cursor `from_position` | Documented deviation | Metrics are current state without replayable positions; recovery reads a fresh snapshot. |
+| Snake-case new JSON member names | Documented deviation | Shibuya keeps camelCase member names under ADR-0007; tags, enumerated values and error codes use snake_case. |
+| Nested error envelope | Documented deviation | Published HTTP errors keep `error` text plus additive `code`; WebSocket errors use a flat typed frame. |
+| Pagination | Not applicable | Current metrics are a single map, not a position-based event page. |
+| Push is a hint, authoritative read backs it | Met | `GET /metrics` and snapshots supply current state after loss; no NOTIFY or replay assumption. |
+| Configurable CORS and upgrade Origin | Met | Explicit allowed origins, disabled by default, implemented in EP-47 and covered by `CorsSpec` and loopback upgrade tests. |
+| Authentication and authorization posture | Documented gap, as expected | No built-in authentication. Use a trusted network or authenticating proxy. Origin validation is not authentication. Future control remains separately gated. |
+| Frozen published shapes and domain vocabulary | Met | Existing JSON/Prometheus goldens and frame contracts remain unchanged; errors and snapshot boundaries are additive. |

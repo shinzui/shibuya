@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bound metrics WebSocket frames and encoded bytes, separate sampling from the
+  sole application writer, resynchronize after dropped deltas, and enforce send
+  and shutdown deadlines. Configuration gains three required record fields;
+  `MetricsServer` gains a required shutdown action.
+
 - Metrics WebSockets send additive `error` frames for malformed messages and before
   subscription-limit closes; exported `ServerMessage` gains `ServerError`, requiring
   downstream exhaustive matches to handle it.

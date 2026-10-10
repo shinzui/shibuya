@@ -16,7 +16,9 @@ module Shibuya.Metrics.Server
 where
 
 import Control.Concurrent.Async (async, cancel)
+import Control.Concurrent.STM (atomically, check, readTVar)
 import Control.Exception (bracket, finally)
+import Control.Monad (void)
 import Data.List (find)
 import Data.String (fromString)
 import Data.Text qualified as Text
@@ -33,7 +35,8 @@ import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
 import Shibuya.Metrics.Prometheus (prometheusApp)
 import Shibuya.Metrics.Types (MetricsServer (..))
-import Shibuya.Metrics.WebSocket (WebSocketState, newWebSocketState, shutdownWebSockets, websocketApp)
+import Shibuya.Metrics.WebSocket (WebSocketState (..), newWebSocketState, shutdownWebSockets, websocketApp)
+import System.Timeout (timeout)
 
 -- | Start the metrics server without dependency checks.
 -- Returns a handle that can be used to stop the server.
@@ -52,15 +55,22 @@ startMetricsServerWithDeps config master depChecks = do
   wsState <- newWebSocketState config.wsMaxConnections
   let app = combinedApp config master wsState depChecks
       settings =
-        Warp.setPort config.port $
-          Warp.setHost
-            (fromString config.host)
-            Warp.defaultSettings
+        Warp.setGracefulShutdownTimeout (Just 0) $
+          Warp.setPort config.port $
+            Warp.setHost
+              (fromString config.host)
+              Warp.defaultSettings
   serverAsync <- async $ Warp.runSettings settings app `finally` shutdownWebSockets wsState
   pure
     MetricsServer
       { serverThread = serverAsync,
-        serverPort = config.port
+        serverPort = config.port,
+        serverShutdown = do
+          shutdownWebSockets wsState
+          void $
+            timeout (config.wsSendTimeoutUs + 100_000) $
+              atomically $
+                readTVar wsState.connectionCount >>= check . (== 0)
       }
 
 validateConfig :: MetricsServerConfig -> IO ()
@@ -70,6 +80,9 @@ validateConfig config
   | config.wsPushIntervalUs <= 0 = fail "MetricsServerConfig.wsPushIntervalUs must be positive"
   | config.wsMaxConnections <= 0 = fail "MetricsServerConfig.wsMaxConnections must be positive"
   | config.wsMaxSubscriptions <= 0 = fail "MetricsServerConfig.wsMaxSubscriptions must be positive"
+  | config.wsMaxQueuedFrames < 2 = fail "MetricsServerConfig.wsMaxQueuedFrames must be at least 2"
+  | config.wsMaxQueuedBytes <= 0 = fail "MetricsServerConfig.wsMaxQueuedBytes must be positive"
+  | config.wsSendTimeoutUs <= 0 = fail "MetricsServerConfig.wsSendTimeoutUs must be positive"
   | config.livenessTimeoutMicros <= 0 = fail "MetricsServerConfig.livenessTimeoutMicros must be positive"
   | config.dependencyTimeoutMicros <= 0 = fail "MetricsServerConfig.dependencyTimeoutMicros must be positive"
   | config.stuckThreshold <= 0 = fail "MetricsServerConfig.stuckThreshold must be positive"
@@ -79,7 +92,7 @@ validateConfig config
 
 -- | Stop the metrics server.
 stopMetricsServer :: MetricsServer -> IO ()
-stopMetricsServer server = cancel server.serverThread
+stopMetricsServer server = server.serverShutdown `finally` cancel server.serverThread
 
 -- | Run an action with a metrics server, ensuring cleanup.
 withMetricsServer ::

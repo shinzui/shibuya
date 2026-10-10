@@ -29,6 +29,15 @@ spec = around withMaster $ do
     it "defaults to a loopback-only listener" $ \_ ->
       defaultConfig.host `shouldBe` "127.0.0.1"
 
+    it "validates frame, byte, and send budgets before opening a socket" $ \master ->
+      mapM_
+        (\config -> startMetricsServer config master `shouldThrow` anyException)
+        [ defaultConfig {wsMaxQueuedFrames = 0},
+          defaultConfig {wsMaxQueuedFrames = 1},
+          defaultConfig {wsMaxQueuedBytes = 0},
+          defaultConfig {wsSendTimeoutUs = 0}
+        ]
+
     it "rejects nonpositive WebSocket resource limits" $ \master ->
       startMetricsServer defaultConfig {wsMaxSubscriptions = 0} master
         `shouldThrow` (anyException :: SomeException -> Bool)

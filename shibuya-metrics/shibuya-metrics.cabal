@@ -26,6 +26,7 @@ library
     Shibuya.Metrics.Error
     Shibuya.Metrics.Health
     Shibuya.Metrics.JSON
+    Shibuya.Metrics.Outbound
     Shibuya.Metrics.Prometheus
     Shibuya.Metrics.Server
     Shibuya.Metrics.Types
@@ -88,6 +89,7 @@ test-suite shibuya-metrics-test
     Shibuya.Metrics.CorsSpec
     Shibuya.Metrics.HealthSpec
     Shibuya.Metrics.JSONSpec
+    Shibuya.Metrics.OutboundQueueSpec
     Shibuya.Metrics.PrometheusSpec
     Shibuya.Metrics.ServerSpec
     Shibuya.Metrics.TestSupport
@@ -115,6 +117,7 @@ test-suite shibuya-metrics-test
     time,
     wai,
     wai-extra ^>=3.1.18,
+    wai-websockets,
     warp,
     websockets,
 
@@ -151,5 +154,74 @@ executable metrics-wire-load
     shibuya-metrics,
     stm,
     time,
+    warp,
+    websockets,
+
+-- Sustained real observers while the production runner processes messages.
+executable metrics-observer-load
+  import: warnings
+  default-language: GHC2024
+  hs-source-dirs: bench
+  main-is: ObserverLoad.hs
+  default-extensions:
+    DerivingStrategies
+    LambdaCase
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N4 -T -A32m"
+    -O2
+
+  build-depends:
+    aeson,
+    async,
+    base ^>=4.21.0.0,
+    bytestring,
+    effectful >=2.6.1 && <2.8,
+    nqe ^>=0.6,
+    shibuya-core,
+    shibuya-metrics,
+    stm,
+    streamly-core,
+    text,
+    warp,
+    websockets,
+
+-- Writer-stall saturation, retained heap plateau, and slot recovery fixture.
+executable metrics-saturation-load
+  import: warnings
+  default-language: GHC2024
+  hs-source-dirs: bench
+  main-is: SaturationLoad.hs
+  default-extensions:
+    DerivingStrategies
+    LambdaCase
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N4 -T -A32m"
+    -O2
+
+  build-depends:
+    aeson,
+    async,
+    base ^>=4.21.0.0,
+    bytestring,
+    effectful >=2.6.1 && <2.8,
+    nqe ^>=0.6,
+    shibuya-core,
+    shibuya-metrics,
+    stm,
+    text,
+    time,
+    wai-websockets,
     warp,
     websockets,
