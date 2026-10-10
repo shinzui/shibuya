@@ -93,6 +93,12 @@ and the fixtures this plan introduces.
 
 2026-10-10 performance correction: Candidate `b7567a2` added about 15.5% basic allocation in serial/retry/dead-letter work. Commit `67f00ec` removes retained detail closures by selecting the mode outside the loop through an OPAQUE accessor and passing literal Bool arguments into INLINE workers. NOINLINE alone permits worker/wrapper decomposition and was insufficient. The corrected candidate passes the focused basic allocation cells; overall performance acceptance remains inconclusive. No budget was relaxed.
 
+2026-10-10 measurement diagnosis: Retrospectively pair odd/even baseline samples from the existing 200-run captures (100 pairs, unchanged budgets). The unchanged baseline is inconclusive against itself: full-inbox live memory has a 95% adverse-ratio interval of 0.9473–1.0749; retry throughput has 0.9419–1.1352. This is a diagnostic of measurement instability, not evidence that the feature passes. Baseline live-memory variation is about 25% and retry throughput variation about 37%. The full-inbox fixture previously let ingestion and processing race, so automatic GC sampled different backlog populations. Hold the first handler until the backlog is populated and force a major GC while it is retained; workload version 4 prevents mixing old and corrected samples. Compile the identical corrected harness against baseline and candidate.
+
+The paired capture now supports `--stability-budgets`: compare fresh baseline runs against baseline runs in both directions before measuring the candidate. Use the unchanged budget and its minimum pair count; a non-pass exits 2 and skips candidate capture. Store control captures as ineligible for release comparison. Existing comparator tests pass (8); driver smoke checks prove stable controls proceed and unstable controls skip the candidate. The corrected checkpoint builds at O2 for both revisions and acknowledges every message for counts below, at and above inbox capacity. No new test cases or audit files were added to the repository.
+
+The user reports a very busy machine; observed load was about 34 on ten cores. Smoke-run timings are ignored. Do not run or accept local wall-time measurements while the machine remains busy. There is no existing CI workflow or registered self-hosted Actions runner. A quiet host must pass the baseline stability control before the fresh, bounded paired acceptance run. Dependent work remains blocked and no budget is waived.
+
 2026-10-10 scope correction: Stop additional tests and performance sampling at the user's request. Remove all 176 generated EP-49 audit files from the repository, including the two previously committed files. Keep this verification summary and the reproducible commands below; future diagnostic output belongs in temporary storage.
 
 2026-10-10 review: Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
@@ -148,7 +154,7 @@ Against baseline `db8e783`, the corrected focused basic matrices each pass 68 of
 
 Detailed diagnostics show the opt-in cost: serial allocation increases about 47% under `-N1` and 46% under `-N4`, with throughput about 27% and 14% lower. Batch allocation increases about 0.4%. In real WebSocket fan-out at 1/16/64 clients, all thirty detailed runs completed 500,000 observations with zero slot misses and no retained oldest attempt; allocation increased about 55/58/72% and throughput fell about 23/22/23% (O1, `-N4`, ten alternating pairs). These are workload diagnostics, not an acceptance claim.
 
-No further tests or captures are needed for this handoff. EP-49 remains In Progress because its performance gate has not passed; EP-50 remains blocked. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
+The functional tests need no expansion. EP-49 remains In Progress because its performance gate has not passed; EP-50 remains blocked. The corrected measurement must run on a quiet host that first passes the baseline stability control. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
 
 
 ## Context and Orientation
@@ -494,10 +500,17 @@ nix fmt
 identities substituted:
 
 ```bash
+set -e
 git worktree add --detach /tmp/ep49-baseline <parent-of-milestone-1-commit>
 git worktree add --detach /tmp/ep49-detailed <milestone-1-commit>
 # In /tmp/ep49-detailed only: set defaultMetricsDetail = MetricsDetailed defaultDetailOptions.
-for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && git rev-parse HEAD:shibuya-core-bench); done
+# Apply the same committed checkpoint harness to the older production baseline.
+for tree in /tmp/ep49-baseline /tmp/ep49-detailed; do
+  cp shibuya-core-bench/bench/Bench/Lifecycle.hs "$tree/shibuya-core-bench/bench/Bench/Lifecycle.hs"
+done
+for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do
+  (cd "$tree" && shasum -a 256 shibuya-core-bench/bench/Bench/Lifecycle.hs shibuya-core-bench/bench/Test/LifecycleLoad.hs)
+done
 for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && cabal build shibuya-core-bench:lifecycle-load && jq -r '.["install-plan"][] | select(.style != "local") | "\(.["pkg-name"])-\(.["pkg-version"])"' dist-newstyle/cache/plan.json | sort -u | shasum -a 256); done
 mkdir -p /tmp/shibuya-ep49-measurements
 jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path","metrics-enabled","metrics-disabled","idle-worker","startup-shutdown","graceful-shutdown-drain","batch-timeout"]' \
@@ -513,9 +526,10 @@ for rts in N1 N4; do
     --candidate-output /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
     --candidate-label ep49-basic-${rts,,} --candidate-production-sha <milestone-1-sha> \
     --rts -$rts --capabilities $caps --iterations 10 \
+    --stability-budgets /tmp/shibuya-ep49-measurements/focused-budgets.json \
     --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path,metrics-enabled,metrics-disabled,idle-worker,startup-shutdown,graceful-shutdown-drain,batch-timeout \
     --machine-id MacBookPro18,2 --platform Darwin-arm64 --compiler ghc-9.12.4 --optimization O2 \
-    --harness-sha <bench-tree-hash> --solver-plan-hash <normalized-solver-hash>
+    --harness-sha <combined-identical-harness-file-hash> --solver-plan-hash <normalized-solver-hash>
   bun scripts/audit/compare-performance.ts \
     --baseline /tmp/shibuya-ep49-measurements/baseline-${rts,,}.json \
     --candidate /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
@@ -524,9 +538,14 @@ for rts in N1 N4; do
 done
 ```
 
+Run the unchanged baseline stability control before either candidate measurement; if it fails
+or is inconclusive, stop and diagnose the host or fixture. Do not repeatedly increase the
+pair count to chase a pass. Build the same version-4 checkpoint harness against both
+production revisions, so old version-3 datasets cannot be reused as corrected evidence.
+
 Repeat the capture and comparison with the `/tmp/ep49-detailed` executable as the
 candidate, labels `ep49-detailed-*`, `--candidate-production-sha <milestone-1-sha>+detailed-default`,
-outputs `detailed-*.json` and `verdict-detailed-*.json`. The three tree hashes and the three
+outputs `detailed-*.json` and `verdict-detailed-*.json`. The harness file hashes and the three
 solver hashes printed by the loops must be identical; if the solver hash differs, stop and
 resolve the dependency difference before capturing. The comparator exits 0 for pass, 1 for
 fail, and 2 for inconclusive; a `${rts,,}` expansion needs bash 4 or later, otherwise write

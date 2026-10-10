@@ -417,6 +417,11 @@ Check an item only when the owning child records its acceptance evidence.
 
 ## Surprises & Discoveries
 
+**EP-49 measurement corrected (2026-10-10).** Existing baseline captures are inconclusive
+against themselves. Correct the full-inbox GC checkpoint and require a baseline stability
+control before candidate measurement. The user reports a busy local machine; its timing
+results cannot certify the feature. Keep EP-49's gate and EP-50's hard dependency in place.
+
 **EP-49 functionally implemented (2026-10-10).** Opt-in latency and oldest-in-flight
 accounting, wire exposure and records are delivered. The core (250 examples), metrics
 (92 examples), GC suites and build pass. Basic allocation regressions were corrected, but

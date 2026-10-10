@@ -1,9 +1,14 @@
 #!/usr/bin/env bun
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import type { PerformanceDataset, PerformanceSample } from "./compare-performance";
+import {
+  comparePerformance,
+  type PerformanceBudgets,
+  type PerformanceDataset,
+  type PerformanceSample,
+} from "./compare-performance";
 
 type Options = Record<string, string>;
 
@@ -83,21 +88,21 @@ function equalLists(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
-function writeDataset(
+function dataset(
   variant: Variant,
   options: Options,
   rts: string,
   capabilities: number,
   services: Record<string, string>,
-): void {
-  const dataset: PerformanceDataset & {
-    capture: {
-      purpose: string;
-      pairedComparisonEligible: boolean;
-      warmupsPerScenario: number;
-      ordering: string;
-    };
-  } = {
+): PerformanceDataset & {
+  capture: {
+    purpose: string;
+    pairedComparisonEligible: boolean;
+    warmupsPerScenario: number;
+    ordering: string;
+  };
+} {
+  return {
     schemaVersion: 1,
     label: variant.label,
     capture: {
@@ -122,8 +127,28 @@ function writeDataset(
     },
     samples: variant.samples,
   };
+}
+
+function writeDataset(variant: Variant, value: PerformanceDataset): void {
   mkdirSync(dirname(variant.output), { recursive: true });
-  writeFileSync(variant.output, `${JSON.stringify(dataset, null, 2)}\n`);
+  writeFileSync(variant.output, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function capture(baseline: Variant, candidate: Variant, scenarios: string[], iterations: number, rts: string): void {
+  for (const scenario of scenarios) {
+    run(baseline.executable, sampleArgs(scenario, `warmup-baseline-${scenario}`, rts));
+    run(candidate.executable, sampleArgs(scenario, `warmup-candidate-${scenario}`, rts));
+    for (let ordinal = 1; ordinal <= iterations; ordinal += 1) {
+      const order = ordinal % 2 === 1 ? [baseline, candidate] : [candidate, baseline];
+      const pairId = `${rts.replace(/[^a-zA-Z0-9]+/g, "")}-${String(ordinal).padStart(2, "0")}`;
+      for (const variant of order) {
+        const sampleId = `${variant.label}-${scenario}-${String(ordinal).padStart(2, "0")}`;
+        const raw = run(variant.executable, sampleArgs(scenario, sampleId, rts));
+        variant.samples.push({ ...parseSample(raw, scenario), pairId, ordinal });
+      }
+    }
+    process.stderr.write(`captured ${iterations} paired ${rts} samples for ${scenario}\n`);
+  }
 }
 
 if (import.meta.main) {
@@ -172,23 +197,35 @@ if (import.meta.main) {
       services = parsed as Record<string, string>;
     }
 
-    for (const scenario of scenarios) {
-      run(baseline.executable, sampleArgs(scenario, `warmup-baseline-${scenario}`, rts));
-      run(candidate.executable, sampleArgs(scenario, `warmup-candidate-${scenario}`, rts));
-      for (let ordinal = 1; ordinal <= iterations; ordinal += 1) {
-        const order = ordinal % 2 === 1 ? [baseline, candidate] : [candidate, baseline];
-        const pairId = `${rts.replace(/[^a-zA-Z0-9]+/g, "")}-${String(ordinal).padStart(2, "0")}`;
-        for (const variant of order) {
-          const sampleId = `${variant.label}-${scenario}-${String(ordinal).padStart(2, "0")}`;
-          const raw = run(variant.executable, sampleArgs(scenario, sampleId, rts));
-          variant.samples.push({ ...parseSample(raw, scenario), pairId, ordinal });
-        }
+    // A busy host or unstable fixture can fail the budget against itself.
+    // Check that before spending time collecting candidate measurements.
+    if (options["--stability-budgets"]) {
+      const budgets: PerformanceBudgets = JSON.parse(readFileSync(resolve(options["--stability-budgets"]), "utf8"));
+      if (!Number.isInteger(budgets.minimumPairs) || budgets.minimumPairs < 2) {
+        throw new Error("stability budgets minimumPairs must be an integer of at least 2");
       }
-      process.stderr.write(`captured ${iterations} paired ${rts} samples for ${scenario}\n`);
+      const left: Variant = { ...baseline, output: `${baseline.output}.control-left.json`, label: `${baseline.label}-control-left`, samples: [] };
+      const right: Variant = { ...baseline, name: "candidate", output: `${baseline.output}.control-right.json`, label: `${baseline.label}-control-right`, samples: [] };
+      capture(left, right, scenarios, budgets.minimumPairs, rts);
+      const leftDataset = dataset(left, options, rts, capabilities, services);
+      const rightDataset = dataset(right, options, rts, capabilities, services);
+      const controlBudgets = { ...budgets, requiredScenarios: scenarios };
+      const forward = comparePerformance(leftDataset, rightDataset, controlBudgets);
+      const reverse = comparePerformance(rightDataset, leftDataset, controlBudgets);
+      leftDataset.capture.purpose = rightDataset.capture.purpose = "baseline-stability-control";
+      leftDataset.capture.pairedComparisonEligible = rightDataset.capture.pairedComparisonEligible = false;
+      writeDataset(left, leftDataset);
+      writeDataset(right, rightDataset);
+      writeFileSync(`${baseline.output}.control-verdict.json`, `${JSON.stringify({ forward, reverse }, null, 2)}\n`);
+      if (forward.status !== "pass" || reverse.status !== "pass") {
+        process.stderr.write("Baseline stability check did not pass; candidate capture skipped. No candidate performance verdict is available.\n");
+        process.exit(2);
+      }
     }
 
-    writeDataset(baseline, options, rts, capabilities, services);
-    writeDataset(candidate, options, rts, capabilities, services);
+    capture(baseline, candidate, scenarios, iterations, rts);
+    writeDataset(baseline, dataset(baseline, options, rts, capabilities, services));
+    writeDataset(candidate, dataset(candidate, options, rts, capabilities, services));
     process.stdout.write(
       `wrote ${baseline.samples.length} baseline and ${candidate.samples.length} candidate samples\n`,
     );

@@ -17,7 +17,7 @@ module Bench.Lifecycle
   )
 where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (newEmptyMVar, putMVar, takeMVar, threadDelay)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Monad (replicateM, replicateM_, unless, when)
 import Data.Aeson (Value, object, (.=))
@@ -238,7 +238,24 @@ runMessageFlow scenario counters runStarted =
   runEff $ runTracingNoop $ do
     master <- startMaster IgnoreAll
     messages <- liftIO $ createMessages scenario counters runStarted
-    let pacedSource = Stream.mapM (paceMessage scenario) (Stream.fromList messages)
+    -- Hold the first handler until the full-inbox backlog is present, then
+    -- collect it while retained. Otherwise max_live_bytes samples whichever
+    -- backlog happens to be present when an automatic collection runs.
+    backlogReady <- liftIO newEmptyMVar
+    let fullInbox = scenario.name == "serial-full-inbox"
+        prepare message = do
+          paced <- paceMessage scenario message
+          when (message.envelope.payload.sequenceNumber == min scenario.messageCount scenario.inboxSize) $
+            liftIO $
+              putMVar backlogReady ()
+          pure paced
+        pacedSource =
+          Stream.mapM (if fullInbox then prepare else paceMessage scenario) (Stream.fromList messages)
+        handler message = do
+          when (message.envelope.payload.sequenceNumber == 1) $ liftIO $ do
+            takeMVar backlogReady
+            performMajorGC
+          messageHandler scenario counters message
         adapter =
           Adapter
             { adapterName = "bench:lifecycle:" <> scenario.name,
@@ -255,7 +272,7 @@ runMessageFlow scenario counters runStarted =
             scenario.ordering
             scenario.concurrency
             adapter
-            (messageHandler scenario counters)
+            (if fullInbox then handler else messageHandler scenario counters)
         SizeBatch size ->
           runSupervisedBatch
             master
@@ -466,7 +483,7 @@ lifecycleResultValue sampleId result@LifecycleResult {scenario} =
   object
     [ "schemaVersion" .= (1 :: Int),
       "sampleId" .= sampleId,
-      "workloadVersion" .= (3 :: Int),
+      "workloadVersion" .= (4 :: Int),
       "scenario" .= scenario.name,
       "configuration" .= scenarioValue scenario,
       "metrics" .= metricsValue result
