@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-10T22:08:53Z
+      mode: "implement"
+      note: "Implement bounded opt-in latency and in-flight accounting with measured acceptance."
 ---
 
 
@@ -69,26 +74,30 @@ and the fixtures this plan introduces.
 ## Progress
 
 
-- [ ] Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; use existing base and containers dependencies.
-- [ ] Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatch`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
-- [ ] Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, concurrent publication and cancellation cleanup, and sampling with an injected clock; suite green.
+- [x] (2026-10-10 22:16Z) Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; use existing base and containers dependencies.
+- [x] (2026-10-10 22:16Z) Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatch`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
+- [x] (2026-10-10 22:16Z) Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, concurrent publication and cancellation cleanup, and sampling with an injected clock; suite green.
 - [ ] Milestone 1, measurement: paired capture of baseline, basic candidate, and detailed diagnostic under `-N1` and `-N4`; verdicts recorded under `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`.
-- [ ] Milestone 1, default: `defaultMetricsDetail` remains `MetricsBasic`; detailed overhead reported; decision recorded below.
-- [ ] Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
-- [ ] Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
-- [ ] Milestone 2, WebSocket: `sendIfChanged` compares an age-zeroed projection; update frame test.
-- [ ] Milestone 2, runner tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, RTS allocation check on the basic path.
+- [x] (2026-10-10 22:16Z) Milestone 1, default: `defaultMetricsDetail` remains `MetricsBasic`; detailed overhead reported; decision recorded below.
+- [x] (2026-10-10 22:16Z) Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
+- [x] (2026-10-10 22:16Z) Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
+- [x] (2026-10-10 22:16Z) Milestone 2, WebSocket: `sendIfChanged` compares an age-zeroed projection; update frame test.
+- [x] (2026-10-10) Milestone 2, runner behavioral tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, RTS allocation check on the basic path remains in the paired measurement item.
 - [ ] Milestone 3, records: ADR, `docs/architecture/METRICS.md`, Haddock, `docs/user/getting-started.md`, CAP-9 and CAP-10 evidence with `okf log add`, three changelogs.
 
 
 ## Surprises & Discoveries
 
 
+2026-10-10 implementation: The seven initial accounting examples were written before the APIs and failed compilation in `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/initial-core-red.log`; the implemented examples passed under `-N1`. The initial wire suite failed both goldens with seed 1161645269 before regeneration (`docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/initial-golden-red.log`). The core passed 247 examples and both GC processes under `-N1`, and metrics passed 92 examples. A byte comparison confirms all four basic JSON objects and every pre-existing Prometheus line are unchanged. Multi-capability core and both GC processes also passed; repeated bounded reuse is exercised 100 times at each of 1/4/64/256 concurrency. The expanded core suite passes 248 examples including 100 cancellations at both handler and finalizer boundaries, completed failure latency, batch AppConfig propagation and ordered oldest identification. Gated claim/release clock boundaries run 100 repetitions. Build all passes. Paired performance and mutation acceptance remain in progress. Strict capability validation reports inherited missing recommended reviews on ten pre-existing records; required profile/log validation passes. No review history is fabricated for unrelated records.
+
 2026-10-10 review: Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10 implementation): Preserve the existing generic value-based JSON encoding order; omit absent members without switching to direct generic encoding. Add one detailed fixture and retain the four basic objects byte-for-byte. Prometheus counts use exact integer text so lifetime counts are not rounded through Double; numeric semantics are unchanged. Use a strict bounded IntMap of noncumulative bin counts per locked slot, then accumulate at sampling time. Expose slotMisses as a read-only diagnostic on the handle. These choices preserve basic wire bytes, exact count arithmetic and synchronized identity/start publication without a new dependency.
 
 - Decision (2026-10-10): Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
   This revision supersedes conflicting 2026-09-30 design assumptions below.

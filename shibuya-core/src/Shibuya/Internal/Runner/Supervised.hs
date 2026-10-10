@@ -13,6 +13,8 @@ module Shibuya.Internal.Runner.Supervised
   ( -- * Running with Supervision
     runSupervised,
     runSupervisedBatch,
+    runSupervisedWith,
+    runSupervisedBatchWith,
 
     -- * Standalone (without Master)
     runWithMetrics,
@@ -190,11 +192,30 @@ runSupervised ::
   -- | Message handler
   Handler es msg ->
   Eff es SupervisedProcessor
-runSupervised master inboxSize procId ordering concurrency adapter handler = Exception.mask_ $ do
+runSupervised = runSupervisedWith Metrics.defaultMetricsDetail
+
+runSupervisedWith ::
+  (IOE :> es, Tracing :> es) =>
+  Metrics.MetricsDetail ->
+  Master ->
+  -- | Inbox size (for backpressure)
+  Natural ->
+  -- | Processor identifier
+  ProcessorId ->
+  -- | OrderingPolicy policy
+  OrderingPolicy ->
+  -- | Concurrency mode
+  Concurrency ->
+  -- | Queue adapter
+  Adapter es msg ->
+  -- | Message handler
+  Handler es msg ->
+  Eff es SupervisedProcessor
+runSupervisedWith detail master inboxSize procId ordering concurrency adapter handler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
   -- Initialize state
-  metricsHandle <- liftIO $ newMetricsHandle now
+  metricsHandle <- liftIO $ Metrics.newMetricsHandleWith detail (concurrencyBound concurrency) now
   doneVar <- liftIO $ newTVarIO False
 
   -- Register with Master
@@ -327,10 +348,29 @@ runSupervisedBatch ::
   -- | Batch handler
   BatchHandler es msg ->
   Eff es SupervisedProcessor
-runSupervisedBatch master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask_ $ do
+runSupervisedBatch = runSupervisedBatchWith Metrics.defaultMetricsDetail
+
+runSupervisedBatchWith ::
+  (IOE :> es, Tracing :> es) =>
+  Metrics.MetricsDetail ->
+  Master ->
+  -- | Inbox size (for backpressure)
+  Natural ->
+  -- | Processor identifier
+  ProcessorId ->
+  -- | Concurrency mode (bounds how many BATCHES run at once)
+  Concurrency ->
+  -- | Batch configuration
+  BatchConfig es msg ->
+  -- | Queue adapter
+  Adapter es msg ->
+  -- | Batch handler
+  BatchHandler es msg ->
+  Eff es SupervisedProcessor
+runSupervisedBatchWith detail master inboxSize procId concurrency batchConfig adapter batchHandler = Exception.mask_ $ do
   now <- liftIO getCurrentTime
 
-  metricsHandle <- liftIO $ newMetricsHandle now
+  metricsHandle <- liftIO $ Metrics.newMetricsHandleWith detail (concurrencyBound concurrency) now
   doneVar <- liftIO $ newTVarIO False
 
   registerProcessor master procId metricsHandle
@@ -637,100 +677,109 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher h
           mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
       addAttributes traceSpan mergedAttrs
 
-      -- Increment in-flight and add inflight attributes.
-      currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+      let process currentInflight = do
+            addAttribute traceSpan attrShibuyaInflightCount currentInflight
+            addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-      addAttribute traceSpan attrShibuyaInflightCount currentInflight
-      addAttribute traceSpan attrShibuyaInflightMax maxConc
+            -- Record handler start event
+            addEvent traceSpan handlerStartedEvent
 
-      -- Record handler start event
-      addEvent traceSpan handlerStartedEvent
+            -- Call handler and finalizer separately. A handler exception is
+            -- substituted with immediate retry so the adapter always observes a
+            -- finalization decision for an ingested message.
+            --
+            -- This is a *separate* per-message 'catchAny' from the one inside
+            -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
+            -- handler+finalize, which skipped finalization when the handler threw;
+            -- splitting them is what makes "always finalize" hold. The extra
+            -- per-message exception frame costs ~126 bytes/message (measured, EP-31
+            -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
+            -- accepted as the price of the always-finalize guarantee — do not merge the
+            -- two catches back together to reclaim it.
+            handlerResult <-
+              catchAny
+                (Right <$> handler (toMessage ingested))
+                ( \ex -> do
+                    recordException traceSpan ex
+                    pure (Left ex)
+                )
+            let (decision, result) = case handlerResult of
+                  Right d -> (d, Right d)
+                  Left ex ->
+                    ( AckRetry (RetryDelay 0),
+                      Left $ HandlerException $ Text.pack $ show ex
+                    )
 
-      -- Call handler and finalizer separately. A handler exception is
-      -- substituted with immediate retry so the adapter always observes a
-      -- finalization decision for an ingested message.
-      --
-      -- This is a *separate* per-message 'catchAny' from the one inside
-      -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
-      -- handler+finalize, which skipped finalization when the handler threw;
-      -- splitting them is what makes "always finalize" hold. The extra
-      -- per-message exception frame costs ~126 bytes/message (measured, EP-31
-      -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
-      -- accepted as the price of the always-finalize guarantee — do not merge the
-      -- two catches back together to reclaim it.
-      handlerResult <-
-        catchAny
-          (Right <$> handler (toMessage ingested))
-          ( \ex -> do
-              recordException traceSpan ex
-              pure (Left ex)
-          )
-      let (decision, result) = case handlerResult of
-            Right d -> (d, Right d)
-            Left ex ->
-              ( AckRetry (RetryDelay 0),
-                Left $ HandlerException $ Text.pack $ show ex
-              )
+            when (isLeft handlerResult) $
+              addEvent traceSpan $
+                mkEvent
+                  eventAckDecision
+                  [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
 
-      when (isLeft handlerResult) $
-        addEvent traceSpan $
-          mkEvent
-            eventAckDecision
-            [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
+            finalizeResult <- finalizeWithRetry traceSpan ingested decision
 
-      finalizeResult <- finalizeWithRetry traceSpan ingested decision
+            -- Record completion event and set status
+            case finalizeResult of
+              Left _ -> do
+                addEvent traceSpan $
+                  mkEvent
+                    eventAckDecision
+                    [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
+                setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
+              Right () -> case result of
+                Right decision' -> do
+                  let decisionText = showAckDecision decision'
+                  addEvent traceSpan $
+                    mkEvent
+                      eventHandlerCompleted
+                      [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+                  addAttribute traceSpan attrShibuyaAckDecision decisionText
 
-      -- Record completion event and set status
-      case finalizeResult of
-        Left _ -> do
-          addEvent traceSpan $
-            mkEvent
-              eventAckDecision
-              [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
-          setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
-        Right () -> case result of
-          Right decision' -> do
-            let decisionText = showAckDecision decision'
-            addEvent traceSpan $
-              mkEvent
-                eventHandlerCompleted
-                [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
-            addAttribute traceSpan attrShibuyaAckDecision decisionText
+                  -- Set span status based on decision
+                  case decision' of
+                    AckOk -> setStatus traceSpan OTel.Ok
+                    AckRetry _ -> setStatus traceSpan OTel.Ok
+                    AckDeadLetter reason -> do
+                      addAttribute
+                        traceSpan
+                        attrShibuyaDeadLetterReasonCode
+                        (deadLetterCodeText (deadLetterReasonCode reason))
+                      setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
+                    AckHalt reason ->
+                      setStatus traceSpan $ OTel.Error $ showHaltReason reason
+                Left err -> do
+                  addEvent traceSpan $
+                    mkEvent
+                      eventAckDecision
+                      [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+                  setStatus traceSpan $ OTel.Error $ handlerErrorToText err
 
-            -- Set span status based on decision
-            case decision' of
-              AckOk -> setStatus traceSpan OTel.Ok
-              AckRetry _ -> setStatus traceSpan OTel.Ok
-              AckDeadLetter reason -> do
-                addAttribute
-                  traceSpan
-                  attrShibuyaDeadLetterReasonCode
-                  (deadLetterCodeText (deadLetterReasonCode reason))
-                setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
-              AckHalt reason ->
-                setStatus traceSpan $ OTel.Error $ showHaltReason reason
-          Left err -> do
-            addEvent traceSpan $
-              mkEvent
-                eventAckDecision
-                [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
-            setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+            -- Decrement in-flight and update stats.
+            liftIO $
+              case finalizeResult of
+                Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
+                Right () -> finishProcessing metricsHandle (metricForResult result)
 
-      -- Decrement in-flight and update stats.
-      liftIO $
-        case finalizeResult of
-          Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
-          Right () -> finishProcessing metricsHandle (metricForResult result)
-
-      -- Handle halt (set flag, don't throw - let stream drain)
-      case finalizeResult of
-        Left _ ->
-          liftIO $
-            requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
-        Right () -> case result of
-          Right (AckHalt reason) ->
-            liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
-          _ -> pure ()
+            -- Handle halt (set flag, don't throw - let stream drain)
+            case finalizeResult of
+              Left _ ->
+                liftIO $
+                  requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
+              Right () -> case result of
+                Right (AckHalt reason) ->
+                  liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
+                _ -> pure ()
+      case metricsHandle.detail of
+        Metrics.MetricsBasic -> do
+          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+          process currentInflight
+        Metrics.MetricsDetailed _ -> Exception.mask $ \restore -> do
+          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+          slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
+          restore (process currentInflight)
+            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+          liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
+            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
   where
     isLeft :: Either a b -> Bool
     isLeft (Left _) = True
@@ -759,3 +808,8 @@ metricForResult (Right (AckHalt reason)) = Right (CountHalt (haltReasonText reas
   where
     haltReasonText (HaltOrderedStream t) = t
     haltReasonText (HaltFatal t) = t
+
+concurrencyBound :: Concurrency -> Int
+concurrencyBound Serial = 1
+concurrencyBound (Ahead n) = n
+concurrencyBound (Async n) = n

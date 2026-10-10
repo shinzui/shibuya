@@ -7,5 +7,5 @@ import Test.Hspec (Spec, describe, it)
 spec :: Spec
 spec =
   describe "JSON wire contract" $
-    it "matches the golden encoding for all four processor states" $
+    it "matches the golden encoding for all four processor states and opt-in detail" $
       assertGolden "processor-metrics.json.golden" (encode fixtureMetrics <> "\n")

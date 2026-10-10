@@ -24,6 +24,7 @@ module Shibuya.Core.Types
 where
 
 import Control.DeepSeq (NFData (..))
+import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString (ByteString)
 import Data.HashMap.Strict (HashMap)
 import Data.String (IsString)
@@ -34,7 +35,7 @@ import Shibuya.Prelude
 -- Every message has a unique identifier.
 newtype MessageId = MessageId {unMessageId :: Text}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (IsString)
+  deriving newtype (IsString, ToJSON, FromJSON)
   deriving anyclass (NFData)
 
 -- | Optional cursor / offset / global position.

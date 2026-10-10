@@ -5,7 +5,7 @@ module Shibuya.Runner.SupervisedSpec (spec) where
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (atomically, check, newEmptyTMVarIO, readTVar, readTVarIO, takeTMVar, tryPutTMVar)
 import Control.Exception (MaskingState (..), getMaskingState)
-import Control.Monad (forM, forM_, replicateM)
+import Control.Monad (forM, forM_, replicateM, replicateM_, when)
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
@@ -46,6 +46,7 @@ import Shibuya.Core.Metrics
     StreamStats (..),
     sampleMetrics,
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Master
@@ -60,6 +61,7 @@ import Shibuya.Internal.Runner.Supervised
     getMetrics,
     isDone,
     runSupervised,
+    runSupervisedWith,
     runWithMetrics,
   )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
@@ -99,6 +101,134 @@ spec = do
       processorMetrics `shouldBe` Just Nothing
 
   describe "Shibuya.Internal.Runner.Supervised" $ do
+    it "reports growing oldest age and clears it after finalization" $ do
+      started <- UIO.newEmptyMVar
+      release <- UIO.newEmptyMVar
+      runEff $ runTracingNoop $ do
+        master <- startMaster IgnoreAll
+        messages <- createTestMessages 1
+        sp <-
+          runSupervisedWith
+            (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
+            master
+            10
+            (ProcessorId "detailed-age")
+            Unordered
+            Serial
+            (testAdapter messages)
+            (\_ -> liftIO (UIO.putMVar started () >> UIO.takeMVar release) >> pure AckOk)
+        liftIO (UIO.takeMVar started)
+        first <- liftIO $ sampleMetrics sp.metrics
+        liftIO $ threadDelay 20_000
+        second <- liftIO $ sampleMetrics sp.metrics
+        liftIO $ do
+          fmap (.messageId) second.oldestInFlight `shouldBe` Just (MessageId "msg-1")
+          fmap (.ageSeconds) second.oldestInFlight `shouldSatisfy` (> fmap (.ageSeconds) first.oldestInFlight)
+          UIO.putMVar release ()
+          UIO.timeout 1_000_000 (atomically $ readTVar sp.done >>= check) `shouldReturn` Just ()
+        completed <- liftIO $ sampleMetrics sp.metrics
+        liftIO $ do
+          completed.oldestInFlight `shouldBe` Nothing
+          fmap (.count) completed.latency `shouldBe` Just 1
+          fmap (.sumSeconds) completed.latency `shouldSatisfy` (>= Just 0.02)
+          Metrics.slotMisses sp.metrics `shouldReturn` 0
+        stopMaster master
+
+    it "identifies the oldest of four concurrent attempts as slots are released" $ do
+      starts <- replicateM 4 UIO.newEmptyMVar
+      releases <- replicateM 4 UIO.newEmptyMVar
+      runEff $ runTracingNoop $ do
+        master <- startMaster IgnoreAll
+        messages <- createTestMessages 4
+        let source =
+              Stream.mapM
+                ( \(i, msg) -> do
+                    when (i > 0) $ UIO.readMVar (starts !! (i - 1))
+                    pure msg
+                )
+                (Stream.fromList (zip [0 ..] messages))
+            adapter = (testAdapter messages) {source}
+            handler msg = do
+              let i = read (drop 8 msg.envelope.payload) - 1
+              liftIO $ UIO.putMVar (starts !! i) () >> UIO.takeMVar (releases !! i)
+              pure AckOk
+        sp <-
+          runSupervisedWith
+            (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
+            master
+            10
+            (ProcessorId "detailed-four")
+            Unordered
+            (Async 4)
+            adapter
+            handler
+        liftIO $ mapM_ UIO.readMVar starts
+        liftIO $ sampleMetrics sp.metrics >>= \m -> fmap (.messageId) m.oldestInFlight `shouldBe` Just (MessageId "msg-1")
+        liftIO $ do
+          UIO.putMVar (releases !! 3) ()
+          UIO.putMVar (releases !! 2) ()
+          UIO.putMVar (releases !! 0) ()
+          let awaitSecond = do
+                m <- sampleMetrics sp.metrics
+                if fmap (.messageId) m.oldestInFlight == Just (MessageId "msg-2") then pure () else threadDelay 1000 >> awaitSecond
+          UIO.timeout 1_000_000 awaitSecond `shouldReturn` Just ()
+          UIO.putMVar (releases !! 1) ()
+          UIO.timeout 1_000_000 (atomically $ readTVar sp.done >>= check) `shouldReturn` Just ()
+          Metrics.slotMisses sp.metrics `shouldReturn` 0
+        stopMaster master
+
+    it "counts completed finalization failures including retry delays" $ do
+      runEff $ runTracingNoop $ do
+        master <- startMaster IgnoreAll
+        let message =
+              mkIngested
+                (mkEnvelope (MessageId "failed-detail") ())
+                (AckHandle (\_ -> liftIO $ ioError (userError "failed finalizer")))
+            adapter = Adapter "failed-detail" (Stream.fromList [message]) (pure ())
+        sp <-
+          runSupervisedWith
+            (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
+            master
+            1
+            (ProcessorId "failed-detail")
+            Unordered
+            Serial
+            adapter
+            (\_ -> pure AckOk)
+        liftIO $ UIO.timeout 1_000_000 (atomically $ readTVar sp.done >>= check) `shouldReturn` Just ()
+        m <- liftIO $ sampleMetrics sp.metrics
+        liftIO $ do
+          m.oldestInFlight `shouldBe` Nothing
+          fmap (.count) m.latency `shouldBe` Just 1
+          fmap (.sumSeconds) m.latency `shouldSatisfy` (>= Just 0.31)
+        stopMaster master
+
+    it "abandons detail when cancellation interrupts a handler or finalizer" $ do
+      forM_ [False, True] $ \inFinalizer -> replicateM_ 100 $ do
+        entered <- UIO.newEmptyMVar
+        blocker <- UIO.newEmptyMVar
+        runEff $ runTracingNoop $ do
+          master <- startMaster IgnoreAll
+          let waitHere = liftIO (UIO.putMVar entered () >> UIO.takeMVar blocker)
+              message = mkIngested (mkEnvelope (MessageId "cancel") ()) (AckHandle (\_ -> when inFinalizer waitHere))
+              adapter = Adapter "cancel-detail" (Stream.fromList [message]) (pure ())
+          sp <-
+            runSupervisedWith
+              (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
+              master
+              1
+              (ProcessorId "cancel-detail")
+              Unordered
+              Serial
+              adapter
+              (\_ -> when (not inFinalizer) waitHere >> pure AckOk)
+          liftIO $ UIO.takeMVar entered
+          stopMaster master
+          liftIO $ do
+            m <- sampleMetrics sp.metrics
+            m.oldestInFlight `shouldBe` Nothing
+            m.latency `shouldBe` Nothing
+
     it "restores interruptibility inside a supervised child" $ do
       observed <- newEmptyTMVarIO
       result <-

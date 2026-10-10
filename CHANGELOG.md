@@ -4,6 +4,10 @@
 
 ### Breaking Changes
 
+- `AppConfig` gains `metricsDetail`; `ProcessorMetrics` gains optional `latency` and
+  `oldestInFlight` fields. Direct record construction must supply them. `MetricsHandle` also gains detail state. `ConfigError`
+  gains `InvalidMaxTrackedPartitions` for negative detailed partition capacity.
+
 - `shibuya-metrics`: `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`,
   and `wsSendTimeoutUs`; direct record construction must supply them. `MetricsServer`
   gains the required `serverShutdown` action, and exhaustive `ServerMessage` matches
@@ -12,6 +16,16 @@
   must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
 
 ### New Features
+
+- Opt-in detailed accounting with `MetricsDetail`, `DetailOptions`, `LatencySummary`,
+  `LatencyBucket`, and `OldestInFlight`; the default remains `MetricsBasic`. Monotonic
+  timing includes finalization retries, one observation per message attempt or emitted
+  batch, using bounded synchronized slots. Add `MessageId` JSON instances, detail-aware
+  handle/runner constructors and read-only slot-miss diagnostics.
+- Add optional camelCase `latency` and `oldestInFlight` JSON/WebSocket members and the
+  `shibuya_message_processing_seconds` histogram and optional
+  `shibuya_processor_oldest_in_flight_seconds` gauge. Preserve basic JSON bytes and omit
+  unavailable values. WebSocket clients extrapolate age between state changes.
 
 - `shibuya-metrics`: bound every queued WebSocket frame and encoded byte, separate
   sampling from the sole application writer, recover dropped deltas with an adjacent

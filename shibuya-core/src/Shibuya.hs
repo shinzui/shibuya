@@ -92,6 +92,13 @@ module Shibuya
     BatchStats (..),
     InFlightInfo (..),
     MetricsMap,
+    MetricsDetail (..),
+    DetailOptions (..),
+    defaultDetailOptions,
+    defaultMetricsDetail,
+    LatencySummary (..),
+    LatencyBucket (..),
+    OldestInFlight (..),
 
     -- * Tracing
     Tracing,
@@ -139,12 +146,19 @@ import Shibuya.Core.Ingested (Ingested (..), Message (..), mkIngested, toMessage
 import Shibuya.Core.Lease (Lease (..))
 import Shibuya.Core.Metrics
   ( BatchStats (..),
+    DetailOptions (..),
     InFlightInfo (..),
+    LatencyBucket (..),
+    LatencySummary (..),
+    MetricsDetail (..),
     MetricsMap,
+    OldestInFlight (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
     StreamStats (..),
+    defaultDetailOptions,
+    defaultMetricsDetail,
   )
 import Shibuya.Core.Retry
 import Shibuya.Core.Types (Attempt (..), Cursor (..), Envelope (..), Headers, MessageId (..), TraceHeaders, mkEnvelope)

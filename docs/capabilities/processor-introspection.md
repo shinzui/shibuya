@@ -5,6 +5,7 @@ description: "Read live per-processor state, in-flight information, stream stati
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
+timestamp: 2026-10-10T22:17:52Z
 capabilityId: CAP-9
 provider: mori://shinzui/shibuya
 status: shipped
@@ -21,6 +22,15 @@ evidence:
   - kind: module
     resource: shibuya-core/src/Shibuya/Core/Metrics.hs
     proves: ProcessorState, InFlightInfo, StreamStats, and BatchStats are public types with public accessors.
+  - kind: test
+    resource: shibuya-core/test/Shibuya/Core/MetricsSpec.hs
+    proves: Bounded synchronized slots, zero timestamps, cumulative buckets, exact duration sums, absence of basic detail clocks and repeated concurrent reuse at 1/4/64/256 are exercised.
+  - kind: test
+    resource: shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs
+    proves: Growing age, oldest identity, completed failure duration and cancellation cleanup are tested in supervised runners.
+  - kind: test
+    resource: shibuya-core/test/Shibuya/App/BatchSpec.hs
+    proves: AppConfig detail opt-in counts one latency observation per emitted batch.
   - kind: example
     resource: shibuya-example/app/Main.hs
     proves: Reading per-processor counters from the application handle at runtime.
@@ -55,3 +65,10 @@ server dependency.
 - Counters are per-process. Aggregating across replicas is the caller's job.
 - Per-message counters moved off `TVar` updates in 0.8.0.0 for throughput; the values are live
   but not transactional snapshots across processors.
+
+Opt-in `MetricsDetailed defaultDetailOptions` on `AppConfig.metricsDetail` adds optional
+`latency` and `oldestInFlight`. Basic remains the default. Duration includes handler execution
+and finalization retries, once per attempt or emitted batch; interrupted attempts do not count.
+Identity and monotonic start are published together in bounded synchronized slots. Sampling
+is best effort across slots. See [the accounting decision](../adr/0009-account-for-in-flight-detail-and-latency-with-bounded-synchronized-slots-behind-an-opt-in-detail-level.md)
+and [the metrics architecture](../architecture/METRICS.md#latency-and-in-flight-detail).

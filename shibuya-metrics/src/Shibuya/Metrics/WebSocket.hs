@@ -41,6 +41,7 @@ import GHC.Clock (getMonotonicTimeNSec)
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master, getAllMetricsIO)
 import Shibuya.Core.Metrics (MetricsMap, ProcessorId (..))
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (MessageId (..))
 import Shibuya.Internal.Runner.Master (ProcessorLifecycle (..), getLifecycleSnapshotIO)
 import Shibuya.Metrics.Config (MetricsServerConfig (..))
@@ -331,7 +332,7 @@ pushUpdates config master cs = do
         -- immediately, but retire admitted terminals before the recovery tick.
         Out.DroppedUpdates -> atomically $ writeTVar cs.lastMetrics $ Map.withoutKeys previous removed
         Out.Enqueued -> do
-          let updates = [ProcessorUpdate pid pm | (pid, pm) <- Map.toList filtered, Map.lookup pid previous /= Just pm]
+          let updates = [ProcessorUpdate pid pm | (pid, pm) <- Map.toList filtered, fmap stableView (Map.lookup pid previous) /= Just (stableView pm)]
           frames <- mapM (encoded gen Out.Update) updates
           updateResult <- admit config cs frames
           unless (updateResult == Out.MustClose) $ atomically $ do
@@ -375,3 +376,8 @@ terminalStatus = \case
 
 messageIdText :: MessageId -> Text
 messageIdText (MessageId value) = value
+
+-- Ages grow without a state change. Clients extrapolate from their last frame;
+-- snapshots and HTTP scrapes always include a freshly sampled age.
+stableView :: Metrics.ProcessorMetrics -> Metrics.ProcessorMetrics
+stableView pm = pm {Metrics.oldestInFlight = fmap (\oldest -> oldest {Metrics.ageSeconds = 0}) pm.oldestInFlight}

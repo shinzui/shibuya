@@ -20,6 +20,7 @@ import Shibuya.Core.Metrics
     ProcessorState (..),
     StreamStats (..),
   )
+import Shibuya.Core.Metrics qualified as Metrics
 
 -- | WAI application for Prometheus metrics endpoint.
 -- Handles: GET /metrics/prometheus
@@ -51,7 +52,13 @@ renderPrometheusMetrics metrics =
       renderGaugeMetrics "shibuya_processor_state" (fromIntegral . stateToInt . (.state)) metrics,
       renderHelp "shibuya_processor_in_flight" "Number of messages currently being processed",
       renderType "shibuya_processor_in_flight" "gauge",
-      renderGaugeMetrics "shibuya_processor_in_flight" (fromIntegral . inFlightCount . (.state)) metrics
+      renderGaugeMetrics "shibuya_processor_in_flight" (fromIntegral . inFlightCount . (.state)) metrics,
+      renderHelp "shibuya_message_processing_seconds" "Processing attempt duration including finalization retries (one observation per message or emitted batch)",
+      renderType "shibuya_message_processing_seconds" "histogram",
+      Map.foldMapWithKey renderLatency metrics,
+      renderHelp "shibuya_processor_oldest_in_flight_seconds" "Age of oldest in-flight processing attempt",
+      renderType "shibuya_processor_oldest_in_flight_seconds" "gauge",
+      Map.foldMapWithKey renderOldest metrics
     ]
 
 renderHelp :: Text -> Text -> Builder.Builder
@@ -102,3 +109,26 @@ stateToInt Stopped = 4
 inFlightCount :: ProcessorState -> Int
 inFlightCount (Processing info _ _) = info.inFlight
 inFlightCount _ = 0
+
+renderLatency :: ProcessorId -> ProcessorMetrics -> Builder.Builder
+renderLatency (ProcessorId pid) pm = case pm.latency of
+  Nothing -> mempty
+  Just summary ->
+    let labels = Builder.byteString "{processor=\"" <> Builder.byteString (Text.encodeUtf8 (escapeLabel pid))
+        prefix suffix = Builder.byteString "shibuya_message_processing_seconds" <> Builder.byteString suffix <> labels
+        bucket label count =
+          prefix "_bucket"
+            <> Builder.byteString "\",le=\""
+            <> Builder.byteString (Text.encodeUtf8 label)
+            <> Builder.byteString "\"} "
+            <> Builder.integerDec count
+            <> Builder.char8 '\n'
+        scalar suffix value = prefix suffix <> Builder.byteString "\"} " <> value <> Builder.char8 '\n'
+     in mconcat (zipWith bucket Metrics.latencyBucketLabels (map (.count) summary.buckets ++ [summary.count]))
+          <> scalar "_sum" (Builder.doubleDec summary.sumSeconds)
+          <> scalar "_count" (Builder.integerDec summary.count)
+
+renderOldest :: ProcessorId -> ProcessorMetrics -> Builder.Builder
+renderOldest pid pm = case pm.oldestInFlight of
+  Nothing -> mempty
+  Just oldest -> renderMetric "shibuya_processor_oldest_in_flight_seconds" (const oldest.ageSeconds) pid pm

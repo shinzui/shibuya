@@ -1,18 +1,21 @@
 module Shibuya.App.BatchSpec (spec) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (newEmptyMVar, putMVar, takeMVar, threadDelay)
 import Control.Concurrent.STM (TVar, atomically, check, newTVarIO, readTVar, writeTVar)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (nub)
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
 import Shibuya.App
-  ( AppError (..),
+  ( AppConfig (..),
+    AppError (..),
     QueueProcessor (..),
     defaultAppConfig,
+    getAppMetrics,
     mkBatchProcessor,
     runApp,
     stopApp,
@@ -28,6 +31,7 @@ import Shibuya.Batch
   )
 import Shibuya.Core.Ingested (Ingested, mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
@@ -37,6 +41,35 @@ import Test.Hspec
 spec :: Spec
 spec = describe "Shibuya.App.Batch" $ do
   describe "runApp with a BatchingProcessor" $ do
+    it "counts detailed duration per emitted batch through AppConfig" $ do
+      started <- newEmptyMVar
+      proceed <- newEmptyMVar
+      runEff $ runTracingNoop $ do
+        tracking <- newTrackingAck
+        messages <- createTrackedMessages tracking 5
+        let handler _ _ = liftIO (putMVar started () >> takeMVar proceed) >> pure ackAllOk
+            config = defaultBatchConfig {batchSize = 2, batchTimeout = 60}
+            processor = mkBatchProcessor (listAdapter' messages) handler config
+        runApp
+          defaultAppConfig {metricsDetail = Metrics.MetricsDetailed Metrics.defaultDetailOptions}
+          [(ProcessorId "batch-detail", processor)]
+          >>= \case
+            Left err -> liftIO $ expectationFailure (show err)
+            Right app -> do
+              liftIO $ takeMVar started >> putMVar proceed () >> takeMVar started
+              metrics <- getAppMetrics app
+              let m = metrics Map.! ProcessorId "batch-detail"
+              liftIO $ do
+                fmap (.count) m.latency `shouldBe` Just 1
+                m.batch.batchesEmitted `shouldBe` 1
+                m.batch.batchedMessages `shouldBe` 2
+                putMVar proceed () >> takeMVar started
+              metrics2 <- getAppMetrics app
+              liftIO $ fmap (.count) (metrics2 Map.! ProcessorId "batch-detail").latency `shouldBe` Just 2
+              liftIO $ putMVar proceed ()
+              waitApp app
+              stopApp app
+
     -- Milestone 1: a bad batch config is rejected by runApp with AppBatchConfigError.
     it "rejects a batch config with size 0 (AppBatchConfigError)" $ do
       result <- runEff $ runTracingNoop $ do

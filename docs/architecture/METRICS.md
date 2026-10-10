@@ -308,3 +308,42 @@ defines bounded delivery.
 | Configurable CORS and upgrade Origin | Met | Explicit allowed origins, disabled by default, implemented in EP-47 and covered by `CorsSpec` and loopback upgrade tests. |
 | Authentication and authorization posture | Documented gap, as expected | No built-in authentication. Use a trusted network or authenticating proxy. Origin validation is not authentication. Future control remains separately gated. |
 | Frozen published shapes and domain vocabulary | Met | Existing JSON/Prometheus goldens and frame contracts remain unchanged; errors and snapshot boundaries are additive. |
+
+## Latency and in-flight detail
+
+`AppConfig.metricsDetail` defaults to `MetricsBasic`, which retains the existing counter
+and sampled-progress path without per-attempt clocks or slot cleanup. Opt in with
+`MetricsDetailed defaultDetailOptions`. Each processor allocates one synchronized slot per
+configured concurrent handler (or concurrent batch). The slot publishes the message identity
+and monotonic start together, and retains its own histogram. Slot locks cover publication,
+completion and sampling only; they never cover a handler or finalizer. Sampling is best effort
+across slots, while identity and start always agree within a slot. Cancellation abandons a
+slot without counting an unfinished attempt. A diagnostic `slotMisses` count should remain
+zero for supported runners. `DetailOptions.maxTrackedPartitions` defaults to 256, must be
+nonnegative, and reserves the bounded cursor table introduced by the progress extension.
+
+The optional `latency` member appears after the first completed attempt. It contains integer
+`count`, `sumSeconds`, and eighteen cumulative `{le, count}` finite buckets from 100
+microseconds to 60 seconds. Durations include the handler and all finalization retries and
+metrics completion: one observation per message attempt, or per emitted batch in batch mode.
+This does not measure queue wait or handler-only latency. Retry decisions and completed
+finalization failures still contribute an observation; interrupted attempts do not.
+
+While a slot is occupied, optional `oldestInFlight` contains `messageId`, `startedAt` and
+`ageSeconds`. Batch identity is the first retained message's identity. The monotonic start is
+converted relative to the handle's initial wall time; later wall-clock adjustments do not
+change elapsed age. Timestamp zero is valid. Both detail members are omitted when unavailable;
+basic processors retain their existing JSON bytes. Histogram counts and nanosecond sums use
+unbounded integers. Scanning costs grow with the configured concurrency bound.
+
+Prometheus adds the `shibuya_message_processing_seconds` histogram, with `_bucket` series
+labelled by processor and `le`, `_sum` seconds and exact integer `_count`. Its `+Inf` bucket
+is the total count; JSON contains only finite bounds because JSON has no infinite number.
+The `shibuya_processor_oldest_in_flight_seconds` gauge exists only while an attempt is in
+flight. No zero value is fabricated for processors with detail disabled or no active attempt.
+
+HTTP reads and WebSocket snapshots include freshly sampled age. WebSocket delta comparison
+ignores age alone; clients extrapolate `ageSeconds` using elapsed time on their own clock
+since receiving the last frame. Identity, completed histograms and all other state changes
+continue to emit updates. Detailed accounting remains explicit opt-in; measured overhead and
+basic-path acceptance are recorded in [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md).

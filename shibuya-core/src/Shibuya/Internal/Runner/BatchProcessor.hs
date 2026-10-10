@@ -41,6 +41,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), liftIO, withEffToIO, (:>))
+import Effectful.Exception qualified as Exception
 import GHC.IO (unsafeUnmask)
 import OpenTelemetry.Attributes (toAttribute)
 import OpenTelemetry.Trace.Core qualified as OTel
@@ -69,6 +70,7 @@ import Shibuya.Core.Metrics
     recordBatchOutcomeMetrics,
     sampleMetrics,
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Envelope (..))
 import Shibuya.Internal.Runner.Finalize (finalizeWithRetry)
 import Shibuya.Internal.Runner.Halt
@@ -153,101 +155,111 @@ processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler (i
               ]
       addAttributes traceSpan frameworkAttrs
 
-      -- Increment in-flight (a batch counts as one in-flight unit) and report it.
-      currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-      addAttribute traceSpan attrShibuyaInflightCount currentInflight
-      addAttribute traceSpan attrShibuyaInflightMax maxConc
+      let process currentInflight = do
+            addAttribute traceSpan attrShibuyaInflightCount currentInflight
+            addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-      addEvent traceSpan (mkEvent eventBatchStarted [])
+            addEvent traceSpan (mkEvent eventBatchStarted [])
 
-      terminal <- liftIO $ readProcessorExit stopSignal
+            terminal <- liftIO $ readProcessorExit stopSignal
 
-      -- Run the handler under exception isolation. On any exception, record it
-      -- on the span and substitute the whole-batch retry default.
-      (handlerResult, skippedAfterHalt) <-
-        case terminal of
-          Just _ -> pure (Left (), True)
-          Nothing -> do
-            result <-
-              catchAny
-                (Right <$> handler info (toMessage <$> batch))
-                ( \ex -> do
-                    recordException traceSpan ex
-                    pure (Left ())
+            -- Run the handler under exception isolation. On any exception, record it
+            -- on the span and substitute the whole-batch retry default.
+            (handlerResult, skippedAfterHalt) <-
+              case terminal of
+                Just _ -> pure (Left (), True)
+                Nothing -> do
+                  result <-
+                    catchAny
+                      (Right <$> handler info (toMessage <$> batch))
+                      ( \ex -> do
+                          recordException traceSpan ex
+                          pure (Left ())
+                      )
+                  pure (result, False)
+            let (resolvedAck, handlerThrew) = case handlerResult of
+                  Right a -> (a, False)
+                  Left () -> (ackAll (AckRetry (RetryDelay 0)), True)
+
+            -- RELIABLE FINALIZATION: iterate OUR OWN retained list, never the
+            -- handler's output. For each retained message, choose its decision once
+            -- via findWithDefault, then call the idempotent adapter finalizer with
+            -- bounded retry. Do not let one adapter failure prevent attempts for the
+            -- rest of the batch.
+            results <-
+              mapM
+                ( \ingested -> do
+                    let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
+                        d = fromMaybe resolvedAck.fallback explicitDecision
+                    finalResult <- finalizeWithRetry traceSpan ingested d
+                    pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
                 )
-            pure (result, False)
-      let (resolvedAck, handlerThrew) = case handlerResult of
-            Right a -> (a, False)
-            Left () -> (ackAll (AckRetry (RetryDelay 0)), True)
+                (NE.toList batch)
+            let decisions = [d | (_, _, d, _) <- results]
+                finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
 
-      -- RELIABLE FINALIZATION: iterate OUR OWN retained list, never the
-      -- handler's output. For each retained message, choose its decision once
-      -- via findWithDefault, then call the idempotent adapter finalizer with
-      -- bounded retry. Do not let one adapter failure prevent attempts for the
-      -- rest of the batch.
-      results <-
-        mapM
-          ( \ingested -> do
-              let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
-                  d = fromMaybe resolvedAck.fallback explicitDecision
-              finalResult <- finalizeWithRetry traceSpan ingested d
-              pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
-          )
-          (NE.toList batch)
-      let decisions = [d | (_, _, d, _) <- results]
-          finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
+            -- Compute halt and partial-failure signals from the resolved decisions.
+            let finalizationFailure =
+                  case finalizeFailures of
+                    [] -> Nothing
+                    failed@((firstMessageId, _) : _) ->
+                      Just $
+                        ProcessorFailed
+                          ( "batch finalization failed for message ids: "
+                              <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
+                          )
+                          (Just firstMessageId)
+                firstHalt = listToMaybe [r | AckHalt r <- decisions]
+                requestedExit = finalizationFailure <|> (ProcessorHalted <$> firstHalt)
+                overrideFailures =
+                  [ ()
+                  | (_, explicitlyNamed, d, _) <- results,
+                    explicitlyNamed,
+                    isFailing d
+                  ]
+                partialInc = not handlerThrew && not (null overrideFailures)
 
-      -- Compute halt and partial-failure signals from the resolved decisions.
-      let finalizationFailure =
-            case finalizeFailures of
-              [] -> Nothing
-              failed@((firstMessageId, _) : _) ->
-                Just $
-                  ProcessorFailed
-                    ( "batch finalization failed for message ids: "
-                        <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
-                    )
-                    (Just firstMessageId)
-          firstHalt = listToMaybe [r | AckHalt r <- decisions]
-          requestedExit = finalizationFailure <|> (ProcessorHalted <$> firstHalt)
-          overrideFailures =
-            [ ()
-            | (_, explicitlyNamed, d, _) <- results,
-              explicitlyNamed,
-              isFailing d
-            ]
-          partialInc = not handlerThrew && not (null overrideFailures)
+            -- Span status: error on halt or exception, otherwise Ok.
+            addEvent traceSpan (mkEvent eventBatchCompleted [])
+            case requestedExit of
+              Just processorExit -> setStatus traceSpan (OTel.Error (processorExitText processorExit))
+              Nothing ->
+                if skippedAfterHalt
+                  then setStatus traceSpan (OTel.Error "batch skipped after halt")
+                  else
+                    if handlerThrew
+                      then setStatus traceSpan (OTel.Error "batch handler exception")
+                      else setStatus traceSpan OTel.Ok
 
-      -- Span status: error on halt or exception, otherwise Ok.
-      addEvent traceSpan (mkEvent eventBatchCompleted [])
-      case requestedExit of
-        Just processorExit -> setStatus traceSpan (OTel.Error (processorExitText processorExit))
-        Nothing ->
-          if skippedAfterHalt
-            then setStatus traceSpan (OTel.Error "batch skipped after halt")
-            else
-              if handlerThrew
-                then setStatus traceSpan (OTel.Error "batch handler exception")
-                else setStatus traceSpan OTel.Ok
+            traverse_ (recordException traceSpan . snd) finalizeFailures
 
-      traverse_ (recordException traceSpan . snd) finalizeFailures
+            -- Record metrics: decrement in-flight, add per-message counter deltas,
+            -- advance batch counters, set Failed state on halt or exhausted
+            -- finalization retry.
+            liftIO $
+              recordBatchOutcomeMetrics
+                metricsHandle
+                (triggerMetric info.trigger)
+                info.size
+                handlerThrew
+                partialInc
+                (decisionMetric <$> decisions)
+                (processorExitText <$> requestedExit)
 
-      -- Record metrics: decrement in-flight, add per-message counter deltas,
-      -- advance batch counters, set Failed state on halt or exhausted
-      -- finalization retry.
-      liftIO $
-        recordBatchOutcomeMetrics
-          metricsHandle
-          (triggerMetric info.trigger)
-          info.size
-          handlerThrew
-          partialInc
-          (decisionMetric <$> decisions)
-          (processorExitText <$> requestedExit)
-
-      -- Halt: set the shared flag; do NOT throw (let the stream drain).
-      for_ requestedExit $ \processorExit ->
-        liftIO $ requestProcessorExit exitPublisher processorExit
+            -- Halt: set the shared flag; do NOT throw (let the stream drain).
+            for_ requestedExit $ \processorExit ->
+              liftIO $ requestProcessorExit exitPublisher processorExit
+      case metricsHandle.detail of
+        Metrics.MetricsBasic -> do
+          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+          process currentInflight
+        Metrics.MetricsDetailed _ -> Exception.mask $ \restore -> do
+          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+          slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle firstMsg.envelope.messageId
+          restore (process currentInflight)
+            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+          liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
+            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
   where
     isFailing :: AckDecision -> Bool
     isFailing (AckDeadLetter _) = True

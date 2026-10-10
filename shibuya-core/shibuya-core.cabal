@@ -120,6 +120,7 @@ test-suite shibuya-core-test
     Shibuya.Batch.TestHarness
     Shibuya.BatchSpec
     Shibuya.Core.AckSpec
+    Shibuya.Core.MetricsSpec
     Shibuya.Core.RetrySpec
     Shibuya.Core.TypesSpec
     Shibuya.PolicySpec

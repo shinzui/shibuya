@@ -7,6 +7,7 @@ import Shibuya.App.LifecycleSpec qualified
 import Shibuya.Batch.ReliabilitySpec qualified
 import Shibuya.BatchSpec qualified
 import Shibuya.Core.AckSpec qualified
+import Shibuya.Core.MetricsSpec qualified
 import Shibuya.Core.RetrySpec qualified
 import Shibuya.Core.TypesSpec qualified
 import Shibuya.PolicySpec qualified
@@ -23,6 +24,7 @@ import Test.Hspec
 
 main :: IO ()
 main = hspec $ do
+  Shibuya.Core.MetricsSpec.spec
   Shibuya.App.BatchSpec.spec
   Shibuya.App.LifecycleSpec.spec
   Shibuya.Batch.ReliabilitySpec.spec

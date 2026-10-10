@@ -15,6 +15,16 @@
 
 ### New Features
 
+- Opt-in detailed accounting with `MetricsDetail`, `DetailOptions`, `LatencySummary`,
+  `LatencyBucket`, and `OldestInFlight`; the default remains `MetricsBasic`. Monotonic
+  timing includes finalization retries, one observation per message attempt or emitted
+  batch, using bounded synchronized slots. Add `MessageId` JSON instances, detail-aware
+  handle/runner constructors and read-only slot-miss diagnostics.
+- Add optional camelCase `latency` and `oldestInFlight` JSON/WebSocket members and the
+  `shibuya_message_processing_seconds` histogram and optional
+  `shibuya_processor_oldest_in_flight_seconds` gauge. Preserve basic JSON bytes and omit
+  unavailable values. WebSocket clients extrapolate age between state changes.
+
 - Bound every queued WebSocket frame and encoded byte with independent sampling
   and one application writer. Drop oldest updates under pressure, followed by an
   adjacent `queue_overflow` error and replacement snapshot; close on required-frame

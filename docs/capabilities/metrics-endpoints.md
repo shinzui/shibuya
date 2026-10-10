@@ -5,7 +5,7 @@ description: "Expose live processor metrics as a JSON HTTP endpoint, a Prometheu
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
-timestamp: 2026-10-10T21:37:58Z
+timestamp: 2026-10-10T22:17:52Z
 capabilityId: CAP-10
 provider: mori://shinzui/shibuya
 status: shipped
@@ -110,3 +110,11 @@ pipeline uses CAP-9 directly and never depends on this.
   along with the core dropped-message metric surface. A dashboard or alert referencing it breaks
   on upgrade.
 - Metrics are per-process; the endpoints expose one application's counters, not a fleet's.
+
+With core detail enabled, JSON and WebSocket metrics include optional `latency` and
+`oldestInFlight`; absent values are omitted. Prometheus adds the
+`shibuya_message_processing_seconds` histogram and optional
+`shibuya_processor_oldest_in_flight_seconds` gauge. Basic JSON bytes and existing series are
+preserved. WebSocket clients extrapolate age from the last frame; age alone does not trigger
+a delta, while HTTP and snapshots return current sampled age. See
+[latency and in-flight detail](../architecture/METRICS.md#latency-and-in-flight-detail).

@@ -57,6 +57,10 @@ spec = do
       object ["type" .= ("error" :: String), "code" .= ("invalid_message" :: String), "message" .= ("bad input" :: String)]
     messageCase Goodbye $ object ["type" .= ("goodbye" :: String)]
 
+    it "decodes a legacy update with no detail members" $ do
+      let legacy = ProcessorUpdate (ProcessorId "processing") processing
+      eitherDecode "{\"type\":\"update\",\"processor\":\"processing\",\"metrics\":{\"batch\":{\"batchedMessages\":15,\"batchesEmitted\":14,\"flushTriggered\":19,\"partialFailures\":16,\"sizeTriggered\":17,\"timeoutTriggered\":18},\"startedAt\":\"2026-09-20T03:25:45Z\",\"state\":{\"inFlight\":2,\"lastActivity\":\"2026-09-20T00:01:00Z\",\"lastProgress\":\"2026-09-20T00:01:15Z\",\"maxConcurrency\":4,\"status\":\"processing\"},\"stats\":{\"failed\":13,\"processed\":12,\"received\":11}}}" `shouldBe` Right legacy
+
     it "characterizes strict legacy decoders and extension-tolerant consumers" $ do
       let err = ServerError "queue_overflow" "resnapshot"
           legacy = withObject "LegacyServerMessage" $ \v -> do

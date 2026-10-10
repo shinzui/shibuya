@@ -73,6 +73,7 @@ import Shibuya.Core.Metrics
     ProcessorId (..),
     ProcessorMetrics (..),
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Internal.App
   ( AppHandle (..),
     OwnershipFailure (..),
@@ -95,8 +96,8 @@ import Shibuya.Internal.Runner.Master
   )
 import Shibuya.Internal.Runner.Supervised
   ( SupervisedProcessor (..),
-    runSupervised,
-    runSupervisedBatch,
+    runSupervisedBatchWith,
+    runSupervisedWith,
   )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..), validatePolicy)
 import Shibuya.Telemetry.Effect (Tracing)
@@ -174,13 +175,15 @@ data AppConfig = AppConfig
   { -- | How processor failures affect siblings.
     strategy :: !SupervisionStrategy,
     -- | Bounded-inbox capacity per processor (backpressure). Must be >= 1.
-    inboxSize :: !Int
+    inboxSize :: !Int,
+    -- | Optional latency and in-flight detail; defaults to basic accounting.
+    metricsDetail :: !Metrics.MetricsDetail
   }
   deriving stock (Eq, Show, Generic)
 
 -- | 'IgnoreFailures' with an inbox of 100.
 defaultAppConfig :: AppConfig
-defaultAppConfig = AppConfig {strategy = IgnoreFailures, inboxSize = 100}
+defaultAppConfig = AppConfig {strategy = IgnoreFailures, inboxSize = 100, metricsDetail = Metrics.defaultMetricsDetail}
 
 -- | Run queue processors concurrently under NQE supervision.
 --
@@ -213,7 +216,7 @@ runApp config namedProcessors =
           (startMaster nqeStrategy)
           stopMaster
           ( \master -> do
-              processors <- spawnProcessors master (fromIntegral config.inboxSize) namedProcessors
+              processors <- spawnProcessors config.metricsDetail master (fromIntegral config.inboxSize) namedProcessors
               markMasterRunning master
               shutdownStarted <- liftIO $ newTVarIO False
               shutdownResult <- liftIO newEmptyTMVarIO
@@ -253,6 +256,9 @@ runApp config namedProcessors =
 validateAppConfig :: AppConfig -> Either AppError ()
 validateAppConfig config
   | config.inboxSize < 1 = Left $ AppConfigInvalid $ InvalidInboxSize config.inboxSize
+  | Metrics.MetricsDetailed options <- config.metricsDetail,
+    options.maxTrackedPartitions < 0 =
+      Left $ AppConfigInvalid $ InvalidMaxTrackedPartitions options.maxTrackedPartitions
   | otherwise = Right ()
 
 -- | Reject duplicate processor identifiers before the master or any adapter is
@@ -293,19 +299,21 @@ validateAllPolicies = traverse_ validateOne
 -- | Spawn all processors under supervision.
 spawnProcessors ::
   (IOE :> es, Tracing :> es) =>
+  Metrics.MetricsDetail ->
   Master ->
   Natural ->
   [(ProcessorId, QueueProcessor es)] ->
   Eff es [(ProcessorId, (SupervisedProcessor, QueueProcessor es))]
-spawnProcessors master inboxSize = traverse spawnOne
+spawnProcessors detail master inboxSize = traverse spawnOne
   where
     spawnOne (procId, qp) = case qp of
       QueueProcessor {adapter, handler, ordering, concurrency} -> do
-        sp <- runSupervised master inboxSize procId ordering concurrency adapter handler
+        sp <- runSupervisedWith detail master inboxSize procId ordering concurrency adapter handler
         pure (procId, (sp, qp))
       BatchingProcessor {adapter, batchHandler, batchConfig, concurrency} -> do
         sp <-
-          runSupervisedBatch
+          runSupervisedBatchWith
+            detail
             master
             inboxSize
             procId

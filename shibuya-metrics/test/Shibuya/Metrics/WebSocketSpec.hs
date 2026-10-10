@@ -8,7 +8,7 @@ import Control.Monad (replicateM_, when)
 import Data.Aeson (Value, eitherDecode, encode, object, (.=))
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef (atomicModifyIORef', newIORef)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Map.Strict qualified as Map
 import Data.String (fromString)
 import Effectful (runEff)
@@ -25,6 +25,8 @@ import Shibuya.Core.Metrics
     incrementReceived,
     newMetricsHandleWithClock,
   )
+import Shibuya.Core.Metrics qualified as Metrics
+import Shibuya.Core.Types (MessageId (..))
 import Shibuya.Internal.Runner.Master (markProcessorFailedIO, registerProcessor, unregisterProcessor)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Outbound qualified as Out
@@ -95,6 +97,35 @@ spec = around withMaster $ do
         clientWithOrigin port [("Origin", "https://evil.example.com")] $ \conn -> do
           expected <- MetricsSnapshot <$> currentSnapshot master
           receiveServer conn `shouldReturn` expected
+
+  describe "detailed metrics updates" $ do
+    it "suppresses age-only changes and publishes release with latency" $ \master -> do
+      clock <- newIORef 0
+      handle <-
+        Metrics.newMetricsHandleWithClockAndDetail
+          (readIORef clock)
+          (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
+          1
+          fixedTime
+      runEff $ registerProcessor master (ProcessorId "detail") handle
+      withServer fastConfig master $ \port -> WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+        _ <- receiveServer conn
+        slot <- Metrics.claimInFlightSlot handle (MessageId "blocked")
+        _ <- Metrics.beginProcessing handle 1
+        timeout 1_000_000 (receiveServer conn) >>= \case
+          Just (ProcessorUpdate _ pm) -> fmap (.messageId) pm.oldestInFlight `shouldBe` Just (MessageId "blocked")
+          other -> expectationFailure (show other)
+        writeIORef clock 1_000_000_000
+        timeout 50_000 (receiveServer conn) `shouldReturn` Nothing
+        writeIORef clock 2_000_000_000
+        timeout 50_000 (receiveServer conn) `shouldReturn` Nothing
+        Metrics.finishProcessing handle (Right Metrics.CountProcessed)
+        Metrics.releaseInFlightSlot handle slot
+        timeout 1_000_000 (receiveServer conn) >>= \case
+          Just (ProcessorUpdate _ pm) -> do
+            pm.oldestInFlight `shouldBe` Nothing
+            fmap (.count) pm.latency `shouldBe` Just 1
+          other -> expectationFailure (show other)
 
   describe "controlled outbound delivery" $ do
     it "keeps sampling during a blocked write and sends an adjacent recovery pair" $ \master -> do

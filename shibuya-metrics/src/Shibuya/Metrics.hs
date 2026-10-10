@@ -30,6 +30,18 @@
 -- * @GET /metrics/prometheus@ - Prometheus-format metrics
 -- * @WS /ws@ - WebSocket for real-time updates
 --
+-- == Latency and in-flight detail
+--
+-- Opt in through @AppConfig.metricsDetail = MetricsDetailed defaultDetailOptions@.
+-- JSON and WebSocket frames gain optional @latency@ (count, sumSeconds, finite
+-- cumulative buckets) and @oldestInFlight@ (messageId, startedAt, ageSeconds).
+-- Timing includes finalization retries once per attempt or emitted batch.
+-- Prometheus exposes @shibuya_message_processing_seconds@ and the optional
+-- @shibuya_processor_oldest_in_flight_seconds@ gauge. Age-only changes do not
+-- emit WebSocket deltas: clients extrapolate from their last received frame.
+-- HTTP reads and snapshots return freshly sampled age. Basic accounting remains
+-- the default and omits these members.
+--
 -- == Cross-origin access
 --
 -- Set 'corsAllowedOrigins' to explicit serialized browser origins, for example

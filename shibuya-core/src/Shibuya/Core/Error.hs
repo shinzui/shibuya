@@ -67,6 +67,8 @@ data ConfigError
     InvalidInboxSize !Int
   | -- | Processor identifiers must be unique within one application.
     DuplicateProcessorId !ProcessorId
+  | -- | Detail partition capacity must be nonnegative.
+    InvalidMaxTrackedPartitions !Int
   deriving stock (Eq, Show, Generic)
 
 -- | Convert configuration error to text for display.
@@ -75,3 +77,5 @@ configErrorToText (InvalidInboxSize n) =
   "inboxSize must be >= 1, got " <> Text.pack (show n)
 configErrorToText (DuplicateProcessorId (ProcessorId pid)) =
   "processor IDs must be unique, duplicate: " <> pid
+configErrorToText (InvalidMaxTrackedPartitions n) =
+  "maxTrackedPartitions must be nonnegative, got " <> Text.pack (show n)

@@ -1,5 +1,9 @@
 -- | Metrics and state tracking for processors.
 -- Provides introspection into what's happening in the system.
+-- Detailed accounting is opt-in through 'MetricsDetailed': a bounded synchronized
+-- slot per concurrent attempt measures handler plus finalization duration and
+-- publishes oldest identity/start/age. Interrupted attempts are abandoned; basic
+-- handles retain counters without detail clocks or ownership brackets.
 module Shibuya.Core.Metrics
   ( -- * Processor State
     ProcessorState (..),
@@ -28,6 +32,22 @@ module Shibuya.Core.Metrics
     emptyProcessorMetrics,
     HotCounters (..),
     MetricsHandle (..),
+    MetricsDetail (..),
+    DetailOptions (..),
+    defaultDetailOptions,
+    defaultMetricsDetail,
+    LatencyBucket (..),
+    LatencySummary (..),
+    OldestInFlight (..),
+    latencyBucketBoundsSeconds,
+    latencyBucketLabels,
+    InFlightSlots,
+    claimInFlightSlot,
+    releaseInFlightSlot,
+    abandonInFlightSlot,
+    slotMisses,
+    newMetricsHandleWith,
+    newMetricsHandleWithClockAndDetail,
     newMetricsHandle,
     newMetricsHandleWithClock,
     sampleMetrics,
@@ -49,19 +69,25 @@ module Shibuya.Core.Metrics
   )
 where
 
+import Control.Concurrent.MVar (MVar, modifyMVar, modifyMVar_, newMVar, readMVar)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
+import Control.Exception (mask_)
 import Control.Monad (void, when)
 import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:), (.:?))
 import Data.Aeson qualified as Aeson
 import Data.Atomics.Counter (AtomicCounter, incrCounter, readCounter)
 import Data.Atomics.Counter qualified as Counter
-import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef, writeIORef)
+import Data.IntMap.Strict qualified as IntMap
+import Data.List (minimumBy)
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
+import Data.Ord (comparing)
 import Data.Text qualified as Text
 import Data.Time.Clock (addUTCTime)
 import Data.Word (Word64)
 import GHC.Clock (getMonotonicTimeNSec)
+import Shibuya.Core.Types (MessageId)
 import Shibuya.Prelude
 
 -- | Processor identifier.
@@ -182,6 +208,144 @@ data BatchStats = BatchStats
 emptyBatchStats :: BatchStats
 emptyBatchStats = BatchStats 0 0 0 0 0 0
 
+-- | Basic accounting is the default. Detailed timing includes handler execution
+-- and all finalization retries, once per message attempt or emitted batch.
+data MetricsDetail = MetricsBasic | MetricsDetailed !DetailOptions
+  deriving stock (Eq, Show, Generic)
+
+-- | Bounds for optional detail. Zero partitions reserves latest-only progress.
+data DetailOptions = DetailOptions {maxTrackedPartitions :: !Int}
+  deriving stock (Eq, Show, Generic)
+
+defaultDetailOptions :: DetailOptions
+defaultDetailOptions = DetailOptions 256
+
+defaultMetricsDetail :: MetricsDetail
+defaultMetricsDetail = MetricsBasic
+
+data LatencyBucket = LatencyBucket {le :: !Double, count :: !Integer}
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+data LatencySummary = LatencySummary
+  {count :: !Integer, sumSeconds :: !Double, buckets :: ![LatencyBucket]}
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+data OldestInFlight = OldestInFlight
+  {messageId :: !MessageId, startedAt :: !UTCTime, ageSeconds :: !Double}
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+latencyBucketBoundsSeconds :: [Double]
+latencyBucketBoundsSeconds = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60]
+
+latencyBucketBoundsNs :: [Word64]
+latencyBucketBoundsNs = [100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000, 1_000_000_000, 2_500_000_000, 5_000_000_000, 10_000_000_000, 30_000_000_000, 60_000_000_000]
+
+latencyBucketLabels :: [Text]
+latencyBucketLabels = ["0.0001", "0.00025", "0.0005", "0.001", "0.0025", "0.005", "0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1", "2.5", "5", "10", "30", "60", "+Inf"]
+
+-- Each slot is also a histogram shard. Its lock is never held across user code.
+data DetailSlot = DetailSlot
+  { start :: !(Maybe (MessageId, Word64)),
+    observations :: !Integer,
+    totalNs :: !Integer,
+    bins :: !(IntMap.IntMap Integer)
+  }
+
+data InFlightSlots = InFlightSlots
+  {cells :: ![MVar DetailSlot], misses :: !(IORef Integer)}
+
+-- | Diagnostic exhaustion count. Supported runners must never miss a slot.
+slotMisses :: MetricsHandle -> IO Integer
+slotMisses handle = maybe (pure 0) (readIORef . (.misses)) handle.slots
+
+-- | Claim a bounded slot, publishing identity and start under the same lock.
+-- Callers must mask ownership transfer until they install exception cleanup.
+claimInFlightSlot :: MetricsHandle -> MessageId -> IO Int
+claimInFlightSlot handle messageId = case handle.slots of
+  Nothing -> pure (-1)
+  Just table -> mask_ $ do
+    now <- handle.progressClock
+    let claim _ [] = do
+          atomicModifyIORef' table.misses (\n -> (n + 1, ()))
+          pure (-1)
+        claim index (cell : rest) = do
+          owned <- modifyMVar cell $ \slot -> case slot.start of
+            Nothing -> pure (slot {start = Just (messageId, now)}, True)
+            Just _ -> pure (slot, False)
+          if owned then pure index else claim (index + 1) rest
+    claim 0 table.cells
+{-# INLINE claimInFlightSlot #-}
+
+-- | Complete one attempt, including finalization. Interrupted attempts instead
+-- use 'abandonInFlightSlot' and contribute no completed observation.
+releaseInFlightSlot :: MetricsHandle -> Int -> IO ()
+releaseInFlightSlot handle index = withSlot handle index $ \cell -> mask_ $ do
+  now <- handle.progressClock
+  modifyMVar_ cell $ \slot -> case slot.start of
+    Nothing -> pure slot
+    Just (_, began) -> do
+      let duration = if now >= began then now - began else 0
+          bucketIndex = length (takeWhile (< duration) latencyBucketBoundsNs)
+      pure $!
+        DetailSlot
+          Nothing
+          (slot.observations + 1)
+          (slot.totalNs + toInteger duration)
+          (IntMap.insertWith (+) bucketIndex 1 slot.bins)
+
+abandonInFlightSlot :: MetricsHandle -> Int -> IO ()
+abandonInFlightSlot handle index = withSlot handle index $ \cell ->
+  modifyMVar_ cell $ \slot -> pure $! slot {start = Nothing}
+
+withSlot :: MetricsHandle -> Int -> (MVar DetailSlot -> IO ()) -> IO ()
+withSlot handle index action
+  | index < 0 = pure ()
+  | otherwise = case handle.slots of
+      Nothing -> pure ()
+      Just table -> case drop index table.cells of
+        cell : _ -> action cell
+        [] -> pure ()
+
+-- Copy each strict shard under its lock, format only after releasing it.
+-- Sampling across slots is best effort; identity and timestamp always agree.
+sampleDetail :: MetricsHandle -> IO (Maybe LatencySummary, Maybe OldestInFlight)
+sampleDetail handle = case handle.slots of
+  Nothing -> pure (Nothing, Nothing)
+  Just table -> do
+    copies <- mapM readMVar table.cells
+    let observations = sum (map (.observations) copies)
+        totalNs = sum (map (.totalNs) copies)
+        bins = IntMap.unionsWith (+) (map (.bins) copies)
+        cumulative = drop 1 (scanl (+) 0 [IntMap.findWithDefault 0 i bins | i <- [0 .. 17]])
+        summary =
+          if observations == 0
+            then Nothing
+            else
+              Just
+                ( LatencySummary
+                    observations
+                    (fromInteger totalNs / 1_000_000_000)
+                    (zipWith LatencyBucket latencyBucketBoundsSeconds cumulative)
+                )
+        starts = [start | DetailSlot {start = Just start} <- copies]
+    oldest <- case starts of
+      [] -> pure Nothing
+      _ -> do
+        now <- handle.progressClock
+        let (messageId, began) = minimumBy (comparing snd) starts
+            elapsed = if now >= began then now - began else 0
+        pure $
+          Just
+            ( OldestInFlight
+                messageId
+                (monotonicToUTC handle began)
+                (fromIntegral elapsed / 1_000_000_000)
+            )
+    pure (summary, oldest)
+
 -- | Combined processor metrics.
 data ProcessorMetrics = ProcessorMetrics
   { -- | Current state
@@ -191,10 +355,20 @@ data ProcessorMetrics = ProcessorMetrics
     -- | Batch statistics
     batch :: !BatchStats,
     -- | When the processor started
-    startedAt :: !UTCTime
+    startedAt :: !UTCTime,
+    latency :: !(Maybe LatencySummary),
+    oldestInFlight :: !(Maybe OldestInFlight)
   }
   deriving stock (Eq, Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
+
+instance ToJSON ProcessorMetrics where
+  toJSON = Aeson.genericToJSON omitNothingOptions
+
+instance FromJSON ProcessorMetrics where
+  parseJSON = Aeson.genericParseJSON omitNothingOptions
+
+omitNothingOptions :: Aeson.Options
+omitNothingOptions = Aeson.defaultOptions {Aeson.omitNothingFields = True}
 
 -- | Empty processor metrics.
 emptyProcessorMetrics :: UTCTime -> ProcessorMetrics
@@ -203,7 +377,9 @@ emptyProcessorMetrics now =
     { state = Idle,
       stats = emptyStreamStats,
       batch = emptyBatchStats,
-      startedAt = now
+      startedAt = now,
+      latency = Nothing,
+      oldestInFlight = Nothing
     }
 
 -- | Map of processor IDs to their metrics.
@@ -232,6 +408,8 @@ data MetricsHandle = MetricsHandle
     progressClock :: !(IO Word64),
     lastObservedProgress :: !(IORef (Int, Int, Int)),
     stateActiveRef :: !(IORef Bool),
+    detail :: !MetricsDetail,
+    slots :: !(Maybe InFlightSlots),
     cold :: !(TVar ProcessorMetrics)
   }
 
@@ -242,7 +420,25 @@ newMetricsHandle = newMetricsHandleWithClock getMonotonicTimeNSec
 -- clock is intended for deterministic tests; production callers should use
 -- 'newMetricsHandle'.
 newMetricsHandleWithClock :: IO Word64 -> UTCTime -> IO MetricsHandle
-newMetricsHandleWithClock clock now = do
+newMetricsHandleWithClock clock = newMetricsHandleWithClockAndDetail clock MetricsBasic 1
+
+newMetricsHandleWith :: MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
+newMetricsHandleWith = newMetricsHandleWithClockAndDetail getMonotonicTimeNSec
+
+newMetricsHandleWithClockAndDetail :: IO Word64 -> MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
+newMetricsHandleWithClockAndDetail clock detail maxConcurrency now = do
+  when (maxConcurrency < 1) $ ioError (userError "metrics concurrency must be positive")
+  case detail of
+    MetricsDetailed options
+      | options.maxTrackedPartitions < 0 ->
+          ioError (userError "maxTrackedPartitions must be nonnegative")
+    _ -> pure ()
+  slots <- case detail of
+    MetricsBasic -> pure Nothing
+    MetricsDetailed _ -> do
+      cells <- mapM (const (newMVar (DetailSlot Nothing 0 0 IntMap.empty))) [1 .. maxConcurrency]
+      misses <- newIORef 0
+      pure (Just (InFlightSlots cells misses))
   progressOriginNs <- clock
   received <- Counter.newCounter 0
   processed <- Counter.newCounter 0
@@ -271,6 +467,8 @@ newMetricsHandleWithClock clock now = do
         progressClock = clock,
         lastObservedProgress = lastObservedProgress,
         stateActiveRef = stateActiveRef,
+        detail = detail,
+        slots = slots,
         cold = cold
       }
 
@@ -297,7 +495,8 @@ sampleMetrics handle = do
         Stopped -> Stopped
         _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt lastProgressAt
         _ -> Idle
-  pure coldSnapshot {state = sampledState, stats = sampledStats}
+  (latency, oldestInFlight) <- sampleDetail handle
+  pure coldSnapshot {state = sampledState, stats = sampledStats, latency, oldestInFlight}
 
 incrementReceived :: MetricsHandle -> IO ()
 incrementReceived handle =

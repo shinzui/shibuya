@@ -183,6 +183,16 @@ case result of
       liftIO $ printMetrics metrics
 ```
 
+For latency histograms and oldest in-flight identity and age, set
+`metricsDetail = MetricsDetailed defaultDetailOptions` on `defaultAppConfig`. The default is
+`MetricsBasic`, which retains the existing counters without per-attempt timing. Detailed
+observations include handler execution and finalization retries, once per message attempt or
+emitted batch. JSON omits unavailable `latency` and `oldestInFlight` members. HTTP scrapes
+return current age; WebSocket clients extrapolate age from their last frame because age alone
+does not trigger updates. Detail allocates bounded state and has measured overhead; see
+[the metrics architecture](../architecture/METRICS.md#latency-and-in-flight-detail).
+
+
 ### Inbox Size
 
 The inbox size controls backpressure - how many messages are buffered between the adapter stream and the handler:
