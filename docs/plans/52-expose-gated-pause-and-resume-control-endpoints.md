@@ -11,6 +11,18 @@ provenance:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-30T23:27:06Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      verdict: "changes-requested"
+      note: "Original draft review found API/concurrency and performance-evidence defects; addressed in the accompanying update. Implementation and measured acceptance remain pending."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      mode: "update"
+      note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
 ---
 
 
@@ -60,17 +72,21 @@ control surface and its observability, and closes the request once EP-51 is Comp
 
 - [ ] Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
 - [ ] Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
+- [ ] Milestone 3: Final integrated basic performance matrix and real observer-load checks pass against the pre-initiative baseline; detailed overhead reported.
 - [ ] Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; record wire-load sanity numbers; close IR-4 after EP-51 is Complete.
 
 
 ## Surprises & Discoveries
 
 
-(None yet.)
+2026-10-10 review: Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10): Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics.
+  This revision supersedes conflicting 2026-09-30 design assumptions below.
 
 - Decision: Gate every control operation behind one Boolean, `enableControl`, that defaults
   to `False`, and answer a refused request with HTTP 403 and the code `control_disabled`.
@@ -92,7 +108,7 @@ control surface and its observability, and closes the request once EP-51 is Comp
   destructive operations, and a future destructive operation must record its own decision.
   Date: 2026-09-30
 
-- Decision: Treat a repeated pause or resume as success with the same body, not as an error.
+- Decision: Treat a repeated pause or resume as success with the same body absent an intervening transition, not as an error.
   Rationale: Operators retry; a browser re-sends on a flaky network. Idempotent success means
   the second request can never leave the processor in a state the operator did not ask for,
   and the body tells them the state they have.
@@ -130,9 +146,8 @@ decides whether the control plane acts or refuses; this plan's gate is the flag
 result as performing it once, so pausing a paused processor succeeds and changes nothing. A
 reversible operation is one whose effect can be undone by another operation on the same
 surface, as resume undoes pause; a destructive operation, such as discarding messages, has
-no such mirror and is out of this plan's scope. A preflight is the `OPTIONS` request a
-browser sends before a cross-origin `POST` to ask whether the server permits it; the server
-never sees the `POST` if the preflight fails.
+no such mirror and is out of this plan's scope. A preflight is an OPTIONS probe used for requests such as JSON POSTs. Simple POSTs can
+reach a server without preflight, so the actual mutation must validate Origin itself.
 
 The server today. `shibuya-metrics/src/Shibuya/Metrics/Server.hs` exports `combinedApp ::
 MetricsServerConfig -> Master -> WebSocketState -> [DependencyCheck] -> Application`, the
@@ -179,20 +194,22 @@ ControlOutcome`, `resumeProcessorIO :: Master -> ProcessorId -> IO ControlOutcom
 
 ```haskell
 data ControlOutcome
-  = ControlApplied           -- the state changed
-  | ControlAlreadyInState    -- already paused (or already running); nothing changed
+  = ControlApplied !PauseState        -- state at the atomic decision
+  | ControlAlreadyInState !PauseState -- unchanged state at that decision
   | ControlNotFound          -- no processor with that identifier is registered
   | ControlNotControllable   -- registered without a pause handle (test-only registrations)
-  | ControlTerminal          -- the processor has stopped or failed; pause is meaningless
+  | ControlTerminal          -- the processor has stopped or failed
+  | ControlDraining          -- shutdown has begun; control refused
 ```
 
-The registry entry per processor carries an optional pause handle, and `registerProcessor
+The registry entry per processor carries an optional pause handle, and `registerProcessorWithPause
 master pid metricsHandle (Just pauseHandle)` registers a controllable processor while
 `Nothing` registers one that is not. `ProcessorState` in `Shibuya.Core.Metrics` has the
-constructor `Paused !InFlightInfo !UTCTime`, encoded as
-`{"status":"paused","pausedAt":"<utc>","inFlight":<n>,"maxConcurrency":<m>}`, and
+constructor `Paused !InFlightInfo !UTCTime !UTCTime`, encoded as
+`{"status":"paused","pausedAt":"<utc>","lastProgress":"<utc>","inFlight":<n>,"maxConcurrency":<m>}`, and
 `sampleMetrics` reports it while the pause holds. Pausing gates the adapter source in the
-ingester, so no new message is pulled while in-flight messages finish and acknowledge.
+ingester, so the next admission check blocks; a poll already admitted, inbox work and adapter
+prefetch may still complete and drain.
 `stopAppGracefully` resumes paused processors before shutting adapters down, so a paused
 application still stops cleanly.
 
@@ -201,10 +218,12 @@ adds `Shibuya.Metrics.Error` exporting `errorResponse :: Status -> Text -> Text 
 Response`, which renders `{"error": <message>, "code": <code>, ...extra members}` with the
 `application/json` content type; it also retrofits `code` onto the existing 404 bodies and
 adds `Shibuya.Metrics.Cors.corsMiddleware`, whose preflight answer allows `GET`, `POST`, and
-`OPTIONS`. Milestone 1 may proceed without EP-47 by rendering its refusal through a local
-helper of the same shape, but Milestone 2 must not begin until `Shibuya.Metrics.Error` exists
-so that the surface has exactly one error renderer, and the preflight test in Milestone 2 runs
-only once EP-47 is Complete.
+`OPTIONS`. EP-47 is a hard dependency alongside EP-51: both must be Complete before this plan starts.
+Use its error helper and CORS policy throughout; do not invent a temporary second renderer.
+`PauseState = IntakeRunning | IntakePaused UTCTime` and the payload on successful
+ControlOutcome values are owned by EP-51. The response is built from that payload, never
+from a second metrics sample which can race with resume or terminal publication.
+
 
 ADRs that govern this plan, all under `docs/adr/`.
 `0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`
@@ -274,13 +293,15 @@ cabal file, and export `controlApp :: MetricsServerConfig -> Master -> Applicati
 - Any other path under `["control", ...]` answers 404 with code `not_found` and message
   `Not found`.
 
-Request bodies are ignored on every route; a client need not send one, and one that does is
-not rejected. Render every error through `errorResponse` from `Shibuya.Metrics.Error` if it
-exists; if you are running ahead of EP-47, write a private `controlError :: Status -> Text ->
-Text -> [Pair] -> Response` with exactly that output shape and replace it with the shared
-helper when it lands, recording the swap in the Decision Log. The 405 responses need the extra
-`Allow` header, so build them with `responseLBS` and the same JSON body shape rather than
-through the helper if the helper takes no headers.
+Request bodies are ignored; clients need not send one. Before any enabled action, reject
+malformed/multiple Origin values and any supplied Origin not in corsAllowedOrigins with
+403 origin_not_allowed. This applies even with an empty list and to text/plain or bodyless
+POSTs that need no preflight. Missing Origin remains allowed for CLI clients; Origin is not
+authentication. A same-origin browser must configure its public origin explicitly. Evaluate
+method and enableControl before Origin, so disabled actions consistently return control_disabled.
+Render errors with the shared errorResponse; add Allow to 405 responses using
+mapResponseHeaders. Never duplicate the error object construction to add a header.
+
 
 Wire it into `httpApp` in `Server.hs` by adding, beside the JSON routes and under the same
 `enableJSON` guard, the case `("control" : _) | config.enableJSON -> controlApp config master
@@ -313,37 +334,30 @@ Goal: with the gate on, pause and resume act and report; with it off, nothing ch
 the whole path is proven through a real application on a real port. Do not begin until
 `Shibuya.Metrics.Error` exists.
 
-Replace the Milestone 1 stub in `Control.hs`. For `pause` with the gate on, call
-`pauseProcessorIO master (ProcessorId pid)` and map the outcome:
+Replace the Milestone 1 stub in Control.hs. After gate and Origin checks, call the master
+operation exactly once. ControlApplied (IntakePaused t) and ControlAlreadyInState
+(IntakePaused t) answer pause with 200 and `{processor, state: "paused", pausedAt: t}`.
+Resume successes carrying IntakeRunning answer 200 and `{processor, state: "running"}`.
+These bodies describe intake intent at the operation's atomic decision, not handler activity
+or a promise that another request cannot change it immediately afterward. Repeated operations
+without an intervening transition preserve the body and the pause timestamp.
 
-- `ControlApplied` or `ControlAlreadyInState`: sample `getProcessorMetricsIO master pid`. If
-  the sampled state is `Paused _ pausedAt`, answer 200 with
-  `{"processor": pid, "state": "paused", "pausedAt": pausedAt}`. If the sample is missing or
-  its state is `Failed` or `Stopped`, the processor reached a terminal state between the
-  request and the sample; answer 409 with code `processor_terminal` and a `processor` member.
-  Record this race handling in the Decision Log; it is why the response is built from the
-  sample rather than from the outcome alone.
-- `ControlNotFound`: 404, code `processor_not_found`, message `Processor not found`, member
-  `processor`.
-- `ControlTerminal`: 409, code `processor_terminal`, message `Processor has finished`, member
-  `processor`.
-- `ControlNotControllable`: 409, code `processor_not_controllable`, message `Processor does
-  not support control operations`, member `processor`.
+ControlNotFound maps to 404 processor_not_found, ControlTerminal to 409 processor_terminal,
+ControlNotControllable to 409 processor_not_controllable, and ControlDraining to 409
+processor_draining. Every refusal includes processor. Do not classify a sampled Failed state
+as terminal: the current core also uses it for transient handler failures. Use only the
+retained lifecycle checked by the core transaction. No second getProcessorMetricsIO call is
+needed to construct success, eliminating the pause-versus-resume response race.
 
-For `resume`, call `resumeProcessorIO` and answer 200 with `{"processor": pid, "state":
-"running"}` for `ControlApplied` and `ControlAlreadyInState`; the three failure outcomes map
-exactly as for pause. Both action handlers are idempotent by construction: a second request
-returns the same status and body, and for pause the same `pausedAt`, because the pause handle
-keeps the original timestamp.
 
 Extend `ControlSpec.hs` with the in-process cases, all under `defaultConfig {enableControl =
-True}` and a master whose processors are registered with `registerProcessor master pid handle
+True}` and a master whose processors are registered with `registerProcessorWithPause master pid handle
 (Just pauseHandle)` using a real `PauseHandle` from EP-51's module: pause answers 200 with
 state `paused` and a `pausedAt` that parses as a time, and `isProcessorPausedIO` answers
 `Just True`; a second pause answers the identical body; resume answers 200 with state
 `running` and `isProcessorPausedIO` answers `Just False`; a second resume answers the identical
 body; an unregistered identifier answers 404 `processor_not_found` with the `processor`
-member echoed; a processor registered with `Nothing` answers 409 `processor_not_controllable`;
+member echoed; a processor registered through the old wrapper with no pause handle answers 409 `processor_not_controllable`;
 a processor whose lifecycle has been marked failed with `markProcessorFailedIO` and then
 unregistered answers 409 `processor_terminal`; `GET` on an action path still answers 405.
 Apply the ADR-0001 rule again: run the new examples against the Milestone 1 tree first and
@@ -366,33 +380,63 @@ defaultConfig {enableControl = True, wsPushIntervalUs = 10_000} master wsState [
 executable already uses; confirm the current release on Hackage before writing it) and
 WebSocket with `WS.runClient`.
 
-The scenario, with every wait an STM barrier or a bounded `timeout` used only as a failure
-bound: open a WebSocket client and read its initial snapshot; enqueue message `m1` and wait
-until started equals 1; `POST` pause and assert 200 with state `paused`; enqueue `m2`;
-release `m1`'s gate and wait until the tracker records `m1` acknowledged with `AckOk`; assert
-that a 200-millisecond bounded wait for started to reach 2 returns `Nothing`, which shows the
-paused processor pulled nothing more from the adapter; `GET /metrics/orders` and assert the
-decoded `state.status` is `paused` with `inFlight` 0; read WebSocket frames until an `update`
-for `orders` whose state status is `paused` arrives, within a bounded timeout; `POST` resume
-and assert 200 with state `running`; wait until started equals 2, release `m2`'s gate, and wait
-until `m2` is acknowledged; finally call `stopAppGracefully defaultShutdownConfig` and assert
-it returns `True` within the total shutdown timeout, which proves that a processor paused
-and resumed through HTTP still drains and stops.
+The scenario uses a test-only barrier immediately before the next gate check. Open the
+WebSocket, enqueue m1 and await its handler, then hold the ingester at that pre-admission
+barrier. POST pause, release the barrier and enqueue m2. Release m1 and observe its tracked
+acknowledgement and paused metrics with zero in flight. The gate-observed barrier proves
+m2 cannot start. Observe the paused WebSocket update, POST resume, then observe m2 start and
+acknowledge before graceful shutdown. In a separate case put the barrier after admission:
+a pause may allow that already-admitted poll to return one message, which must drain; the
+following admission blocks. This explicitly tests the honest source-pause contract.
 
-If EP-47 is Complete, add the preflight example: with `corsAllowedOrigins = ["https://ops.example.com"]`
+Add the preflight example: with `corsAllowedOrigins = ["https://ops.example.com"]`
 and `enableControl = True`, an `OPTIONS /control/processors/orders/pause` request carrying
 `Origin: https://ops.example.com` and `Access-Control-Request-Method: POST` answers 204 with
 `Access-Control-Allow-Origin: https://ops.example.com` and an `Access-Control-Allow-Methods`
-value containing `POST`. If EP-47 is not yet Complete, leave this example written but marked
-pending in Progress, and do not mark this plan Complete until it has run green.
+value containing `POST`. Also test actual control POSTs with a forbidden Origin under both empty and nonempty
+allow lists, using no content type and text/plain. They must perform no mutation even when
+a preflight is bypassed. Allowed origins and headerless CLI calls succeed. Concurrent pause
+and resume responses each carry the state captured by their own transaction, and shutdown
+races return processor_draining without re-pausing intake. Use barriers, not sleeps.
+
 
 Result and proof: the metrics suite passes with the new examples, the recorded failures
 against the earlier tree exist, and the end-to-end example's transcript in Concrete Steps
 shows the pause, the drained `m1`, the WebSocket update, the resume, and the clean stop.
 
 
-### Milestone 3: records and closure
+### Milestone 3: integrated performance, records and closure
 
+
+Final integration gate: after EP-47, EP-48, EP-49, EP-50 and EP-51 are Complete, build
+baseline from the clean commit before the first child implementation and candidate from the
+final integrated commit. Run identical lifecycle-load harness sources and normalized external
+solver identities under -N1 and -N4, ten alternating pairs (twenty if inconclusive), across
+every requiredScenarios entry in docs/audits/lifecycle-release/performance-budgets.json.
+Use capture-performance-paired.ts and compare-performance.ts; all basic-default cells must
+pass 5% throughput, 5% allocation/live-memory and 10% tail/shutdown limits. Failed or
+inconclusive cells block this milestone. Keep defaultMetricsDetail basic. Repeat detailed
+runs with explicit configuration/patch hashes and report overhead without declaring them free.
+
+Apply identical harness-only additions to both builds for cursor-bearing messages and real
+HTTP/Prometheus/WebSocket observers at 1/16/64 clients during core processing; include slow
+clients, byte/frame saturation, memory plateau and finite shutdown. Existing proxy sampling
+and churn benchmarks alone are insufficient. Verify detailed samples actually contain latency
+and progress. Preserve all reports, identities and commands under
+`docs/audits/lifecycle-release/artifacts/mp7-integrated/`. Performance scripts accept identity
+arguments; independently compare the actual hashes. This gate is required even if each child
+passed against its immediate parent. Record exact executable paths and run the comparator:
+
+```bash
+bun scripts/audit/compare-performance.ts \
+  --baseline docs/audits/lifecycle-release/artifacts/mp7-integrated/baseline-N1.json \
+  --candidate docs/audits/lifecycle-release/artifacts/mp7-integrated/basic-N1.json \
+  --budgets docs/audits/lifecycle-release/performance-budgets.json \
+  --output docs/audits/lifecycle-release/artifacts/mp7-integrated/verdict-N1.json
+```
+
+Repeat for N4. Exit 0 means pass, 1 fail, 2 inconclusive. Observer variants use a focused
+budget copy with matching requiredScenarios and unchanged limits. No agent waives a cell.
 
 Goal: everything a reader needs to use the control plane is written down where the other
 routes are documented, the durable decision is an ADR, and IR-4 is closed with evidence.
@@ -400,7 +444,7 @@ routes are documented, the durable decision is an ADR, and IR-4 is closed with e
 Update the Haddock header of `shibuya-metrics/src/Shibuya/Metrics.hs`: add the three control
 routes to the endpoint list, the `enableControl` gate and its default, the response bodies,
 and the codes `control_disabled`, `processor_not_found`, `processor_terminal`,
-`processor_not_controllable`, `method_not_allowed`, and `not_found` with their statuses.
+`processor_not_controllable`, `processor_draining`, `origin_not_allowed`, `method_not_allowed`, and `not_found` with their statuses.
 Re-export `enableControl` through the existing `MetricsServerConfig (..)` export; no new
 export is needed for the module, but export `controlApp` from `Shibuya.Metrics.Server`'s
 re-export list only if a host would mount it alone, which this plan does not require.
@@ -484,8 +528,7 @@ grep -n 'Paused' shibuya-core/src/Shibuya/Core/Metrics.hs
 ls shibuya-metrics/src/Shibuya/Metrics/Error.hs shibuya-metrics/src/Shibuya/Metrics/Cors.hs
 ```
 
-The first two commands must print matches; the third may fail until EP-47 lands, which
-blocks Milestone 2 but not Milestone 1.
+All three commands must succeed: EP-47 and EP-51 are hard dependencies.
 
 Build and test after each milestone:
 
@@ -588,10 +631,10 @@ respectively, each echoing the `processor` member; a wrong method answers 405 wi
 `Allow` header; and `enableJSON = False` hides every control path behind the generic 404.
 
 End to end, through a real application on a real port: after a pause, the in-flight message
-finishes and is acknowledged while no further message is started; `GET /metrics/<id>` shows
+finishes and is acknowledged; admitted and buffered messages may drain while the next
+admission waits; `GET /metrics/<id>` shows
 `status` `paused`; a real WebSocket client receives an `update` frame with that state; after
-a resume the next message starts and completes; and `stopAppGracefully` returns `True`. When
-EP-47 is Complete, a preflight for an action path from an allowed origin answers 204 with
+a resume the next message starts and completes; and `stopAppGracefully` returns `True`. A preflight for an action path from an allowed origin answers 204 with
 `POST` among the allowed methods.
 
 Documentation acceptance: the Haddock header, the getting-started guide, and
@@ -612,7 +655,7 @@ read-only and returns the next free handle each time; once a handle is committed
 permanent, so if you delete an uncommitted record, re-run `okf id next` rather than reusing
 the number from memory. The end-to-end example creates only in-process resources (a `TBQueue`,
 a Warp listener on a free port, a `Master`) and brackets each, so an aborted run leaks
-nothing beyond the process. If Milestone 2 starts before `Shibuya.Metrics.Error` exists, stop
+nothing beyond the process. If Milestone 1 starts before `Shibuya.Metrics.Error` exists, stop
 and record the wait in Progress rather than inventing a second error renderer. If EP-51's
 functions differ in name or shape from the ones named in Context and Orientation, adapt the
 calls, record the difference in Surprises & Discoveries, and do not edit `shibuya-core` from
@@ -625,10 +668,10 @@ checkout.
 
 Hard dependency: `docs/plans/51-implement-source-level-processor-pause-and-resume.md`, which
 supplies `Shibuya.Internal.Runner.Master.pauseProcessorIO`, `resumeProcessorIO`,
-`isProcessorPausedIO`, `ControlOutcome`, the optional pause handle in `registerProcessor`, and
-`ProcessorState.Paused` with its JSON encoding. Soft dependency:
+`isProcessorPausedIO`, `ControlOutcome`, `PauseState`, the optional pause handle in `registerProcessorWithPause`, and
+`ProcessorState.Paused` with its JSON encoding. Hard dependency:
 `docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`, which supplies
-`Shibuya.Metrics.Error.errorResponse` (required before Milestone 2) and
+`Shibuya.Metrics.Error.errorResponse` (required before Milestone 1) and
 `Shibuya.Metrics.Cors.corsMiddleware` allowing `GET`, `POST`, and `OPTIONS` (required before
 the preflight example runs and before this plan is marked Complete). The `error` WebSocket
 frame introduced by `docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md`
@@ -661,6 +704,8 @@ POST /control/processors/<id>/pause        gate off: 403 code control_disabled (
                                            not found: 404 code processor_not_found, member processor
                                            terminal: 409 code processor_terminal, member processor
                                            not controllable: 409 code processor_not_controllable, member processor
+                                           draining: 409 code processor_draining, member processor
+                                           forbidden Origin: 403 code origin_not_allowed (no action)
 POST /control/processors/<id>/resume       gate off: 403 code control_disabled (no action)
                                            applied / already running: 200 {"processor","state":"running"}
                                            failures exactly as for pause
@@ -677,3 +722,6 @@ test dependencies. Documentation artifacts: `shibuya-metrics/src/Shibuya/Metrics
 `docs/capabilities/gated-processor-control.md` with its log entry, one new ADR under
 `docs/adr/`, `CHANGELOG.md`, `shibuya-metrics/CHANGELOG.md`, and the IR-4 record with its log
 entry.
+
+
+Revision note (2026-10-10): API and performance review applied. Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics. Implementation and performance measurements remain pending.

@@ -11,6 +11,18 @@ provenance:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-30T23:27:06Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      verdict: "changes-requested"
+      note: "Original draft review found API/concurrency and performance-evidence defects; addressed in the accompanying update. Implementation and measured acceptance remain pending."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      mode: "update"
+      note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
 ---
 
 
@@ -35,9 +47,9 @@ before it.
 
 After this plan, every WebSocket connection has exactly one writer feeding it from one bounded
 queue, faults on the connection arrive as an `error` frame the page can read, and a page that
-falls behind is told in-band that it missed frames and is then given a fresh `snapshot`. A
-client written against the 0.10.0.0 dialect keeps working unchanged: the only visible
-differences are a new optional frame type and a new configuration field. The plan closes
+falls behind is told in-band that it missed frames and is then given a fresh `snapshot`. An extension-tolerant
+client written against the 0.10.0.0 dialect keeps working: the only visible
+differences are a new frame type and queue/timeout configuration fields. The plan closes
 `docs/improvement-requests/harden-shibuya-metrics-for-browser-clients-cors-tests-and-ws-convention-alignment.md`
 (IR-5) by delivering its third item, the additive convention alignment with a published
 conformance mapping, once the cross-origin plan
@@ -70,18 +82,21 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 
 
 - [ ] Milestone 1: Add the `ServerError` constructor and `error` frame, emit it for invalid client frames and for subscription-limit closes, with round-trip and loopback tests seen failing first.
-- [ ] Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the single `outputLoop` writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
+- [ ] Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the independent producer and sole writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
 - [ ] Milestone 3: Publish the conformance mapping in `docs/architecture/METRICS.md`, update the package Haddock, CAP-10, changelogs, and ADRs, record wire-load sanity numbers, and close IR-5 after EP-47 is Complete.
 
 
 ## Surprises & Discoveries
 
 
-(None yet.)
+2026-10-10 review: Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10): Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load.
+  This revision supersedes conflicting 2026-09-30 design assumptions below.
 
 - Decision: Emit `error` frames for the two faults that exist today (invalid client frames and
   subscription-limit closes) before restructuring delivery, as a separate milestone.
@@ -95,8 +110,7 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
   Rationale: Today the receive loop and the push loop both call `WS.sendTextData` on the same
   connection. The `websockets` library serialises the byte writes with a lock, so frames are
   not corrupted, but their order is whichever thread ran first, so a stale `update` can follow
-  a fresh `snapshot`. A single writer with a queue fixes that ordering, stops a slow peer from
-  delaying `goodbye` and `terminal`, and makes the overflow signal of the cross-project
+  a fresh `snapshot`. A single writer with a queue fixes that ordering, isolates sampling from socket backpressure, and makes the overflow signal of the cross-project
   convention honest instead of vacuous. This is the MasterPlan's recorded choice.
   Date: 2026-09-30
 
@@ -106,8 +120,8 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
   Rationale: An `update` carries the whole current metrics of a processor, so a later one
   supersedes a dropped one and the resync snapshot restores anything missed; `terminal` is a
   once-only event derived from a ledger that is advanced when the frame is queued, so dropping
-  it would lose it forever. Retained frames are finite per connection, so the bound is
-  exceeded only by that finite amount.
+  it would lose it forever. The original exemption for retained frames is superseded by the 2026-10-10 strict
+  frame/byte bound: if a required frame cannot fit after coalescing updates, close the peer.
   Date: 2026-09-30
 
 - Decision: Signal overflow with `error` code `queue_overflow` followed by a full `snapshot` for
@@ -198,7 +212,8 @@ bodies carry a stable `code`. `docs/adr/0004-make-websocket-lifecycle-and-termin
 records the slot ownership, the explicit subscription representation, the STM shutdown signal
 that yields one `goodbye`, and the once-only `terminal` delivery derived from comparing the
 connection's last visible map with the live registry; this plan preserves every one of those
-guarantees and supersedes only the paragraph that says sender loops send `goodbye` directly.
+guarantees and supersedes direct sending and unqualified delivery claims with bounded
+flush/close behavior for stalled peers.
 `docs/adr/0001-remove-obsolete-linked-actors-and-test-gc-liveness.md` sets the rule that a
 test for a defect must be observed failing against the unfixed code before it is trusted;
 Milestones 1 and 2 follow it with isolated worktrees.
@@ -221,7 +236,7 @@ Integration Points assign this plan the `ServerError` constructor, the `wsMaxQue
 field, and the restructure of `WebSocket.hs`, and note that
 `docs/plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md`
 makes `sendIfChanged` ignore a derived `ageSeconds` member; whichever of the two plans lands
-second must rebase and keep that projection inside the new `outputLoop` delta computation.
+second must rebase and keep that projection inside the new producer delta computation.
 
 
 ## Plan of Work
@@ -258,113 +273,76 @@ Log and both changelogs that `error` is an additive wire frame and that adding a
 to the exported `ServerMessage` breaks exhaustive matches downstream.
 
 
-### Milestone 2: one bounded outbound queue per connection
+### Milestone 2: strictly bounded delivery and independent production
 
 
-Goal: exactly one thread writes to each socket, frames leave in ledger order, a slow client
-cannot stall `goodbye` or `terminal`, and overflow is signalled in-band followed by a resync.
+The connection has three structurally owned loops: receive, sample/enqueue on an independent
+interval, and write. A slow write must not stop sampling or consume the only timer. Use one
+producer interval timer per tick, never one timer per dequeued frame. The writer alone sends
+application data and close frames; protocol-level ping handling remains with the websockets
+library. Completion or failure of any loop cancels and joins the others, except that a requested
+orderly close waits for the writer within the send deadline before ending the connection.
+Retain the existing masked connection-slot acquisition and unconditional local release.
 
-Work, configuration: add `wsMaxQueuedFrames :: !Int` to `MetricsServerConfig` in `Config.hs`
-with Haddock "Maximum queued outbound frames per WebSocket connection before the oldest
-droppable frame is discarded (default: 64)", default 64 in `defaultConfig`, and a
-`validateConfig` guard in `Server.hs` (`MetricsServerConfig.wsMaxQueuedFrames must be
-positive`), following the pattern of the existing `wsMaxSubscriptions` guard. Add the field to
-every direct record construction in tests and in `shibuya-metrics/bench/WireLoad.hs` if any
-exist (today they all use `defaultConfig { ... }`, so expect no change).
+Add validated configuration fields `wsMaxQueuedFrames` (default 64, minimum 2),
+`wsMaxQueuedBytes` (default 1048576, positive), and `wsSendTimeoutUs` (default 5000000,
+positive). Queue capacity includes every queued frame, including errors, terminal events,
+resync snapshots and goodbye. At most one popped frame is in the writer in addition to the
+queue. Encode and force payloads before admission, count encoded bytes, and reject an
+oversized single snapshot instead of retaining an unbounded lazy encoding. Document that
+this bounds retained encoded payloads, not the entire process heap or one transient encoding.
+Initial and resync snapshots obey the same limits. A host with a large registry can raise
+the byte budget explicitly.
 
-Work, the pure policy: create `shibuya-metrics/src/Shibuya/Metrics/Outbound.hs`, listed under
-`exposed-modules` in `shibuya-metrics/shibuya-metrics.cabal`, containing
+Create `Shibuya.Metrics.Outbound` with a pure queue transition model and property tests.
+Use an explicit outcome (`Enqueued`, `DroppedUpdates`, `MustClose`), queue entries carrying
+strict encoded payload, byte size, subscription generation and retention class, and counters
+for total frames and bytes. Every transition preserves both bounds. Updates may be coalesced
+or evicted oldest-first. Subscription snapshots, terminal, error, and goodbye are required:
+if they cannot fit after discarding obsolete updates, request connection closure rather than
+exceeding the budget or silently losing them. An endless invalid-frame stream is not a finite
+number of errors; required-frame saturation must stop receiving and close. Keep a single
+bounded close request outside the data queue; it is a control signal, not another payload log.
 
-```haskell
--- | One encoded frame waiting to be written to a connection.
-data QueuedFrame = QueuedFrame
-  { payload :: !LBS.ByteString,
-    -- | Retained frames are never discarded by overflow.
-    retained :: !Bool
-  }
-  deriving stock (Eq, Show)
+One producer lock serializes subscription mutation, sampling/ledger changes and enqueuing;
+it is never held across socket IO. Mutate SubscribeAll, Subscribe and Unsubscribe inside
+that lock, increment a subscription generation, and remove unsent obsolete updates before
+queuing the new snapshot. The writer preserves queue order, so an already-popped old frame
+can precede the snapshot, never follow it. Keep the existing subscription-limit semantics.
 
--- | Append a frame to a bounded queue. Returns the new queue and whether a
--- frame was discarded. A retained frame is always appended. A droppable frame
--- is appended when the queue holds fewer than the bound; otherwise the oldest
--- droppable frame is removed first, or the new frame itself is discarded when
--- no droppable frame is queued.
-enqueueBounded :: Int -> QueuedFrame -> Seq QueuedFrame -> (Seq QueuedFrame, Bool)
-```
+When updates are dropped, mark resync pending and stop generating ordinary deltas for that
+generation. On the next producer turn, sample current metrics and retained lifecycle. Queue
+any required terminal removals before an indivisible two-frame batch consisting of
+`ServerError "queue_overflow" ...` and the replacement snapshot. Remove obsolete queued
+updates for that generation, leave earlier required frames in order, and account the batch
+as two frames and its full byte size. Only after admitting the complete batch replace the
+comparison ledger and clear resync pending. No new data frame can interleave between the
+error and snapshot. If required events plus resync cannot fit, close; never advance a ledger
+for a required frame silently discarded. A terminal event may be delivered once on a live
+connection, but delivery to a stalled/disconnected peer is not guaranteed. A client reconnects
+and fetches a fresh snapshot when the connection closes; metrics are not a replay log.
 
-with `Data.Sequence` from `containers`, which the package already depends on. Retained
-frames are `terminal`, `error`, `goodbye`, and the resync `snapshot`; droppable frames are a
-`snapshot` answering a subscribe, `update`, and `pong`. State the invariant in the module
-header: the queue length exceeds the bound only by retained frames, and retained frames are
-finite per connection (one `goodbye`, at most one `error` per fault, at most one `terminal`
-per processor ever removed).
+Subscription-limit refusal becomes an ordered writer command: error then close 1008, with
+an acknowledgement to the receiver. The receiver must not return and cancel the writer or
+send the close directly while its error is still queued. Shutdown atomically stops producers,
+queues goodbye after admitted required frames (droppable updates may be discarded), and asks
+the writer to finish within wsSendTimeoutUs. Every send and the overall shutdown flush have
+that finite bound; timing out cancels the writer/connection and releases its slot. A queue
+cannot force a TCP-stalled peer to receive goodbye or terminal. Normal responsive peers still
+receive them in order. Prove stopMetricsServer also returns within its bound against a stalled
+socket; do not rely solely on setting shutdownRequested after Warp cancellation.
 
-Work, the connection state: in `WebSocket.hs` extend `ConnectionState` with
-`outbound :: !(TVar (Seq QueuedFrame))`, `overflowed :: !(TVar Bool)`, and
-`sendLock :: !(MVar ())`, all created in `newConnectionState`. Add an internal
-`enqueueFrame :: Int -> ConnectionState -> Bool -> ServerMessage -> IO ()` that encodes the
-message, runs `enqueueBounded` inside `modifyTVar'`-style STM on `outbound`, and sets
-`overflowed` to `True` when a drop is reported. Every place that calls `WS.sendTextData`
-today becomes a call to `enqueueFrame`, except the writer itself.
+For EP-49, carry its stableView comparison (ageSeconds zeroed) into the producer. Comparing
+snapshots remains separate from sending them; idle age changes do not flood the queue.
 
-Work, the writer: replace `pushLoop` and `waitForPushOrShutdown` with
-`outputLoop :: MetricsServerConfig -> Master -> WebSocketState -> ConnectionState ->
-WS.Connection -> IO ()`. Each iteration creates a `registerDelay` for `wsPushIntervalUs` and
-waits in one STM transaction, using `orElse`, for the first of three events: `shutdownRequested`
-is `True`; `outbound` is non-empty, in which case the transaction pops the head frame and
-returns it; or the delay elapsed. A popped frame is written with `WS.sendTextData conn
-frame.payload`; this is the only `sendTextData` call left in the module. On the interval tick
-the loop first checks `overflowed`: if set, it takes `sendLock`, enqueues a retained
-`ServerError "queue_overflow" "Frames were discarded because this connection fell behind; a
-fresh snapshot follows"`, samples the current metrics, filters them by the current
-subscription, enqueues that `snapshot` as retained, writes `lastMetrics` to it, clears
-`overflowed`, and releases the lock; otherwise it runs the existing `pushUpdates` logic under
-`sendLock`, enqueuing each changed `update` as droppable and each `terminal` as retained and
-then writing `lastMetrics`, exactly as `pushUpdates` orders those steps today. When shutdown
-wins, the loop enqueues `Goodbye` as retained, then drains: it pops and writes every remaining
-frame in order until the queue is empty, and returns. Because `serveConnection` keeps
-`race_ (receiveLoop ...) (outputLoop ...)`, returning ends the connection as before, and the
-slot-release `finally` in `websocketApp` is unchanged. Keep `normalPeerClosure`, the initial
-`snapshot` (now enqueued under `sendLock` before the race starts, with `lastMetrics` written
-in the same critical section), the subscribe-all exclusion semantics, and the `terminal`
-derivation untouched.
-
-Work, the receive loop: `handleClientMessage` answers `SubscribeAll` and `Subscribe` by taking
-`sendLock`, sampling and filtering the metrics, enqueuing the droppable `snapshot`, and writing
-`lastMetrics`, all inside the lock, so that queue order equals ledger order and the writer's
-next delta is computed against the map the client will have seen. `Ping` enqueues a droppable
-`Pong`. `rejectOversizedSubscription` enqueues the retained `error` and then sends the close
-code as today; the close code is sent directly because it is not a data frame and the
-connection ends immediately after.
-
-If EP-49 has already landed, its `sendIfChanged` projection that zeroes the derived
-`ageSeconds` member before comparing must be carried into the delta computation unchanged;
-if EP-49 lands later, it adds that projection to the new `outputLoop` code. Note which case
-applied in Surprises & Discoveries.
-
-Result and proof: a new test module `shibuya-metrics/test/Shibuya/Metrics/OutboundQueueSpec.hs`
-(registered in `other-modules` and in `shibuya-metrics/test/Main.hs`) covers the pure policy:
-appending below the bound; dropping the oldest droppable when full and reporting `True`;
-discarding the new droppable frame when only retained frames are queued; and appending a
-retained frame beyond the bound without a drop. `WebSocketSpec` gains four loopback cases.
-Ordering: with processors `alpha` and `beta` registered and `fastConfig`, the client sends
-`subscribe` for `alpha` while a background thread increments both processors' received
-counters every millisecond; after the selective `snapshot` arrives, no later frame within
-200 ms may be an `update` for `beta`. Goodbye: the existing shutdown test still receives
-`goodbye`, and a variant with several queued updates receives them all before `goodbye`.
-Terminal: the existing once-only terminal test still passes, and a variant with
-`wsMaxQueuedFrames = 1` and continuous updates still delivers the `terminal` exactly once.
-Overflow: register 512 idle processors, use push interval 1 ms and `wsMaxQueuedFrames = 4`,
-connect, read the initial snapshot, then sleep 500 ms while a background thread increments
-every processor's received counter continuously; on resuming reads the client must receive,
-possibly after some `update` frames, an `error` frame with code `queue_overflow` immediately
-followed by a `snapshot`, and afterwards a `ping` must still be answered. Run the overflow
-case twenty times in a loop with `--match` and record the results; if it is not stable in
-twenty of twenty runs, replace it with a deterministic test that injects a blocking send
-hook (a test-only field on `WebSocketState` that wraps the writer's send, defaulting to the
-real send) and record that decision in the Decision Log. Both the ordering and overflow tests
-are run first in a detached worktree at the Milestone 1 commit and observed failing (the
-ordering test sees a stale `beta` update; the overflow test never sees an `error` frame).
+Use deterministic test hooks around the writer from the outset, not a sleep-and-kernel-buffer
+overflow test. Tests block a write, tick the producer explicitly, and assert overflow while
+sampling continues; then unblock and verify error immediately followed by snapshot. Test frame
+and byte bounds after every transition, malformed-frame floods, oversized snapshots, all-retained
+saturation, subscription races including Unsubscribe, timer fairness during a ping flood,
+terminal once-only behavior, error-before-1008 ordering, and bounded shutdown/slot release.
+Run each deterministic interleaving repeatedly under -N1 and -N4. Mutation controls reintroduce
+a second writer, unlimited retained frames, and timer resets to show the tests fail.
 
 
 ### Milestone 3: conformance mapping, records, and closure
@@ -375,11 +353,11 @@ record that describes the package is current, and IR-5 is closed with evidence. 
 a section "WebSocket protocol and conformance" to `docs/architecture/METRICS.md` that first
 describes the protocol as it now is (client frames, server frames including `error` with its
 three codes `invalid_message`, `subscription_limit_exceeded`, and `queue_overflow`, the
-bounded queue, the drop-oldest policy, the resync sequence, and `goodbye`) and then gives the
+bounded queue, the drop-oldest update policy, strict limits, resync sequence, timeout closure, and `goodbye`) and then gives the
 mapping, one row per element: type-tagged frames, met; explicit subscribe and unsubscribe,
 met; snapshot then delta, met; ping and pong with a 30-second server ping, met; in-band
 `error` frames, additively closed by this plan; bounded per-connection queue with overflow
-signalling, additively closed by this plan; `goodbye` before a server-initiated close, met;
+signalling, additively closed by this plan; `goodbye` before a responsive server-initiated close, met; stalled-peer timeout may close without delivery, documented deviation;
 replay cursor `from_position`, documented deviation because metrics are current state rather
 than a replayable log and a fresh `snapshot` is the recovery path; snake_case member names,
 documented deviation per ADR-0007 (camelCase members, snake_case tags, values, and codes);
@@ -388,7 +366,7 @@ access, met by the `corsAllowedOrigins` configuration of EP-47 (cite its plan pa
 landed, the `Config.hs` field); authentication, documented posture of none, with a trusted
 network or an authenticating reverse proxy expected in front of the server. Update the Haddock
 header of `shibuya-metrics/src/Shibuya/Metrics.hs` to list the `error` frame, its codes, the
-overflow and resync behaviour, and `wsMaxQueuedFrames`. Update
+overflow and resync behaviour, and `wsMaxQueuedFrames`, `wsMaxQueuedBytes`, and `wsSendTimeoutUs`. Update
 `docs/capabilities/metrics-endpoints.md` (CAP-10): remove the limit sentence that says bounded
 slow-consumer queues, overflow signalling, and convention alignment remain open, add
 `shibuya-metrics/test/Shibuya/Metrics/OutboundQueueSpec.hs` and the new `WebSocketSpec` cases
@@ -398,18 +376,21 @@ its profile. Create the ADR `docs/adr/<next unused four-digit number>-deliver-we
 (EP-49, EP-51, and EP-52 also allocate ADR numbers, so take the next unused one when this
 milestone runs) in
 the same plain-Markdown format as ADR-0004 with Status, Date, Context, Decision, Consequences,
-and Evidence, recording the single-writer rule, the droppable and retained classification,
-the overflow signal and resync, and the bound; then add one line directly under the Status
+and Evidence, recording the single-writer rule, independent producer, strict frame/byte limits, ordered
+error/resync batches, timeout closure, and the required-frame saturation policy; then add one line directly under the Status
 line of `docs/adr/0004-make-websocket-lifecycle-and-terminal-delivery-explicit.md` reading
 "Superseded in part by [the outbound-queue decision](<number>-deliver-websocket-frames-through-one-bounded-outbound-queue-per-connection.md): sender loops no longer
 write to the socket directly." Add entries under an `Unreleased` heading in `CHANGELOG.md` and
 `shibuya-metrics/CHANGELOG.md`: the additive `error` frame, the source-breaking `ServerMessage`
-constructor, the new `wsMaxQueuedFrames` field affecting direct record construction, the
+constructor, the new queue frame/byte and send-timeout fields affecting direct record construction, the
 single-writer ordering guarantee, and the new exposed module. Run the wire-load fixture's
 websocket-churn scenario before Milestone 2 and after Milestone 3 and record both JSON
-reports' `operationsPerSecond` and `latencyP95Micros` in Surprises & Discoveries; this is a
-sanity check, not a gate, because the fixture measures connection churn rather than message
-throughput.
+reports' `operationsPerSecond` and `latencyP95Micros` in Surprises & Discoveries; connection churn is only a smoke measurement. Also extend a matched wire harness to
+measure sustained updates with 1, 16 and 64 clients, including slow readers, while core work
+runs. Compare ten alternating pairs on identical harnesses: throughput within 5%, allocation
+and live memory within 5%, p95/p99 within 10%, and bounded shutdown. Record saturation memory
+plateaus and slot recovery. The final MasterPlan integration gate repeats these with all
+features present; being off the message function does not isolate shared CPU and GC costs.
 
 Closure: only when the registry row for EP-47 in the MasterPlan reads Complete, edit
 `docs/improvement-requests/harden-shibuya-metrics-for-browser-clients-cors-tests-and-ws-convention-alignment.md`:
@@ -453,14 +434,15 @@ Expected in the worktree: the invalid-frame case fails with a timeout or an unex
 `Pong`, and the limit case fails with an uncaught `CloseRequest 1008`. Paste the failure lines
 into Surprises & Discoveries.
 
-Overflow stability run for Milestone 2:
+Deterministic queue/concurrency checks for Milestone 2:
 
 ```bash
-for i in $(seq 1 20); do
-  cabal test shibuya-metrics --test-show-details=direct \
-    --test-options='--match "queue_overflow"' || echo "RUN $i FAILED"
-done
+cabal test shibuya-metrics --test-show-details=direct --test-options='--match "outbound"'
 ```
+
+Use barriers and an injected send action, recording repetitions under -N1 and -N4. No test
+assumes that sleeping fills a kernel buffer.
+
 
 Wire-load sanity numbers, before Milestone 2 and after Milestone 3:
 
@@ -505,16 +487,14 @@ and is still answered with `pong` afterwards; a client whose `subscribe` exceeds
 receives an `error` frame with code `subscription_limit_exceeded` and is then closed with
 code 1008.
 
-After Milestone 2, `grep -n 'sendTextData' shibuya-metrics/src/Shibuya/Metrics/WebSocket.hs`
-shows exactly one call, inside `outputLoop`; `OutboundQueueSpec` passes; a selective
-`subscribe` issued while updates flow is answered by its `snapshot` with no later `update` for
-an excluded processor; `goodbye` still arrives on shutdown after every queued frame; a
-processor removed with a retained terminal lifecycle produces exactly one `terminal` frame
-even with `wsMaxQueuedFrames = 1`; and a client that stops reading receives an `error` frame
-with code `queue_overflow` followed immediately by a `snapshot` once it resumes, in twenty of
-twenty runs or through the recorded deterministic replacement. Every pre-existing
-`WebSocketSpec`, `TypesSpec`, `ServerSpec`, golden, and health example still passes, and the
-golden fixtures are byte-for-byte unchanged, because this plan changes no metrics encoder.
+After Milestone 2 there is exactly one application data writer and one ordered close path.
+The deterministic tests prove producer progress during a blocked send, strict frame/byte
+bounds, resync adjacency, subscription ordering, and close/slot release within the configured
+deadline. Responsive peers receive terminal once and goodbye before normal shutdown; stalled
+peers are disconnected within the bound. Pre-existing lifecycle and wire tests still pass.
+A current-client decoder must be tested explicitly for unknown error frames; additive frame
+types do not guarantee compatibility with clients that reject all unknown tags.
+
 
 After Milestone 3, `docs/architecture/METRICS.md` contains the conformance mapping with every
 listed element classified; the `Shibuya.Metrics` Haddock lists the `error` frame and its
@@ -525,7 +505,7 @@ changes under `Unreleased`; and, when EP-47 is Complete, IR-5 reads `status: com
 
 Use STM barriers or the injected hook for interleavings; a bare sleep proves nothing about
 ordering. Assert on received frames and connection outcomes, not on logs. Record exact seeds,
-commands, and the twenty-run overflow transcript in this plan.
+commands, and the deterministic overflow transcript in this plan.
 
 
 ## Idempotence and Recovery
@@ -537,9 +517,8 @@ the reverted test mutation to the main working tree. `okf log add` appends; if a
 added twice, delete the duplicate line by hand before validating. Editing IR-5's frontmatter
 is reversible with `git checkout -- docs/improvement-requests/...`. If Milestone 2's
 restructure regresses a pre-existing test, keep the single-writer design and fix the
-ordering under `sendLock` rather than reintroducing a second writer; if the overflow test
-proves flaky, follow the recorded fallback to the injected hook rather than loosening the
-assertion. Commit each milestone separately so a partial failure is recoverable by
+ordering under the producer lock rather than reintroducing a second writer; the overflow test uses deterministic injected barriers from the outset, without
+loosening its ordering assertions. Commit each milestone separately so a partial failure is recoverable by
 reverting one commit with the trailers above.
 
 
@@ -551,9 +530,8 @@ the current solution) for `acceptRequest`, `receiveData`, `sendTextData`, `sendC
 `withPingThread`, `runClient`, `runClientWith`, and the `ConnectionException` constructors
 `CloseRequest` and `ConnectionClosed`, verified in the cached 0.13.0.0 source distribution;
 `stm ^>=2.5` (2.5.3.1) for `TVar`, `registerDelay`, `check`, `orElse`, and `modifyTVar'`,
-verified in the Mori-registered `haskell/stm` source at
-`/Users/shinzui/Keikaku/hub/haskell/stm-project`; `wai-websockets ^>=3.0` (3.0.1.2) for
-`websocketsOr`, verified in the Mori-registered `yesodweb/wai` source; `containers ^>=0.7`
+located through `mori://haskell/stm` (project-relative source path discovered at implementation); `wai-websockets ^>=3.0` (3.0.1.2) for
+`websocketsOr`, verified in the Mori-registered `mori://yesodweb/wai/packages/wai-websockets` source; `containers ^>=0.7`
 for `Data.Sequence`; `aeson ^>=2.2` for `eitherDecode`; and `base` for `MVar`. No new
 dependency is added.
 
@@ -573,37 +551,27 @@ data ServerMessage
 encoded as `{"type":"error","code":<code>,"message":<message>}` and decoded by the `"error"`
 branch of `parseJSON`.
 
-Interfaces at the end of Milestone 2, in `shibuya-metrics/src/Shibuya/Metrics/Config.hs`:
+Interfaces at the end of Milestone 2, in Config.hs:
 
 ```haskell
-wsMaxQueuedFrames :: !Int -- ^ default 64; validated positive by Shibuya.Metrics.Server
+wsMaxQueuedFrames :: !Int -- default 64; minimum 2
+wsMaxQueuedBytes :: !Int  -- default 1048576; positive
+wsSendTimeoutUs :: !Int   -- default 5000000; positive
 ```
 
-in the new module `shibuya-metrics/src/Shibuya/Metrics/Outbound.hs`:
+Outbound.hs owns the queue model, strict payload entries and explicit enqueue outcomes;
+WebSocket.hs owns the independent producer, receiver, sole writer and bounded close handshake.
+`WebSocketState`, `newWebSocketState`, `shutdownWebSockets`, and `websocketApp` retain their
+existing public function signatures. Any record extension is recorded as a source change.
 
-```haskell
-data QueuedFrame = QueuedFrame {payload :: !LBS.ByteString, retained :: !Bool}
-enqueueBounded :: Int -> QueuedFrame -> Seq QueuedFrame -> (Seq QueuedFrame, Bool)
-```
-
-and in `shibuya-metrics/src/Shibuya/Metrics/WebSocket.hs`, internal but named here so the
-structure is unambiguous:
-
-```haskell
-outputLoop ::
-  MetricsServerConfig -> Master -> WebSocketState -> ConnectionState -> WS.Connection -> IO ()
-enqueueFrame :: Int -> ConnectionState -> Bool -> ServerMessage -> IO ()
-```
-
-where `ConnectionState` gains `outbound :: !(TVar (Seq QueuedFrame))`,
-`overflowed :: !(TVar Bool)`, and `sendLock :: !(MVar ())`. The exported `WebSocketState`,
-`newWebSocketState`, `shutdownWebSockets`, and `websocketApp` keep their types; `combinedApp`
-in `Server.hs` is unchanged.
 
 Plan dependencies: none are hard. `docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`
 is a soft dependency that gates only the IR-5 closure step of Milestone 3 and the
 cross-origin row of the conformance mapping. `docs/plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md`
 shares `sendIfChanged`; whichever lands second rebases and keeps the derived-age projection.
 This plan owns `Shibuya.Metrics.WebSocket`, `Shibuya.Metrics.Outbound`, the `ServerMessage`
-sum, the `wsMaxQueuedFrames` field, the conformance section of `docs/architecture/METRICS.md`,
+sum, the queue/timeout fields, the conformance section of `docs/architecture/METRICS.md`,
 the outbound-queue ADR, and the closure of IR-5, and touches no `shibuya-core` module.
+
+
+Revision note (2026-10-10): API and performance review applied. Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load. Implementation and performance measurements remain pending.

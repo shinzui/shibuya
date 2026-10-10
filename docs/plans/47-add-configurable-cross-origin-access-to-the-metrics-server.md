@@ -11,6 +11,18 @@ provenance:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-30T23:27:06Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      verdict: "changes-requested"
+      note: "Original draft review found API/concurrency and performance-evidence defects; addressed in the accompanying update. Implementation and measured acceptance remain pending."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      mode: "update"
+      note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
 ---
 
 
@@ -40,8 +52,7 @@ nothing the initiative adds is visible to a browser.
 After this plan, a host application lists the origins its operations page is served from in
 `MetricsServerConfig`, and the server answers those origins with the right headers on every
 route, answers the browser's preflight `OPTIONS` probes, and applies the same allow list to
-WebSocket upgrade requests. A server with no origins configured stays byte-for-byte
-identical to today's server, which is provable because this plan first pins that
+WebSocket upgrade requests. A server with no origins configured preserves today's read-route headers, which is provable because this plan first pins that
 headerless behavior in a test. Every error body on the surface also gains a stable `code`
 member beside its existing human-readable `error` message, so a browser client can switch on
 outcomes without parsing prose. You can see the change working by starting the example
@@ -60,6 +71,7 @@ and its WebSocket convention item and the closure of the request belong to
 
 - [ ] Milestone 1: Characterize the headerless server in a test, add `Shibuya.Metrics.Error` with `errorResponse`, and retrofit additive `code` members onto the existing 404 bodies.
 - [ ] Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
+- [ ] Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
 - [ ] Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
 - [ ] Milestone 4: Update the Haddock protocol reference, the user guide, the capability record and its log, both changelogs, and record wire-load sanity numbers.
 
@@ -67,11 +79,14 @@ and its WebSocket convention item and the closure of the request belong to
 ## Surprises & Discoveries
 
 
-(None yet.)
+2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10): Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
+  This revision supersedes conflicting 2026-09-30 design assumptions below.
 
 - Decision: Represent the policy as a plain list of allowed origins, `corsAllowedOrigins ::
   [Text]`, where the empty list means disabled, and reject the literal `*` at configuration
@@ -179,8 +194,7 @@ and `defaultRejectRequest` with the record fields `rejectCode` (400 by default),
 `rejectMessage`, `rejectHeaders`, and `rejectBody`. The client side offers `runClientWith ::
 String -> Int -> String -> ConnectionOptions -> Headers -> ClientApp a -> IO a`, whose fifth
 argument is the list of extra request headers a test needs to send an `Origin`.
-wai-websockets is registered under `yesodweb/wai` at
-`/Users/shinzui/Keikaku/hub/haskell/wai-project`; its `websocketsOr` decides whether a request
+wai-websockets is registered at `mori://yesodweb/wai/packages/wai-websockets`; its `websocketsOr` decides whether a request
 is an upgrade and hands the `PendingConnection` to the `ServerApp` unchanged.
 
 The test suite `shibuya-metrics-test` (`shibuya-metrics/shibuya-metrics.cabal`, modules under
@@ -242,8 +256,7 @@ errorResponse :: Status -> Text -> Text -> [Pair] -> Response
 ```
 
 whose result has status as given, header `Content-Type: application/json`, and a body that
-is the JSON object `{"error": <message>, "code": <code>}` extended with the extra pairs, in
-that order (message first, then code, then extras). Add the module to `exposed-modules` in
+is the JSON object `{"error": <message>, "code": <code>}` extended with the extra pairs, with reserved `error` and `code` keys protected from overrides by extras. Add the module to `exposed-modules` in
 `shibuya-metrics/shibuya-metrics.cabal`. Replace `notFoundResponse` in `Server.hs` with two
 calls: the unknown path becomes `errorResponse status404 "Not found" "not_found" []` and the
 plain-HTTP `/ws` case becomes `errorResponse status404 "WebSocket endpoint - use ws://
@@ -252,7 +265,7 @@ becomes `errorResponse status404 "Processor not found" "processor_not_found" ["p
 procIdText]` and the fallthrough becomes `errorResponse status404 "Not found" "not_found" []`.
 The `error` strings, the `processor` member, and the statuses are unchanged. Update the three
 exact expectations in `ServerSpec.hs` to include the `code` member, and add one example that
-decodes a body through `errorResponse` and checks the member order and content type.
+decodes a body through `errorResponse` and checks decoded members and content type (JSON object order is not a contract).
 Acceptance: `cabal test shibuya-metrics` passes with the new header-equality examples and
 the updated 404 examples, and `cabal build all` succeeds.
 
@@ -274,35 +287,49 @@ corsMiddleware :: [Text] -> Middleware
 isAllowedOrigin :: [Text] -> ByteString -> Bool
 ```
 
-`isAllowedOrigin` encodes each configured origin as UTF-8 and compares it to the header
-value with plain byte equality; no normalization, no prefix matching. `corsMiddleware []` is
-the identity middleware and returns the wrapped application untouched, so the disabled path
-allocates nothing per request. For a non-empty list the middleware reads the `Origin`
-request header. Absent: run the wrapped application unchanged. Present and allowed: if the
-method is `OPTIONS` and `Access-Control-Request-Method` is present, respond `204` with no
-body and exactly these headers, `Access-Control-Allow-Origin` set to the request's origin,
-`Vary: Origin`, `Access-Control-Allow-Methods: GET, POST, OPTIONS`,
-`Access-Control-Allow-Headers` set to the value of `Access-Control-Request-Headers` when
-present and to `Content-Type` otherwise, and `Access-Control-Max-Age: 600`; for any other
-request, run the wrapped application and append `Access-Control-Allow-Origin` (the
-request's origin) and `Vary: Origin` to whatever response it produces, including 404 and 503
-bodies, using `mapResponseHeaders`. Present and not allowed: a preflight gets
-`errorResponse status403 "Origin not allowed" "origin_not_allowed" []` with no CORS headers;
-any other request runs the wrapped application unchanged and gains no headers. The header
-`Access-Control-Allow-Credentials` is never emitted anywhere. In `Server.hs` wrap the HTTP
-side, `fallback = corsMiddleware config.corsAllowedOrigins (httpApp config master depChecks)`,
-so that both the WebSocket-enabled and WebSocket-disabled branches serve the same HTTP
-behavior. Add `Shibuya.Metrics.Cors` to `exposed-modules`.
+Compile configured origins to UTF-8 once at middleware construction and compare exactly;
+never normalize incoming Origin values, do prefix matching, or encode the list per request.
+`corsMiddleware []` is identity for existing read routes. With a nonempty list, append/merge
+`Vary: Origin` on every response, including requests with no Origin and refused origins, so
+shared caches cannot reuse a response selected under another origin. Preserve existing Vary
+tokens and avoid duplicate Allow-Origin headers. Allowed ordinary responses get one
+Access-Control-Allow-Origin value, including 404/503 responses. Disallowed ordinary read
+requests retain their existing status/body and get no Access-Control-* headers.
+
+Preflight requires OPTIONS plus Origin plus Access-Control-Request-Method. Permit only
+GET, POST and OPTIONS, validate the requested method, and return 204 with an empty body,
+Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers
+(echo validated header tokens, or Content-Type), and Access-Control-Max-Age 600. Vary also
+includes Access-Control-Request-Method and Access-Control-Request-Headers. Reject a forbidden
+origin with 403 origin_not_allowed and a forbidden method with 403 cors_method_not_allowed.
+Never emit Access-Control-Allow-Credentials. Malformed or multiple Origin values fail closed
+for preflight and mutation. Plain OPTIONS without preflight headers uses the ordinary router.
+This behavior follows the [Fetch CORS protocol](https://fetch.spec.whatwg.org/#http-cors-protocol); CORS controls response access and does not
+prevent a simple POST from reaching the server.
+
+Consequently EP-52 must check Origin on the actual control POST before calling core control,
+not rely on preflight or on withholding response headers. For that new route, a supplied
+Origin must be in corsAllowedOrigins even when the list is empty. Headerless CLI requests
+remain supported. A same-origin browser using control must explicitly configure its public
+page origin; do not infer trust from Host or arbitrary forwarded headers. This rule changes
+only new control routes. Authentication remains a deployment concern.
+
+Wrap `fallback = corsMiddleware config.corsAllowedOrigins (httpApp config master depChecks)`
+in combinedApp and expose the Cors module. The existing upgrade guard uses the same compiled
+exact-origin policy and remains disabled when the list is empty; it is not an authentication
+mechanism. Document validation requirements for hosts mounting combinedApp directly, since
+only startMetricsServer currently calls validateConfig.
+
 
 Write `shibuya-metrics/test/Shibuya/Metrics/CorsSpec.hs`, add it to `other-modules` and
 `test/Main.hs`, and give it these examples using `Network.Wai.Test` with
 `defaultRequest {requestMethod = ..., requestHeaders = ...}` passed through `setPath`: with
 `corsAllowedOrigins = ["https://ops.example.com"]`, a preflight `OPTIONS /metrics` from that
-origin returns 204 with the five headers above and an empty body; a `GET /metrics` from that
+origin returns 204 with the headers above and an empty body; a `GET /metrics` from that
 origin returns 200 with `Access-Control-Allow-Origin: https://ops.example.com` and `Vary:
 Origin` and still the published JSON body; a `GET /metrics/missing` from that origin returns
 the published 404 body with the two headers appended; a preflight and a `GET` from
-`https://evil.example.com` return no `Access-Control-*` header and no `Vary`, the preflight
+`https://evil.example.com` return no `Access-Control-*` header and a merged `Vary: Origin`, the preflight
 being 403 with code `origin_not_allowed`; a preflight carrying
 `Access-Control-Request-Headers: x-trace-id` gets that value echoed in
 `Access-Control-Allow-Headers`; no response anywhere carries
@@ -343,15 +370,14 @@ with the new examples.
 Milestone 4 records the change everywhere a reader would look. Extend the Haddock header of
 `shibuya-metrics/src/Shibuya/Metrics.hs` with a "Cross-origin access" paragraph naming the
 field and the preflight behavior, and with the error codes `not_found`,
-`processor_not_found`, `websocket_upgrade_required`, and `origin_not_allowed` beside the
+`processor_not_found`, `websocket_upgrade_required`, and `origin_not_allowed` and `cors_method_not_allowed` beside the
 routes that return them; re-export `corsMiddleware` and `errorResponse` from that module so
 hosts that mount `combinedApp` inside their own server can reuse them. In
 `docs/user/getting-started.md`, under "Monitoring & Metrics", add a "Cross-origin access"
 subsection showing the configuration, stating that the default is disabled and headerless,
 that the wildcard is refused, that the server still performs no authentication and expects a
-trusted network or an authenticating reverse proxy, and that serving the page and the API
-from one origin behind a reverse proxy is a supported deployment that needs no origin list
-at all. (`docs/USAGE_GUIDE.md` is an index that points at that file.) In
+trusted network or an authenticating reverse proxy. Same-origin read access needs no
+origin list; browser control POSTs explicitly allow their page origin even when same-origin. (`docs/USAGE_GUIDE.md` is an index that points at that file.) In
 `docs/capabilities/metrics-endpoints.md`, read `docs/capabilities/profile.dhall` and the
 existing records first, then replace the limit that says cross-origin access is unsupported
 with a sentence describing the configurable allow list and upgrade validation, add an
@@ -551,3 +577,6 @@ plan's Milestone 1 helper exists.
 `docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md`
 cites `corsAllowedOrigins` in its conformance mapping and closes IR-5 only after this plan is
 Complete. This plan has no hard dependency and no soft dependency on any other child.
+
+
+Revision note (2026-10-10): API and performance review applied. Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52. Implementation and performance measurements remain pending.

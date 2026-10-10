@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Date: 2026-09-30
+Date: 2026-10-10
 
 ## Context
 
@@ -70,27 +70,54 @@ explicitly; the first control operations are pause and resume, which are reversi
 non-destructive and therefore need no preview step. The server still performs no
 authentication: the documented posture is a trusted network or an authenticating reverse
 proxy in front of it, and a reverse proxy that serves the page and the API from one origin
-remains a supported deployment that needs no cross-origin configuration.
+remains supported without cross-origin configuration for reads. New control POSTs with
+an Origin require an explicit matching allow-list entry even for same-origin deployments;
+headerless CLI requests remain supported. Origin checking is not authentication.
 
 Hot-path observability stays within the release performance budget. Any per-message
 accounting added for inspection is measured with the paired harness of
 `docs/audits/lifecycle-release/performance-budgets.json` before it is accepted. Accounting
 that cannot meet the budget when always on is placed behind an explicit detail level whose
-disabled path is itself measured to be within budget, and the shipped default is the level
-the measurement supports.
+disabled path is itself measured to be within budget, and this initiative keeps MetricsBasic as the default. A future default change needs a separate
+decision and full integrated evidence, not only a focused per-child pass.
+
+The actual control POST validates a supplied Origin before mutation, including simple POSTs
+that do not trigger preflight. Enabled CORS responses merge Vary: Origin even for absent or
+refused origins; preflight also varies by requested method and headers. JSON object member
+order is not a semantic contract. New Cursor objects use a kind tag and string value so
+integer positions remain lossless in browser JSON.
+
+Pause means intake admission intent: a pull already admitted and adapter prefetch may still
+complete. Registry lifecycle checks, pause intent, timestamp and cold state publication are
+atomic. Control success returns the state captured by that transaction; it does not infer
+success by sampling later. Draining rejects operator control and atomically resumes intake
+before adapter shutdown. Cold Failed metrics alone do not prove a terminal lifecycle. Paused metrics retain the
+existing lastProgress timestamp: outstanding work still fails readiness when stuck, while
+a drained pause does not. Pause must not reset the stall clock.
+
+WebSocket output has strict frame and byte limits, including required frames. Sampling is
+independent of the sole writer, and subscription changes and resync batches are serialized.
+Required-frame saturation or a send deadline closes the connection rather than growing the
+queue. Delivery of terminal or goodbye to an unresponsive peer cannot be guaranteed.
+
+Completion requires the full integrated basic performance matrix against the pre-initiative
+baseline, identical harnesses with real cursor inputs, and sustained real observer load.
+Detailed allocation and contention are measured, not claimed absent. API review cannot
+certify performance. These constraints refine the planned extension; implementation remains
+pending in MasterPlan 7.
 
 ## Consequences
 
-- A client written against the 0.10.0.0 surface keeps working against every release that
-  follows this decision; new capabilities appear as new members, frames, and routes.
+- An extension-tolerant client can keep using existing members; unknown state/frame handling
+  must be tested explicitly, since additive sum values can break exhaustive decoders; new capabilities appear as new members, frames, and routes.
 - New members inside the processor metrics object are camelCase. This is a documented
   deviation from the cross-project convention that asked for snake_case members, chosen so
   that one object never mixes styles. New frame tags, error codes, and series follow the
   snake_case convention the surface already uses for those positions.
 - Adding `code` beside existing string `error` members changes exact-JSON test expectations
   deliberately; the change is recorded in the changelog as additive.
-- An unconfigured server is indistinguishable from today's server on the wire, so the
-  loopback-only default and the absence of authentication remain the operator's boundary.
+- Unconfigured existing read routes retain their header behavior; additive error codes
+  change bodies deliberately. The loopback-only default and the absence of authentication remain the operator's boundary.
 - Enabling cross-origin access or control is a host decision recorded in configuration, and
   documentation restates the trusted-network assumption instead of implying safety.
 - Core detail accounting may ship disabled by default if measurement requires it; a UI that

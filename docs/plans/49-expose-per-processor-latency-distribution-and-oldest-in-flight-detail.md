@@ -11,6 +11,18 @@ provenance:
     model: "claude-fable-5-1"
     harness: "claude-code"
     at: 2026-09-30T23:27:06Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      verdict: "changes-requested"
+      note: "Original draft review found API/concurrency and performance-evidence defects; addressed in the accompanying update. Implementation and measured acceptance remain pending."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-10T19:49:01Z
+      mode: "update"
+      note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
 ---
 
 
@@ -36,10 +48,11 @@ client written against the 0.10.0.0 surface keeps working: the additions are new
 members and new Prometheus series, and nothing that exists today is renamed, removed, or
 re-typed.
 
-The message hot path is protected. The new accounting stores its timestamps unboxed in
-preallocated arrays, uses no shared lock, allocates nothing per message, and lives behind a
-`MetricsDetail` switch on `AppConfig` whose disabled path costs one field read and a branch.
-The shipped default is whichever level the repository's paired performance harness accepts.
+The message hot path is protected. Detailed accounting uses a bounded table with synchronized slot publication and lives behind
+a `MetricsDetail` switch. `defaultMetricsDetail` is `MetricsBasic` throughout this initiative.
+The basic path performs no detail clocks, slot operations, or cleanup brackets. Detailed
+allocation and contention are measured costs, not assumed to be zero; changing the default
+requires a later explicit decision backed by integrated measurements.
 You can see the result by starting `shibuya-example`, letting a few messages through, and
 fetching `http://127.0.0.1:9090/metrics/<processorId>`: the JSON gains a `latency` object
 once a message has completed, and a blocked handler shows an `oldestInFlight` object whose
@@ -56,26 +69,29 @@ and the fixtures this plan introduces.
 ## Progress
 
 
-- [ ] Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; add `primitive` to `shibuya-core.cabal`.
+- [ ] Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; use existing base and containers dependencies.
 - [ ] Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatch`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
-- [ ] Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, torn-sample retry, and sampling with an injected clock; suite green.
+- [ ] Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, concurrent publication and cancellation cleanup, and sampling with an injected clock; suite green.
 - [ ] Milestone 1, measurement: paired capture of baseline, basic candidate, and detailed diagnostic under `-N1` and `-N4`; verdicts recorded under `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`.
-- [ ] Milestone 1, default: `defaultMetricsDetail` set from the verdict; decision recorded below.
+- [ ] Milestone 1, default: `defaultMetricsDetail` remains `MetricsBasic`; detailed overhead reported; decision recorded below.
 - [ ] Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
 - [ ] Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
 - [ ] Milestone 2, WebSocket: `sendIfChanged` compares an age-zeroed projection; update frame test.
-- [ ] Milestone 2, runner tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, tasty-bench allocation check on the basic path.
+- [ ] Milestone 2, runner tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, RTS allocation check on the basic path.
 - [ ] Milestone 3, records: ADR, `docs/architecture/METRICS.md`, Haddock, `docs/user/getting-started.md`, CAP-9 and CAP-10 evidence with `okf log add`, three changelogs.
 
 
 ## Surprises & Discoveries
 
 
-(None yet.)
+2026-10-10 review: Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10): Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
+  This revision supersedes conflicting 2026-09-30 design assumptions below.
 
 - Decision: Keep `runSupervised` and `runSupervisedBatch` at their current types and add
   `runSupervisedWith` and `runSupervisedBatchWith` that take a `MetricsDetail`; the old names
@@ -85,6 +101,7 @@ and the fixtures this plan introduces.
   Changing that signature would force a harness edit and make the baseline-versus-candidate
   comparison impossible by construction. Delegating through one default constant also lets a
   single flipped constant measure the detailed level with the unchanged harness.
+  The 2026-10-10 update keeps the released default basic regardless of this diagnostic.
   Date: 2026-09-30
 
 - Decision: Encode the `+Inf` bucket only in Prometheus text; the JSON `buckets` list carries
@@ -102,7 +119,7 @@ and the fixtures this plan introduces.
   Date: 2026-09-30
 
 - Decision: Measure with a focused budgets file that narrows only `requiredScenarios` to the
-  eight measured scenarios and changes no limit, pair count, confidence level, or seed.
+  focused measured scenarios and changes no limit, pair count, confidence level, or seed.
   Rationale: `scripts/audit/compare-performance.ts` reports every missing required scenario
   as an error, so the canonical file cannot judge a focused subset; the release-level full
   matrix stays the release owner's gate.
@@ -151,8 +168,7 @@ wins, otherwise a positive in-flight count means `Processing` and zero means `Id
 sampler-side design exists because `docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md`
 measured a direct per-handler clock design, two clock reads per message stored in boxed
 `IORef`s, at 28% slower on the serial no-op benchmark and 12% slower on the async one, and
-rejected it. This plan needs two clock reads per message by definition, so it stores them
-unboxed and measures before choosing a default.
+rejected it. This plan needs two clock reads per message by definition, so it measures synchronized detailed accounting and keeps the default basic.
 
 `beginProcessing handle maxConcurrency` fetch-adds `inFlight`, records the concurrency bound
 and marks the handle active when the count reaches one, and returns the new count.
@@ -219,14 +235,11 @@ now so the type breaks only once. `docs/plans/51-implement-source-level-processo
 adds a `Paused` constructor to `ProcessorState`; its edits are disjoint in content, and
 whichever plan lands second rebases on the first.
 
-The `primitive` package supplies `Data.Primitive.ByteArray` (unboxed mutable arrays with
-`casIntArray` and `fetchAddIntArray`) and `Data.Primitive.SmallArray`. It is not registered
-in the Mori registry, so read it from the local Cabal store after building. At planning time
-Hackage's preferred versions list 0.9.1.0 as the newest release and the repository's current
-solver plan already resolves `primitive-0.9.1.0` through `streamly`, so declaring
-`primitive ^>=0.9` adds a direct edge without changing the dependency solution. Verify both
-facts again before editing the Cabal file.
-
+The proposed `Data.Primitive.ByteArray.casIntArray` and `fetchAddIntArray` are not
+exports of primitive 0.9.1.0 (verified in its cached source after Mori returned no project).
+Do not add that dependency for these nonexistent APIs. Start with synchronized bounded
+slots using `base` MVars and existing containers; any later low-level optimization must
+identify real APIs through Mori, verify releases, and prove its memory-ordering protocol.
 
 ## Plan of Work
 
@@ -244,11 +257,11 @@ Add the types to `shibuya-core/src/Shibuya/Core/Metrics.hs` and export them. `Me
 is `MetricsBasic | MetricsDetailed !DetailOptions`; `DetailOptions` is a record with
 `maxTrackedPartitions :: !Int`, `defaultDetailOptions = DetailOptions 256`, and
 `defaultMetricsDetail :: MetricsDetail` is the single constant that Milestone 1's measurement
-fixes. `LatencyBucket` is `{ le :: !Double, count :: !Int }`; `LatencySummary` is
-`{ count :: !Int, sumSeconds :: !Double, buckets :: ![LatencyBucket] }` where `buckets` is
+records, initially and finally `MetricsBasic`. `LatencyBucket` is `{ le :: !Double, count :: !Integer }`; `LatencySummary` is
+`{ count :: !Integer, sumSeconds :: !Double, buckets :: ![LatencyBucket] }` where `buckets` is
 cumulative over `latencyBucketBoundsSeconds = [0.0001, 0.00025, 0.0005, 0.001, 0.0025,
 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60]`; keep a parallel
-`latencyBucketBoundsNs :: [Int]` for the hot path so no floating-point work happens per
+`latencyBucketBoundsNs :: [Word64]` for the hot path so no floating-point work happens per
 message, and a parallel `latencyBucketLabels :: [Text]` (`"0.0001"` through `"60"` and
 `"+Inf"`) for Prometheus. `OldestInFlight` is `{ messageId :: !MessageId, startedAt ::
 !UTCTime, ageSeconds :: !Double }`. All three derive `Eq`, `Show`, `Generic`, and generic
@@ -260,59 +273,54 @@ genericParseJSON omitNothingOptions` with `omitNothingOptions = defaultOptions
 `shibuya-core/src/Shibuya/Core/Types.hs` add `ToJSON` and `FromJSON` to `MessageId`'s
 newtype-deriving list; confirm first with a search that no instance exists anywhere.
 
-Add the slot table. `InFlightSlots` holds `slotCount`, `shardCount = min slotCount 16`, a
-`MutableByteArray RealWorld` of `slotCount` `Int` start timestamps (0 means free), a
-`SmallMutableArray RealWorld MessageId` of the same length initialised with the sentinel
-`MessageId ""`, a `MutableByteArray RealWorld` histogram laid out as `shardCount` groups of
-21 `Int`s (18 finite buckets, one overflow bucket, one nanosecond sum, one count), and an
-`AtomicCounter` `slotMisses`. Bucket counters are raw, not cumulative; the sampler
-accumulates. `MetricsHandle` gains `detail :: !MetricsDetail` and `slots :: !(Maybe
-InFlightSlots)`. `newMetricsHandleWith detail maxConcurrency now` and
-`newMetricsHandleWithClockAndDetail clock detail maxConcurrency now` build the table only for
-`MetricsDetailed`, with `slotCount = max 1 maxConcurrency`; `newMetricsHandle` and
-`newMetricsHandleWithClock` keep their types and mean `MetricsBasic`.
+Add the slot table. `InFlightSlots` is abstract and contains exactly `max 1 maxConcurrency`
+slots, each protected by its own `MVar`, plus a diagnostic miss counter. A slot contains
+an optional `(MessageId, Word64)` start and a strict histogram accumulator: eighteen finite
+buckets, overflow, total count, and an `Integer` nanosecond sum. Zero is a valid monotonic
+timestamp, never a free-slot sentinel. Bounds are `Word64`, not machine-sized signed Int.
+Counters and sums use `Integer` to avoid lifetime overflow. The slot is also its histogram
+shard; a lock protects a short publication or sample, never a handler or finalizer. No claim
+of zero allocation or constant-time scanning is made: scanning is O(concurrency) and must
+be measured at 1, 4, 64, and 256 concurrent handlers before considering an optimization.
 
-Add the hooks. `claimInFlightSlot handle messageId` returns `-1` immediately when `slots`
-is `Nothing`; otherwise it reads the monotonic clock once, scans slots from 0 with
-`casIntArray` expecting 0 and writing the timestamp, writes the message id beside the first
-slot it wins, and returns its index; if no slot is free it fetch-adds `slotMisses` and
-returns `-1`. `releaseInFlightSlot handle slot` returns at once for `-1`; otherwise it reads
-the clock, computes the duration in nanoseconds from the slot's start, picks the bucket by
-scanning `latencyBucketBoundsNs`, fetch-adds that bucket, the sum, and the count in shard
-`slot mod shardCount`, writes the sentinel id, and writes 0 to the start cell last so a
-sampler never sees a live id on a free slot. Mark both `INLINE`. Under `Async n`, `Ahead n`,
-and the keyed scheduler the in-flight count never exceeds the bound, and Serial is 1, so
-`slotCount = max 1 maxConcurrency` suffices; `slotMisses` exists to prove that.
+`MetricsHandle` gains `detail :: !MetricsDetail` and `slots :: !(Maybe InFlightSlots)`.
+`newMetricsHandleWith detail maxConcurrency now` and the clock-injected variant allocate
+slots only for `MetricsDetailed`. Existing `newMetricsHandle` and `newMetricsHandleWithClock`
+keep their signatures and mean basic. Validate positive concurrency and nonnegative
+`maxTrackedPartitions` before acquiring resources; zero partitions means latest-only tracking.
 
-Make `sampleMetrics` read the table. For a detailed handle: read every start cell, keep the
-minimum nonzero; read that slot's id, then re-read the start cell, and accept only if it is
-unchanged; on a torn read retry the scan up to three times and otherwise report
-`oldestInFlight = Nothing` for this sample. Convert the accepted start with `monotonicToUTC`,
-compute `ageSeconds` from `progressClock` now, and build `OldestInFlight`; `Nothing` when no
-slot is claimed. Sum the shards into a `LatencySummary` whose `buckets` are cumulative over
-the eighteen finite bounds; report `Nothing` until `count` is positive. A basic handle
-reports both members `Nothing`.
+`claimInFlightSlot` returns -1 for a basic handle; otherwise read the clock and claim the
+first free slot under that slot's MVar, publishing identity and timestamp together. Exhaustion
+increments the diagnostic miss count and returns -1, but any miss in a supported runner is
+a correctness failure in tests. `releaseInFlightSlot` reads the end clock, then under the
+owned slot's MVar clears the start and records one completed handler-plus-finalization
+observation. `abandonInFlightSlot` clears ownership without recording a completed duration.
+Both ignore -1. Use masked ownership transfer around claim and cleanup, restore cancellation
+for the processing action, abandon on exceptional exit, and release exactly once on normal
+exit. Never put this bracket on the basic path. Do not swallow asynchronous cancellation.
+A completed failed finalization is an observation; an interrupted attempt is not.
 
-Wire the hooks. In `processOne`, bind `slot <- liftIO (claimInFlightSlot metricsHandle
-messageId)` immediately after `beginProcessing`, and call `releaseInFlightSlot metricsHandle
-slot` immediately after the `finishFinalizationFailure` or `finishProcessing` call and
-before any `requestProcessorExit`. In `processOneBatch`, claim with `(NE.head
-batch).envelope.messageId` after `beginProcessing` and release after
-`recordBatchOutcomeMetrics`; a batch therefore reports its whole handler-plus-finalization
-duration and the first message of the oldest batch. Add `runSupervisedWith` and
-`runSupervisedBatchWith` to `Supervised.hs`, identical to the existing functions except for a
-leading `MetricsDetail` argument passed to `newMetricsHandleWith` with the concurrency bound
-(`Serial` is 1, `Ahead n` and `Async n` are `n`); define `runSupervised =
-runSupervisedWith defaultMetricsDetail` and likewise for batch. `runWithMetrics` and
-`runWithMetricsBatch` stay basic. In `App.hs` add `metricsDetail :: !MetricsDetail` to
-`AppConfig`, set it to `defaultMetricsDetail` in `defaultAppConfig`, and have
-`spawnProcessors` call the `With` variants with `config.metricsDetail`. Re-export
-`MetricsDetail (..)`, `DetailOptions (..)`, `defaultDetailOptions`, `defaultMetricsDetail`,
-`LatencySummary (..)`, `LatencyBucket (..)`, and `OldestInFlight (..)` from `Shibuya`. Add
-`primitive ^>=0.9` to the library `build-depends` in `shibuya-core/shibuya-core.cabal`.
-Search the whole repository for direct `AppConfig` and `ProcessorMetrics` record construction
-(the metrics test support, the wire-load fixture, and the benches construct
-`ProcessorMetrics`) and add the new fields.
+Make `sampleMetrics` read each slot under its MVar, copy its strict contents, and release
+the lock before formatting. Aggregate histogram copies and derive count and cumulative buckets
+from the same copies so bucket counts remain ordered and `+Inf == count`. Select the oldest
+published start; different slots are sampled at slightly different instants, so this is a
+best-effort concurrent observation, not an atomic snapshot of all handlers. Identity and start
+within a slot must always match. A basic handle reads no slot or detail clock.
+
+In `processOne`, bracket detailed ownership immediately after `beginProcessing` through
+completion of finalization and metrics accounting. In `processOneBatch`, claim with the first
+retained message identity and release after `recordBatchOutcomeMetrics`. The histogram measures
+one processing attempt in serial/message mode and one emitted batch in batch mode, including
+finalization retries. Document these units on JSON and Prometheus; it is not handler-only
+latency or adapter queue wait. Cancellation at every hook boundary must leave no occupied slot.
+
+Add `runSupervisedWith` and `runSupervisedBatchWith` with a leading `MetricsDetail` argument.
+Existing runner signatures delegate with `defaultMetricsDetail = MetricsBasic`; `runWithMetrics`
+and `runWithMetricsBatch` remain basic. `AppConfig.metricsDetail` also defaults to the same
+constant, and `spawnProcessors` calls the `With` variants. Re-export the new public types
+and constructors through `Shibuya`. Update every direct metrics/config record construction.
+No dependency is added for this prototype.
+
 
 Write the unit tests in a new `shibuya-core/test/Shibuya/Core/MetricsSpec.hs`, listed in
 `other-modules` of `shibuya-core-test` and in `shibuya-core/test/Main.hs`, using
@@ -322,30 +330,30 @@ advancing the clock by 3 ms lands exactly in the `0.005` bucket and every larger
 cumulative summary, with `count` 1 and `sumSeconds` 0.003; `latency` is `Nothing` before any
 release; with two slots claimed at different clock values the sampler names the earlier
 message and its age equals the clock difference; a basic handle returns `Nothing` for both
-members and never touches the clock (assert the clock call count). Write each test before its
+members and never touches the clock (assert the clock call count before and after the detail hooks; the existing basic sampler may read
+its progress clock). Add deterministic races for claim/publication/release and cancellation
+at every ownership boundary, timestamp zero, repeated slot reuse, and a duration over 60
+seconds whose finite buckets remain zero but overflow/count increment. Write each test before its
 implementation and record the failing run.
 
-Then measure. Build the lifecycle-load executable from three sources with one unchanged
-harness: the committed baseline (the parent of the Milestone 1 commit, in a detached
-worktree), the Milestone 1 commit whose `defaultMetricsDetail` is `MetricsBasic`, and a
-diagnostic worktree at the same commit with only that constant flipped to `MetricsDetailed
-defaultDetailOptions`, whose patch hash is recorded and which is never committed. Confirm
-with `git rev-parse HEAD:shibuya-core-bench` that the harness tree hash is identical in all
-three, and confirm that the normalized solver hash is identical (adding the direct
-`primitive` edge must not change the external solution). Capture `-N1` and `-N4` with
-`scripts/audit/capture-performance-paired.ts` for the eight scenarios named in Concrete
-Steps, ten pairs per cell, twenty for any cell the comparator calls inconclusive, and judge
-each dataset pair with `scripts/audit/compare-performance.ts` against a focused copy of the
-budgets that narrows only `requiredScenarios`. The basic candidate must pass every cell
-against the baseline; a failing or inconclusive basic cell is a defect to fix, not a number
-to waive. If the detailed diagnostic also passes every cell against the baseline, set
-`defaultMetricsDetail = MetricsDetailed defaultDetailOptions`; otherwise leave it
-`MetricsBasic`. Either way record the measured detailed cost in the Decision Log now and in
-the changelog and ADR in Milestone 3. Keep the raw datasets, verdicts, identities, and
-commands under `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/` with a
-`README.md` in the style of `docs/audits/lifecycle-release/artifacts/ep39-metrics-lifecycle/README.md`.
-If Milestone 2 or 3 later touches `claimInFlightSlot`, `releaseInFlightSlot`,
-`processOne`, or `processOneBatch`, measure again.
+Then measure using the paired capture commands below. The baseline is the parent of the
+accounting commit and the basic candidate is the committed candidate, with identical harness
+sources, external solver identities, compiler flags and RTS. A diagnostic build may flip
+only `defaultMetricsDetail` to detailed, recording the exact patch hash and asserting that a
+sample actually contains a latency summary. Keep the shipped constant basic even if the
+focused detailed comparison passes. Ten alternating pairs under both -N1 and -N4 are the
+minimum; rerun inconclusive cells at twenty pairs, and never accept a failed or inconclusive
+basic cell. Report detailed overhead explicitly and optimize without weakening correctness.
+
+Focused captures must include the eight message scenarios below plus `metrics-enabled`,
+`metrics-disabled`, `idle-worker`, `startup-shutdown`, `graceful-shutdown-drain`, and
+`batch-timeout`; update the focused budgets' requiredScenarios to exactly the captured set,
+without changing limits. The final integration gate in the MasterPlan compares all changes
+against the pre-initiative baseline using the complete canonical matrix. Repeat evidence if
+later edits change hooks, samplers, encoders, or configuration. Measure observer fan-out and
+long-lived detailed processors separately, including 1/4/64/256 concurrency, clock zero,
+slot reuse, and long total durations. Store commands, source/patch hashes and reports under
+`docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`.
 
 
 ### Milestone 2: exposure over JSON, Prometheus, and WebSocket, with fixtures and runner tests
@@ -401,13 +409,15 @@ handlers block on four separate `MVar`s released in reverse order: after all fou
 oldest must be the first message; after releasing it, the oldest must be the second. A batch
 processor built with `mkBatchProcessor` through `runApp` with `metricsDetail = MetricsDetailed
 defaultDetailOptions`: `latency.count` equals the number of emitted batches, not messages.
-Finally an allocation check: in `shibuya-core-bench/bench/Bench/HotPath.hs` add
-`serial-noop-10000-basic` and `serial-noop-10000-detailed` cases using `runSupervisedWith`
-explicitly, keep `serial-noop-10000` unchanged, run the group with `--csv` on the parent of
-the Milestone 1 commit and on the candidate, and record that the `serial-noop-10000` and
-`serial-noop-10000-basic` allocated-bytes columns match the baseline within 1%.
+Finally measure allocation with lifecycle-load's RTS statistics (`allocatedBytesPerMessage`),
+not tasty-bench CSV timing columns. The same benchmark source must be built against both
+production revisions; adding a case only to the candidate invalidates the comparison. Use
+an identical harness extension on both sides for higher concurrency and retain its hash.
+Basic allocation must meet the canonical 5% limit; detailed allocation is reported explicitly.
 
-Run the example: `cabal run shibuya-example`, then `curl -s
+
+Temporarily configure the example AppConfig with `metricsDetail = MetricsDetailed
+defaultDetailOptions`, then run `cabal run shibuya-example`, then `curl -s
 http://127.0.0.1:9090/metrics/<processorId> | jq .latency` and paste the object into
 Concrete Steps.
 
@@ -416,11 +426,11 @@ Concrete Steps.
 
 
 At the end of this milestone the design is explained where the next contributor will look.
-Create `docs/adr/<next>-account-for-in-flight-detail-and-latency-off-the-allocation-path-behind-a-measured-detail-level.md`
+Create `docs/adr/<next>-account-for-in-flight-detail-and-latency-with-bounded-synchronized-slots-behind-an-opt-in-detail-level.md`
 at the next unused four-digit number, in the plain-Markdown format of
 `docs/adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md` (title, Status,
 Date, Context, Decision, Consequences, Evidence): the slot table, the sharded histogram, the
-`MetricsDetail` switch, the measured default with its numbers, the age-zeroed WebSocket
+`MetricsDetail` switch, the basic default and measured detailed overhead, the age-zeroed WebSocket
 projection, the `+Inf` and gauge decisions above, and a sentence that
 `docs/plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md` extends
 the record with a bounded partition table. Add a "Latency and in-flight detail" section to
@@ -433,7 +443,7 @@ evidence rows for the new accounting to CAP-9 (`processor-introspection.md`) and
 series and members to CAP-10 (`metrics-endpoints.md`), advance their timestamps, append with
 `okf log add`, and validate. Append to `CHANGELOG.md`, `shibuya-core/CHANGELOG.md`, and
 `shibuya-metrics/CHANGELOG.md` under an `Unreleased` heading: breaking for direct construction
-of `AppConfig` and `ProcessorMetrics` and for the new `primitive` dependency; additive for
+of `AppConfig` and `ProcessorMetrics`; additive for
 the `latency` and `oldestInFlight` members, the `MessageId` JSON instances, the histogram and
 gauge series, and the new public functions. Do not choose a version.
 
@@ -441,17 +451,15 @@ gauge series, and the new public functions. Do not choose a version.
 ## Concrete Steps
 
 
-Run everything from `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya`. Confirm the
-dependency facts first:
+Run everything from the repository root. Before editing, search for existing JSON instances:
 
 ```bash
-grep -rn 'instance.*JSON.*MessageId' shibuya-core/src shibuya-metrics/src   # expect: no output
-curl -sL https://hackage.haskell.org/package/primitive/preferred.json | head -c 200
-grep -o '"pkg-name":"primitive","pkg-version":"[^"]*"' dist-newstyle/cache/plan.json | head -1
+rg 'instance.*JSON.*MessageId' shibuya-core/src shibuya-metrics/src
 ```
 
-Expected: the preferred list starts with `0.9.1.0`, and the plan already contains
-`primitive-0.9.1.0`. Build and test after each milestone:
+
+Expected: no existing MessageId JSON instances. Build and test after each milestone:
+
 
 ```bash
 cabal build all
@@ -471,7 +479,8 @@ git worktree add --detach /tmp/ep49-detailed <milestone-1-commit>
 # In /tmp/ep49-detailed only: set defaultMetricsDetail = MetricsDetailed defaultDetailOptions.
 for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && git rev-parse HEAD:shibuya-core-bench); done
 for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && cabal build shibuya-core-bench:lifecycle-load && jq -r '.["install-plan"][] | select(.style != "local") | "\(.["pkg-name"])-\(.["pkg-version"])"' dist-newstyle/cache/plan.json | sort -u | shasum -a 256); done
-jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path"]' \
+mkdir -p docs/audits/lifecycle-release/artifacts/ep49-detail-accounting
+jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path","metrics-enabled","metrics-disabled","idle-worker","startup-shutdown","graceful-shutdown-drain","batch-timeout"]' \
   docs/audits/lifecycle-release/performance-budgets.json \
   > docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/focused-budgets.json
 for rts in N1 N4; do
@@ -484,7 +493,7 @@ for rts in N1 N4; do
     --candidate-output docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/basic-${rts,,}.json \
     --candidate-label ep49-basic-${rts,,} --candidate-production-sha <milestone-1-sha> \
     --rts -$rts --capabilities $caps --iterations 10 \
-    --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path \
+    --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path,metrics-enabled,metrics-disabled,idle-worker,startup-shutdown,graceful-shutdown-drain,batch-timeout \
     --machine-id MacBookPro18,2 --platform Darwin-arm64 --compiler ghc-9.12.4 --optimization O2 \
     --harness-sha <bench-tree-hash> --solver-plan-hash <normalized-solver-hash>
   bun scripts/audit/compare-performance.ts \
@@ -502,11 +511,10 @@ solver hashes printed by the loops must be identical; if the solver hash differs
 resolve the dependency difference before capturing. The comparator exits 0 for pass, 1 for
 fail, and 2 for inconclusive; a `${rts,,}` expansion needs bash 4 or later, otherwise write
 the lowercase names by hand. Remove the worktrees afterwards with `git worktree remove
---force`. The `serial-fixed-rate`, `batch-timeout`, `idle-worker`, observer, and shutdown
-scenarios are deliberately outside this focused set; the release-level full matrix remains
-the release owner's gate.
+--force`. The final EP-52 integration gate runs the entire canonical matrix, including
+serial-fixed-rate and the health/WebSocket proxies, plus actual sustained observer load.
 
-Milestone 2 transcript to capture:
+Milestone 2 transcript to capture with the example explicitly configured detailed:
 
 ```bash
 cabal run shibuya-example &
@@ -516,7 +524,7 @@ curl -s http://127.0.0.1:9090/metrics/prometheus | grep -E 'processing_seconds|o
 ```
 
 Expected: a `latency` object with `count`, `sumSeconds`, and eighteen `buckets`, and
-histogram lines ending in `le="+Inf"` whose value equals the `_count` line. Milestone 3
+histogram bucket lines labelled `le="+Inf"` whose value equals the `_count` line. Milestone 3
 records:
 
 ```bash
@@ -539,7 +547,7 @@ Intention: intention_01m3ta8zgtebmaz00g0snjzy5a
 
 After one message has completed on a detailed processor, `GET /metrics/<processorId>`
 returns a `latency` member with `count` 1, a positive `sumSeconds`, and eighteen `buckets`
-whose counts are non-decreasing and end at 1, and `GET /metrics/prometheus` contains
+whose counts are non-decreasing (the 60-second bucket need not equal count for longer attempts), and `GET /metrics/prometheus` contains
 `shibuya_message_processing_seconds_bucket{processor="<id>",le="+Inf"} 1.0`,
 `shibuya_message_processing_seconds_count{processor="<id>"} 1.0`, and a matching `_sum`.
 While a handler is deliberately blocked, two fetches a second apart return `oldestInFlight`
@@ -555,8 +563,7 @@ counted; the `MetricsSpec` examples, the two golden examples, and the `WebSocket
 example were each observed failing before their implementation or by mutation, and the
 failing runs are recorded in Surprises & Discoveries with seeds. The basic-candidate verdict
 files report `pass` for every cell under both `-N1` and `-N4`; the detailed verdict files
-exist and the shipped `defaultMetricsDetail` matches them. The tasty-bench allocation
-columns for the unchanged serial case match the baseline within 1%. The ADR, architecture
+exist and the shipped `defaultMetricsDetail` remains `MetricsBasic`. RTS allocation measurements for the basic path meet the canonical 5% limit. The ADR, architecture
 section, Haddock, usage guide, capability records, and three changelogs exist and the
 capability bundle validates.
 
@@ -571,16 +578,15 @@ them if a build is interrupted. Datasets under `docs/audits/lifecycle-release/ar
 are append-only: a rerun writes new file names rather than overwriting a set the plan already
 cites. If a basic cell fails, profile the hot path (a ticky profile of `processOne` is the
 quickest tool), fix the cause, commit, and capture again from the new commit; never edit a
-budget or reinterpret an inconclusive result. If the `primitive` bound does not solve in
-`cabal build all`, do not relax any other bound; report it. Work on the current branch and
+budget or reinterpret an inconclusive result. Do not introduce a low-level dependency without verified APIs and new measurements. Work on the current branch and
 commit small conventional changes with the trailers above.
 
 
 ## Interfaces and Dependencies
 
 
-New dependency: `primitive ^>=0.9` in the library stanza of `shibuya-core/shibuya-core.cabal`
-(Hackage newest 0.9.1.0 at planning time; already in the solution through `streamly`).
+No new dependency is required by the synchronized-slot prototype.
+
 
 New and changed interfaces in `Shibuya.Core.Metrics`, all exported:
 
@@ -588,9 +594,9 @@ New and changed interfaces in `Shibuya.Core.Metrics`, all exported:
 data MetricsDetail = MetricsBasic | MetricsDetailed !DetailOptions
 data DetailOptions = DetailOptions {maxTrackedPartitions :: !Int}
 defaultDetailOptions :: DetailOptions          -- DetailOptions 256
-defaultMetricsDetail :: MetricsDetail          -- fixed by Milestone 1's measurement
-data LatencyBucket = LatencyBucket {le :: !Double, count :: !Int}
-data LatencySummary = LatencySummary {count :: !Int, sumSeconds :: !Double, buckets :: ![LatencyBucket]}
+defaultMetricsDetail :: MetricsDetail          -- MetricsBasic throughout this initiative
+data LatencyBucket = LatencyBucket {le :: !Double, count :: !Integer}
+data LatencySummary = LatencySummary {count :: !Integer, sumSeconds :: !Double, buckets :: ![LatencyBucket]}
 latencyBucketBoundsSeconds :: [Double]
 latencyBucketLabels :: [Text]
 data OldestInFlight = OldestInFlight {messageId :: !MessageId, startedAt :: !UTCTime, ageSeconds :: !Double}
@@ -602,7 +608,8 @@ data MetricsHandle = MetricsHandle { {- existing fields -} , detail :: !MetricsD
 newMetricsHandleWith :: MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
 newMetricsHandleWithClockAndDetail :: IO Word64 -> MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
 claimInFlightSlot :: MetricsHandle -> MessageId -> IO Int      -- INLINE; -1 when basic or full
-releaseInFlightSlot :: MetricsHandle -> Int -> IO ()           -- INLINE; no-op for -1
+releaseInFlightSlot :: MetricsHandle -> Int -> IO ()           -- no-op for -1
+abandonInFlightSlot :: MetricsHandle -> Int -> IO ()           -- cancellation cleanup
 ```
 
 `beginProcessing`, `finishProcessing`, `finishFinalizationFailure`, `recordBatchOutcomeMetrics`,
@@ -631,3 +638,6 @@ extends them and must not redefine them. `docs/plans/51-implement-source-level-p
 edits the same module for a different concern; implement the two sequentially in either
 order and rebase the second. Coordination context is
 `docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`.
+
+
+Revision note (2026-10-10): API and performance review applied. Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose. Implementation and performance measurements remain pending.
