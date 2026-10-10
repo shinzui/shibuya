@@ -13,6 +13,7 @@ parser.add_argument('--baseline', type=Path, required=True)
 parser.add_argument('--candidate', type=Path, default=Path.cwd())
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--pairs', type=int, default=10)
+parser.add_argument('--constraint', action='append', default=[])
 parser.add_argument('--messages', type=int, default=2_000_000)
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
@@ -23,6 +24,9 @@ def command(root, *argv):
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+for root in roots.values():
+    subprocess.run(['cabal', 'build', 'metrics-observer-load'] + ['--constraint=' + value for value in args.constraint], cwd=root, check=True, stdout=subprocess.DEVNULL)
 
 harnesses = {name: sha((root / 'shibuya-metrics/bench/ObserverLoad.hs').read_bytes()) for name, root in roots.items()}
 if len(set(harnesses.values())) != 1:

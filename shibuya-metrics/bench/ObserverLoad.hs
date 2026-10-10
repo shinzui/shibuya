@@ -78,7 +78,7 @@ main = do
                   atomically $ modifyTVar' connected (+ 1)
                   -- A quarter of observers read ten times slower than the producer.
                   forever $ do
-                    when (index `mod` 4 == 0) $ threadDelay 100_000
+                    when ((index - 1) `mod` 4 == 0) $ threadDelay 100_000
                     bytes <- WS.receiveData conn :: IO LBS.ByteString
                     _ <- evaluate $ LBS.length bytes
                     atomicModifyIORef' frames (\n -> (n + 1, ()))
