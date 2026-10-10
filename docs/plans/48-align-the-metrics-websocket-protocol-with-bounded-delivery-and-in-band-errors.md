@@ -94,6 +94,13 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 ## Surprises & Discoveries
 
 
+2026-10-10 terminal-admission regression: a required terminal can evict an ordinary update.
+The new controlled case fails against `e1fbebd` with `[Update,Required,Update]` instead of
+`[Update,Update,Required]` (seed 639195096). Stop producing ordinary deltas immediately on
+that admission's `DroppedUpdates` outcome and retire only the admitted terminal ledger;
+the next tick supplies the adjacent recovery error/snapshot without repeating terminal.
+The failing transcript is `m2-terminal-admission-red.txt` in the evidence directory.
+
 2026-10-10 scheduling discovery: thirty default `-N4` pairs per configuration remain
 inconclusive, with two one-client candidate p99 outliers 5–9 times the baseline and matching
 large throughput shifts despite almost identical allocation. A matched `-N4 -qm` scheduling

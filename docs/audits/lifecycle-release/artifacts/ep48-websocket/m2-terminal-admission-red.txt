@@ -1,0 +1,81 @@
+Using saved setting for 'extra-substituters = https://shinzui.cachix.org' from ~/.local/share/nix/trusted-settings.json.
+Using saved setting for 'extra-trusted-public-keys = shinzui.cachix.org-1:QEmAoJrA9WwLP0uxfDgktLi2BRrcvQQWdz8NzcMg4/E=' from ~/.local/share/nix/trusted-settings.json.
+warning: ignoring untrusted flake configuration setting 'extra-trusted-public-keys'.
+Pass '--accept-flake-config' to trust it
+git-hooks.nix: updating /private/tmp/shibuya-ep48-mutants-final repo
+/private/tmp/shibuya-ep48-mutants-final/.pre-commit-config.yaml
+commit-msg uninstalled
+pre-commit uninstalled
+pre-commit installed at /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/.git/hooks/commit-msg
+pre-commit installed at /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/.git/hooks/pre-commit
+The files belonging to this database system will be owned by user "shinzui".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /private/tmp/shibuya-ep48-mutants-final/db/db ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... America/Los_Angeles
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /private/tmp/shibuya-ep48-mutants-final/db/db -l logfile start
+
+Build profile: -w ghc-9.12.4 -O1
+In order, the following will be built (use -v for more details):
+ - shibuya-core-0.10.0.1 (lib) (configuration changed)
+ - shibuya-metrics-0.10.0.1 (lib) (configuration changed)
+ - shibuya-metrics-0.10.0.1 (test:shibuya-metrics-test) (configuration changed)
+Configuring library for shibuya-core-0.10.0.1...
+Preprocessing library for shibuya-core-0.10.0.1...
+Building library for shibuya-core-0.10.0.1...
+Configuring library for shibuya-metrics-0.10.0.1...
+Preprocessing library for shibuya-metrics-0.10.0.1...
+Building library for shibuya-metrics-0.10.0.1...
+[ 9 of 11] Compiling Shibuya.Metrics.WebSocket ( src/Shibuya/Metrics/WebSocket.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/build/Shibuya/Metrics/WebSocket.o, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/build/Shibuya/Metrics/WebSocket.dyn_o ) [Source file changed]
+[10 of 11] Compiling Shibuya.Metrics.Server ( src/Shibuya/Metrics/Server.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/build/Shibuya/Metrics/Server.o, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/build/Shibuya/Metrics/Server.dyn_o ) [Shibuya.Metrics.WebSocket changed]
+Configuring test suite 'shibuya-metrics-test' for shibuya-metrics-0.10.0.1...
+Preprocessing test suite 'shibuya-metrics-test' for shibuya-metrics-0.10.0.1...
+Building test suite 'shibuya-metrics-test' for shibuya-metrics-0.10.0.1...
+[ 4 of 11] Compiling Shibuya.Metrics.ServerSpec ( test/Shibuya/Metrics/ServerSpec.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test-tmp/Shibuya/Metrics/ServerSpec.o ) [Shibuya.Metrics.WebSocket changed]
+[ 5 of 11] Compiling Shibuya.Metrics.PrometheusSpec ( test/Shibuya/Metrics/PrometheusSpec.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test-tmp/Shibuya/Metrics/PrometheusSpec.o ) [Shibuya.Metrics.WebSocket changed]
+[ 8 of 11] Compiling Shibuya.Metrics.CorsSpec ( test/Shibuya/Metrics/CorsSpec.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test-tmp/Shibuya/Metrics/CorsSpec.o ) [Shibuya.Metrics.WebSocket changed]
+[10 of 11] Compiling Shibuya.Metrics.WebSocketSpec ( test/Shibuya/Metrics/WebSocketSpec.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test-tmp/Shibuya/Metrics/WebSocketSpec.o ) [Source file changed]
+[11 of 11] Compiling Main             ( test/Main.hs, /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test-tmp/Main.o ) [Shibuya.Metrics.WebSocketSpec changed]
+[12 of 12] Linking /private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/build/shibuya-metrics-test/shibuya-metrics-test [Objects changed]
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+controlled outbound delivery
+  stops ordinary deltas when terminal admission drops an update [✘]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:216:45: 
+  1) controlled outbound delivery stops ordinary deltas when terminal admission drops an update
+       expected: [Update,Update,Required]
+        but got: [Update,Required,Update]
+
+  To rerun use: --match "/controlled outbound delivery/stops ordinary deltas when terminal admission drops an update/" --seed 639195096
+
+Randomized with seed 639195096
+
+Finished in 0.0050 seconds
+1 example, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

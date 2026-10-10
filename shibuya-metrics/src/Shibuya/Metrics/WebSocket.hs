@@ -325,15 +325,20 @@ pushUpdates config master cs = do
     else do
       -- Required terminal events precede updates and survive eviction.
       result <- admit config cs terminalFrames
-      unless (result == Out.MustClose) $ do
-        let updates = [ProcessorUpdate pid pm | (pid, pm) <- Map.toList filtered, Map.lookup pid previous /= Just pm]
-        frames <- mapM (encoded gen Out.Update) updates
-        updateResult <- admit config cs frames
-        unless (updateResult == Out.MustClose) $ atomically $ do
-          -- Retain the old live comparison ledger after delta loss, but retire
-          -- admitted terminals so the recovery tick never repeats them.
-          pending <- readTVar cs.resyncPending
-          writeTVar cs.lastMetrics $ if pending then Map.withoutKeys previous removed else filtered
+      case result of
+        Out.MustClose -> pure ()
+        -- Terminal admission can itself evict a delta. Stop ordinary updates
+        -- immediately, but retire admitted terminals before the recovery tick.
+        Out.DroppedUpdates -> atomically $ writeTVar cs.lastMetrics $ Map.withoutKeys previous removed
+        Out.Enqueued -> do
+          let updates = [ProcessorUpdate pid pm | (pid, pm) <- Map.toList filtered, Map.lookup pid previous /= Just pm]
+          frames <- mapM (encoded gen Out.Update) updates
+          updateResult <- admit config cs frames
+          unless (updateResult == Out.MustClose) $ atomically $ do
+            -- Retain the old live comparison ledger after delta loss, but retire
+            -- admitted terminals so the recovery tick never repeats them.
+            pending <- readTVar cs.resyncPending
+            writeTVar cs.lastMetrics $ if pending then Map.withoutKeys previous removed else filtered
 
 writerLoop :: WebSocketHooks -> MetricsServerConfig -> ConnectionState -> WS.Connection -> IO ()
 writerLoop hooks config cs conn = loop

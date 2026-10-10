@@ -193,6 +193,35 @@ spec = around withMaster $ do
           _ <- tick control
           timeout 30_000 (receiveServer conn) `shouldReturn` Nothing
 
+    it "stops ordinary deltas when terminal admission drops an update" $ \master -> do
+      alpha <- registerIdleProcessor master (ProcessorId "alpha")
+      beta <- registerIdleProcessor master (ProcessorId "beta")
+      withControlledServer fastConfig {wsMaxQueuedFrames = 3} master $ \port control ->
+        WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+          _ <- receiveServer conn
+          atomically $ writeTVar control.gate True
+          incrementReceived alpha
+          _ <- tick control
+          awaitBlocked control
+          incrementReceived alpha
+          _ <- tick control
+          incrementReceived beta
+          _ <- tick control
+          incrementReceived alpha
+          _ <- tick control
+          markProcessorFailedIO master (ProcessorId "alpha") "boom" Nothing
+          runEff $ unregisterProcessor master (ProcessorId "alpha")
+          incrementReceived beta
+          q <- tick control
+          map Out.retention (Out.entries q) `shouldBe` [Out.Update, Out.Update, Out.Required]
+          _ <- tick control
+          atomically $ writeTVar control.gate False
+          _ <- receiveServer conn
+          receiveServer conn `shouldReturn` ProcessorTerminal (ProcessorId "alpha") (TerminalFailed "boom" Nothing)
+          receiveServer conn `shouldReturn` ServerError "queue_overflow" "Updates dropped; replacing metrics snapshot"
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+
     it "preserves once-only terminal delivery before overflow recovery" $ \master -> do
       handle <- registerIdleProcessor master (ProcessorId "alpha")
       withControlledServer fastConfig {wsMaxQueuedFrames = 3} master $ \port control ->
