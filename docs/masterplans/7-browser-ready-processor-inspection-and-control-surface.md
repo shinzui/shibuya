@@ -388,8 +388,8 @@ marks the sender paragraph of ADR-0004 as superseded in part.
 
 Check an item only when the owning child records its acceptance evidence.
 
-- [ ] EP-47 M1: Characterize headerless behavior, add the shared error helper, and retrofit additive error codes.
-- [ ] EP-47 M2: Configurable cross-origin policy for HTTP responses and preflight requests.
+- [x] (2026-10-10 20:07 UTC) EP-47 M1: Characterize headerless behavior, add the shared error helper, and retrofit additive error codes.
+- [x] (2026-10-10 20:07 UTC) EP-47 M2: Configurable cross-origin policy for HTTP responses and preflight requests.
 - [ ] EP-47 M3: Validate the WebSocket upgrade `Origin` header by the same policy.
 - [ ] EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
 - [ ] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.

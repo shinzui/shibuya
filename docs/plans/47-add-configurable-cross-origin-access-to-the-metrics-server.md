@@ -75,9 +75,9 @@ and its WebSocket convention item and the closure of the request belong to
 
 
 - [x] (2026-10-10 20:06 UTC) Milestone 1 implementation and metrics acceptance: Characterize the headerless server in a test, add `Shibuya.Metrics.Error` with `errorResponse`, and retrofit additive `code` members onto the existing 404 bodies.
-- [ ] Milestone 1 remaining acceptance: finish the repository-wide build already running.
-- [ ] Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
-- [ ] Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
+- [x] (2026-10-10 20:07 UTC) Milestone 1 remaining acceptance: repository-wide build exited zero.
+- [x] (2026-10-10 20:07 UTC) Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
+- [x] (2026-10-10 20:07 UTC) Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
 - [ ] Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
 - [ ] Milestone 4: Update the Haddock protocol reference, the user guide, the capability record and its log, both changelogs, and record wire-load sanity numbers.
 
@@ -89,14 +89,30 @@ and its WebSocket convention item and the closure of the request belong to
 with no errors and p95 104 microseconds (`before.json`). Before any CORS implementation,
 the headerless characterization passed (1 example, 0 failures). After the shared error
 helper and reserved-key test, the full metrics suite passed (54 examples, 0 failures).
-The first repository-wide build is compiling uncached TLS dependencies; it remains an
-acceptance item until that command exits successfully.
+The first repository-wide build exited zero after compiling uncached TLS dependencies.
+
+HTTP policy acceptance: The compiling pre-implementation spec ran 15 cross-origin examples
+with 10 expected failures (9 HTTP/configuration cases and the WebSocket refusal case).
+With the HTTP policy implemented, the complete metrics suite passed 65 examples, 0 failures,
+and all three core suites passed (236 ordinary examples plus both isolated GC suites).
+`cabal build all` and `nix fmt` exited zero. An explicit empty requested-header field first
+returned 204 because splitting an empty ByteString yields no tokens; rejecting an empty token
+list made the malformed-header regression pass. The implementation uses `Data.Aeson.Types.Pair`
+(the installed Aeson export), not the draft's `Data.Aeson.Pair` import.
 
 2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
 
 ## Decision Log
 
+
+- Decision (2026-10-10 implementation): Validate requested header names as ASCII HTTP tokens;
+  reject empty lists and wildcard header requests with `cors_headers_not_allowed`. Preserve
+  `Vary: *`, merge other Vary fields case-insensitively, and remove stale permission headers
+  before applying the configured ordinary-response policy. Expose `isValidOrigin` for hosts
+  using the pure application constructor. Origin validation also excludes non-ASCII authority
+  bytes, userinfo, comma-separated values and backslashes. Rationale: malformed input must
+  fail closed and host responses must not accidentally grant credentials or multiple origins.
 
 - Decision (2026-10-10): Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
   This revision supersedes conflicting 2026-09-30 design assumptions below.

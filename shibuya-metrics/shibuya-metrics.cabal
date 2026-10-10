@@ -22,6 +22,7 @@ library
   exposed-modules:
     Shibuya.Metrics
     Shibuya.Metrics.Config
+    Shibuya.Metrics.Cors
     Shibuya.Metrics.Error
     Shibuya.Metrics.Health
     Shibuya.Metrics.JSON
@@ -84,6 +85,7 @@ test-suite shibuya-metrics-test
 
   other-modules:
     Paths_shibuya_metrics
+    Shibuya.Metrics.CorsSpec
     Shibuya.Metrics.HealthSpec
     Shibuya.Metrics.JSONSpec
     Shibuya.Metrics.PrometheusSpec

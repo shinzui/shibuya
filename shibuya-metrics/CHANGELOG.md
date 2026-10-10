@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
+  must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
+
 ### New Features
+
+- add the reusable `Shibuya.Metrics.Cors` module and configurable HTTP
+  cross-origin access with validated preflights and cache variation.
 
 - add stable `code` members to existing error bodies, preserving their
   `error` text, context, status, and content type (additive wire change).

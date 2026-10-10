@@ -5,6 +5,7 @@ module Shibuya.Metrics.Config
   )
 where
 
+import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
 import GHC.Generics (Generic)
 
@@ -23,6 +24,11 @@ data MetricsServerConfig = MetricsServerConfig
     enablePrometheus :: !Bool,
     -- | Enable WebSocket endpoint (default: True)
     enableWebSocket :: !Bool,
+    -- | Exact browser Origins allowed for HTTP CORS and WebSocket upgrades.
+    -- An empty list disables the policy (default). Entries must be serialized
+    -- @scheme://host[:port]@ origins without whitespace, paths or trailing slashes.
+    -- Origins are compared byte-for-byte; the wildcard @*@ is refused.
+    corsAllowedOrigins :: ![Text],
     -- | WebSocket push interval in microseconds (default: 100_000 = 100ms)
     wsPushIntervalUs :: !Int,
     -- | Maximum WebSocket connections (default: 100)
@@ -48,6 +54,7 @@ defaultConfig =
       enableJSON = True,
       enablePrometheus = True,
       enableWebSocket = True,
+      corsAllowedOrigins = [],
       wsPushIntervalUs = 100_000, -- 100ms
       wsMaxConnections = 100,
       wsMaxSubscriptions = 1_000,

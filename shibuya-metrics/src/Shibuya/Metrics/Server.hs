@@ -17,7 +17,9 @@ where
 
 import Control.Concurrent.Async (async, cancel)
 import Control.Exception (bracket, finally)
+import Data.List (find)
 import Data.String (fromString)
+import Data.Text qualified as Text
 import Network.HTTP.Types (status404)
 import Network.Wai (Application, pathInfo)
 import Network.Wai.Handler.Warp qualified as Warp
@@ -25,6 +27,7 @@ import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
+import Shibuya.Metrics.Cors (corsMiddleware, isValidOrigin)
 import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
@@ -70,6 +73,8 @@ validateConfig config
   | config.livenessTimeoutMicros <= 0 = fail "MetricsServerConfig.livenessTimeoutMicros must be positive"
   | config.dependencyTimeoutMicros <= 0 = fail "MetricsServerConfig.dependencyTimeoutMicros must be positive"
   | config.stuckThreshold <= 0 = fail "MetricsServerConfig.stuckThreshold must be positive"
+  | Just invalid <- find (not . isValidOrigin) config.corsAllowedOrigins =
+      fail $ "MetricsServerConfig.corsAllowedOrigins contains an invalid origin: " <> show (Text.unpack invalid)
   | otherwise = pure ()
 
 -- | Stop the metrics server.
@@ -88,6 +93,9 @@ withMetricsServer config master =
     stopMetricsServer
 
 -- | Combined WAI application routing to all endpoints.
+-- Hosts mounting this directly must enforce the configuration constraints themselves:
+-- positive timeouts/resource limits and valid explicit serialized origins. The built-in
+-- 'startMetricsServer' validates before starting; this pure constructor does not.
 combinedApp ::
   MetricsServerConfig ->
   Master ->
@@ -103,7 +111,7 @@ combinedApp config master wsState depChecks =
         fallback
     else fallback
   where
-    fallback = httpApp config master depChecks
+    fallback = corsMiddleware config.corsAllowedOrigins (httpApp config master depChecks)
 
 -- | HTTP application routing based on path.
 httpApp :: MetricsServerConfig -> Master -> [DependencyCheck] -> Application
