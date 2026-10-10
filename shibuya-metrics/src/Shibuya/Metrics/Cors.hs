@@ -128,7 +128,9 @@ requestedHeaders headers = case [value | (key, value) <- headers, key == "Access
   [] -> Just "Content-Type"
   values ->
     let names = concatMap (map trim . BS.split ',') values
-     in if not (null names) && all validToken names then Just (BS.intercalate ", " names) else Nothing
+     in if all (not . BS.null) values && not (null names) && all validToken names
+          then Just (BS.intercalate ", " names)
+          else Nothing
   where
     validToken token = not (BS.null token) && token /= "*" && BS.all tokenChar token
     tokenChar c =

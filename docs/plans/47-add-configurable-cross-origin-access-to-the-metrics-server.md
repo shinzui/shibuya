@@ -79,7 +79,8 @@ and its WebSocket convention item and the closure of the request belong to
 - [x] (2026-10-10 20:07 UTC) Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
 - [x] (2026-10-10 20:07 UTC) Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
 - [x] (2026-10-10 20:08 UTC) Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
-- [ ] Milestone 4: Update the Haddock protocol reference, the user guide, the capability record and its log, both changelogs, and record wire-load sanity numbers.
+- [x] (2026-10-10 20:12 UTC) Milestone 4 documentation: update the Haddock protocol reference, user guide, capability record and log, both changelogs, and ADR-0007; validate builds, tests, formatting, and manual example requests.
+- [ ] Milestone 4 evidence: record the final committed-source wire-load sanity report and finalize coordination status.
 
 
 ## Surprises & Discoveries
@@ -98,13 +99,25 @@ and all three core suites passed (236 ordinary examples plus both isolated GC su
 `cabal build all` and `nix fmt` exited zero. An explicit empty requested-header field first
 returned 204 because splitting an empty ByteString yields no tokens; rejecting an empty token
 list made the malformed-header regression pass. The implementation uses `Data.Aeson.Types.Pair`
-(the installed Aeson export), not the draft's `Data.Aeson.Pair` import.
+(the installed `mori://haskell/aeson/packages/aeson` export), not the draft's `Data.Aeson.Pair` import.
 
 WebSocket acceptance: The full metrics suite passed 69 examples with zero failures, including
 real loopback HTTP-403 assertions for refused/repeated Origins, zero connection slots after
 refusal, a subsequent allowed snapshot, headerless clients, and the disabled-policy case.
 The new guard wraps the existing WebSocket application without changing its slot bracket.
 `cabal build all` and `nix fmt` exited zero after this milestone.
+
+Documentation acceptance: `cabal build all`, the final metrics suite (69 examples, zero
+failures), `nix fmt`, and capability profile/log enforcement (10 concepts) exited zero.
+The real example's curl transcript records default OPTIONS /metrics as 200 without CORS,
+and a temporarily configured example as empty 204 with the allowed-origin, method, header,
+max-age and all three Vary tokens. The example's source was restored afterwards. The draft's
+default 404 expectation was incorrect because the existing router dispatches by path.
+An empty repeated Access-Control-Request-Headers field alongside a valid field was also
+reproduced returning 204 (1 example, 1 failure), then fixed to refuse with 403; the final
+69-example suite passes. ADR-0007 now records the durable header-validation, cache-variation,
+exact-origin matching and direct-host validation constraints; other child requirements remain
+pending.
 
 2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
@@ -168,7 +181,7 @@ The new guard wraps the existing WebSocket application without changing its slot
 
 
 Milestone 1 provides the shared error renderer and additive codes without changing headers.
-HTTP and WebSocket origin policies are accepted; documentation and final wire-load evidence remain.
+HTTP and WebSocket origin policies and documentation are accepted; final wire-load evidence remains.
 
 
 ## Context and Orientation
@@ -425,10 +438,11 @@ the sentence that WebSocket convention alignment remains open, and append a date
 construction, as the 0.10.0.0 entries phrased it), the additive `code` member on error
 bodies, and the new modules `Shibuya.Metrics.Cors` and `Shibuya.Metrics.Error`. Do not
 choose a version number. Finally run the wire-load health scenario once on the commit before
-Milestone 1 and once on the final commit, store both JSON reports under
+Milestone 1 and once on the final production-code commit, store both JSON reports under
 `docs/audits/lifecycle-release/artifacts/ep47-cors-wire-load/`, and copy the p95 figures into
-Surprises & Discoveries; the middleware adds one header lookup per request, so a p95 increase
-above 10% is not expected and must be explained if it appears. Acceptance: `nix fmt` is
+Surprises & Discoveries; the fixture uses default configuration (disabled CORS), whose middleware is identity. A p95
+increase above 10% must be explained if it appears; this sanity check does not measure enabled
+CORS or replace the integrated performance gates owned by the final child. Acceptance: `nix fmt` is
 clean, `okf validate` passes for the capability bundle, and every command in Concrete Steps
 exits zero.
 
@@ -476,15 +490,18 @@ report failures for the not-yet-implemented behavior and pass after implementati
 Milestone 3 headers for a manual check against a running example:
 
 ```bash
-cabal run shibuya-example
+cabal run shibuya-example:shibuya-example
 curl -i -X OPTIONS -H 'Origin: https://ops.example.com' \
   -H 'Access-Control-Request-Method: GET' http://127.0.0.1:9090/metrics
 ```
 
-With the example's configuration extended to `corsAllowedOrigins = ["https://ops.example.com"]`
-the transcript contains `HTTP/1.1 204 No Content`, `Access-Control-Allow-Origin:
-https://ops.example.com`, and `Vary: Origin`; against the unmodified example it contains a
-`404` with `{"error":"Not found","code":"not_found"}` and no `Access-Control-` line.
+With the example's configuration temporarily extended to
+`corsAllowedOrigins = ["https://ops.example.com"]`, the transcript contains
+`HTTP/1.1 204 No Content`, `Access-Control-Allow-Origin: https://ops.example.com`, and
+`Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers`. Against the
+unmodified example it contains `200` with the existing metrics JSON and no `Access-Control-`
+line: the existing router chooses read routes by path, including for OPTIONS. Restore the
+example's source after this manual demonstration; the shipped example retains default policy.
 
 Milestone 4 records:
 
@@ -571,7 +588,7 @@ New at the end of Milestone 1, in `shibuya-metrics/src/Shibuya/Metrics/Error.hs`
 errorResponse :: Status -> Text -> Text -> [Pair] -> Response
 ```
 
-with `Status` from `Network.HTTP.Types`, `Text` from `Data.Text`, `Pair` from `Data.Aeson`,
+with `Status` from `Network.HTTP.Types`, `Text` from `Data.Text`, `Pair` from `Data.Aeson.Types`,
 and `Response` from `Network.Wai`.
 
 New at the end of Milestone 2, in `shibuya-metrics/src/Shibuya/Metrics/Config.hs` the field

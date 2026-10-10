@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-10-10
+* **Update**: CAP-10 gains configurable cross-origin access with WebSocket upgrade origin validation; CorsSpec added as evidence.
+
 ## 2026-09-20
 * **Update**: Replace the working-but-unproven caveat with release-gated HTTP, golden, frame, and real WebSocket test evidence; retain browser/CORS and convention limits.
 

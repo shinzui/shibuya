@@ -35,6 +35,9 @@ evidence:
     resource: shibuya-metrics/src/Shibuya/Metrics/Health.hs
     proves: A health endpoint suitable for orchestrator probes.
   - kind: test
+    resource: shibuya-metrics/test/Shibuya/Metrics/CorsSpec.hs
+    proves: Explicit cross-origin response and preflight policies, cache variation, malformed input refusal, and default header preservation are exercised.
+  - kind: test
     resource: shibuya-metrics/test/Shibuya/Metrics/ServerSpec.hs
     proves: Every HTTP route, enable flag, 404 path, and unhealthy 503 path is exercised.
   - kind: test
@@ -72,7 +75,7 @@ pipeline uses CAP-9 directly and never depends on this.
 - The built-in server binds to `127.0.0.1` by default. Setting `host = "*"` exposes
   metrics, processor IDs, message IDs, and terminal failure text; do so only behind an
   authentication and authorization boundary. The server does not implement authentication
-  or WebSocket `Origin` validation itself.
+  itself. Origin validation is opt-in and is not authentication.
 - WebSocket connection state is bounded by `wsMaxConnections` and
   `wsMaxSubscriptions` (1,000 retained processor IDs per connection by default). A client
   that would exceed the subscription or subscribe-all exclusion limit is closed with policy
@@ -82,9 +85,11 @@ pipeline uses CAP-9 directly and never depends on this.
   including enable flags and 404/503 paths, exact JSON and Prometheus golden output, every
   client/server frame encoding, and the WebSocket protocol over real loopback connections.
   This is contract and lifecycle evidence, not a production-network or security certification.
-- Cross-origin browser access remains unsupported: the server has no configurable CORS
-  response policy or WebSocket `Origin` validation. Bounded slow-consumer queues, overflow
-  signaling, and broader cross-project WebSocket convention alignment also remain open under
+- Cross-origin browser access requires an explicit `corsAllowedOrigins` list (disabled by
+  default). HTTP preflights and responses use exact origin matching; WebSocket upgrades use
+  the same policy before acquiring a connection slot. Wildcards and credentialed CORS are
+  unsupported. Headerless clients remain supported. Bounded slow-consumer queues, overflow
+  signaling, and broader cross-project WebSocket convention alignment remain open under
   IR-5.
 - Versions track `shibuya-core` rather than signalling independent change. Several releases
   (0.2.0.0, 0.3.0.0, 0.5.0.0, 0.6.0.0, 0.7.0.0) are re-releases with no user-visible change of

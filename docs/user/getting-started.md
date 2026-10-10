@@ -239,6 +239,48 @@ common acknowledgement shapes.
 
 ## Monitoring & Metrics
 
+### Cross-origin access
+
+A browser page served from another origin can read the metrics endpoints when the host
+explicitly allows its origin:
+
+```haskell
+import Shibuya.App (getAppMaster)
+import Shibuya.Metrics
+
+let config = defaultConfig
+      { corsAllowedOrigins = ["https://ops.example.com"] }
+withMetricsServer config (getAppMaster appHandle) $ \_ -> do
+  putStrLn "Metrics server running; press Enter to stop it."
+  _ <- getLine
+  pure ()
+```
+
+The empty default list disables CORS and preserves existing read-route headers. Entries
+must exactly match the browser's `Origin` value (`scheme://host[:port]`), without a path,
+query, fragment, whitespace, or trailing slash; `*` is refused. The server answers allowed
+preflight `OPTIONS` requests for `GET`, `POST`, and `OPTIONS`, echoes valid requested header
+names (or allows `Content-Type`), and caches preflight permission for 600 seconds. Enabled
+responses vary by Origin; preflight responses also vary by requested method and headers.
+Allowed ordinary responses include `Access-Control-Allow-Origin`, even on 404/503 errors.
+Disallowed read origins receive the ordinary body without CORS permission; disallowed
+preflights receive 403 with `origin_not_allowed`. Unsupported preflight methods receive
+`cors_method_not_allowed`, and malformed requested header lists receive
+`cors_headers_not_allowed`. No response grants credentialed CORS access.
+
+The same configured list guards WebSocket upgrade Origins before connection slots are
+acquired. Headerless non-browser clients remain supported. An empty list preserves the
+existing WebSocket behavior. Same-origin reads need no allow list; browser control POSTs
+must explicitly allow their page origin, even for same-origin deployments. CORS governs
+browser response access and does not authenticate clients or prevent simple POSTs from
+reaching an application.
+
+The server performs no authentication. Run it on a trusted network or behind an
+authenticating reverse proxy. `startMetricsServer` validates configuration before starting;
+when mounting `combinedApp` directly, the host must enforce the documented configuration
+constraints itself (including valid explicit origins and positive timeouts/resource limits).
+`corsMiddleware` and `errorResponse` are also exported for host applications.
+
 ### Getting Processor Metrics
 
 ```haskell

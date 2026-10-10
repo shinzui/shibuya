@@ -86,6 +86,14 @@ spec = around withMaster $ do
         invalid <- send app "OPTIONS" "/metrics" (preflight "GET" <> [("Access-Control-Request-Headers", headers)])
         invalid.simpleStatus `shouldBe` status403
         noAccessHeaders invalid
+      repeatedEmpty <-
+        send
+          app
+          "OPTIONS"
+          "/metrics"
+          (preflight "GET" <> [("Access-Control-Request-Headers", ""), ("Access-Control-Request-Headers", "x-trace-id")])
+      repeatedEmpty.simpleStatus `shouldBe` status403
+      noAccessHeaders repeatedEmpty
 
     it "rejects forbidden, malformed, and repeated requested methods" $ \master -> do
       app <- appFor master

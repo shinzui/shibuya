@@ -84,7 +84,15 @@ decision and full integrated evidence, not only a focused per-child pass.
 The actual control POST validates a supplied Origin before mutation, including simple POSTs
 that do not trigger preflight. Enabled CORS responses merge Vary: Origin even for absent or
 refused origins; preflight also varies by requested method and headers. JSON object member
-order is not a semantic contract. New Cursor objects use a kind tag and string value so
+order is not a semantic contract. Preflight permits GET, POST and OPTIONS and validates
+requested header names as ASCII HTTP tokens, refusing empty lists and wildcard requests
+with `cors_headers_not_allowed`. Duplicate Origin fields are refused on preflight and enabled
+WebSocket upgrades. Existing Vary tokens are retained, including `Vary: *`; stale host CORS
+permission headers are removed before ordinary-response policy is applied. Origin lists are
+encoded once when constructing an application, then compared byte-for-byte. Direct hosts
+of the pure `combinedApp` must enforce the configuration constraints themselves; only the
+built-in server performs startup validation. These policies govern browser response access
+and do not themselves authorize mutating requests. New Cursor objects use a kind tag and string value so
 integer positions remain lossless in browser JSON.
 
 Pause means intake admission intent: a pull already admitted and adapter prefetch may still
@@ -131,3 +139,8 @@ The published surface it freezes is the one pinned by `shibuya-metrics-test` und
 [`docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md`](../plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md),
 and the WebSocket lifecycle it extends is
 [`docs/adr/0004-make-websocket-lifecycle-and-terminal-delivery-explicit.md`](0004-make-websocket-lifecycle-and-terminal-delivery-explicit.md).
+
+HTTP cross-origin access and upgrade origin validation are implemented and tested under
+[`docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md).
+The remaining control, detailed accounting, delivery queue and integrated performance
+requirements remain pending in MasterPlan 7; this evidence certifies only the origin-policy child.

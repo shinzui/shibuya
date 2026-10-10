@@ -9,12 +9,11 @@
 
 ### New Features
 
-- add `originGuard` and reject disallowed or repeated WebSocket Origins
-  with HTTP 403 before acquiring a connection slot. Empty origin lists preserve upgrade behavior.
-
-- add the reusable `Shibuya.Metrics.Cors` module and configurable HTTP
-  cross-origin access with validated preflights and cache variation.
-
+- add configurable cross-origin HTTP access and preflight handling, plus
+  WebSocket upgrade Origin validation before connection-slot acquisition.
+- export `Shibuya.Metrics.Cors` and `Shibuya.Metrics.Error`, with reusable
+  `corsMiddleware`, `isAllowedOrigin`, `isValidOrigin`, `originGuard`, and `errorResponse`
+  helpers, plus top-level re-exports for `combinedApp`, `corsMiddleware`, and `errorResponse`.
 - add stable `code` members to existing error bodies, preserving their
   `error` text, context, status, and content type (additive wire change).
 
