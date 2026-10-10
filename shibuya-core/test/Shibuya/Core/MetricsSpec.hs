@@ -73,6 +73,20 @@ spec = describe "Detailed metrics" $ do
     m.oldestInFlight `shouldBe` Nothing
     readIORef calls `shouldReturn` initialCalls
 
+  it "aggregates lifetime nanoseconds beyond a Word64 across occupied slots" $ do
+    (clock, h) <- handle 2
+    a <- claimInFlightSlot h (MessageId "a")
+    b <- claimInFlightSlot h (MessageId "b")
+    writeIORef clock maxBound
+    releaseInFlightSlot h a
+    releaseInFlightSlot h b
+    m <- sampleMetrics h
+    let summary = fromJust m.latency
+    summary.count `shouldBe` 2
+    summary.sumSeconds `shouldBe` (fromInteger (2 * toInteger (maxBound :: Word64)) / 1e9)
+    map (.count) summary.buckets `shouldBe` replicate 18 0
+    m.oldestInFlight `shouldBe` Nothing
+
   it "publishes complete slots and reuses bounded storage at 1/4/64/256 concurrency" $ do
     forM_ [1, 4, 64, 256] $ \capacity -> do
       (_, h) <- handle capacity

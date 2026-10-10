@@ -401,8 +401,8 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
 - [x] (2026-10-10) EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
 - [ ] EP-49 M1: Prototype synchronized detailed accounting, prove cancellation cleanup, measure both levels, and retain the basic default.
-- [ ] EP-49 M2: Expose the latency summary and oldest in-flight detail in JSON, Prometheus, and WebSocket frames.
-- [ ] EP-49 M3: Documentation, ADR, changelog, and capability evidence.
+- [x] (2026-10-10) EP-49 M2: Expose the latency summary and oldest in-flight detail in JSON, Prometheus, and WebSocket frames.
+- [x] (2026-10-10) EP-49 M3: Documentation, ADR, changelog, and capability evidence.
 - [ ] EP-50 M1: Record acknowledged cursors in a per-processor slot and a bounded partition table, and measure.
 - [ ] EP-50 M2: Expose progress in JSON and WebSocket frames, absent when no cursor exists.
 - [ ] EP-50 M3: Documentation, ADR extension, changelog, and IR-3 closure.
@@ -416,6 +416,13 @@ Check an item only when the owning child records its acceptance evidence.
 
 
 ## Surprises & Discoveries
+
+**EP-49 functionally implemented (2026-10-10).** Opt-in latency and oldest-in-flight
+accounting, wire exposure and records are delivered. The core (250 examples), metrics
+(92 examples), GC suites and build pass. Basic allocation regressions were corrected, but
+the focused performance matrices remain inconclusive; EP-49 stays In Progress and EP-50
+remains blocked. Additional sampling stopped at the user's request. Generated EP-49 audit
+files were removed from the project; the child retains a concise verification summary.
 
 
 **EP-48 implemented (2026-10-10).** In-band errors, strict frame/byte queues, independent

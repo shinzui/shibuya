@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-10T22:45:50Z
+      mode: "update"
+      note: "Align cursor hook ownership with EP-49 static detail specialization and opaque mode selection."
 ---
 
 
@@ -148,7 +153,7 @@ processor's `MetricsHandle`, runs the handler, resolves the handler's `AckDecisi
 `shibuya-core/src/Shibuya/Internal/Runner/Finalize.hs`, which invokes the adapter's
 acknowledgement handle with bounded retry and returns `Right ()` on success or `Left` on
 exhausted retry. It then calls `finishProcessing` and, for halts and finalization failures,
-requests processor exit. The batch path is `processOneBatch` in
+requests processor exit. The batch path is `processOneBatchWithDetail` behind the `processOneBatch` wrapper in
 `shibuya-core/src/Shibuya/Internal/Runner/BatchProcessor.hs`; it runs a batch handler once
 and then iterates its own retained list of messages, calling `finalizeWithRetry` for each and
 collecting `(messageId, explicitlyNamed, decision, finalResult)` tuples in a `results` list.
@@ -209,7 +214,10 @@ instances no longer derive `anyclass`: they use `genericToJSON` and `genericPars
 rather than encoded as `null`. `emptyProcessorMetrics` sets every optional field to
 `Nothing`. `processOne` calls `claimInFlightSlot` right after `beginProcessing` and
 `releaseInFlightSlot` right after `finishProcessing`, each guarded by the handle's detail
-level; `processOneBatch` does the same around its batch. EP-49 created
+level; `processOneBatchWithDetail` does the same around its batch. Mode selection uses
+`metricsDetailLevel` (OPAQUE) outside the loop; the loop and worker receive a literal
+`detailed :: Bool` and are INLINE so the basic specialization removes ownership closures.
+Preserve both constraints and guard every cursor update with `when detailed`. EP-49 created
 `shibuya-core/test/Shibuya/Core/MetricsSpec.hs`, registered it in
 `shibuya-core/test/Main.hs` and the cabal `other-modules`, and extended
 `fixtureMetrics` and the golden file with a processor carrying latency and oldest-in-flight
@@ -326,15 +334,16 @@ monotonicity for opaque values. Retried, halted, failed-finalization and cursorl
 leave progress unchanged. Test all four, plus successful dead-letter finalization.
 
 
-Now the two hook sites. In `processOne` in `Shibuya/Internal/Runner/Supervised.hs`, after the
+Now the two hook sites. Preserve the existing static `detailed` guard in both workers
+so basic mode makes no cursor hook calls. In `processOne` in `Shibuya/Internal/Runner/Supervised.hs`, after the
 `finalizeResult` case that records events and status and before the in-flight decrement,
-add: when `finalizeResult` is `Right ()` and `result` is `Right AckOk` or `Right
+add: when `detailed` is true, `finalizeResult` is `Right ()` and `result` is `Right AckOk` or `Right
 (AckDeadLetter _)`, call `liftIO $ recordAcknowledgedCursor metricsHandle
 ingested.envelope.partition ingested.envelope.cursor`. A handler exception is substituted
-with `AckRetry`, so it never records. In `processOneBatch` in
+with `AckRetry`, so it never records. In `processOneBatchWithDetail` in
 `Shibuya/Internal/Runner/BatchProcessor.hs`, inside the `mapM` over `NE.toList batch` that
 produces `results`, after `finalizeWithRetry` returns for a message and only when it returned
-`Right ()` and the chosen decision `d` is `AckOk` or `AckDeadLetter _`, call the same hook
+`Right ()`, `detailed` is true, and the chosen decision `d` is `AckOk` or `AckDeadLetter _`, call the same hook
 with that message's envelope; because the loop walks the retained list in batch order, a
 partition's cursors are recorded in order.
 
@@ -649,7 +658,8 @@ recordAcknowledgedCursor :: MetricsHandle -> Maybe Text -> Maybe Cursor -> IO ()
 `newMetricsHandleWith`, `MetricsDetail`, `DetailOptions`, and the `omitNothingFields`
 encoder options are owned by EP-49 and only consumed here; `sampleMetrics` gains the snapshot
 assembly. The hook is called from `Shibuya.Internal.Runner.Supervised.processOne` and
-`Shibuya.Internal.Runner.BatchProcessor.processOneBatch`, whose signatures do not change.
+`Shibuya.Internal.Runner.BatchProcessor.processOneBatchWithDetail`; retain their existing
+Bool detail argument and INLINE pragmas, and the public batch wrapper signature.
 
 Dependencies: a hard dependency on
 `docs/plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md`,

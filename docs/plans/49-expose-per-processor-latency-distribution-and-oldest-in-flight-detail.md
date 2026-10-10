@@ -75,23 +75,25 @@ and the fixtures this plan introduces.
 
 
 - [x] (2026-10-10 22:16Z) Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; use existing base and containers dependencies.
-- [x] (2026-10-10 22:16Z) Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatch`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
+- [x] (2026-10-10 22:16Z) Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatchWithDetail`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
 - [x] (2026-10-10 22:16Z) Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, concurrent publication and cancellation cleanup, and sampling with an injected clock; suite green.
-- [ ] Milestone 1, measurement: paired capture of baseline, basic candidate, and detailed diagnostic under `-N1` and `-N4`; verdicts recorded under `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`.
+- [ ] Milestone 1, measurement: basic-path performance acceptance remains inconclusive under `-N1` and `-N4`; see Outcomes & Retrospective. Further sampling stopped at the user's request.
 - [x] (2026-10-10 22:16Z) Milestone 1, default: `defaultMetricsDetail` remains `MetricsBasic`; detailed overhead reported; decision recorded below.
 - [x] (2026-10-10 22:16Z) Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
 - [x] (2026-10-10 22:16Z) Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
-- [x] (2026-10-10 22:16Z) Milestone 2, WebSocket: `sendIfChanged` compares an age-zeroed projection; update frame test.
+- [x] (2026-10-10 22:16Z) Milestone 2, WebSocket: the WebSocket push producer compares an age-zeroed projection; update frame test.
 - [x] (2026-10-10) Milestone 2, runner behavioral tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, RTS allocation check on the basic path remains in the paired measurement item.
-- [ ] Milestone 3, records: ADR, `docs/architecture/METRICS.md`, Haddock, `docs/user/getting-started.md`, CAP-9 and CAP-10 evidence with `okf log add`, three changelogs.
+- [x] (2026-10-10) Milestone 3, records: ADR, `docs/architecture/METRICS.md`, Haddock, `docs/user/getting-started.md`, CAP-9 and CAP-10 evidence with `okf log add`, three changelogs.
 
 
 ## Surprises & Discoveries
 
 
-2026-10-10 implementation: The seven initial accounting examples were written before the APIs and failed compilation in `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/initial-core-red.txt`; the implemented examples passed under `-N1`. The initial wire suite failed both goldens with seed 1161645269 before regeneration (`docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/initial-golden-red.txt`). The core passed 247 examples and both GC processes under `-N1`, and metrics passed 92 examples. A byte comparison confirms all four basic JSON objects and every pre-existing Prometheus line are unchanged. Multi-capability core and both GC processes also passed; repeated bounded reuse is exercised 100 times at each of 1/4/64/256 concurrency. The expanded core suite passes 248 examples including 100 cancellations at both handler and finalizer boundaries, completed failure latency, batch AppConfig propagation and ordered oldest identification. Gated claim/release clock boundaries run 100 repetitions. Build all passes. Paired performance and mutation acceptance remain in progress. Strict capability validation reports inherited missing recommended reviews on ten pre-existing records; required profile/log validation passes. No review history is fabricated for unrelated records.
+2026-10-10 implementation: Added 17 feature examples. The final core suite passes 250 examples under `-N1` and `-N4`; metrics passes 92 examples; both GC suites and `cabal build all` pass. Basic JSON objects and existing Prometheus series retain their bytes. Accounting, wire and age-only WebSocket mutations were observed failing; the lifetime-sum overflow mutation fails with seed 902585140. Required capability profile/log validation passes; strict validation reports inherited missing recommended reviews on ten existing records.
 
-2026-10-10 performance correction: The initial committed candidate (`b7567a2`) fails the basic allocation gates by about 15.5% for serial/retry/dead-letter work; complete failed N1/N4 evidence is retained in `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/initial-regression/`. Ticky profiling isolates two costs: a shared processing action retains a detail ownership closure, and matching the handle's detail selector lets worker/wrapper carry six counter/state references through three worker closures where the original carried one handle (120 bytes/message). Fully saturated literal Bool arguments and INLINE loop/worker definitions specialize basic and detailed ownership paths without duplicating the source. An OPAQUE level accessor prevents record decomposition at mode selection; NOINLINE alone still allows worker/wrapper. The corrected serial pilot is 2,579.54 bytes/message, matching the baseline allocation pattern. Full paired acceptance remains pending; no budget was relaxed.
+2026-10-10 performance correction: Candidate `b7567a2` added about 15.5% basic allocation in serial/retry/dead-letter work. Commit `67f00ec` removes retained detail closures by selecting the mode outside the loop through an OPAQUE accessor and passing literal Bool arguments into INLINE workers. NOINLINE alone permits worker/wrapper decomposition and was insufficient. The corrected candidate passes the focused basic allocation cells; overall performance acceptance remains inconclusive. No budget was relaxed.
+
+2026-10-10 scope correction: Stop additional tests and performance sampling at the user's request. Remove all 176 generated EP-49 audit files from the repository, including the two previously committed files. Keep this verification summary and the reproducible commands below; future diagnostic output belongs in temporary storage.
 
 2026-10-10 review: Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose.
 
@@ -140,7 +142,13 @@ and the fixtures this plan introduces.
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Functional implementation is delivered in `b7567a2` with the basic-path correction in `67f00ec`. Latency and oldest-in-flight detail are opt-in, exposed through JSON, Prometheus and WebSocket, and documented with ADR-0009 and capability evidence. The shipped default remains basic.
+
+Against baseline `db8e783`, the corrected focused basic matrices each pass 68 of 69 cells. The remaining `-N1` serial-full-inbox live-memory ratio is 1.0083 (95% CI 0.9606–1.0591); the `-N4` retry-path throughput adverse ratio is 1.0244 (95% CI 0.9699–1.0815). Both intervals cross the 1.05 limit, so neither matrix is accepted. Higher-concurrency `-N4` diagnostics also remain inconclusive. Measurements used GHC 9.12.4, O2, MacBookPro18,2, identical harnesses and external solver identities, and unchanged budgets.
+
+Detailed diagnostics show the opt-in cost: serial allocation increases about 47% under `-N1` and 46% under `-N4`, with throughput about 27% and 14% lower. Batch allocation increases about 0.4%. In real WebSocket fan-out at 1/16/64 clients, all thirty detailed runs completed 500,000 observations with zero slot misses and no retained oldest attempt; allocation increased about 55/58/72% and throughput fell about 23/22/23% (O1, `-N4`, ten alternating pairs). These are workload diagnostics, not an acceptance claim.
+
+No further tests or captures are needed for this handoff. EP-49 remains In Progress because its performance gate has not passed; EP-50 remains blocked. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
 
 
 ## Context and Orientation
@@ -215,7 +223,7 @@ renders five series by hand (`shibuya_messages_received_total`,
 `shibuya_messages_processed_total`, `shibuya_messages_failed_total`,
 `shibuya_processor_state`, `shibuya_processor_in_flight`) with a `processor` label and
 `escapeLabel`. `shibuya-metrics/src/Shibuya/Metrics/WebSocket.hs` pushes an `update` frame
-from `sendIfChanged` only when a processor's sampled `ProcessorMetrics` differs from the last
+from its push producer only when a processor's sampled `ProcessorMetrics` differs from the last
 value sent. The suite `shibuya-metrics-test` compares
 `shibuya-metrics/test/golden/processor-metrics.json.golden` and
 `shibuya-metrics/test/golden/prometheus.golden` byte for byte; the fixtures are built in
@@ -319,7 +327,7 @@ best-effort concurrent observation, not an atomic snapshot of all handlers. Iden
 within a slot must always match. A basic handle reads no slot or detail clock.
 
 In `processOne`, bracket detailed ownership immediately after `beginProcessing` through
-completion of finalization and metrics accounting. In `processOneBatch`, claim with the first
+completion of finalization and metrics accounting. In the specialized `processOneBatchWithDetail` worker, claim with the first
 retained message identity and release after `recordBatchOutcomeMetrics`. The histogram measures
 one processing attempt in serial/message mode and one emitted batch in batch mode, including
 finalization retries. Document these units on JSON and Prometheus; it is not handler-only
@@ -363,8 +371,8 @@ without changing limits. The final integration gate in the MasterPlan compares a
 against the pre-initiative baseline using the complete canonical matrix. Repeat evidence if
 later edits change hooks, samplers, encoders, or configuration. Measure observer fan-out and
 long-lived detailed processors separately, including 1/4/64/256 concurrency, clock zero,
-slot reuse, and long total durations. Store commands, source/patch hashes and reports under
-`docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`.
+slot reuse, and long total durations. Keep diagnostic commands, source/patch hashes and raw reports in temporary storage outside
+the repository; record only the concise verdict in this plan.
 
 
 ### Milestone 2: exposure over JSON, Prometheus, and WebSocket, with fixtures and runner tests
@@ -400,7 +408,8 @@ built with `newMetricsHandleWithClockAndDetail` and an `IORef` clock: claim a sl
 can fail by renaming `sumSeconds` in a scratch worktree and recording the failing golden
 examples.
 
-In `WebSocket.hs` change `sendIfChanged` to compare `stableView old /= stableView metrics`,
+In `WebSocket.hs` the push producer compares `fmap stableView` of the prior sample with
+`Just (stableView metrics)`,
 where `stableView` replaces `ageSeconds` by 0 inside `oldestInFlight`, so a stuck processor
 does not push an update every interval; document in the Haddock of `Shibuya.Metrics` that a
 client extrapolates age from the last frame's `ageSeconds` and its own clock. Add a
@@ -490,28 +499,28 @@ git worktree add --detach /tmp/ep49-detailed <milestone-1-commit>
 # In /tmp/ep49-detailed only: set defaultMetricsDetail = MetricsDetailed defaultDetailOptions.
 for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && git rev-parse HEAD:shibuya-core-bench); done
 for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && cabal build shibuya-core-bench:lifecycle-load && jq -r '.["install-plan"][] | select(.style != "local") | "\(.["pkg-name"])-\(.["pkg-version"])"' dist-newstyle/cache/plan.json | sort -u | shasum -a 256); done
-mkdir -p docs/audits/lifecycle-release/artifacts/ep49-detail-accounting
+mkdir -p /tmp/shibuya-ep49-measurements
 jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path","metrics-enabled","metrics-disabled","idle-worker","startup-shutdown","graceful-shutdown-drain","batch-timeout"]' \
   docs/audits/lifecycle-release/performance-budgets.json \
-  > docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/focused-budgets.json
+  > /tmp/shibuya-ep49-measurements/focused-budgets.json
 for rts in N1 N4; do
   caps=${rts#N}
   bun scripts/audit/capture-performance-paired.ts \
     --baseline-executable "$(cd /tmp/ep49-baseline && cabal list-bin shibuya-core-bench:lifecycle-load)" \
-    --baseline-output docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/baseline-${rts,,}.json \
+    --baseline-output /tmp/shibuya-ep49-measurements/baseline-${rts,,}.json \
     --baseline-label ep49-baseline-${rts,,} --baseline-production-sha <parent-sha> \
     --candidate-executable "$(cabal list-bin shibuya-core-bench:lifecycle-load)" \
-    --candidate-output docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/basic-${rts,,}.json \
+    --candidate-output /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
     --candidate-label ep49-basic-${rts,,} --candidate-production-sha <milestone-1-sha> \
     --rts -$rts --capabilities $caps --iterations 10 \
     --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path,metrics-enabled,metrics-disabled,idle-worker,startup-shutdown,graceful-shutdown-drain,batch-timeout \
     --machine-id MacBookPro18,2 --platform Darwin-arm64 --compiler ghc-9.12.4 --optimization O2 \
     --harness-sha <bench-tree-hash> --solver-plan-hash <normalized-solver-hash>
   bun scripts/audit/compare-performance.ts \
-    --baseline docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/baseline-${rts,,}.json \
-    --candidate docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/basic-${rts,,}.json \
-    --budgets docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/focused-budgets.json \
-    --output docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/verdict-basic-${rts,,}.json
+    --baseline /tmp/shibuya-ep49-measurements/baseline-${rts,,}.json \
+    --candidate /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
+    --budgets /tmp/shibuya-ep49-measurements/focused-budgets.json \
+    --output /tmp/shibuya-ep49-measurements/verdict-basic-${rts,,}.json
 done
 ```
 
@@ -585,9 +594,8 @@ capability bundle validates.
 Every command above is safe to rerun. Golden regeneration overwrites the fixture files;
 review the diff before committing and revert with `git checkout -- shibuya-metrics/test/golden`
 if it contains anything undecided. Measurement worktrees are disposable; remove and recreate
-them if a build is interrupted. Datasets under `docs/audits/lifecycle-release/artifacts/ep49-detail-accounting/`
-are append-only: a rerun writes new file names rather than overwriting a set the plan already
-cites. If a basic cell fails, profile the hot path (a ticky profile of `processOne` is the
+them if a build is interrupted. Diagnostic output under `/tmp/shibuya-ep49-measurements/` stays outside the repository.
+Preserve distinct captures when rerunning; summarize the result in this plan. If a basic cell fails, profile the hot path (a ticky profile of `processOne` is the
 quickest tool), fix the cause, commit, and capture again from the new commit; never edit a
 budget or reinterpret an inconclusive result. Do not introduce a low-level dependency without verified APIs and new measurements. Work on the current branch and
 commit small conventional changes with the trailers above.
@@ -618,6 +626,7 @@ data InFlightSlots                              -- abstract; fields internal
 data MetricsHandle = MetricsHandle { {- existing fields -} , detail :: !MetricsDetail, slots :: !(Maybe InFlightSlots)}
 newMetricsHandleWith :: MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
 newMetricsHandleWithClockAndDetail :: IO Word64 -> MetricsDetail -> Int -> UTCTime -> IO MetricsHandle
+metricsDetailLevel :: MetricsHandle -> MetricsDetail         -- OPAQUE; read outside the loop
 claimInFlightSlot :: MetricsHandle -> MessageId -> IO Int      -- INLINE; -1 when basic or full
 releaseInFlightSlot :: MetricsHandle -> Int -> IO ()           -- no-op for -1
 abandonInFlightSlot :: MetricsHandle -> Int -> IO ()           -- cancellation cleanup
@@ -638,12 +647,12 @@ runSupervisedBatch = runSupervisedBatchWith defaultMetricsDetail
 In `Shibuya.App`, `AppConfig` gains `metricsDetail :: !MetricsDetail` and `defaultAppConfig`
 sets it to `defaultMetricsDetail`; `Shibuya` re-exports the new types and constants. In
 `shibuya-metrics`: `Shibuya.Metrics.Prometheus` renders the histogram and gauge;
-`Shibuya.Metrics.WebSocket.sendIfChanged` compares the age-zeroed projection; no exported
+the `Shibuya.Metrics.WebSocket` push producer compares the age-zeroed projection; no exported
 signature changes. Tests use `Test.Hspec`, `Network.Wai.Test`, `Warp.testWithApplication`,
 and `Network.WebSockets` as the existing suites do.
 
 Ownership: this plan owns `MetricsDetail`, `DetailOptions`, the omit-`Nothing` encoder
-options, the slot table, the hook points in `processOne` and `processOneBatch`, the
+options, the slot table, the hook points in `processOne` and `processOneBatchWithDetail`, the
 `runSupervisedWith` pair, and the golden fixtures for the new members; `docs/plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md`
 extends them and must not redefine them. `docs/plans/51-implement-source-level-processor-pause-and-resume.md`
 edits the same module for a different concern; implement the two sequentially in either
@@ -651,4 +660,4 @@ order and rebase the second. Coordination context is
 `docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`.
 
 
-Revision note (2026-10-10): API and performance review applied. Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose. Implementation and performance measurements remain pending.
+Revision note (2026-10-10): API and performance review applied. Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose. Functional implementation is delivered; performance acceptance remains pending.

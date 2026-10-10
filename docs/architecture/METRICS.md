@@ -347,3 +347,10 @@ ignores age alone; clients extrapolate `ageSeconds` using elapsed time on their 
 since receiving the last frame. Identity, completed histograms and all other state changes
 continue to emit updates. Detailed accounting remains explicit opt-in; measured overhead and
 basic-path acceptance are recorded in [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md).
+
+Detailed accounting has a measurable cost. EP-49's serial diagnostics observed roughly
+46–47% additional allocation; batching amortized this to about 0.4%. Costs vary with workload
+and observer count. The default remains basic, and basic-path performance acceptance is
+still pending in [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md).
+Preserve the static loop specialization and opaque mode accessor described in
+[ADR-0009](../adr/0009-account-for-in-flight-detail-and-latency-with-bounded-synchronized-slots-behind-an-opt-in-detail-level.md).
