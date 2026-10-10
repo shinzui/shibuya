@@ -53,6 +53,40 @@ import Test.Hspec
 
 spec :: Spec
 spec = around withMaster $ do
+  describe "cross-origin WebSocket upgrades" $ do
+    it "accepts an allowed Origin with an initial snapshot" $ \master ->
+      withServer originConfig master $ \port ->
+        clientWithOrigin port [("Origin", "https://ops.example.com")] $ \conn -> do
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+
+    it "refuses forbidden or multiple Origins with HTTP 403 before acquiring a slot" $ \master -> do
+      wsState <- newWebSocketState 1
+      let app = combinedApp originConfig master wsState []
+      Warp.testWithApplication (pure app) $ \port -> do
+        mapM_
+          ( \headers -> do
+              clientWithOrigin port headers receiveServer
+                `shouldThrow` isForbiddenHandshake
+              atomically (readTVar wsState.connectionCount) `shouldReturn` 0
+          )
+          [[("Origin", "https://evil.example.com")], [("Origin", "null")], [("Origin", "")], [("Origin", "https://ops.example.com"), ("origin", "https://ops.example.com")]]
+        clientWithOrigin port [("Origin", "https://ops.example.com")] $ \conn -> do
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+
+    it "allows clients without Origin when the policy is enabled" $ \master ->
+      withServer originConfig master $ \port ->
+        clientWithOrigin port [] $ \conn -> do
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+
+    it "allows any Origin when the policy is disabled" $ \master ->
+      withServer defaultConfig master $ \port ->
+        clientWithOrigin port [("Origin", "https://evil.example.com")] $ \conn -> do
+          expected <- MetricsSnapshot <$> currentSnapshot master
+          receiveServer conn `shouldReturn` expected
+
   describe "WebSocket wire protocol" $ do
     it "sends an initial snapshot" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "alpha")
@@ -235,3 +269,15 @@ holdConnection port ready release =
 
 shouldReturn :: (Eq a, Show a) => IO a -> a -> IO ()
 shouldReturn action expected = action >>= (`shouldBe` expected)
+
+originConfig :: MetricsServerConfig
+originConfig = defaultConfig {corsAllowedOrigins = ["https://ops.example.com"], wsMaxConnections = 1}
+
+clientWithOrigin :: Int -> WS.Headers -> WS.ClientApp a -> IO a
+clientWithOrigin port = WS.runClientWith "127.0.0.1" port "/ws" WS.defaultConnectionOptions
+
+isForbiddenHandshake :: WS.HandshakeException -> Bool
+isForbiddenHandshake (WS.MalformedResponse response _) =
+  WS.responseCode response == 403
+    && lookup "Content-Type" (WS.responseHeaders response) == Just "application/json"
+isForbiddenHandshake _ = False

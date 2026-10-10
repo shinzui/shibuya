@@ -9,6 +9,9 @@
 
 ### New Features
 
+- `shibuya-metrics`: add `originGuard` and reject disallowed or repeated WebSocket Origins
+  with HTTP 403 before acquiring a connection slot. Empty origin lists preserve upgrade behavior.
+
 - `shibuya-metrics`: add the reusable `Shibuya.Metrics.Cors` module and configurable HTTP
   cross-origin access with validated preflights and cache variation.
 

@@ -27,7 +27,7 @@ import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
-import Shibuya.Metrics.Cors (corsMiddleware, isValidOrigin)
+import Shibuya.Metrics.Cors (corsMiddleware, isValidOrigin, originGuard)
 import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
 import Shibuya.Metrics.JSON (jsonAppWithHealth)
@@ -107,7 +107,7 @@ combinedApp config master wsState depChecks =
     then
       WaiWS.websocketsOr
         WS.defaultConnectionOptions
-        (websocketApp config master wsState)
+        (originGuard config.corsAllowedOrigins (websocketApp config master wsState))
         fallback
     else fallback
   where

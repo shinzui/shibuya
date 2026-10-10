@@ -3,11 +3,14 @@ module Shibuya.Metrics.Cors
   ( corsMiddleware,
     isAllowedOrigin,
     isValidOrigin,
+    originGuard,
   )
 where
 
+import Data.Aeson (encode, object, (.=))
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as BS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Char (isAsciiLower, isAsciiUpper, isSpace, toLower)
 import Data.List (foldl')
 import Data.Set qualified as Set
@@ -16,6 +19,7 @@ import Data.Text qualified as Text
 import Data.Text.Encoding (encodeUtf8)
 import Network.HTTP.Types (HeaderName, RequestHeaders, ResponseHeaders, status204, status403)
 import Network.Wai (Middleware, mapResponseHeaders, requestHeaders, requestMethod, responseLBS)
+import Network.WebSockets qualified as WS
 import Shibuya.Metrics.Error (errorResponse)
 
 -- | Check configured origin syntax. Entries must still be written exactly as the
@@ -44,6 +48,31 @@ isAllowedOrigin :: [Text] -> ByteString -> Bool
 isAllowedOrigin origins = (`Set.member` compiled)
   where
     compiled = Set.fromList $ map encodeUtf8 origins
+
+-- | Apply the same exact-origin policy before the inner WebSocket application
+-- acquires a slot. Empty policy and headerless non-browser clients pass through.
+-- A repeated Origin is refused even if each value individually matches.
+originGuard :: [Text] -> WS.ServerApp -> WS.ServerApp
+originGuard [] = id
+originGuard origins = \app pending ->
+  let headers = WS.requestHeaders (WS.pendingRequest pending)
+   in if not (hasHeader "Origin" headers) || maybe False permits (singleHeader "Origin" headers)
+        then app pending
+        else
+          WS.rejectRequestWith
+            pending
+            WS.defaultRejectRequest
+              { WS.rejectCode = 403,
+                WS.rejectMessage = "Forbidden",
+                WS.rejectHeaders = [("Content-Type", "application/json"), ("Vary", "Origin")],
+                WS.rejectBody =
+                  LBS.toStrict $
+                    encode $
+                      object
+                        ["error" .= ("Origin not allowed" :: Text), "code" .= ("origin_not_allowed" :: Text)]
+              }
+  where
+    permits = isAllowedOrigin origins
 
 -- | Disabled by an empty list. When enabled, ordinary reads keep their status and
 -- body, and every response varies by Origin. Only explicit allowed origins get

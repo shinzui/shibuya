@@ -78,7 +78,7 @@ and its WebSocket convention item and the closure of the request belong to
 - [x] (2026-10-10 20:07 UTC) Milestone 1 remaining acceptance: repository-wide build exited zero.
 - [x] (2026-10-10 20:07 UTC) Milestone 2: Add `corsAllowedOrigins` to the configuration with validation, implement `Shibuya.Metrics.Cors.corsMiddleware`, wrap the HTTP side of `combinedApp`, and cover all four IR-5 cases in `CorsSpec`.
 - [x] (2026-10-10 20:07 UTC) Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
-- [ ] Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
+- [x] (2026-10-10 20:08 UTC) Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
 - [ ] Milestone 4: Update the Haddock protocol reference, the user guide, the capability record and its log, both changelogs, and record wire-load sanity numbers.
 
 
@@ -99,6 +99,12 @@ and all three core suites passed (236 ordinary examples plus both isolated GC su
 returned 204 because splitting an empty ByteString yields no tokens; rejecting an empty token
 list made the malformed-header regression pass. The implementation uses `Data.Aeson.Types.Pair`
 (the installed Aeson export), not the draft's `Data.Aeson.Pair` import.
+
+WebSocket acceptance: The full metrics suite passed 69 examples with zero failures, including
+real loopback HTTP-403 assertions for refused/repeated Origins, zero connection slots after
+refusal, a subsequent allowed snapshot, headerless clients, and the disabled-policy case.
+The new guard wraps the existing WebSocket application without changing its slot bracket.
+`cabal build all` and `nix fmt` exited zero after this milestone.
 
 2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
@@ -162,7 +168,7 @@ list made the malformed-header regression pass. The implementation uses `Data.Ae
 
 
 Milestone 1 provides the shared error renderer and additive codes without changing headers.
-The HTTP and WebSocket origin policies and their documentation remain to be accepted.
+HTTP and WebSocket origin policies are accepted; documentation and final wire-load evidence remain.
 
 
 ## Context and Orientation
