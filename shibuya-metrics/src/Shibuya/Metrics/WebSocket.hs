@@ -162,6 +162,9 @@ admit config cs frames = do
     stopped <- readTVar cs.closing
     case stopped of
       Just _ -> pure Out.MustClose
+      -- An empty terminal batch must not write an unchanged queue and wake
+      -- every waiting writer before the actual delta is ready.
+      Nothing | null frames -> pure Out.Enqueued
       Nothing -> do
         q <- readTVar cs.outbound
         let (result, next) = Out.enqueue (limits config) frames q

@@ -94,6 +94,26 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 ## Surprises & Discoveries
 
 
+2026-10-10 scheduling discovery: thirty default `-N4` pairs per configuration remain
+inconclusive, with two one-client candidate p99 outliers 5–9 times the baseline and matching
+large throughput shifts despite almost identical allocation. A matched `-N4 -qm` scheduling
+control narrows the variability substantially; this is evidence for worker-placement effects,
+not proof of their sole cause. Source inspection also found empty terminal admissions writing
+an unchanged queue and waking waiting writers. Skip those writes before further measurement.
+Both earlier series are retained as diagnostics rather than claimed as passes.
+
+2026-10-10 validation discovery: strict OKF enforcement treats the inherited missing
+`reviews` metadata as nonzero. The plan explicitly permits those pre-existing advisories;
+required-field/profile/log enforcement without strict mode passes. Preserve this distinction
+in the final evidence rather than claiming the strict command returned zero.
+
+2026-10-10 measurement discovery: the detached baseline initially solved a different
+QuickCheck version. The capture harness rejected it before sampling; rebuilding with the
+candidate’s existing 2.15.0.1 constraint makes every selected package/version identical.
+The Hackage release and upstream 2.15.0.1 tag were checked; no production dependency bounds
+or repository pins changed. The single-reader fixture was corrected to make its reported
+slow reader real, and the preliminary partial capture was discarded before the accepted run.
+
 2026-10-10 bounded-delivery evidence: 89 metrics examples pass; the controlled suite passed ten repetitions each under `-N1` and `-N4`. All three isolated regression controls fail behaviorally: unlimited required retention, a second application writer, and resetting the producer timer on receive traffic. The detached M1 baseline fails the new unsubscribe snapshot boundary test (Pong instead of snapshot). The saturation fixture stops production after 45 ticks, retains 14 frames / 59,976 encoded bytes within 64 frames / 65,536 bytes, shows live heap samples 328,080–331,320 bytes, and releases the stalled slot within the one-second send deadline. Evidence is under `docs/audits/lifecycle-release/artifacts/ep48-websocket/`.
 
 2026-10-10 implementation: The detached pre-change worktree at `30258cc` failed the new invalid-message test by timing out instead of sending an error. The main-tree suite passes 71 examples after adding the error constructor and ordered subscription-limit response. The decoder reason includes Aeson’s `Error in $:` prefix.
@@ -156,7 +176,13 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Milestones 1 and 2 are committed. The final implementation passes 89 metrics examples,
+236 core examples, both isolated GC suites, twenty controlled concurrency repetitions, and
+all three candidate-bound mutation controls. The first ten observer pairs per configuration
+passed memory/allocation/shutdown but left several throughput and tail-latency confidence
+intervals inconclusive. Thirty pairs per configuration are being captured with unchanged
+workload, source, package versions and budgets; IR-5 remains accepted until this gate resolves.
+
 
 
 ## Context and Orientation
