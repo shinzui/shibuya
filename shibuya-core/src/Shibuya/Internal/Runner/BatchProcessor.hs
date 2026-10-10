@@ -132,7 +132,22 @@ processOneBatch ::
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
+processOneBatch metricsHandle = case Metrics.metricsDetailLevel metricsHandle of
+  Metrics.MetricsBasic -> processOneBatchWithDetail False metricsHandle
+  Metrics.MetricsDetailed _ -> processOneBatchWithDetail True metricsHandle
+
+processOneBatchWithDetail ::
+  (IOE :> es, Tracing :> es) =>
+  Bool ->
+  MetricsHandle ->
+  ProcessorId ->
+  Int ->
+  ProcessorSignal ->
+  ProcessorExitPublisher ->
+  BatchHandler es msg ->
+  (BatchInfo, NonEmpty (Ingested es msg)) ->
+  Eff es ()
+processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -249,11 +264,11 @@ processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler (i
             -- Halt: set the shared flag; do NOT throw (let the stream drain).
             for_ requestedExit $ \processorExit ->
               liftIO $ requestProcessorExit exitPublisher processorExit
-      case metricsHandle.detail of
-        Metrics.MetricsBasic -> do
+      if not detailed
+        then do
           currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
           process currentInflight
-        Metrics.MetricsDetailed _ -> Exception.mask $ \restore -> do
+        else Exception.mask $ \restore -> do
           currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
           slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle firstMsg.envelope.messageId
           restore (process currentInflight)
@@ -265,6 +280,7 @@ processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler (i
     isFailing (AckDeadLetter _) = True
     isFailing (AckRetry _) = True
     isFailing _ = False
+{-# INLINE processOneBatchWithDetail #-}
 
 decisionMetric :: AckDecision -> AckDecisionMetric
 decisionMetric AckOk = CountProcessed
@@ -308,7 +324,25 @@ processBatchesUntilDrained ::
   ProcessorSignal ->
   ProcessorExitPublisher ->
   Eff es ()
-processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher = do
+processBatchesUntilDrained metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher =
+  -- Specialize the complete loop once; keep mode selection and ownership
+  -- closures out of the basic batch hot path.
+  case Metrics.metricsDetailLevel metricsHandle of
+    Metrics.MetricsBasic -> processBatchesUntilDrainedWithDetail False metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher
+    Metrics.MetricsDetailed _ -> processBatchesUntilDrainedWithDetail True metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher
+
+processBatchesUntilDrainedWithDetail ::
+  (IOE :> es, Tracing :> es) =>
+  Bool ->
+  MetricsHandle ->
+  ProcessorId ->
+  Concurrency ->
+  BatchHandler es msg ->
+  Stream IO (BatchInfo, NonEmpty (Ingested es msg)) ->
+  ProcessorSignal ->
+  ProcessorExitPublisher ->
+  Eff es ()
+processBatchesUntilDrainedWithDetail detailed metricsHandle procId concurrency handler batchesStream stopSignal exitPublisher = do
   let maxConc = case concurrency of
         Serial -> 1
         Ahead n -> n
@@ -318,8 +352,7 @@ processBatchesUntilDrained metricsHandle procId concurrency handler batchesStrea
     -- The supervisor keeps framework coordination masked; only the owned batch
     -- action is unmasked so user code and finalizers remain cancellable.
     let runBatchAction batch =
-          runInIO $
-            processOneBatch metricsHandle procId maxConc stopSignal exitPublisher handler batch
+          runInIO $ processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler batch
         batchAction = unsafeUnmask . runBatchAction
         pendingLimit = max 2 (2 * max 1 maxConc)
     case concurrency of
@@ -331,6 +364,7 @@ processBatchesUntilDrained metricsHandle procId concurrency handler batchesStrea
         runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchesStream
       Async n ->
         runKeyedScheduler (max 1 n) pendingLimit (Just . fstBatchKey) batchAction batchesStream
+{-# INLINE processBatchesUntilDrainedWithDetail #-}
 
 fstBatchKey :: (BatchInfo, NonEmpty (Ingested es msg)) -> BatchKey
 fstBatchKey (info, _) = info.batchKey

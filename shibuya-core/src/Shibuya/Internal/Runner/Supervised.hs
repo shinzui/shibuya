@@ -316,7 +316,12 @@ runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adap
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
       -- Processor: process messages, exit when stream done and inbox empty
-      runInIO $ processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar
+      -- Saturated literal arguments plus INLINE on the loop and worker erase
+      -- the detail ownership action from the basic specialization. Selecting a
+      -- partially applied worker retains a per-message closure.
+      case Metrics.metricsDetailLevel metricsHandle of
+        Metrics.MetricsBasic -> runInIO $ processUntilDrained False metricsHandle procId ordering concurrency handler inbox streamDoneVar
+        Metrics.MetricsDetailed _ -> runInIO $ processUntilDrained True metricsHandle procId ordering concurrency handler inbox streamDoneVar
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
@@ -567,6 +572,7 @@ inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
 -- Supports Serial, Ahead, and Async concurrency modes.
 processUntilDrained ::
   (IOE :> es, Tracing :> es) =>
+  Bool ->
   MetricsHandle ->
   ProcessorId ->
   OrderingPolicy ->
@@ -575,7 +581,7 @@ processUntilDrained ::
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
+processUntilDrained detailed metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
   stopSignal <- liftIO newProcessorSignal
   let exitPublisher = newProcessorExitPublisherWithWake stopSignal streamDoneVar
 
@@ -595,8 +601,8 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
         runProcessAction ingested =
-          runInIO $
-            processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
+          runInIO $ processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
+
         -- Restore normal interruptibility for handlers and finalizers while the
         -- concurrent Streamly scheduler retains its inherited mask.
         processAction = unsafeUnmask . runProcessAction
@@ -638,6 +644,7 @@ processUntilDrained metricsHandle procId ordering concurrency handler inbox stre
     -- After draining, check if we halted
     maybeExit <- readProcessorExit stopSignal
     traverse_ throwProcessorExit maybeExit
+{-# INLINE processUntilDrained #-}
 
 handlerStartedEvent :: OTel.NewEvent
 handlerStartedEvent = mkEvent eventHandlerStarted []
@@ -647,6 +654,7 @@ handlerStartedEvent = mkEvent eventHandlerStarted []
 -- Thread-safe for concurrent execution.
 processOne ::
   (IOE :> es, Tracing :> es) =>
+  Bool ->
   MetricsHandle ->
   Text ->
   HashMap.HashMap Text Attribute ->
@@ -655,7 +663,7 @@ processOne ::
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested = do
+processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested = do
   -- Extract parent context from message headers for distributed tracing
   let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
 
@@ -769,11 +777,11 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher h
                 Right (AckHalt reason) ->
                   liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
                 _ -> pure ()
-      case metricsHandle.detail of
-        Metrics.MetricsBasic -> do
+      if not detailed
+        then do
           currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
           process currentInflight
-        Metrics.MetricsDetailed _ -> Exception.mask $ \restore -> do
+        else Exception.mask $ \restore -> do
           currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
           slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
           restore (process currentInflight)
@@ -798,6 +806,7 @@ processOne metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher h
     showHaltReason :: HaltReason -> Text
     showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t
     showHaltReason (HaltFatal t) = "halt_fatal: " <> t
+{-# INLINE processOne #-}
 
 metricForResult :: Either HandlerError AckDecision -> Either Text AckDecisionMetric
 metricForResult (Left err) = Left (handlerErrorToText err)

@@ -23,6 +23,14 @@ exhaustion increments a diagnostic miss count; supported runner tests require ze
 
 Masked ownership transfer claims the slot, restores cancellation during processing, abandons
 on exceptional exit, and releases once on completion. The basic branch has no detail bracket.
+Select the mode once outside the loop through an OPAQUE accessor. Pass fully saturated
+literal Bool arguments to INLINE loop/worker definitions so the compiler removes the detail
+ownership closure from the basic specialization. Matching the handle inline expands three
+basic worker closures by 40 bytes each; NOINLINE permits the worker/wrapper transformation
+and does not suffice. Keep this constraint when adding cursor hooks. The
+[GHC pragma reference](https://downloads.haskell.org/ghc/9.12.1/docs/users_guide/exts/pragmas.html)
+documents the stronger OPAQUE guarantee.
+
 Duration covers handler, finalization retries and metrics completion, once per message
 attempt or emitted batch. A completed finalization failure counts; an interrupted attempt
 does not. Batch identity is the first retained message. Existing runner entry points keep

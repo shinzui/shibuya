@@ -32,6 +32,7 @@ module Shibuya.Core.Metrics
     emptyProcessorMetrics,
     HotCounters (..),
     MetricsHandle (..),
+    metricsDetailLevel,
     MetricsDetail (..),
     DetailOptions (..),
     defaultDetailOptions,
@@ -412,6 +413,13 @@ data MetricsHandle = MetricsHandle
     slots :: !(Maybe InFlightSlots),
     cold :: !(TVar ProcessorMetrics)
   }
+
+-- | Read the configured level once, outside the processing loop. Keep this
+-- accessor opaque: exposing the record match lets GHC carry the individual
+-- counter references through each basic worker closure instead of one handle.
+{-# OPAQUE metricsDetailLevel #-}
+metricsDetailLevel :: MetricsHandle -> MetricsDetail
+metricsDetailLevel handle = handle.detail
 
 newMetricsHandle :: UTCTime -> IO MetricsHandle
 newMetricsHandle = newMetricsHandleWithClock getMonotonicTimeNSec
