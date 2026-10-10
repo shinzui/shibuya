@@ -6,9 +6,16 @@ description: >-
   WebSocket frame, and strictly additive alignment with the cross-project WebSocket convention,
   so a browser UI on another origin can consume the server and its contract stops being
   working-but-unproven.
-timestamp: 2026-09-30T23:43:10Z
+timestamp: 2026-10-10T21:37:58Z
 requestId: IR-5
-status: accepted
+status: completed
+completedAt: 2026-10-10T21:37:58Z
+resolution: >-
+  Delivered by docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md,
+  docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md, and
+  docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md;
+  contract tests, configurable browser access, and additive bounded WebSocket alignment
+  pass with the published conformance mapping and local acceptance evidence.
 origin: mori://shinzui/keiro-ui
 plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
@@ -24,23 +31,29 @@ This is the enabling request for browser consumption of shibuya-metrics: without
 the surface is reachable from a browser page on another origin. Implementation is shibuya's
 own downstream work.
 
-The test-suite deliverable in requested change 2 is complete under
-`docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md`:
-`shibuya-metrics-test` now covers every published HTTP route, exact JSON and Prometheus
-fixtures, every frame encoding, and real loopback WebSocket behavior, and the release skill
-runs it. CAP-10 no longer calls the endpoints working-but-unproven. Requested changes 1 and
-3—configurable CORS/Origin policy and broader additive convention alignment—remain open; they
-are now planned as described below, and the request's scope is unchanged.
+Completed under
+`docs/plans/39-make-metrics-health-and-websocket-lifecycle-reporting-trustworthy.md`
+(route/frame contract tests),
+`docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`
+(configurable HTTP CORS and WebSocket Origin validation), and
+`docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md`
+(in-band errors, bounded delivery, independent sampling and ordered snapshot recovery).
+The [conformance mapping](../architecture/METRICS.md#websocket-protocol-and-conformance)
+classifies every shared-convention element and preserves deliberate deviations, including
+no replay cursor and finite stalled-peer shutdown. Closed-client decoders must handle the
+new error tag; additive frame types do not guarantee compatibility with every old decoder.
+CAP-10 records the shipped contract and test evidence.
 
-Accepted on 2026-09-30 and planned under
-`docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`. Configurable
-cross-origin access (requested change 1) is delivered by
-`docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`, and the additive
-WebSocket convention alignment with its conformance mapping (requested change 3) by
-`docs/plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md`,
-which also closes this request once both have landed. Shibuya's own wire contract and browser
-posture are recorded in
-`docs/adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`.
+Final functional validation passes 90 metrics examples, 236 core examples and both core GC
+suites. [EP-48 acceptance evidence](../audits/lifecycle-release/artifacts/ep48-websocket/README.md)
+records 30/90/30 matched sustained-observer pairs at 1/16/64 clients passing the
+unchanged budgets in the controlled four-capability profile, saturation bounds and slot
+recovery, and the earlier default-scheduler series' inconclusive confidence intervals.
+The MasterPlan's complete integrated gate remains mandatory for later children.
+Shibuya's wire contract and browser posture remain governed by
+`docs/adr/0007-evolve-the-metrics-wire-contract-additively-and-keep-browser-access-and-control-opt-in.md`
+and bounded delivery by
+`docs/adr/0008-deliver-websocket-frames-through-one-bounded-outbound-queue-per-connection.md`.
 
 ## Context
 

@@ -1,0 +1,26 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+controlled outbound delivery
+  produces metrics during a continuous ping stream [✘]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:491:44: 
+  1) controlled outbound delivery produces metrics during a continuous ping stream
+       expected: Just ()
+        but got: Nothing
+
+  To rerun use: --match "/controlled outbound delivery/produces metrics during a continuous ping stream/" --seed 674337040
+
+Randomized with seed 674337040
+
+Finished in 0.5071 seconds
+1 example, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

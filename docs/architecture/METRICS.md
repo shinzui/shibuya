@@ -264,7 +264,7 @@ Every connection has one application writer and one bounded outbound queue. Defa
 `combinedApp` validate configuration themselves. Counts include snapshots, terminal events,
 errors, recovery snapshots and goodbye. Strict encoded payloads are forced before admission.
 The writer can hold one popped frame outside the queue. The budgets bound retained queue
-payloads, not the whole process heap, decoded input, metrics maps, or one transient encoding.
+payloads, not the whole process heap, decoded input, metrics maps, or transient encodings used to build an admission batch.
 Raise the byte budget explicitly if the registry's initial snapshot is larger than 1 MiB.
 
 Updates and pongs are expendable and evicted oldest-first. Losing updates marks recovery

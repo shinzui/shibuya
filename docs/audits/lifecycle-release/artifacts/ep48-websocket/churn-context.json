@@ -1,0 +1,11 @@
+{
+  "source": {
+    "baseline": "7a2527be72c08e0a14b4c135d42b902a93dfaa91",
+    "candidate": "1e8b9f3d20e09d4258c9f5d26dab3c9d0a568ae9"
+  },
+  "harnessSha": "90c20e38c08a23b87b07e95e331584d9c8e4f50a42b77a5d2fd36c1569647039",
+  "solverPlanHash": "c91f7081b33d5997f8c82939214290f890570821813680c7222a1e6ca4fddaee",
+  "rtsFlags": "-N4 -T -A32m",
+  "iterations": 500,
+  "interpretation": "connection-churn smoke, not a sustained-core budget gate"
+}

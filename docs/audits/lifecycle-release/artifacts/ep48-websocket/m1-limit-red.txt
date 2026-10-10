@@ -1,0 +1,26 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+WebSocket wire protocol
+  closes clients that exceed the retained processor subscription limit [✘]
+
+Failures:
+
+  ./Control/Concurrent/Async/Internal.hs:667:24: 
+  1) WebSocket wire protocol closes clients that exceed the retained processor subscription limit
+       uncaught exception: ConnectionException
+       CloseRequest 1008 "WebSocket processor subscription limit exceeded (maximum 2)"
+
+  To rerun use: --match "/WebSocket wire protocol/closes clients that exceed the retained processor subscription limit/" --seed 1969043499
+
+Randomized with seed 1969043499
+
+Finished in 0.0134 seconds
+1 example, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-red/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

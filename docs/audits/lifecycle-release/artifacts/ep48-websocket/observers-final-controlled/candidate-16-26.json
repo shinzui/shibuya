@@ -1,0 +1,1 @@
+{"allocatedBytesPerMessage":2313.784844,"clients":16,"completed":2000000,"elapsedSeconds":1.503009,"finalWebSocketConnections":0,"latencyP95Ms":8.0e-3,"latencyP99Ms":1.6e-2,"liveBytes":83119648,"maxLiveBytes":83119648,"messages":2000000,"observerFrames":1452,"schemaVersion":1,"shutdownLatencyMs":0.738,"slowReaders":4,"throughputPerSecond":1330664.0213065923}

@@ -1,0 +1,25 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+controlled outbound delivery
+  keeps sampling during a blocked write and sends an adjacent recovery pair [✘]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:113:13: 
+  1) controlled outbound delivery keeps sampling during a blocked write and sends an adjacent recovery pair
+       predicate failed on: [Right (ProcessorUpdate (ProcessorId {unProcessorId = "alpha"}) (ProcessorMetrics {state = Idle, stats = StreamStats {received = 3, processed = 0, failed = 0}, batch = BatchStats {batchesEmitted = 0, batchedMessages = 0, partialFailures = 0, sizeTriggered = 0, timeoutTriggered = 0, flushTriggered = 0}, startedAt = 2026-09-20 03:25:45 UTC})),Right (ProcessorUpdate (ProcessorId {unProcessorId = "alpha"}) (ProcessorMetrics {state = Idle, stats = StreamStats {received = 4, processed = 0, failed = 0}, batch = BatchStats {batchesEmitted = 0, batchedMessages = 0, partialFailures = 0, sizeTriggered = 0, timeoutTriggered = 0, flushTriggered = 0}, startedAt = 2026-09-20 03:25:45 UTC}))]
+
+  To rerun use: --match "/controlled outbound delivery/keeps sampling during a blocked write and sends an adjacent recovery pair/" --seed 962069202
+
+Randomized with seed 962069202
+
+Finished in 0.0044 seconds
+1 example, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

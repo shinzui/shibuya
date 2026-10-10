@@ -1,0 +1,60 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+bounded outbound queue
+  preserves frame and byte bounds and exact counters over exhaustive transition traces [✘]
+  evicts updates oldest-first while retaining required order [✘]
+  refuses required saturation and oversized snapshots without dropping required frames [✘]
+  admits recovery batches wholly and consecutively after earlier required frames [✘]
+  marks rejected oversized updates for recovery, but not lost pongs [✔]
+  removes unsent old-generation updates without deleting required snapshots [✔]
+controlled outbound delivery
+  closes a malformed-frame flood with bounded required retention and slot recovery [✘]
+
+Failures:
+
+  test/Shibuya/Metrics/OutboundQueueSpec.hs:27:28: 
+  1) bounded outbound queue preserves frame and byte bounds and exact counters over exhaustive transition traces
+       predicate failed on: 4
+
+  To rerun use: --match "/bounded outbound queue/preserves frame and byte bounds and exact counters over exhaustive transition traces/" --seed 680310095
+
+  test/Shibuya/Metrics/OutboundQueueSpec.hs:38:13: 
+  2) bounded outbound queue evicts updates oldest-first while retaining required order
+       expected: DroppedUpdates
+        but got: Enqueued
+
+  To rerun use: --match "/bounded outbound queue/evicts updates oldest-first while retaining required order/" --seed 680310095
+
+  test/Shibuya/Metrics/OutboundQueueSpec.hs:43:54: 
+  3) bounded outbound queue refuses required saturation and oversized snapshots without dropping required frames
+       expected: (MustClose,Queue (fromList [Frame 0 Required "aaaa",Frame 0 Required "aaaa"]) 8)
+        but got: (Enqueued,Queue (fromList [Frame 0 Required "aaaa",Frame 0 Required "aaaa",Frame 0 Required "a"]) 9)
+
+  To rerun use: --match "/bounded outbound queue/refuses required saturation and oversized snapshots without dropping required frames/" --seed 680310095
+
+  test/Shibuya/Metrics/OutboundQueueSpec.hs:52:39: 
+  4) bounded outbound queue admits recovery batches wholly and consecutively after earlier required frames
+       expected: (MustClose,Queue (fromList [Frame 0 Required "a",Frame 0 Update "aaa"]) 4)
+        but got: (Enqueued,Queue (fromList [Frame 0 Required "a",Frame 0 Update "aaa",Frame 0 Required "aaaa",Frame 0 Required "aaaaa"]) 13)
+
+  To rerun use: --match "/bounded outbound queue/admits recovery batches wholly and consecutively after earlier required frames/" --seed 680310095
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:534:34: 
+  5) controlled outbound delivery closes a malformed-frame flood with bounded required retention and slot recovery
+       predicate failed on: 3
+
+  To rerun use: --match "/controlled outbound delivery/closes a malformed-frame flood with bounded required retention and slot recovery/" --seed 680310095
+
+Randomized with seed 680310095
+
+Finished in 0.0053 seconds
+7 examples, 5 failures
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-mutants-final/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+HUnitFailure (Just (SrcLoc {srcLocPackage = "shibuya-metrics-0.10.0.1-inplace-shibuya-metrics-test", srcLocModule = "Shibuya.Metrics.WebSocketSpec", srcLocFile = "test/Shibuya/Metrics/WebSocketSpec.hs", srcLocStartLine = 534, srcLocStartCol = 34, srcLocEndLine = 534, srcLocEndCol = 49})) (Reason "predicate failed on: 3")
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

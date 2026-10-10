@@ -14,12 +14,19 @@ parser.add_argument('--baseline', type=Path, required=True)
 parser.add_argument('--candidate', type=Path, default=Path.cwd())
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--pairs', type=int, default=10)
+parser.add_argument('--clients', type=int, nargs='+', choices=[1, 16, 64], default=[1, 16, 64])
 parser.add_argument('--rts-flags', default='-N4 -T -A32m')
 parser.add_argument('--resume', action='store_true')
 parser.add_argument('--constraint', action='append', default=[])
 parser.add_argument('--messages', type=int, default=2_000_000)
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
+if not args.resume and any((args.output / (name + '.json')).exists() for name in ['baseline', 'candidate']):
+    raise SystemExit('Use a fresh output directory or --resume; existing datasets are not overwritten')
+rts_flags = shlex.split(args.rts_flags)
+capability_flags = [flag[2:] for flag in rts_flags if flag.startswith('-N')]
+if len(capability_flags) != 1 or not capability_flags[0].isdigit() or int(capability_flags[0]) <= 0:
+    raise SystemExit('Specify exactly one explicit positive -N capability count')
 roots = {'baseline': args.baseline.resolve(), 'candidate': args.candidate.resolve()}
 
 def command(root, *argv):
@@ -29,6 +36,8 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 for root in roots.values():
+    if command(root, 'git', 'status', '--porcelain', '--untracked-files=all', '--', 'shibuya-core/src', 'shibuya-metrics/src'):
+        raise SystemExit('Commit production source changes before capturing: ' + str(root))
     subprocess.run(['cabal', 'build', 'metrics-observer-load'] + ['--constraint=' + value for value in args.constraint], cwd=root, check=True, stdout=subprocess.DEVNULL)
 
 harnesses = {name: sha((root / 'shibuya-metrics/bench/ObserverLoad.hs').read_bytes()) for name, root in roots.items()}
@@ -48,7 +57,7 @@ environment = dict(machineId=command(args.candidate, 'sysctl', '-n', 'hw.model')
                    platform=platform.system() + '-' + platform.machine(),
                    compiler=command(args.candidate, 'ghc', '--numeric-version'),
                    optimization='O1 libraries / O2 harness', rtsFlags=args.rts_flags,
-                   capabilities=4, services={})
+                   capabilities=int(capability_flags[0]), services={})
 datasets = {name: dict(schemaVersion=1, label='ep48-' + name,
                        capture=dict(purpose='sustained-real-observers', pairedComparisonEligible=True,
                                     warmupsPerScenario=1, ordering='baseline first on odd pairs; candidate first on even pairs'),
@@ -63,17 +72,25 @@ if args.resume:
             raise SystemExit('Resume source or controlled environment differs')
         if any(sample['configuration']['messages'] != args.messages for sample in previous['samples']):
             raise SystemExit('Resume message count differs')
-        previous['capture']['warmupsPerScenario'] += 1
-        previous['capture'].setdefault('phaseEndPairCounts', [10]).append(args.pairs)
+        capture = previous['capture']
+        capture.setdefault('phaseEndPairCounts', [max(s['ordinal'] for s in previous['samples'])]).append(args.pairs)
+        warmups = capture.setdefault('warmupsByScenario', {
+            'websocket-observers-' + str(clients): capture['warmupsPerScenario'] for clients in [1, 16, 64]})
+        for clients in args.clients:
+            scenario = 'websocket-observers-' + str(clients)
+            if sum(sample['scenario'] == scenario for sample in previous['samples']) < args.pairs:
+                warmups[scenario] += 1
+        capture['warmupsPerScenario'] = min(warmups.values())
+        capture.setdefault('extensions', []).append(dict(clients=args.clients, targetPairs=args.pairs))
         datasets[name] = previous
 binaries = {name: command(root, 'cabal', 'list-bin', 'metrics-observer-load') for name, root in roots.items()}
 metrics = ['throughputPerSecond', 'latencyP95Ms', 'latencyP99Ms', 'allocatedBytesPerMessage', 'maxLiveBytes', 'shutdownLatencyMs']
-for clients in [1, 16, 64]:
+for clients in args.clients:
     scenario = 'websocket-observers-' + str(clients)
     def run(name, suffix):
         path = (args.output / (name + '-' + str(clients) + '-' + suffix + '.json')).resolve()
         env = dict(os.environ, CLIENTS=str(clients), MESSAGES=str(args.messages), OUTPUT_JSON=str(path))
-        subprocess.run([binaries[name], '+RTS', *shlex.split(args.rts_flags), '-RTS'],
+        subprocess.run([binaries[name], '+RTS', *rts_flags, '-RTS'],
                        cwd=roots[name], env=env, stdout=subprocess.DEVNULL, check=True, timeout=60)
         return json.loads(path.read_text())
     counts = [sum(sample['scenario'] == scenario for sample in datasets[name]['samples']) for name in roots]

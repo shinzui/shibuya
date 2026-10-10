@@ -1,0 +1,26 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+WebSocket wire protocol
+  establishes an unsubscribe snapshot before subsequent replies [✘]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:308:44: 
+  1) WebSocket wire protocol establishes an unsubscribe snapshot before subsequent replies
+       expected: MetricsSnapshot (fromList [])
+        but got: Pong
+
+  To rerun use: --match "/WebSocket wire protocol/establishes an unsubscribe snapshot before subsequent replies/" --seed 524302768
+
+Randomized with seed 524302768
+
+Finished in 0.0047 seconds
+1 example, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-red/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

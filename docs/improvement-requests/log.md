@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-10-10
+* **Update**: IR-5 completed: configurable cross-origin access (EP-47), the contract suite (EP-39), and bounded WebSocket delivery with in-band errors and a conformance mapping (EP-48); controlled local acceptance evidence recorded.
+
 ## 2026-09-30
 * **Update**: Accept IR-3, IR-4, and IR-5 and link them to `docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md`; child plans EP-47 through EP-52 deliver them and `docs/adr/0007` records Shibuya's own wire contract.
 

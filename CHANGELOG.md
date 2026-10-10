@@ -2,22 +2,23 @@
 
 ## Unreleased
 
-- Bound metrics WebSocket frames and encoded bytes, separate sampling from the
-  sole application writer, resynchronize after dropped deltas, and enforce send
-  and shutdown deadlines. Configuration gains three required record fields;
-  `MetricsServer` gains a required shutdown action.
-
-- Metrics WebSockets send additive `error` frames for malformed messages and before
-  subscription-limit closes; exported `ServerMessage` gains `ServerError`, requiring
-  downstream exhaustive matches to handle it.
-
 ### Breaking Changes
 
+- `shibuya-metrics`: `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`,
+  and `wsSendTimeoutUs`; direct record construction must supply them. `MetricsServer`
+  gains the required `serverShutdown` action, and exhaustive `ServerMessage` matches
+  must handle the new `ServerError` constructor.
 - `shibuya-metrics`: `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
   must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
 
 ### New Features
 
+- `shibuya-metrics`: bound every queued WebSocket frame and encoded byte, separate
+  sampling from the sole application writer, recover dropped deltas with an adjacent
+  error/snapshot pair, and enforce send/shutdown deadlines. Expose the pure
+  `Shibuya.Metrics.Outbound` queue model and optional `WebSocketHooks` instrumentation.
+- `shibuya-metrics`: send additive in-band `error` frames for malformed messages and
+  before subscription-limit closes; subscription mutations establish ordered snapshots.
 - `shibuya-metrics`: add configurable cross-origin HTTP access and preflight handling, plus
   WebSocket upgrade Origin validation before connection-slot acquisition.
 - `shibuya-metrics`: export `Shibuya.Metrics.Cors` and `Shibuya.Metrics.Error`, with reusable

@@ -5,6 +5,7 @@ description: "Expose live processor metrics as a JSON HTTP endpoint, a Prometheu
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
+timestamp: 2026-10-10T21:37:58Z
 capabilityId: CAP-10
 provider: mori://shinzui/shibuya
 status: shipped
@@ -44,8 +45,11 @@ evidence:
     resource: shibuya-metrics/test/Shibuya/Metrics/TypesSpec.hs
     proves: Every published client and server frame has an exact JSON contract and round trip.
   - kind: test
+    resource: shibuya-metrics/test/Shibuya/Metrics/OutboundQueueSpec.hs
+    proves: Exhaustive queue transition traces preserve frame and encoded-byte bounds, required order, recovery batch admission, and saturation refusal.
+  - kind: test
     resource: shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs
-    proves: Real loopback connections exercise snapshots, subscriptions, updates, shutdown, limits, and terminal removal.
+    proves: Real loopback connections and controlled stalls exercise independent sampling, snapshot boundaries, overflow recovery, errors before policy close, terminal ordering, shutdown deadlines, and slot release.
   - kind: test
     resource: shibuya-metrics/test/golden/processor-metrics.json.golden
     proves: Processor JSON fields and state shapes are compared byte-for-byte.
@@ -88,9 +92,17 @@ pipeline uses CAP-9 directly and never depends on this.
 - Cross-origin browser access requires an explicit `corsAllowedOrigins` list (disabled by
   default). HTTP preflights and responses use exact origin matching; WebSocket upgrades use
   the same policy before acquiring a connection slot. Wildcards and credentialed CORS are
-  unsupported. Headerless clients remain supported. Bounded slow-consumer queues, overflow
-  signaling, and broader cross-project WebSocket convention alignment remain open under
-  IR-5.
+  unsupported. Headerless clients remain supported.
+- Outbound WebSocket retention is bounded by `wsMaxQueuedFrames` (64, minimum 2) and
+  `wsMaxQueuedBytes` (1 MiB), including required frames. One popped frame and transient
+  encoding are outside that queue budget. Updates/pongs may be evicted oldest-first;
+  dropped deltas recover through an adjacent `queue_overflow` error and snapshot. Required
+  saturation or oversized snapshots close with 1013 rather than growing the queue.
+- `wsSendTimeoutUs` (five seconds) bounds sends and the entire orderly close flush.
+  Responsive shutdown peers receive goodbye; stalled peers, policy/capacity closes and
+  disconnected peers have no final-frame delivery guarantee. Metrics are current state,
+  not replayable history. The [conformance mapping](../architecture/METRICS.md#websocket-protocol-and-conformance)
+  records the preserved dialect and deliberate convention deviations.
 - Versions track `shibuya-core` rather than signalling independent change. Several releases
   (0.2.0.0, 0.3.0.0, 0.5.0.0, 0.6.0.0, 0.7.0.0) are re-releases with no user-visible change of
   their own.

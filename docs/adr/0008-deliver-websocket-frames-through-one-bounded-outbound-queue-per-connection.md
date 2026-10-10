@@ -55,10 +55,15 @@ Warp's own final wait is disabled to prevent it extending this bound indefinitel
 - `Shibuya.Metrics.Outbound` exposes the admission model. Optional `WebSocketHooks` support
   deterministic writer stalls, explicit producer ticks and admission observation in tests.
 - Metrics remain current state, not replayable history. HTTP reads remain authoritative.
+- Independent observer loops share CPU and GC with core work. Acceptance therefore measures
+  sustained real observers alongside the production runner, with matching harnesses, package
+  versions and explicit RTS scheduling. A controlled local scheduling result cannot certify
+  every default-scheduler outcome; the final integrated feature set must repeat the budgets.
 
 ## Evidence
 
 [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md),
 the [protocol mapping](../architecture/METRICS.md#websocket-protocol-and-conformance),
 [queue model tests](../../shibuya-metrics/test/Shibuya/Metrics/OutboundQueueSpec.hs), and
-[controlled loopback tests](../../shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs).
+[controlled loopback tests](../../shibuya-metrics/test/Shibuya/Metrics/WebSocketSpec.hs), and
+[local acceptance evidence](../audits/lifecycle-release/artifacts/ep48-websocket/README.md).

@@ -21,3 +21,6 @@ CLAUDE.local.md
 .envrc.local
 result
 result-*
+
+# Python audit harness bytecode
+__pycache__/

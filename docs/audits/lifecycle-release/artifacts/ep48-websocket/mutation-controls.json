@@ -1,17 +1,22 @@
-[
-  {
-    "control": "unlimited-required",
-    "exitCode": 1,
-    "failingTestMatch": "bounded"
-  },
-  {
-    "control": "second-writer",
-    "exitCode": 1,
-    "failingTestMatch": "adjacent"
-  },
-  {
-    "control": "receive-resets-timer",
-    "exitCode": 1,
-    "failingTestMatch": "continuous"
-  }
-]
+{
+  "productionSha": "1e8b9f3d20e09d4258c9f5d26dab3c9d0a568ae9",
+  "queueSourceSha256": "771de109dd9846d074f96a105546dcc8422c8016bbcfa355cc2802ee033745a3",
+  "websocketSourceSha256": "58aef762676a7ddabc928f561148fbaf733bea3b5b3ff9330ae161868766dde6",
+  "controls": [
+    {
+      "control": "unlimited-required",
+      "exitCode": 1,
+      "failingTestMatch": "bounded"
+    },
+    {
+      "control": "second-writer",
+      "exitCode": 1,
+      "failingTestMatch": "adjacent"
+    },
+    {
+      "control": "receive-resets-timer",
+      "exitCode": 1,
+      "failingTestMatch": "continuous"
+    }
+  ]
+}

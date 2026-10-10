@@ -1,0 +1,34 @@
+Running 1 test suites...
+Test suite shibuya-metrics-test: RUNNING...
+
+WebSocket wire protocol
+  reports invalid client messages and remains usable [✘]
+  reports a retained terminal failure once when a processor disappears [✔]
+health characterization
+  reports a running, intentionally empty master live and ready [✔]
+  reports a failed processor while it remains registered [✔]
+  reports an unhealthy dependency unready with its diagnostic fields [✔]
+  restamps separated bursts and reports progress independently [✔]
+  reports a genuinely non-progressing handler stuck [✔]
+  reports draining and stopped masters unavailable [✔]
+
+Failures:
+
+  test/Shibuya/Metrics/WebSocketSpec.hs:97:44: 
+  1) WebSocket wire protocol reports invalid client messages and remains usable
+       expected: Just (Right (Object (fromList [("code",String "invalid_message"),("message",String "Error in $: Unknown message type: bogus"),("type",String "error")])))
+        but got: Nothing
+
+  To rerun use: --match "/WebSocket wire protocol/reports invalid client messages and remains usable/" --seed 1498905511
+
+Randomized with seed 1498905511
+
+Finished in 1.0790 seconds
+8 examples, 1 failure
+Test suite shibuya-metrics-test: FAIL
+Test suite logged to:
+/private/tmp/shibuya-ep48-red/dist-newstyle/build/aarch64-osx/ghc-9.12.4/shibuya-metrics-0.10.0.1/t/shibuya-metrics-test/test/shibuya-metrics-0.10.0.1-shibuya-metrics-test.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: [Cabal-7125]
+Tests failed for test:shibuya-metrics-test from shibuya-metrics-0.10.0.1.
+

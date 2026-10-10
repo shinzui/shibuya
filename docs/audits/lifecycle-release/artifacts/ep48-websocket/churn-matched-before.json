@@ -1,0 +1,1 @@
+{"completed":500,"elapsedSeconds":0.103273,"errors":0,"finalWebSocketConnections":0,"iterations":500,"latencyP50Micros":184,"latencyP95Micros":315,"latencyP99Micros":376,"maxLiveBytes":286264,"operationsPerSecond":4841.536510026822,"retainedBytes":286264,"scenario":"websocket-churn","schemaVersion":1}

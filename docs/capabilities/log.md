@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-10-10
+* **Update**: Bound outbound frames and bytes, add in-band errors and adjacent snapshot recovery, and enforce send/shutdown deadlines; queue and controlled transport tests plus protocol mapping added.
 * **Update**: CAP-10 gains configurable cross-origin access with WebSocket upgrade origin validation; CorsSpec added as evidence.
 
 ## 2026-09-20

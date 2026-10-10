@@ -1,0 +1,4393 @@
+{
+  "schemaVersion": 1,
+  "label": "ep48-candidate",
+  "capture": {
+    "purpose": "sustained-real-observers",
+    "pairedComparisonEligible": true,
+    "warmupsPerScenario": 1,
+    "ordering": "baseline first on odd pairs; candidate first on even pairs",
+    "phaseEndPairCounts": [
+      30,
+      90
+    ],
+    "warmupsByScenario": {
+      "websocket-observers-1": 1,
+      "websocket-observers-16": 2,
+      "websocket-observers-64": 1
+    },
+    "extensions": [
+      {
+        "clients": [
+          16
+        ],
+        "targetPairs": 90
+      }
+    ]
+  },
+  "environment": {
+    "machineId": "MacBookPro18,2",
+    "platform": "Darwin-arm64",
+    "compiler": "9.12.4",
+    "optimization": "O1 libraries / O2 harness",
+    "rtsFlags": "-N4 -qm -T -A32m",
+    "capabilities": 4,
+    "services": {}
+  },
+  "source": {
+    "productionSha": "1e8b9f3d20e09d4258c9f5d26dab3c9d0a568ae9",
+    "harnessSha": "e00419f5339069224471f58668a026a6c21ec66b538f0992623ff5bc2cdc318e",
+    "solverPlanHash": "c91f7081b33d5997f8c82939214290f890570821813680c7222a1e6ca4fddaee"
+  },
+  "samples": [
+    {
+      "pairId": "websocket-observers-1-01",
+      "ordinal": 1,
+      "sampleId": "candidate-websocket-observers-1-01",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1440850.5629042936,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.400636,
+        "maxLiveBytes": 80264376,
+        "shutdownLatencyMs": 0.175
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-02",
+      "ordinal": 2,
+      "sampleId": "candidate-websocket-observers-1-02",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1411260.3048463385,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.40496,
+        "maxLiveBytes": 80264496,
+        "shutdownLatencyMs": 0.168
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-03",
+      "ordinal": 3,
+      "sampleId": "candidate-websocket-observers-1-03",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1429422.9562467928,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.41792,
+        "maxLiveBytes": 80264424,
+        "shutdownLatencyMs": 0.147
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-04",
+      "ordinal": 4,
+      "sampleId": "candidate-websocket-observers-1-04",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1436076.9823427154,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.363552,
+        "maxLiveBytes": 80264416,
+        "shutdownLatencyMs": 0.175
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-05",
+      "ordinal": 5,
+      "sampleId": "candidate-websocket-observers-1-05",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1483027.1253076354,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2271.311112,
+        "maxLiveBytes": 80264000,
+        "shutdownLatencyMs": 0.134
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-06",
+      "ordinal": 6,
+      "sampleId": "candidate-websocket-observers-1-06",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1422943.686292143,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.4208,
+        "maxLiveBytes": 80264640,
+        "shutdownLatencyMs": 0.168
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-07",
+      "ordinal": 7,
+      "sampleId": "candidate-websocket-observers-1-07",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1424464.899760405,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.416732,
+        "maxLiveBytes": 80264368,
+        "shutdownLatencyMs": 0.152
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-08",
+      "ordinal": 8,
+      "sampleId": "candidate-websocket-observers-1-08",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1434015.5662389714,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2271.453248,
+        "maxLiveBytes": 80264528,
+        "shutdownLatencyMs": 0.175
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-09",
+      "ordinal": 9,
+      "sampleId": "candidate-websocket-observers-1-09",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1474173.9466290064,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.3652,
+        "maxLiveBytes": 80264304,
+        "shutdownLatencyMs": 0.157
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-10",
+      "ordinal": 10,
+      "sampleId": "candidate-websocket-observers-1-10",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1411997.602428071,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.395812,
+        "maxLiveBytes": 80264400,
+        "shutdownLatencyMs": 0.169
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-11",
+      "ordinal": 11,
+      "sampleId": "candidate-websocket-observers-1-11",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1407510.0513811545,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.438652,
+        "maxLiveBytes": 80264368,
+        "shutdownLatencyMs": 0.122
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-12",
+      "ordinal": 12,
+      "sampleId": "candidate-websocket-observers-1-12",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1435673.912512903,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.396496,
+        "maxLiveBytes": 80264800,
+        "shutdownLatencyMs": 0.139
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-13",
+      "ordinal": 13,
+      "sampleId": "candidate-websocket-observers-1-13",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1432351.8142526168,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2271.34436,
+        "maxLiveBytes": 80263808,
+        "shutdownLatencyMs": 0.132
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-14",
+      "ordinal": 14,
+      "sampleId": "candidate-websocket-observers-1-14",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1315225.3112480699,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2271.527872,
+        "maxLiveBytes": 80264336,
+        "shutdownLatencyMs": 0.202
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-15",
+      "ordinal": 15,
+      "sampleId": "candidate-websocket-observers-1-15",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1425765.7253048464,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.462704,
+        "maxLiveBytes": 80264528,
+        "shutdownLatencyMs": 0.195
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-16",
+      "ordinal": 16,
+      "sampleId": "candidate-websocket-observers-1-16",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1458779.6287259967,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.397088,
+        "maxLiveBytes": 80264400,
+        "shutdownLatencyMs": 0.149
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-17",
+      "ordinal": 17,
+      "sampleId": "candidate-websocket-observers-1-17",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1446491.3904832439,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.008,
+        "allocatedBytesPerMessage": 2271.339024,
+        "maxLiveBytes": 80264072,
+        "shutdownLatencyMs": 0.139
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-18",
+      "ordinal": 18,
+      "sampleId": "candidate-websocket-observers-1-18",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1365328.4399962043,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2271.542312,
+        "maxLiveBytes": 80264208,
+        "shutdownLatencyMs": 0.216
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-19",
+      "ordinal": 19,
+      "sampleId": "candidate-websocket-observers-1-19",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1454033.634706038,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2271.388076,
+        "maxLiveBytes": 80264328,
+        "shutdownLatencyMs": 0.18
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-20",
+      "ordinal": 20,
+      "sampleId": "candidate-websocket-observers-1-20",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1470165.562694843,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.3497,
+        "maxLiveBytes": 80264352,
+        "shutdownLatencyMs": 0.264
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-21",
+      "ordinal": 21,
+      "sampleId": "candidate-websocket-observers-1-21",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1459917.9526110634,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.372928,
+        "maxLiveBytes": 80264504,
+        "shutdownLatencyMs": 0.129
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-22",
+      "ordinal": 22,
+      "sampleId": "candidate-websocket-observers-1-22",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1465363.567691371,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.386868,
+        "maxLiveBytes": 80264296,
+        "shutdownLatencyMs": 0.236
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-23",
+      "ordinal": 23,
+      "sampleId": "candidate-websocket-observers-1-23",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1477924.6095877404,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.385088,
+        "maxLiveBytes": 80264408,
+        "shutdownLatencyMs": 0.172
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-24",
+      "ordinal": 24,
+      "sampleId": "candidate-websocket-observers-1-24",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1477907.135705128,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2271.340584,
+        "maxLiveBytes": 80264296,
+        "shutdownLatencyMs": 0.177
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-25",
+      "ordinal": 25,
+      "sampleId": "candidate-websocket-observers-1-25",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1490696.1923892505,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.298256,
+        "maxLiveBytes": 80264680,
+        "shutdownLatencyMs": 0.198
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-26",
+      "ordinal": 26,
+      "sampleId": "candidate-websocket-observers-1-26",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1480380.5170080918,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.35464,
+        "maxLiveBytes": 80264328,
+        "shutdownLatencyMs": 0.121
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-27",
+      "ordinal": 27,
+      "sampleId": "candidate-websocket-observers-1-27",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1497317.5555991442,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.008,
+        "allocatedBytesPerMessage": 2271.199288,
+        "maxLiveBytes": 80264120,
+        "shutdownLatencyMs": 0.142
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-28",
+      "ordinal": 28,
+      "sampleId": "candidate-websocket-observers-1-28",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1476164.0106785705,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.296616,
+        "maxLiveBytes": 80264376,
+        "shutdownLatencyMs": 0.251
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-29",
+      "ordinal": 29,
+      "sampleId": "candidate-websocket-observers-1-29",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1482127.0301434996,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.302316,
+        "maxLiveBytes": 80264552,
+        "shutdownLatencyMs": 0.173
+      }
+    },
+    {
+      "pairId": "websocket-observers-1-30",
+      "ordinal": 30,
+      "sampleId": "candidate-websocket-observers-1-30",
+      "scenario": "websocket-observers-1",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 1,
+        "slowReaders": 1,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1494496.8888311016,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2271.28208,
+        "maxLiveBytes": 80264504,
+        "shutdownLatencyMs": 0.18
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-01",
+      "ordinal": 1,
+      "sampleId": "candidate-websocket-observers-16-01",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1410679.9759620132,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.324636,
+        "maxLiveBytes": 83120736,
+        "shutdownLatencyMs": 1.013
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-02",
+      "ordinal": 2,
+      "sampleId": "candidate-websocket-observers-16-02",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1424238.6910107038,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.599188,
+        "maxLiveBytes": 83061304,
+        "shutdownLatencyMs": 0.906
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-03",
+      "ordinal": 3,
+      "sampleId": "candidate-websocket-observers-16-03",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1411260.3048463385,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.293536,
+        "maxLiveBytes": 83056016,
+        "shutdownLatencyMs": 0.84
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-04",
+      "ordinal": 4,
+      "sampleId": "candidate-websocket-observers-16-04",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1395150.5960432135,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.763808,
+        "maxLiveBytes": 83112728,
+        "shutdownLatencyMs": 1.095
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-05",
+      "ordinal": 5,
+      "sampleId": "candidate-websocket-observers-16-05",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1380019.3892724193,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.66556,
+        "maxLiveBytes": 83071832,
+        "shutdownLatencyMs": 0.915
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-06",
+      "ordinal": 6,
+      "sampleId": "candidate-websocket-observers-16-06",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1375515.818431912,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.6953,
+        "maxLiveBytes": 83087664,
+        "shutdownLatencyMs": 0.997
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-07",
+      "ordinal": 7,
+      "sampleId": "candidate-websocket-observers-16-07",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1410458.1238509174,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.785936,
+        "maxLiveBytes": 83144224,
+        "shutdownLatencyMs": 1.284
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-08",
+      "ordinal": 8,
+      "sampleId": "candidate-websocket-observers-16-08",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1411727.5027105168,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.677216,
+        "maxLiveBytes": 83044736,
+        "shutdownLatencyMs": 1.066
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-09",
+      "ordinal": 9,
+      "sampleId": "candidate-websocket-observers-16-09",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1414439.1607283796,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.619452,
+        "maxLiveBytes": 83160512,
+        "shutdownLatencyMs": 1.121
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-10",
+      "ordinal": 10,
+      "sampleId": "candidate-websocket-observers-16-10",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1404248.8357021841,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.368184,
+        "maxLiveBytes": 83132648,
+        "shutdownLatencyMs": 1.007
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-11",
+      "ordinal": 11,
+      "sampleId": "candidate-websocket-observers-16-11",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1403671.3022911425,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.218372,
+        "maxLiveBytes": 83056368,
+        "shutdownLatencyMs": 0.905
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-12",
+      "ordinal": 12,
+      "sampleId": "candidate-websocket-observers-16-12",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1407747.8216862145,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.356384,
+        "maxLiveBytes": 83083808,
+        "shutdownLatencyMs": 0.859
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-13",
+      "ordinal": 13,
+      "sampleId": "candidate-websocket-observers-16-13",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1366094.0910966184,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.317508,
+        "maxLiveBytes": 83111648,
+        "shutdownLatencyMs": 0.407
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-14",
+      "ordinal": 14,
+      "sampleId": "candidate-websocket-observers-16-14",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1377669.4929556316,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.287408,
+        "maxLiveBytes": 83119704,
+        "shutdownLatencyMs": 0.729
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-15",
+      "ordinal": 15,
+      "sampleId": "candidate-websocket-observers-16-15",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1371841.8485843278,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.605112,
+        "maxLiveBytes": 83076016,
+        "shutdownLatencyMs": 0.83
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-16",
+      "ordinal": 16,
+      "sampleId": "candidate-websocket-observers-16-16",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1361986.8118817005,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2313.402384,
+        "maxLiveBytes": 83085160,
+        "shutdownLatencyMs": 0.735
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-17",
+      "ordinal": 17,
+      "sampleId": "candidate-websocket-observers-16-17",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1401710.6476744218,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.375544,
+        "maxLiveBytes": 83080592,
+        "shutdownLatencyMs": 1.428
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-18",
+      "ordinal": 18,
+      "sampleId": "candidate-websocket-observers-16-18",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1418730.5057561444,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.651196,
+        "maxLiveBytes": 83040744,
+        "shutdownLatencyMs": 1.231
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-19",
+      "ordinal": 19,
+      "sampleId": "candidate-websocket-observers-16-19",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1401697.8766379715,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.54162,
+        "maxLiveBytes": 83112016,
+        "shutdownLatencyMs": 0.797
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-20",
+      "ordinal": 20,
+      "sampleId": "candidate-websocket-observers-16-20",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1379580.55232887,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.721788,
+        "maxLiveBytes": 83115920,
+        "shutdownLatencyMs": 0.992
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-21",
+      "ordinal": 21,
+      "sampleId": "candidate-websocket-observers-16-21",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1399412.6665038683,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.4487,
+        "maxLiveBytes": 83108616,
+        "shutdownLatencyMs": 1.149
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-22",
+      "ordinal": 22,
+      "sampleId": "candidate-websocket-observers-16-22",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1421782.4175277336,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2313.293108,
+        "maxLiveBytes": 83107720,
+        "shutdownLatencyMs": 0.741
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-23",
+      "ordinal": 23,
+      "sampleId": "candidate-websocket-observers-16-23",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1355165.9603993404,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2313.74962,
+        "maxLiveBytes": 83116672,
+        "shutdownLatencyMs": 0.895
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-24",
+      "ordinal": 24,
+      "sampleId": "candidate-websocket-observers-16-24",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1338623.573696582,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.017,
+        "allocatedBytesPerMessage": 2314.90874,
+        "maxLiveBytes": 83115672,
+        "shutdownLatencyMs": 0.752
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-25",
+      "ordinal": 25,
+      "sampleId": "candidate-websocket-observers-16-25",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1339053.77104323,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2314.233544,
+        "maxLiveBytes": 83052352,
+        "shutdownLatencyMs": 0.757
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-26",
+      "ordinal": 26,
+      "sampleId": "candidate-websocket-observers-16-26",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1330664.0213065923,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.016,
+        "allocatedBytesPerMessage": 2313.784844,
+        "maxLiveBytes": 83119648,
+        "shutdownLatencyMs": 0.738
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-27",
+      "ordinal": 27,
+      "sampleId": "candidate-websocket-observers-16-27",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1368390.5879358582,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.016,
+        "allocatedBytesPerMessage": 2314.014132,
+        "maxLiveBytes": 83052952,
+        "shutdownLatencyMs": 0.85
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-28",
+      "ordinal": 28,
+      "sampleId": "candidate-websocket-observers-16-28",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1321938.2258267072,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.018,
+        "allocatedBytesPerMessage": 2314.174816,
+        "maxLiveBytes": 83080696,
+        "shutdownLatencyMs": 0.811
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-29",
+      "ordinal": 29,
+      "sampleId": "candidate-websocket-observers-16-29",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1384839.195934666,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.82168,
+        "maxLiveBytes": 83076800,
+        "shutdownLatencyMs": 1.034
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-30",
+      "ordinal": 30,
+      "sampleId": "candidate-websocket-observers-16-30",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1378840.5881030876,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2313.378004,
+        "maxLiveBytes": 83083720,
+        "shutdownLatencyMs": 0.737
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-01",
+      "ordinal": 1,
+      "sampleId": "candidate-websocket-observers-64-01",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1308151.4185266944,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2453.917556,
+        "maxLiveBytes": 91952984,
+        "shutdownLatencyMs": 3.326
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-02",
+      "ordinal": 2,
+      "sampleId": "candidate-websocket-observers-64-02",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1235247.2872425513,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.02,
+        "allocatedBytesPerMessage": 2464.552224,
+        "maxLiveBytes": 91993040,
+        "shutdownLatencyMs": 2.736
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-03",
+      "ordinal": 3,
+      "sampleId": "candidate-websocket-observers-64-03",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1203056.002858461,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.02,
+        "allocatedBytesPerMessage": 2468.903156,
+        "maxLiveBytes": 92000832,
+        "shutdownLatencyMs": 2.843
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-04",
+      "ordinal": 4,
+      "sampleId": "candidate-websocket-observers-64-04",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1338469.4869111069,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2453.90476,
+        "maxLiveBytes": 91976584,
+        "shutdownLatencyMs": 3.616
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-05",
+      "ordinal": 5,
+      "sampleId": "candidate-websocket-observers-64-05",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1372935.1912807631,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2452.657196,
+        "maxLiveBytes": 91964904,
+        "shutdownLatencyMs": 2.602
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-06",
+      "ordinal": 6,
+      "sampleId": "candidate-websocket-observers-64-06",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1348674.0511066546,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2452.235948,
+        "maxLiveBytes": 91973096,
+        "shutdownLatencyMs": 3.589
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-07",
+      "ordinal": 7,
+      "sampleId": "candidate-websocket-observers-64-07",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1326955.982879614,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.109952,
+        "maxLiveBytes": 92038592,
+        "shutdownLatencyMs": 3.616
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-08",
+      "ordinal": 8,
+      "sampleId": "candidate-websocket-observers-64-08",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1315892.4942150076,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2453.374272,
+        "maxLiveBytes": 92011984,
+        "shutdownLatencyMs": 3.427
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-09",
+      "ordinal": 9,
+      "sampleId": "candidate-websocket-observers-64-09",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1154369.8381631204,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.018,
+        "allocatedBytesPerMessage": 2461.129656,
+        "maxLiveBytes": 91969120,
+        "shutdownLatencyMs": 3.653
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-10",
+      "ordinal": 10,
+      "sampleId": "candidate-websocket-observers-64-10",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1312801.9854817227,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2452.641188,
+        "maxLiveBytes": 92041192,
+        "shutdownLatencyMs": 4.042
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-11",
+      "ordinal": 11,
+      "sampleId": "candidate-websocket-observers-64-11",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1334164.9628268287,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.037608,
+        "maxLiveBytes": 91984576,
+        "shutdownLatencyMs": 4.481
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-12",
+      "ordinal": 12,
+      "sampleId": "candidate-websocket-observers-64-12",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1330543.6268623453,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.190188,
+        "maxLiveBytes": 91960440,
+        "shutdownLatencyMs": 3.354
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-13",
+      "ordinal": 13,
+      "sampleId": "candidate-websocket-observers-64-13",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1301633.3546150387,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2452.79792,
+        "maxLiveBytes": 92003424,
+        "shutdownLatencyMs": 2.724
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-14",
+      "ordinal": 14,
+      "sampleId": "candidate-websocket-observers-64-14",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1320105.0011517915,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.096432,
+        "maxLiveBytes": 91928312,
+        "shutdownLatencyMs": 2.993
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-15",
+      "ordinal": 15,
+      "sampleId": "candidate-websocket-observers-64-15",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1314134.7014351664,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2452.124276,
+        "maxLiveBytes": 91980976,
+        "shutdownLatencyMs": 2.895
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-16",
+      "ordinal": 16,
+      "sampleId": "candidate-websocket-observers-64-16",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1362861.0815256685,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2452.032588,
+        "maxLiveBytes": 91980648,
+        "shutdownLatencyMs": 2.392
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-17",
+      "ordinal": 17,
+      "sampleId": "candidate-websocket-observers-64-17",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1341951.344870089,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2451.976072,
+        "maxLiveBytes": 91976936,
+        "shutdownLatencyMs": 3.881
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-18",
+      "ordinal": 18,
+      "sampleId": "candidate-websocket-observers-64-18",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1348463.089194091,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2453.551728,
+        "maxLiveBytes": 91997112,
+        "shutdownLatencyMs": 2.551
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-19",
+      "ordinal": 19,
+      "sampleId": "candidate-websocket-observers-64-19",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1319684.278733156,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2453.67544,
+        "maxLiveBytes": 91972960,
+        "shutdownLatencyMs": 3.306
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-20",
+      "ordinal": 20,
+      "sampleId": "candidate-websocket-observers-64-20",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1359234.9138516912,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2452.1069,
+        "maxLiveBytes": 91984808,
+        "shutdownLatencyMs": 3.21
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-21",
+      "ordinal": 21,
+      "sampleId": "candidate-websocket-observers-64-21",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1336084.7772512862,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2451.970392,
+        "maxLiveBytes": 91968472,
+        "shutdownLatencyMs": 3.682
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-22",
+      "ordinal": 22,
+      "sampleId": "candidate-websocket-observers-64-22",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1381280.3363693876,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2451.788056,
+        "maxLiveBytes": 91976568,
+        "shutdownLatencyMs": 2.381
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-23",
+      "ordinal": 23,
+      "sampleId": "candidate-websocket-observers-64-23",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1362659.5844705864,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2451.1747,
+        "maxLiveBytes": 91968920,
+        "shutdownLatencyMs": 3.597
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-24",
+      "ordinal": 24,
+      "sampleId": "candidate-websocket-observers-64-24",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1324690.1715275068,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.01092,
+        "maxLiveBytes": 91985016,
+        "shutdownLatencyMs": 3.437
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-25",
+      "ordinal": 25,
+      "sampleId": "candidate-websocket-observers-64-25",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1316160.9427924065,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2452.69682,
+        "maxLiveBytes": 91990088,
+        "shutdownLatencyMs": 5.402
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-26",
+      "ordinal": 26,
+      "sampleId": "candidate-websocket-observers-64-26",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1355411.1741452608,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2452.279204,
+        "maxLiveBytes": 91920744,
+        "shutdownLatencyMs": 2.891
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-27",
+      "ordinal": 27,
+      "sampleId": "candidate-websocket-observers-64-27",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1297914.9645052706,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2454.25904,
+        "maxLiveBytes": 91970880,
+        "shutdownLatencyMs": 3.243
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-28",
+      "ordinal": 28,
+      "sampleId": "candidate-websocket-observers-64-28",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1350949.717651509,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2452.219148,
+        "maxLiveBytes": 92000616,
+        "shutdownLatencyMs": 3.574
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-29",
+      "ordinal": 29,
+      "sampleId": "candidate-websocket-observers-64-29",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1328120.9015019054,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2451.903908,
+        "maxLiveBytes": 91961688,
+        "shutdownLatencyMs": 2.663
+      }
+    },
+    {
+      "pairId": "websocket-observers-64-30",
+      "ordinal": 30,
+      "sampleId": "candidate-websocket-observers-64-30",
+      "scenario": "websocket-observers-64",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 64,
+        "slowReaders": 16,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1308690.6876842391,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2453.869044,
+        "maxLiveBytes": 91989624,
+        "shutdownLatencyMs": 2.884
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-31",
+      "ordinal": 31,
+      "sampleId": "candidate-websocket-observers-16-31",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1421545.9454311158,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2313.73454,
+        "maxLiveBytes": 83091624,
+        "shutdownLatencyMs": 0.817
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-32",
+      "ordinal": 32,
+      "sampleId": "candidate-websocket-observers-16-32",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1363311.6475893923,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2314.200344,
+        "maxLiveBytes": 83080768,
+        "shutdownLatencyMs": 0.911
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-33",
+      "ordinal": 33,
+      "sampleId": "candidate-websocket-observers-16-33",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1380029.8638462536,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.67452,
+        "maxLiveBytes": 83089160,
+        "shutdownLatencyMs": 1.141
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-34",
+      "ordinal": 34,
+      "sampleId": "candidate-websocket-observers-16-34",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1340123.2913428035,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2314.630196,
+        "maxLiveBytes": 83122520,
+        "shutdownLatencyMs": 0.937
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-35",
+      "ordinal": 35,
+      "sampleId": "candidate-websocket-observers-16-35",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1289286.9920612155,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.015,
+        "allocatedBytesPerMessage": 2314.46796,
+        "maxLiveBytes": 83057544,
+        "shutdownLatencyMs": 1.117
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-36",
+      "ordinal": 36,
+      "sampleId": "candidate-websocket-observers-16-36",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1408710.6212554711,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.3911,
+        "maxLiveBytes": 83048880,
+        "shutdownLatencyMs": 0.707
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-37",
+      "ordinal": 37,
+      "sampleId": "candidate-websocket-observers-16-37",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1405542.6167549114,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.556044,
+        "maxLiveBytes": 83071392,
+        "shutdownLatencyMs": 1.034
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-38",
+      "ordinal": 38,
+      "sampleId": "candidate-websocket-observers-16-38",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1406497.4556461028,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.717684,
+        "maxLiveBytes": 83077000,
+        "shutdownLatencyMs": 1.021
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-39",
+      "ordinal": 39,
+      "sampleId": "candidate-websocket-observers-16-39",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1437255.531816885,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.722756,
+        "maxLiveBytes": 83031560,
+        "shutdownLatencyMs": 0.965
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-40",
+      "ordinal": 40,
+      "sampleId": "candidate-websocket-observers-16-40",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1466224.0624963345,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2312.93056,
+        "maxLiveBytes": 83147048,
+        "shutdownLatencyMs": 0.669
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-41",
+      "ordinal": 41,
+      "sampleId": "candidate-websocket-observers-16-41",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1449290.0652615316,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.222576,
+        "maxLiveBytes": 83089168,
+        "shutdownLatencyMs": 0.804
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-42",
+      "ordinal": 42,
+      "sampleId": "candidate-websocket-observers-16-42",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1456560.2746490054,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.18198,
+        "maxLiveBytes": 83052992,
+        "shutdownLatencyMs": 0.902
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-43",
+      "ordinal": 43,
+      "sampleId": "candidate-websocket-observers-16-43",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1416682.4272586699,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.618868,
+        "maxLiveBytes": 83084888,
+        "shutdownLatencyMs": 1.158
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-44",
+      "ordinal": 44,
+      "sampleId": "candidate-websocket-observers-16-44",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1433599.2659971758,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.179032,
+        "maxLiveBytes": 83079808,
+        "shutdownLatencyMs": 0.899
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-45",
+      "ordinal": 45,
+      "sampleId": "candidate-websocket-observers-16-45",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1353147.9295145243,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.014,
+        "allocatedBytesPerMessage": 2313.79448,
+        "maxLiveBytes": 83120608,
+        "shutdownLatencyMs": 0.707
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-46",
+      "ordinal": 46,
+      "sampleId": "candidate-websocket-observers-16-46",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1447830.679097741,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.496028,
+        "maxLiveBytes": 83060800,
+        "shutdownLatencyMs": 0.869
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-47",
+      "ordinal": 47,
+      "sampleId": "candidate-websocket-observers-16-47",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1432471.844765891,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.604516,
+        "maxLiveBytes": 83084152,
+        "shutdownLatencyMs": 0.765
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-48",
+      "ordinal": 48,
+      "sampleId": "candidate-websocket-observers-16-48",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1410829.2431042194,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.294712,
+        "maxLiveBytes": 83092112,
+        "shutdownLatencyMs": 0.869
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-49",
+      "ordinal": 49,
+      "sampleId": "candidate-websocket-observers-16-49",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1410382.531001971,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.58856,
+        "maxLiveBytes": 83060752,
+        "shutdownLatencyMs": 0.862
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-50",
+      "ordinal": 50,
+      "sampleId": "candidate-websocket-observers-16-50",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1424974.3860854101,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.356024,
+        "maxLiveBytes": 83059648,
+        "shutdownLatencyMs": 0.74
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-51",
+      "ordinal": 51,
+      "sampleId": "candidate-websocket-observers-16-51",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1425859.2406016272,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.346008,
+        "maxLiveBytes": 83124600,
+        "shutdownLatencyMs": 1.016
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-52",
+      "ordinal": 52,
+      "sampleId": "candidate-websocket-observers-16-52",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1415415.144800508,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.6078,
+        "maxLiveBytes": 83116432,
+        "shutdownLatencyMs": 0.932
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-53",
+      "ordinal": 53,
+      "sampleId": "candidate-websocket-observers-16-53",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1403118.852585527,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.647648,
+        "maxLiveBytes": 83115400,
+        "shutdownLatencyMs": 0.781
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-54",
+      "ordinal": 54,
+      "sampleId": "candidate-websocket-observers-16-54",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1414485.1769025887,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.434964,
+        "maxLiveBytes": 83115792,
+        "shutdownLatencyMs": 1.418
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-55",
+      "ordinal": 55,
+      "sampleId": "candidate-websocket-observers-16-55",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1413183.8750067125,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.468304,
+        "maxLiveBytes": 83115656,
+        "shutdownLatencyMs": 0.778
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-56",
+      "ordinal": 56,
+      "sampleId": "candidate-websocket-observers-16-56",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1410187.6184116916,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.643056,
+        "maxLiveBytes": 83068640,
+        "shutdownLatencyMs": 1.088
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-57",
+      "ordinal": 57,
+      "sampleId": "candidate-websocket-observers-16-57",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1431760.162991577,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.598012,
+        "maxLiveBytes": 83107760,
+        "shutdownLatencyMs": 0.808
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-58",
+      "ordinal": 58,
+      "sampleId": "candidate-websocket-observers-16-58",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1417969.0712586178,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.535224,
+        "maxLiveBytes": 83076704,
+        "shutdownLatencyMs": 1.067
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-59",
+      "ordinal": 59,
+      "sampleId": "candidate-websocket-observers-16-59",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1411438.5805444482,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.323524,
+        "maxLiveBytes": 83064264,
+        "shutdownLatencyMs": 0.829
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-60",
+      "ordinal": 60,
+      "sampleId": "candidate-websocket-observers-16-60",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1416806.871513327,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.720884,
+        "maxLiveBytes": 83007872,
+        "shutdownLatencyMs": 0.68
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-61",
+      "ordinal": 61,
+      "sampleId": "candidate-websocket-observers-16-61",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1398056.8407969764,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.757676,
+        "maxLiveBytes": 83087728,
+        "shutdownLatencyMs": 0.76
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-62",
+      "ordinal": 62,
+      "sampleId": "candidate-websocket-observers-16-62",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1421237.8413102676,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.662252,
+        "maxLiveBytes": 83059672,
+        "shutdownLatencyMs": 0.842
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-63",
+      "ordinal": 63,
+      "sampleId": "candidate-websocket-observers-16-63",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1422018.9683110183,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.215528,
+        "maxLiveBytes": 83056424,
+        "shutdownLatencyMs": 0.8
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-64",
+      "ordinal": 64,
+      "sampleId": "candidate-websocket-observers-16-64",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1422883.9581216793,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.31,
+        "maxLiveBytes": 83065496,
+        "shutdownLatencyMs": 1.053
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-65",
+      "ordinal": 65,
+      "sampleId": "candidate-websocket-observers-16-65",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1429847.0564096111,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.61612,
+        "maxLiveBytes": 83072808,
+        "shutdownLatencyMs": 1.237
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-66",
+      "ordinal": 66,
+      "sampleId": "candidate-websocket-observers-16-66",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1420971.2622771917,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.013,
+        "allocatedBytesPerMessage": 2313.293892,
+        "maxLiveBytes": 83096960,
+        "shutdownLatencyMs": 1.007
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-67",
+      "ordinal": 67,
+      "sampleId": "candidate-websocket-observers-16-67",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1427138.1740908774,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.313368,
+        "maxLiveBytes": 83144544,
+        "shutdownLatencyMs": 1.315
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-68",
+      "ordinal": 68,
+      "sampleId": "candidate-websocket-observers-16-68",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1437888.9489606938,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2313.355348,
+        "maxLiveBytes": 83087552,
+        "shutdownLatencyMs": 0.766
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-69",
+      "ordinal": 69,
+      "sampleId": "candidate-websocket-observers-16-69",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1460828.6112048477,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2313.793496,
+        "maxLiveBytes": 83116424,
+        "shutdownLatencyMs": 0.733
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-70",
+      "ordinal": 70,
+      "sampleId": "candidate-websocket-observers-16-70",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1455473.782186893,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.336088,
+        "maxLiveBytes": 83120768,
+        "shutdownLatencyMs": 0.893
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-71",
+      "ordinal": 71,
+      "sampleId": "candidate-websocket-observers-16-71",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1428671.4355719185,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.394928,
+        "maxLiveBytes": 83115624,
+        "shutdownLatencyMs": 0.778
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-72",
+      "ordinal": 72,
+      "sampleId": "candidate-websocket-observers-16-72",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1445430.3082163318,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.617668,
+        "maxLiveBytes": 83115376,
+        "shutdownLatencyMs": 0.741
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-73",
+      "ordinal": 73,
+      "sampleId": "candidate-websocket-observers-16-73",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1444559.6079465223,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.31922,
+        "maxLiveBytes": 83124656,
+        "shutdownLatencyMs": 1.078
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-74",
+      "ordinal": 74,
+      "sampleId": "candidate-websocket-observers-16-74",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1480700.5490437637,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.209192,
+        "maxLiveBytes": 83088744,
+        "shutdownLatencyMs": 0.812
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-75",
+      "ordinal": 75,
+      "sampleId": "candidate-websocket-observers-16-75",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1476791.8469275716,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2313.340108,
+        "maxLiveBytes": 83119536,
+        "shutdownLatencyMs": 0.767
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-76",
+      "ordinal": 76,
+      "sampleId": "candidate-websocket-observers-16-76",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1451109.227893802,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.180656,
+        "maxLiveBytes": 83028304,
+        "shutdownLatencyMs": 0.841
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-77",
+      "ordinal": 77,
+      "sampleId": "candidate-websocket-observers-16-77",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1463864.1475516506,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.181004,
+        "maxLiveBytes": 83052648,
+        "shutdownLatencyMs": 0.741
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-78",
+      "ordinal": 78,
+      "sampleId": "candidate-websocket-observers-16-78",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1473577.6475953793,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.009,
+        "allocatedBytesPerMessage": 2313.278804,
+        "maxLiveBytes": 83096144,
+        "shutdownLatencyMs": 0.784
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-79",
+      "ordinal": 79,
+      "sampleId": "candidate-websocket-observers-16-79",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1468199.172963406,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.563992,
+        "maxLiveBytes": 83121096,
+        "shutdownLatencyMs": 0.687
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-80",
+      "ordinal": 80,
+      "sampleId": "candidate-websocket-observers-16-80",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1475029.5927812052,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.223972,
+        "maxLiveBytes": 83116640,
+        "shutdownLatencyMs": 0.932
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-81",
+      "ordinal": 81,
+      "sampleId": "candidate-websocket-observers-16-81",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1471763.4817214333,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.012,
+        "allocatedBytesPerMessage": 2313.312572,
+        "maxLiveBytes": 83084920,
+        "shutdownLatencyMs": 0.849
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-82",
+      "ordinal": 82,
+      "sampleId": "candidate-websocket-observers-16-82",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1460752.8574151832,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.271804,
+        "maxLiveBytes": 83120712,
+        "shutdownLatencyMs": 0.838
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-83",
+      "ordinal": 83,
+      "sampleId": "candidate-websocket-observers-16-83",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1490082.014114057,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.405392,
+        "maxLiveBytes": 83124496,
+        "shutdownLatencyMs": 0.747
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-84",
+      "ordinal": 84,
+      "sampleId": "candidate-websocket-observers-16-84",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1498951.4834373356,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.01,
+        "allocatedBytesPerMessage": 2313.160988,
+        "maxLiveBytes": 83119344,
+        "shutdownLatencyMs": 0.822
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-85",
+      "ordinal": 85,
+      "sampleId": "candidate-websocket-observers-16-85",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1475304.8717517476,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.237848,
+        "maxLiveBytes": 83093024,
+        "shutdownLatencyMs": 0.86
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-86",
+      "ordinal": 86,
+      "sampleId": "candidate-websocket-observers-16-86",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1477328.5467888417,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.352428,
+        "maxLiveBytes": 83120672,
+        "shutdownLatencyMs": 0.844
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-87",
+      "ordinal": 87,
+      "sampleId": "candidate-websocket-observers-16-87",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1457530.4769622732,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.148032,
+        "maxLiveBytes": 83056176,
+        "shutdownLatencyMs": 0.884
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-88",
+      "ordinal": 88,
+      "sampleId": "candidate-websocket-observers-16-88",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1463797.7207205691,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.223984,
+        "maxLiveBytes": 83056800,
+        "shutdownLatencyMs": 0.863
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-89",
+      "ordinal": 89,
+      "sampleId": "candidate-websocket-observers-16-89",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1475189.5249742211,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.192304,
+        "maxLiveBytes": 83060800,
+        "shutdownLatencyMs": 0.788
+      }
+    },
+    {
+      "pairId": "websocket-observers-16-90",
+      "ordinal": 90,
+      "sampleId": "candidate-websocket-observers-16-90",
+      "scenario": "websocket-observers-16",
+      "workloadVersion": 1,
+      "configuration": {
+        "clients": 16,
+        "slowReaders": 4,
+        "readerIntervalUs": 100000,
+        "pushIntervalUs": 10000,
+        "inboxSize": 16,
+        "messages": 2000000,
+        "ordering": "Unordered",
+        "concurrency": "Serial",
+        "observerFidelity": "real-websocket"
+      },
+      "metrics": {
+        "expected": 2000000,
+        "completed": 2000000,
+        "acknowledged": 2000000,
+        "throughputPerSecond": 1442870.2729766269,
+        "latencyP95Ms": 0.008,
+        "latencyP99Ms": 0.011,
+        "allocatedBytesPerMessage": 2313.51796,
+        "maxLiveBytes": 83083864,
+        "shutdownLatencyMs": 0.734
+      }
+    }
+  ]
+}

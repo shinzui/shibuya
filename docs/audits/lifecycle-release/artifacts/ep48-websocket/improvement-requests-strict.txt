@@ -1,0 +1,8 @@
+profile: close-lifecycle-and-health-audit-gaps: missing profile-recommended field: reviews
+profile: expose-a-public-worker-probe-contract: missing profile-recommended field: reviews
+profile: expose-processor-progress-latency-and-in-flight-detail-for-inspection-uis: missing profile-recommended field: reviews
+profile: expose-retry-decisions-separately-from-processed-counters: missing profile-recommended field: reviews
+profile: harden-shibuya-metrics-for-browser-clients-cors-tests-and-ws-convention-alignment: missing profile-recommended field: reviews
+profile: implement-designed-processor-pause-resume-and-expose-gated-control-endpoints: missing profile-recommended field: reviews
+profile: represent-application-defined-permanent-processing-failures-in-dead-letter-reasons: missing profile-recommended field: reviews
+profile: restore-readiness-after-a-transient-handler-exception: missing profile-recommended field: reviews

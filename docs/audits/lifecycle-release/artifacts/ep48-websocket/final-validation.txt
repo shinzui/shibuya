@@ -1,0 +1,27 @@
+Production candidate: 1e8b9f3d20e09d4258c9f5d26dab3c9d0a568ae9
+cabal build all: exit 0
+cabal test shibuya-core shibuya-metrics --test-show-details=direct: exit 0
+PASS: bare waitApp survives major collections
+Test suite shibuya-core-gc-test: PASS
+90 examples, 0 failures
+Test suite shibuya-metrics-test: PASS
+PASS [finite source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [finite source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [failed source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, IgnoreFailures]: caller survives major collections after its application finished
+PASS [handler halt on a live idle source, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [serial, concurrent and batch processors together, StopAllOnFailure]: caller survives major collections after its application finished
+PASS [control]: a linked childless supervisor still kills its caller, so the scenarios above are meaningful
+Test suite shibuya-core-gc-finished-test: PASS
+236 examples, 0 failures
+Test suite shibuya-core-test: PASS
+Functional run ended: 2026-10-10T21:37:58Z
+Final controlled observer comparator: pass at 2026-10-10T21:59:14Z
+okf capabilities profile/log enforcement: exit 0, OK: 10 concepts
+okf improvement-requests profile/log enforcement: exit 0, OK: 8 concepts
+okf strict capabilities: exit 1, only 10 inherited missing recommended reviews
+okf strict improvement-requests: exit 1, only 8 inherited missing recommended reviews
+nix fmt: exit 0 (0 files changed)
+git diff --check: exit 0
+Audit helper --help and accepted-dataset overwrite refusal: pass
+Temporary EP-48 worktrees removed after evidence capture

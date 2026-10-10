@@ -76,7 +76,7 @@ printf '{"type":"bogus"}\n' | websocat ws://127.0.0.1:9090/ws
 
 ```text
 {"type":"snapshot","metrics":{...}}
-{"type":"error","code":"invalid_message","message":"Unknown message type: bogus"}
+{"type":"error","code":"invalid_message","message":"Error in $: Unknown message type: bogus"}
 ```
 
 The connection stays open, and a later `{"type":"ping"}` is still answered with
@@ -88,11 +88,28 @@ The connection stays open, and a later `{"type":"ping"}` is still answered with
 
 - [x] (2026-10-10) Milestone 1: Add the `ServerError` constructor and `error` frame, emit it for invalid client frames and for subscription-limit closes, with round-trip and loopback tests seen failing first.
 - [x] (2026-10-10) Milestone 2: Add `wsMaxQueuedFrames`, the pure `Shibuya.Metrics.Outbound` policy, and the independent producer and sole writer with drop-oldest overflow, in-band `queue_overflow`, and resync, with policy, ordering, goodbye, terminal, and overflow tests.
-- [ ] Milestone 3: Publish the conformance mapping in `docs/architecture/METRICS.md`, update the package Haddock, CAP-10, changelogs, and ADRs, record wire-load sanity numbers, and close IR-5 after EP-47 is Complete.
+- [x] (2026-10-10) Milestone 3, documentation: Publish the conformance mapping, package Haddock, CAP-10, changelogs, and ADR-0008; required capability profile/log enforcement passes.
+- [x] (2026-10-10) Milestone 3, acceptance and closure: Final controlled observer budgets pass all 18 cells across 150 pairs, matched churn and saturation are recorded, IR-5 is completed after EP-47, both bundles validate with only inherited strict-mode advisories, and parent coordination is finalized.
 
 
 ## Surprises & Discoveries
 
+
+2026-10-10 final acceptance: production `1e8b9f3` passes all 18 sustained-observer
+budget cells with 30/90/30 pairs at 1/16/64 clients, identical harness/package versions and explicit
+`-N4 -qm -T -A32m`. Retain default-scheduler uncertainty for the mandatory EP-52 integration
+gate; do not claim it passed. Matched 500-connection churn moved operations/second from
+4841.54 to 3038.00, and p95 from
+315 to 446 microseconds (smoke only, including the setup cost).
+The original smoke was 4728.18 to 3482.82 operations/second and 315 to 395 microseconds.
+Final saturation retains 14 frames / 59,976 bytes, live heap
+324,112–331,144 bytes, and releases the slot in 831,148 microseconds.
+
+2026-10-10 initial thirty-pair controlled capture: all 30 pairs at each client count complete, with
+17 of 18 cells passing. Only 16-client p99 remains inconclusive (adverse ratio 1.0695,
+95% upper bound 1.1512 against 1.10). Preserve its full thirty-pair verdict and extend only
+that scenario to 90 pairs using the same production SHA, harness, solver, RTS flags and
+budgets. This is additional evidence, not a waiver or removal of unfavorable observations.
 
 2026-10-10 terminal-admission regression: a required terminal can evict an ordinary update.
 The new controlled case fails against `e1fbebd` with `[Update,Required,Update]` instead of
@@ -129,6 +146,13 @@ slow reader real, and the preliminary partial capture was discarded before the a
 
 
 ## Decision Log
+
+- Decision (2026-10-10): Use a fresh 30-pair local acceptance series with four
+  capabilities and automatic migration disabled equally on both sides; extend the inconclusive
+  16-client p99 cell to 90 pairs while retaining the initial 30. Keep compiler,
+  optimization, message count, observer traffic, all required scenarios and budgets unchanged.
+  Retain every earlier inconclusive series; this controls scheduling variability without
+  claiming default-scheduler certification or relaxing EP-52's final integrated requirements.
 
 - Decision (2026-10-10): Pongs are expendable without forcing metrics recovery; only evicted updates invalidate the ledger. All errors, terminal events, subscription snapshots, recovery snapshots and goodbye remain required. Unsubscribe now establishes the same ordered snapshot boundary as other subscription mutations. Optional transport hooks expose deterministic stalls and producer ticks without holding the producer lock across socket IO.
 - Decision (2026-10-10): Add an explicit shutdown action to the public server handle. Request WebSocket shutdown before Warp cancellation, wait at most the send deadline plus 100 ms of scheduling allowance, and disable Warp’s otherwise unbounded final connection wait. Document the new record field as source-breaking.
@@ -183,12 +207,19 @@ slow reader real, and the preliminary partial capture was discarded before the a
 ## Outcomes & Retrospective
 
 
-Milestones 1 and 2 are committed. The final implementation passes 89 metrics examples,
-236 core examples, both isolated GC suites, twenty controlled concurrency repetitions, and
-all three candidate-bound mutation controls. The first ten observer pairs per configuration
-passed memory/allocation/shutdown but left several throughput and tail-latency confidence
-intervals inconclusive. Thirty pairs per configuration are being captured with unchanged
-workload, source, package versions and budgets; IR-5 remains accepted until this gate resolves.
+All three milestones are complete. Production candidate `1e8b9f3` passes 90 metrics
+examples, 236 core examples, both isolated GC suites, twenty controlled concurrency
+repetitions (ten each under `-N1` and `-N4`, seed 20260920), and all three behavioral mutation
+controls. The identical sustained-observer harness passes all 18 budget cells over 30/90/30
+pairs at 1/16/64 clients with `-N4 -qm -T -A32m`, matching package versions and
+unchanged 5%/5%/10% limits. Earlier default-scheduler captures remain inconclusive diagnostics,
+not passing evidence. This controlled local result does not waive the final integrated gate.
+
+The conformance mapping, Haddock, changelogs, CAP-10 and ADR-0008 describe the actual protocol,
+source changes, queue bounds and delivery limits. IR-5 is completed after EP-47. Required
+profile/log validation passes for both bundles; strict mode reports only inherited missing
+recommended reviews. Complete raw evidence and reproduction commands are under
+`docs/audits/lifecycle-release/artifacts/ep48-websocket/README.md`. No release is published.
 
 
 
@@ -527,7 +558,7 @@ Intention: intention_01m3ta8zgtebmaz00g0snjzy5a
 
 After Milestone 1, `cabal test shibuya-metrics` passes and includes the `ServerError` round
 trip and the two loopback cases; a client that sends `{"type":"bogus"}` over a real socket
-receives `{"type":"error","code":"invalid_message","message":"Unknown message type: bogus"}`
+receives `{"type":"error","code":"invalid_message","message":"Error in $: Unknown message type: bogus"}`
 and is still answered with `pong` afterwards; a client whose `subscribe` exceeds the limit
 receives an `error` frame with code `subscription_limit_exceeded` and is then closed with
 code 1008.
@@ -620,3 +651,8 @@ the outbound-queue ADR, and the closure of IR-5, and touches no `shibuya-core` m
 
 
 Revision note (2026-10-10): API and performance review applied. Separate sampling from socket writes, enforce frame and byte bounds even for errors, make resync/close ordering atomic, bound stalled-peer shutdown, and gate sustained observer load. Implementation and performance measurements remain pending.
+
+
+Revision note (2026-10-10 implementation): EP-48 completes bounded delivery, explicit error
+and recovery ordering, finite shutdown, conformance records and IR-5 closure. Controlled local
+observer evidence passes; default-scheduler uncertainty is preserved for integrated acceptance.

@@ -150,7 +150,7 @@ binds this repository, and children cite only ADR-0007 for the contract.
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 47 | Add configurable cross-origin access to the metrics server | [EP-47](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md) | None | None | Complete |
-| 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | In Progress |
+| 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | Complete |
 | 49 | Expose per-processor latency distribution and oldest in-flight detail | [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md) | None | None | Not Started |
 | 50 | Expose acknowledged cursor progress per processor and partition | [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md) | EP-49 | None | Not Started |
 | 51 | Implement source-level processor pause and resume | [EP-51](../plans/51-implement-source-level-processor-pause-and-resume.md) | None | None | Not Started |
@@ -394,7 +394,7 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-10 20:14 UTC) EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
 - [x] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.
 - [x] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
-- [ ] EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
+- [x] (2026-10-10) EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
 - [ ] EP-49 M1: Prototype synchronized detailed accounting, prove cancellation cleanup, measure both levels, and retain the basic default.
 - [ ] EP-49 M2: Expose the latency summary and oldest in-flight detail in JSON, Prometheus, and WebSocket frames.
 - [ ] EP-49 M3: Documentation, ADR, changelog, and capability evidence.
@@ -412,6 +412,15 @@ Check an item only when the owning child records its acceptance evidence.
 
 ## Surprises & Discoveries
 
+
+**EP-48 implemented (2026-10-10).** In-band errors, strict frame/byte queues, independent
+sampling, one application writer, snapshot boundaries and bounded close are complete;
+ADR-0008 owns delivery semantics and IR-5 is closed. Tests include terminal admission that
+itself drops a delta: stop deltas immediately and retire the terminal before recovery.
+The controlled local observer gate passes 30/90/30 matched pairs at 1/16/64 clients with four
+capabilities and migration disabled. Earlier default-scheduler confidence intervals remain
+inconclusive and are preserved; the EP-52 integrated gate must still meet its complete basic
+matrix and real-observer budgets. Local queue limits do not isolate shared CPU/GC costs.
 
 **EP-47 implemented (2026-10-10).** HTTP origin policy, preflight validation, shared errors
 and WebSocket Origin refusal are complete. The new configured-origin field is independently
@@ -548,13 +557,15 @@ and gives the convention's overflow signal a real meaning.
 ## Outcomes & Retrospective
 
 
-EP-47 is Complete (one of six children), with HTTP CORS, upgrade Origin checks, structured
-error codes, documentation and acceptance evidence committed. EP-48 is the next ready child
-in registry order; EP-49 and EP-51 are also ready, while the hard dependencies of EP-50 and
-EP-52 remain incomplete. IR-3, IR-4 and IR-5 remain open under their owning children.
+EP-47 and EP-48 are Complete (two of six children). Configurable browser access and
+bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
+IR-5 is completed. EP-49 is next in registry order, and EP-51 is also ready. EP-50 awaits
+EP-49, and EP-52 awaits EP-51; IR-3 and IR-4 remain open under their owning children.
 
-The default health sanity report passed; the full integrated budget evidence remains a
+The EP-48 controlled observer profile passes unchanged local budgets. Default-scheduler
+uncertainty is explicitly retained, and the full integrated budget evidence remains a
 mandatory final completion condition. This MasterPlan remains In Progress.
+
 
 
 Revision note (2026-10-10): Reviewed API and performance prescriptions against core runners,
@@ -567,3 +578,8 @@ Revision note (2026-10-10 implementation): EP-47 completed and registry/progress
 recorded real HTTP/WebSocket acceptance, method-agnostic legacy read routing, and the limits
 of the default wire-load sanity evidence. ADR-0007 distilled the implemented origin policy.
 Five children and integrated acceptance remain.
+
+
+Revision note (2026-10-10 EP-48): Mark bounded WebSocket delivery Complete and IR-5 closed;
+record source changes, controlled local observer acceptance and default-scheduler uncertainty,
+retain the mandatory integrated gate, and identify EP-49 as the next implementable child.
