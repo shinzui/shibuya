@@ -80,7 +80,7 @@ and its WebSocket convention item and the closure of the request belong to
 - [x] (2026-10-10 20:07 UTC) Milestone 2: Verify Vary merging for allowed, refused, and absent origins; rejected preflight methods; plain OPTIONS routing; and reserved error keys.
 - [x] (2026-10-10 20:08 UTC) Milestone 3: Validate the `Origin` header of WebSocket upgrade requests by the same allow list before a connection slot is acquired, with real loopback tests.
 - [x] (2026-10-10 20:12 UTC) Milestone 4 documentation: update the Haddock protocol reference, user guide, capability record and log, both changelogs, and ADR-0007; validate builds, tests, formatting, and manual example requests.
-- [ ] Milestone 4 evidence: record the final committed-source wire-load sanity report and finalize coordination status.
+- [x] (2026-10-10 20:14 UTC) Milestone 4 evidence: record the final committed-source wire-load sanity report and finalize coordination status.
 
 
 ## Surprises & Discoveries
@@ -118,6 +118,15 @@ reproduced returning 204 (1 example, 1 failure), then fixed to refuse with 403; 
 69-example suite passes. ADR-0007 now records the durable header-validation, cache-variation,
 exact-origin matching and direct-host validation constraints; other child requirements remain
 pending.
+
+Final wire-load sanity: Baseline `454257a` p95 was 104 microseconds; final production
+source `87119f1` p95 was 101 microseconds (-2.88%). Both reports completed
+5,000 polls with zero errors and zero retained WebSocket connections. The identical harness
+hash and exact source revisions are in `measurement-context.json` beside `before.json`,
+`after.json`, and both manual curl transcripts under
+`docs/audits/lifecycle-release/artifacts/ep47-cors-wire-load/`. This is one run per revision
+with default (disabled) CORS, not evidence for enabled-CORS cost or the integrated release
+matrix. No throughput improvement is claimed from this sanity sample.
 
 2026-10-10 review: Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52.
 
@@ -180,8 +189,22 @@ pending.
 ## Outcomes & Retrospective
 
 
-Milestone 1 provides the shared error renderer and additive codes without changing headers.
-HTTP and WebSocket origin policies and documentation are accepted; final wire-load evidence remains.
+All four milestones are complete. Hosts can opt into exact-origin HTTP response access,
+validated preflights and WebSocket upgrade Origin checks. The empty list preserves existing
+read headers and upgrade behavior. The shared renderer protects reserved error keys and
+adds stable codes without changing published statuses or existing members. No core file,
+processor fixture, golden metrics contract, dependency bound, or release version changed.
+
+Validation passed: 69 metrics examples, 236 ordinary core examples and both isolated GC
+suites; repository-wide builds; formatting; capability profile/log enforcement; real example
+curl responses; and the default wire-load sanity check. New behavior was demonstrated failing
+before implementation, including the empty repeated-header edge case. Durable policy choices
+are recorded in ADR-0007, with execution details retained here.
+
+EP-48 may now consume the origin policy and close IR-5 after its remaining delivery and
+convention work. EP-52 may consume the error helper once its other hard dependency is complete.
+IR-5 remains accepted/open; this plan implements its origin-policy item only. The integrated
+performance matrix remains the final child's responsibility.
 
 
 ## Context and Orientation
@@ -633,3 +656,10 @@ Complete. This plan has no hard dependency and no soft dependency on any other c
 
 
 Revision note (2026-10-10): API and performance review applied. Correct cache variation and preflight validation, precompile origins, compare JSON objects without key-order assumptions, and require actual control POST origin checks in EP-52. Implementation and performance measurements remain pending.
+
+
+Revision note (2026-10-10 implementation): Completed EP-47 with failing-first HTTP and
+WebSocket tests, shared structured errors, documented opt-in origins and host helpers,
+capability and ADR evidence, and source-bound default wire-load sanity reports. Corrected
+the draft's default OPTIONS response and Aeson Pair import. Remaining initiative work and
+integrated performance acceptance are tracked by the MasterPlan.

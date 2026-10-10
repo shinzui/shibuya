@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+Date: Sat, 10 Oct 2026 20:10:26 GMT
+Server: Warp/3.4.16
+Content-Type: application/json
+
+{"events":{"batch":{"batchedMessages":0,"batchesEmitted":0,"flushTriggered":0,"partialFailures":0,"sizeTriggered":0,"timeoutTriggered":0},"startedAt":"2026-10-10T20:10:26.861644Z","state":{"inFlight":1,"lastActivity":"2026-10-10T20:10:26.958348Z","lastProgress":"2026-10-10T20:10:26.958348Z","maxConcurrency":1,"status":"processing"},"stats":{"failed":0,"processed":80,"received":182}},"orders":{"batch":{"batchedMessages":0,"batchesEmitted":0,"flushTriggered":0,"partialFailures":0,"sizeTriggered":0,"timeoutTriggered":0},"startedAt":"2026-10-10T20:10:26.861316Z","state":{"inFlight":1,"lastActivity":"2026-10-10T20:10:26.958347Z","lastProgress":"2026-10-10T20:10:26.958347Z","maxConcurrency":1,"status":"processing"},"stats":{"failed":0,"processed":81,"received":183}}}

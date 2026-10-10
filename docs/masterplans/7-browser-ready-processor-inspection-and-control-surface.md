@@ -149,7 +149,7 @@ binds this repository, and children cite only ADR-0007 for the contract.
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 47 | Add configurable cross-origin access to the metrics server | [EP-47](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md) | None | None | In Progress |
+| 47 | Add configurable cross-origin access to the metrics server | [EP-47](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md) | None | None | Complete |
 | 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | Not Started |
 | 49 | Expose per-processor latency distribution and oldest in-flight detail | [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md) | None | None | Not Started |
 | 50 | Expose acknowledged cursor progress per processor and partition | [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md) | EP-49 | None | Not Started |
@@ -391,7 +391,7 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-10 20:07 UTC) EP-47 M1: Characterize headerless behavior, add the shared error helper, and retrofit additive error codes.
 - [x] (2026-10-10 20:07 UTC) EP-47 M2: Configurable cross-origin policy for HTTP responses and preflight requests.
 - [x] (2026-10-10 20:08 UTC) EP-47 M3: Validate the WebSocket upgrade `Origin` header by the same policy.
-- [ ] EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
+- [x] (2026-10-10 20:14 UTC) EP-47 M4: Documentation, capability record, changelog, and wire-load sanity numbers.
 - [ ] EP-48 M1: Add the `error` frame for invalid client messages and subscription-limit closes.
 - [ ] EP-48 M2: Strict frame/byte bounds, independent producer/writer, ordered resync and bounded close.
 - [ ] EP-48 M3: Conformance mapping, documentation, ADR, capability record, and IR-5 closure.
@@ -412,6 +412,21 @@ Check an item only when the owning child records its acceptance evidence.
 
 ## Surprises & Discoveries
 
+
+**EP-47 implemented (2026-10-10).** HTTP origin policy, preflight validation, shared errors
+and WebSocket Origin refusal are complete. The new configured-origin field is independently
+extensible by later children. Empty origin lists preserve existing read-route headers and
+upgrades; enabled requests merge Vary, and repeated Origin fields fail closed on preflight
+and upgrade. The default health wire-load sanity check moved p95 from 104 to 101 microseconds
+with 5,000 successful polls per revision; it does not measure enabled CORS or certify the
+initiative's integrated budget. Artifact context pins the pre-initiative baseline to
+`454257a` and the final EP-47 production source to `87119f1`.
+
+**Legacy read routing is method-agnostic (2026-10-10).** A default OPTIONS /metrics returns
+200 metrics JSON rather than the draft's assumed 404; real example curl output confirms it.
+Plain OPTIONS continues through that router. EP-52 must enforce control methods and actual
+POST Origin independently, as already required by its contract. ADR-0007 now records exact
+matching, cache variation, malformed-header refusal and direct-host validation constraints.
 
 **API/performance review (2026-10-10).** The original plan and all six children were created
 by claude-fable-5-1 with no recorded reviews. Source inspection found missing primitive
@@ -533,12 +548,22 @@ and gives the convention's overflow signal a real meaning.
 ## Outcomes & Retrospective
 
 
-Review/update complete; all six implementation plans remain Not Started. No production
-code or performance result was produced by this review. Integrated budget evidence is a
-mandatory completion condition, so performance approval remains pending.
+EP-47 is Complete (one of six children), with HTTP CORS, upgrade Origin checks, structured
+error codes, documentation and acceptance evidence committed. EP-48 is the next ready child
+in registry order; EP-49 and EP-51 are also ready, while the hard dependencies of EP-50 and
+EP-52 remain incomplete. IR-3, IR-4 and IR-5 remain open under their owning children.
+
+The default health sanity report passed; the full integrated budget evidence remains a
+mandatory final completion condition. This MasterPlan remains In Progress.
 
 
 Revision note (2026-10-10): Reviewed API and performance prescriptions against core runners,
 metrics server, lifecycle harness, comparator and Mori-discovered dependency sources. Applied
 correctness fixes to all six children and ADR-0007, corrected dependency edges, and assigned
 final integrated regression evidence to EP-52. No implementation or release is certified.
+
+
+Revision note (2026-10-10 implementation): EP-47 completed and registry/progress updated;
+recorded real HTTP/WebSocket acceptance, method-agnostic legacy read routing, and the limits
+of the default wire-load sanity evidence. ADR-0007 distilled the implemented origin policy.
+Five children and integrated acceptance remain.

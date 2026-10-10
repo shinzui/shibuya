@@ -1,0 +1,9 @@
+HTTP/1.1 204 No Content
+Date: Sat, 10 Oct 2026 20:10:31 GMT
+Server: Warp/3.4.16
+Access-Control-Allow-Origin: https://ops.example.com
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+Access-Control-Max-Age: 600
+Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+

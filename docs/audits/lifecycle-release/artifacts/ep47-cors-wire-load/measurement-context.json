@@ -1,0 +1,11 @@
+{
+  "baselineRevision": "454257abdda9cf7f80978f7f38a0600d3ca00cf1",
+  "candidateRevision": "87119f1bbe54e444ec2ae72d820723ac3717c1fd",
+  "harness": "shibuya-metrics/bench/WireLoad.hs",
+  "harnessSha256": "90c20e38c08a23b87b07e95e331584d9c8e4f50a42b77a5d2fd36c1569647039",
+  "scenario": "health",
+  "iterations": 5000,
+  "configuration": "defaultConfig (CORS disabled)",
+  "command": "SCENARIO=health ITERATIONS=5000 OUTPUT_JSON=<before.json|after.json> cabal run shibuya-metrics:metrics-wire-load",
+  "scope": "Single-run default HTTP sanity check; not the integrated release matrix or enabled-CORS performance evidence."
+}
