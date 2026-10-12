@@ -76,7 +76,7 @@ managed-provider helper or Kafka DLQ feature is added by this audit.
 - [x] (2026-10-12T23:49Z) F8 implementation — Eight lifecycle exporter cases pass for finite single/batch sources, source failure, once-only shutdown, exception caching, timeout, cancellation, startup tracer capture, and disabled mode.
 - [x] (2026-10-12T23:52Z) F8 regression validation — Core suite: 271 examples, 0 failures; `cabal build all`, `nix fmt`, and native-system `nix flake check` pass.
 - [x] (2026-10-12T23:52Z) Documentation follow-up — Guide example compiled and ran successfully with SDK 1.0; provider timeout and finally-based app cleanup are explicit. ADR 12 distills ownership and disabled-context decisions.
-- [ ] Final integration check — Run the PGMQ suite against this local core checkout and record its result; the published-core adapter suite already passed 181 examples.
+- [x] (2026-10-12T23:55Z) Final integration check — PGMQ local-core suite: 181 examples, 0 failures; four DLQ identity cases pass with current runtime. Temporary gitignored override removed.
 
 
 ## Surprises & Discoveries
@@ -233,7 +233,9 @@ its test commit is `341c2a9` in `mori://shinzui/shibuya-pgmq-adapter` (commit ar
 URI pending). Local-core validation initially found two older test fixtures building
 `AppConfig` without the new strict `metricsDetail` field. They now update
 `defaultAppConfig` instead, compatible with both the published and current core.
-A final local-core full suite is running using a temporary gitignored override.
+The final local-core full suite passed 181 examples in 64.7292 seconds using a
+temporary gitignored override, now removed. Cabal plan metadata confirms the local
+core package source. Both published and current-core DLQ identity cases pass.
 
 The exact guide Quick Start was extracted to `/tmp/plan9-quickstart.hs`, compiled
 via `cabal exec -- ghc -XGHC2024 -threaded /tmp/plan9-quickstart.hs -o /tmp/plan9-quickstart`,
@@ -304,7 +306,8 @@ Document checks passed for whitespace, the single surviving ID-9 file, language-
 fences, local Markdown links, and removal of companion-file references from this
 repository and both adapter documentation trees. No new PostgreSQL/Redpanda/Jaeger
 smoke, full multi-repository test matrix, performance benchmark, or release gate
-is claimed by this documentation update.
+was claimed by the preceding documentation-only review. Subsequent implementation
+acceptance is recorded above, including the PostgreSQL identity tests.
 
 
 ## Context and Orientation
@@ -573,9 +576,17 @@ DLQ tests should have a stable `DLQ consumer trace` name so they can be selected
 cabal test shibuya-pgmq-adapter-test --enable-tests --test-options='--match "DLQ consumer trace"' --test-show-details=direct
 ```
 
-Do not run or report the last selector as proof until tests with that name exist.
-Use the existing `ChaosSpec` database fixtures and supported ephemeral-database
-workflow; do not reset a user's unrelated database. For F8 core lifecycle regression:
+The four tests with that selector now exist and pass. Use the existing `ChaosSpec` database fixtures and supported ephemeral-database
+workflow; do not reset a user's unrelated database. For local integration validation, resolve the core package with
+`mori path mori://shinzui/shibuya/packages/shibuya-core`. Add its absolute path as
+an extra `packages:` entry in the PGMQ checkout's gitignored `cabal.project.local`,
+preserving any existing local settings. Run the full PGMQ suite with the same
+command above but no `--match` filter. The recorded implementation used the sibling
+checkout of that canonical core project; Cabal's plan JSON reported it as a local
+package. Remove only the temporary entry/file you introduced after validation;
+no override is committed. Both published-core and local-core full runs passed.
+
+For F8 core lifecycle regression:
 
 ```bash
 # Shibuya repository root.
@@ -587,7 +598,8 @@ cabal test shibuya-core-test --test-show-details=direct
 
 
 Current implementation evidence is scoped: the core suite drives a mock adapter
-through `runWithMetrics` and asserts exactly one span and the attribute union.
+through `runWithMetrics` and asserts exactly one Consumer span and the attribute
+union, alongside the ingestion-lifetime Internal span.
 Kafka conversion tests assert the actual broker record's attributes but are not
 an end-to-end `runApp` parent-link test. The recorded 2026-05-05 Jaeger smoke is
 historical corroboration. F3 unit tests prove header merging; the new M3.1V PostgreSQL cases supply actual
@@ -696,8 +708,12 @@ strengthened the core assertion; lifecycle and disabled-contract work is underwa
 
 2026-10-12 implementation: Reconciled all finding statuses and milestone
 instructions with implemented behavior, recorded core and published-core adapter
-full-suite results, and distilled ADR 12. Final local-core adapter check is pending.
+full-suite results, and distilled ADR 12. Final local-core adapter check passed all 181 examples.
 
 2026-10-12 implementation: Corrected two PGMQ fixture constructions discovered
 when compiling against current core; they use default config record updates and
 retain behavior. Recorded the 104-example metrics integration regression pass.
+
+2026-10-12 completion: All audit findings are implemented or explicitly resolved,
+all remaining progress items are checked, and the guide/ADR and multi-repository
+validation evidence are current. No benchmark or release publication is claimed.
