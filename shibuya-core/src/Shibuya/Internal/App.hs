@@ -15,6 +15,7 @@ import Control.Concurrent.STM (TMVar, TVar)
 import Data.Map.Strict (Map)
 import Effectful (Eff, IOE, (:>))
 import Effectful.Exception qualified as Exception
+import OpenTelemetry.Trace.Core (Tracer)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig, BatchHandler)
 import Shibuya.Core.Metrics (ProcessorId (..))
@@ -103,5 +104,7 @@ data AppHandle es = AppHandle
     -- | Coordinates repeated and concurrent graceful-stop calls. The first
     -- caller performs shutdown; every caller observes the same terminal result.
     shutdownStarted :: !(TVar Bool),
-    shutdownResult :: !(TMVar (Either SomeException Bool))
+    shutdownResult :: !(TMVar (Either SomeException Bool)),
+    -- | Tracer selected at startup, retaining the IOE-only stop API.
+    shutdownTracer :: !(Maybe Tracer)
   }

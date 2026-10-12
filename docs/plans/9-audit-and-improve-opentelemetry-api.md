@@ -12,6 +12,11 @@ provenance:
       at: 2026-10-12T23:33:00Z
       mode: "update"
       note: "Consolidate audit findings into plan 9 and reconcile implemented, superseded, and remaining work against current core and adapter sources."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-12T23:38:40Z
+      mode: "implement"
+      note: "Implement remaining DLQ identity, lifecycle tracing, disabled API contract, and provider lifetime documentation."
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -45,12 +50,12 @@ per individually processed message, enriched by the adapter, with usable parent
 links and predictable disabled-tracing behavior. Batch tracing is not assessed by
 this audit's per-message acceptance tests.
 
-The 2026-10-12 review confirms F1/F2/F3/F5 implementations. F4's dead configuration
-was removed by a later API cleanup; the proposed convenience helper was never
-implemented. F6 and F8 remain open. F7's allocation was improved, but its disabled
-callback still receives a span with zero IDs. The most consequential outstanding
-validation is a tracing-enabled PostgreSQL DLQ test. This update changes documents,
-not runtime code.
+The 2026-10-12 implementation closes the remaining audit work: enabled PostgreSQL
+DLQ identity tests, source-lifetime and shutdown spans, a shared no-op tracer,
+and an explicit compatible disabled-span contract with safe propagation. F4's dead
+configuration was removed by plan 25; caller-managed provider ownership is retained.
+The current guide includes a compiled and executed full-lifetime example. No
+managed-provider helper or Kafka DLQ feature is added by this audit.
 
 
 ## Progress
@@ -65,14 +70,26 @@ not runtime code.
 - [x] (2026-07-02; verified 2026-10-12) F4 dead-config remedy — Plan 25 removed `TracingConfig` and corrected the umbrella-module example (`a96ad52`). Caller-managed tracing remains the supported contract.
 - [x] (2026-07-02; verified 2026-10-12) F7 allocation improvement — Plan 26 hoisted the disabled span into a shared constant (`8e55ab4`); zero-ID callback semantics remain.
 - [x] (2026-10-12) Reviewed both former documents against all three working trees; consolidated findings into this plan, corrected current paths/interfaces, and updated inbound references.
-- [ ] M3.1 validation remainder — Add an enabled-tracing PostgreSQL test proving the DLQ header identifies the failing consumer span, including direct-queue and topic-route delivery. Preserve the existing disabled-tracing test.
-- [ ] F6 — Resolve provider allocation on every `runTracingNoop` invocation while accounting for the public `getTracer` contract; this is startup overhead, not the per-message allocation fixed by plan 26.
-- [ ] F7 — Decide and implement an explicit disabled-span API contract, or formally accept/document the invalid-ID sentinel. The proposed `Maybe Span` callback has not landed.
-- [ ] F8 — Add and verify ingester-lifetime and adapter-shutdown trace coverage while preserving cancellation, timeout, and failure behavior.
-- [ ] Documentation follow-up — Correct the OTel 1.0 provider-shutdown example in `docs/user/opentelemetry.md`; then record updated acceptance for any remaining implementation work. A managed tracing helper is optional, not a prerequisite for closing the removed dead-config defect.
+- [x] (2026-10-12T23:46Z) M3.1V — Four enabled-tracing PostgreSQL DLQ identity cases pass (direct/topic, original/no headers); producer and custom headers verified. Existing disabled test retained. Core active-header test compares exported IDs.
+- [x] (2026-10-12T23:49Z) F6 — Shared private no-op tracer/provider preserves `getTracer :: Eff es Tracer`; independent-run stable-name and non-recording checks pass. No startup timing claim.
+- [x] (2026-10-12T23:49Z) F7 — Accepted the compatible invalid, non-recording sentinel contract; Haddocks and tests specify zero IDs. Injection omits invalid contexts; enabled identity remains verified.
+- [x] (2026-10-12T23:49Z) F8 implementation — Eight lifecycle exporter cases pass for finite single/batch sources, source failure, once-only shutdown, exception caching, timeout, cancellation, startup tracer capture, and disabled mode.
+- [x] (2026-10-12T23:52Z) F8 regression validation — Core suite: 271 examples, 0 failures; `cabal build all`, `nix fmt`, and native-system `nix flake check` pass.
+- [x] (2026-10-12T23:52Z) Documentation follow-up — Guide example compiled and ran successfully with SDK 1.0; provider timeout and finally-based app cleanup are explicit. ADR 12 distills ownership and disabled-context decisions.
+- [ ] Final integration check — Run the PGMQ suite against this local core checkout and record its result; the published-core adapter suite already passed 181 examples.
 
 
 ## Surprises & Discoveries
+
+
+Implementation on 2026-10-12 used the existing ephemeral PostgreSQL fixture without
+new infrastructure. Hackage preferred-version endpoints and upstream tags both
+confirmed API and in-memory exporter 1.0.0.0 before adding adapter test bounds
+`^>=1.0`. The exporter test generator is `DefaultIdGenerator`, as verified in
+Mori-located source. The four DLQ cases passed in 5.2828 seconds. Core telemetry
+passed 28 examples before disabled-contract changes. Lifecycle spans make total
+span count exceed one; the ownership regression now asserts exactly one Consumer
+span, retaining its attributes and override checks.
 
 
 ### Original hypotheses and their disposition
@@ -108,7 +125,7 @@ adapter migrations: gitignored development overrides were allowed, while release
 verification used published packages. Do not repeat the obsolete instruction to
 wait for the original 0.5.0.0 publication before inspecting these fixes.
 
-### Review discoveries on 2026-10-12
+### Review discoveries on 2026-10-12 (before implementation)
 
 
 The findings table still said F3/F5 were open and adapter migration awaited
@@ -143,6 +160,25 @@ ID-9 documents lacked provenance, so their original model attribution is unknown
 
 
 ## Decision Log
+
+
+Implementation on 2026-10-12 preserves `getTracer` and `withSpan'` signatures.
+One private `NOINLINE` no-op tracer is initialized once with `unsafePerformIO`,
+using only the public SDK constructor, no processors, and no background resource.
+It never consults or replaces the global provider. The disabled callback sentinel
+is accepted as an explicit compatibility contract, and invalid context injection
+returns no headers. `currentTraceHeaders` also rejects invalid active contexts.
+These are compatible API changes apart from intentionally correcting invalid
+outgoing headers; there are no new library dependencies or bounds in core.
+
+`AppHandle` captures the enabled startup tracer as `Maybe Tracer` so the public
+`stopApp`/`stopAppGracefully` functions retain their IOE-only constraint. The
+once-only leader wraps each adapter call in an Internal span and reuses existing
+exception caching/deadlines. Both metrics ingester call sites wrap the entire
+stream, not individual admissions, with one Internal span. Existing SDK span
+bracketing records and rethrows synchronous/asynchronous errors. No tracing
+provider is managed or shut down by Shibuya. The lifecycle ownership decision is
+distilled in ADR 12; ADR 3 remains the failure/cancellation contract.
 
 
 On 2026-05-05, the audit was deliberately written before code changes and treated
@@ -185,17 +221,41 @@ number or second plan identity is introduced.
 ## Outcomes & Retrospective
 
 
+### Implementation acceptance on 2026-10-12
+
+
+Core build and full tests passed: 271 examples, 0 failures, including 39 telemetry
+examples and existing lifecycle regressions. Metrics integration passed 104
+examples, 0 failures. Both modified repositories passed `cabal build all`, `nix fmt`,
+and native `nix flake check` (treefmt and pre-commit). The PGMQ suite passed 181
+examples against published core, including four new enabled-tracing identity cases;
+its test commit is `341c2a9` in `mori://shinzui/shibuya-pgmq-adapter` (commit artifact
+URI pending). Local-core validation initially found two older test fixtures building
+`AppConfig` without the new strict `metricsDetail` field. They now update
+`defaultAppConfig` instead, compatible with both the published and current core.
+A final local-core full suite is running using a temporary gitignored override.
+
+The exact guide Quick Start was extracted to `/tmp/plan9-quickstart.hs`, compiled
+via `cabal exec -- ghc -XGHC2024 -threaded /tmp/plan9-quickstart.hs -o /tmp/plan9-quickstart`,
+and executed as `OTEL_TRACES_EXPORTER=none /tmp/plan9-quickstart` with exit 0. This
+proves the example's current SDK types and cleanup execute; exporter behavior is
+covered by the separate in-memory lifecycle tests, not claimed from that smoke.
+No benchmark, new Jaeger/Redpanda smoke, dependency release, or performance timing
+claim was added. The flake checks cover the native system, not every platform.
+
 ### Verified implementation state
 
 
-The audit and the highest-priority span-ownership changes landed. Core commit
-`7c6586b` supplies the hook; Kafka conversion supplies system/partition/offset;
-PGMQ supplies an empty map; core tests verify one exported span and adapter override
-precedence. Core `193de1d` and the PGMQ migration supply outgoing consumer context.
-F1/F2/F3/F5 therefore need no repeat implementation. F3 needs stronger integration
-proof. F4's misleading config was removed by `a96ad52`; a new lifecycle helper was
-not delivered and is not implied by that deletion. F6/F8 remain unimplemented.
-F7 still exposes zero IDs despite the shared-span improvement in `8e55ab4`.
+The audit's span-ownership fixes remain: core `7c6586b` supplies attributes, Kafka
+conversion supplies system/partition/offset, and PGMQ supplies an empty map. Core
+`193de1d` and the PGMQ migration provide outgoing consumer context. The strengthened
+ownership regression verifies exactly one Consumer span and adapter override
+precedence alongside the new ingestion span. F3 now has actual PostgreSQL span-ID
+and trace-ID equality proof. F4's config removal in `a96ad52` remains the resolution.
+F6 shares a private no-op provider while preserving the concrete getter. F7 accepts
+and documents the compatible zero-ID sentinel, with invalid-context propagation
+suppressed. F8 provides ingestion-lifetime and adapter-shutdown spans with tested
+error, cancellation, timeout, and once-only behavior.
 
 The reviewed clean source baselines were this repository at
 `3fcfb367994fbf200d76f47b932882bdf10227db`,
@@ -283,8 +343,9 @@ files were verified in the registered checkouts.
 Relevant local context is [plan 25](25-pre-1-0-public-api-cleanup.md), which removes
 the redundant configuration path, [plan 26](26-reduce-per-message-hot-path-overhead.md),
 which hoists tracing constants, and [plan 10](10-upgrade-to-hs-opentelemetry-1-0.md),
-which upgrades the SDK-facing code. No dedicated OTel ADR was found in the local
-ADR heading scan. [ADR 3](../adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md)
+which upgrades the SDK-facing code. The original review found no dedicated OTel ADR; implementation adds
+[ADR 12](../adr/0012-keep-telemetry-ownership-and-disabled-context-contracts-explicit.md)
+for span ownership, provider lifetime, and the disabled-context contract. [ADR 3](../adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md)
 requires explicit failure outcomes, unconditional master cleanup, bounded graceful
 shutdown, and once-only adapter shutdown. F8 must preserve these guarantees.
 
@@ -302,7 +363,7 @@ sibling Consumer spans instead of one process operation. The fix is present in
 `shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs:680`: the framework owns the
 span and merges envelope attributes once, with adapter keys taking precedence.
 `shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs:101` exercises one message and
-requires exactly one exported span.
+requires exactly one exported Consumer span, alongside one ingestion-lifetime span.
 
 In `mori://shinzui/shibuya-kafka-adapter`,
 `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs:69` supplies the map;
@@ -328,7 +389,7 @@ The current operation key is `messaging.operation.type`, not the original audit'
 so framework defaults apply. No symmetric PGMQ tracing wrapper is missing.
 
 
-### Finding F3 — DLQ forwards the original parent (D, original P1): implemented; integration proof open
+### Finding F3 — DLQ forwards the original parent (D, original P1): implemented and verified
 
 
 The original defect forwarded the producer header rather than injecting the
@@ -345,8 +406,10 @@ original headers unchanged when no consumer context exists.
 `shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/InternalSpec.hs:403` in that same
 canonical project has six current merge cases (five original plus a later non-UTF8
 case). `shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ChaosSpec.hs:337` tests the
-no-op fallback against the database. The remaining enabled-tracing test is defined
-in milestone M3.1V below. It is a validation gap, not an absent merge implementation.
+no-op fallback against the database. Four enabled-tracing “DLQ consumer trace” cases
+now compare both IDs with the exported process span, for direct/topic routes and
+original/no headers; they verify stashed upstream values and custom fields. Adapter
+commit `341c2a9` adds this proof (commit artifact URI pending).
 
 
 ### Finding F4 — Dead config and provider lifecycle (A, original P1): dead config resolved; helper not implemented
@@ -360,12 +423,11 @@ helper proposal is superseded as a required fix, and its handle-returning bracke
 would have been too short-lived.
 
 An optional future helper must keep the provider alive through processor completion
-and shutdown, and test success, startup failure, exception, and cancellation. Keep
-this separate from the remaining documentation correction: the Quick Start in
-`docs/user/opentelemetry.md:20` still passes `shutdownTracerProvider` to `bracket`
-without supplying the timeout argument required by the current API. The Kafka demo
-uses the current explicit `Just 5_000_000` timeout. Update that guide with a tested
-full-lifetime example; do not reintroduce `TracingConfig` merely to match old prose.
+and shutdown, and test success, startup failure, exception, and cancellation. The
+Quick Start in `docs/user/opentelemetry.md` now uses `Just 5_000_000` for provider
+shutdown and an effectful `finally` around `waitApp`/`stopApp`. Its complete finite
+source example was compiled with SDK 1.0 and executed successfully. This corrects
+the documentation without introducing another configuration or provider helper.
 
 
 ### Finding F5 — No convenient active-context injection (D, original P2): implemented
@@ -376,108 +438,98 @@ full-lifetime example; do not reintroduce `TracingConfig` merely to match old pr
 It returns `Nothing` with tracing disabled or no active span, otherwise calls the
 retained `injectTraceContext`. PGMQ consumes it in the actual DLQ path, so the
 original claim that adapters never exercise injection is obsolete. Haddocks explain
-both APIs. `PropagationSpec` covers the three branches; exact active-span identity
-should be strengthened as part of M3.1V.
+both APIs. `PropagationSpec` now compares exported IDs and covers disabled, absent,
+and invalid active contexts. `injectTraceContext` uses the SDK's public `isValid`
+check before encoding; valid non-recording contexts remain propagatable.
 
 
-### Finding F6 — No-op provider allocation (A, P2): open
+### Finding F6 — No-op provider allocation (A, P2): implemented
 
 
-`shibuya-core/src/Shibuya/Telemetry/Effect.hs:103` still calls
-`createTracerProvider [] emptyTracerProviderOptions` for every `runTracingNoop`.
-The stored representation retains a strict `Tracer` even though guarded span
-operations skip it. This is per runner invocation, not per message. No measured
-startup-cost claim is made here. Plan 26's constant hoisting did not remove it.
-
-The proposed optional-tracer representation has not landed. Before implementing
-it, settle how `getTracer` (`Effect.hs:245`) continues to supply a concrete tracer
-under no-op mode; `EffectSpec` already exercises that contract. An unannounced
-change to `Maybe Tracer`, an exception, or an undefined value is not an acceptable
-internal optimization. Record the chosen compatibility approach and demonstrate
-unchanged no-op action results and `getTracer` behavior, plus removal of repeated
-provider construction. This finding remains a design-and-implementation backlog
-item rather than a ready-to-apply signature change.
+`shibuya-core/src/Shibuya/Telemetry/Effect.hs` now evaluates a shared private
+`noopTracer` instead of constructing a provider in each `runTracingNoop` call.
+A `NOINLINE` top-level constant initializes the no-processor provider once through
+`unsafePerformIO`. The public SDK has no pure concrete tracer constructor, so this
+retains the public `getTracer :: Eff es Tracer` contract without depending on
+SDK internals or the mutable global provider. No exporter/background resource is
+allocated. `EffectSpec` compares stable provider identity across independent runs,
+uses the returned tracer directly, and checks non-recording behavior. Existing
+no-op action-result tests pass. This removes repeated construction; no measured
+startup-cost or throughput improvement is claimed.
 
 
-### Finding F7 — Disabled callback exposes zero IDs (A, P2): partially improved; contract open
+### Finding F7 — Disabled callback exposes zero IDs (A, P2): explicit compatible contract accepted
 
 
-`shibuya-core/src/Shibuya/Telemetry/Effect.hs:159` calls `f dummySpan` when disabled.
-The value at line 294 is now a shared `NOINLINE` constant wrapping a zero-ID
-`SpanContext`, not a freshly built full span on each callback. The callback type
-remains `Span -> Eff es a`; the proposed `Maybe Span` change never landed.
-
-The remaining concern is callers inspecting or injecting that invalid sentinel
-for correlation. `currentTraceHeaders` already guards disabled mode. A future
-resolution must choose explicit documentation/acceptance of the sentinel or an
-API that represents absence; an additive helper can avoid forcing an immediate
-breaking change. Do not claim a breaking signature change is the only possible
-fix. Cover inspection/injection behavior and retain enabled-span behavior before
-marking this contract resolved.
+The `withSpan'` callback retains `Span -> Eff es a`. Disabled mode supplies the
+existing shared non-recording sentinel, whose zero trace/span IDs explicitly
+represent absence. Haddocks and the guide forbid correlation or parenting with
+those invalid IDs. `EffectSpec` inspects both IDs, checks non-recording behavior,
+and proves `injectTraceContext` returns an empty list. `currentTraceHeaders`
+returns `Nothing` under disabled mode or an invalid active context. Enabled
+identity tests continue to compare real exported IDs. The optional `Maybe Span`
+proposal is deliberately not implemented; preserving callers' signatures is the
+chosen resolution, not an accidental deferral.
 
 
-### Finding F8 — No framework ingestion/shutdown spans (B, P2): open
+### Finding F8 — No framework ingestion/shutdown spans (B, P2): implemented
 
 
-`shibuya-core/src/Shibuya/Internal/Runner/Ingester.hs:53` folds the source with
-metrics and pause support but has no tracing constraint or span.
-`shibuya-core/src/Shibuya/App.hs:363` coordinates shutdown, and its adapter calls
-at line 413 have no spans. `ingestSpanName` remains unused by the runner. This
-finding concerns framework-owned spans; underlying broker instrumentation and
-lifecycle metrics may still provide information. The old statement that failures
-are visible only in logs is obsolete after lifecycle observability work.
+`shibuya-core/src/Shibuya/Internal/Runner/Ingester.hs` wraps the metrics ingester's
+entire stream in the Internal `shibuya.ingest` span and adds `shibuya.processor.id`.
+Both single and batch call sites in `Shibuya.Internal.Runner.Supervised` pass the
+processor identity. No additional per-message ingestion span is introduced.
+`shibuya-core/src/Shibuya/App.hs` wraps each adapter shutdown attempt in an Internal
+`<ProcessorId> shutdown` span, using the optional tracer captured at startup in
+`shibuya-core/src/Shibuya/Internal/App.hs`. Stop APIs retain their IOE-only constraint.
 
-The proposed implementation is an Internal-kind span for each source-stream
-lifetime, plus a separate Internal span per adapter shutdown attempt. Avoid adding
-an extra per-message ingestion span. Ensure recorded exceptions and status survive
-failure/cancellation, do not mask the original failure, and preserve ADR 3's
-shutdown semantics. Account for both single-message and batch ingester call sites.
-The shutdown API currently requires only `IOE`, so adding `Tracing` requires an
-explicit compatibility decision. Long-lived spans are normally exported on end;
-this proposal alone does not promise live visibility of an operation that never
-finishes.
-
-
-### Milestones and remaining execution order
+SDK brackets record exception events and Error status before rethrowing failures,
+including cancellation and deadlines. The existing leadership, cached result,
+total deadline, synchronous-failure continuation, and unconditional master cleanup
+remain in place. `LifecycleSpec` verifies finite single/batch streams, source
+failure and its terminal lifecycle, normal and repeated shutdown, cached thrown
+failure, deadline False result, cancellation of ingestion, tracer capture across
+runners, and no spans in disabled mode. All eight exporter cases and the full core
+suite pass. Long-lived spans normally export on end; live visibility of unfinished
+operations still comes from lifecycle metrics.
 
 
-M1 (audit) and M2 (F1/F2 plus both adapter migrations) are complete. M2 acceptance
-is a single exported process span with the union of framework/adapter attributes,
-not just successful compilation. Retain the core semantic test and adapter
-conversion tests when changing these paths.
+### Milestones and execution results
 
-M3.1V is the next concrete validation milestone. In the PGMQ project's
-`shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ChaosSpec.hs`, add an in-memory
-exporter around a real `runApp` consumer whose handler dead-letters a message with
-a known producer context. Wait for finalization and stop the app while the provider
-is alive. Read the DLQ row and the exported process span; decode the active header
-and compare both trace ID and span ID with that span. Check the stashed producer
-header and custom headers. Exercise direct-queue and topic-route delivery, and a
-message with no original headers. Preserve the separate no-op test. Add the
-exporter/API dependencies to the adapter test stanza if required, using Mori and
-registry/upstream release verification before selecting bounds. Strengthen core
-`PropagationSpec` to compare the header against the active exported span as well.
-Acceptance is equality of IDs, not simply the presence of a `traceparent` string.
 
-M3.2 addresses F8 using the files and constraints above. Add in-memory exporter
-tests for a finite source, a source exception, normal adapter shutdown, and a
-shutdown exception/timeout. Assert span kind, processor identity, error event and
-status, once-only shutdown, preserved thrown failures, and zero exported spans
-under no-op mode. Run existing lifecycle tests to guard the cancellation contract.
-This milestone does not depend on inventing a managed tracing helper.
+M1 (audit) and M2 (F1/F2 plus both adapter migrations) were already complete.
+M2 acceptance remains one exported Consumer process span with the union of
+framework/adapter attributes. The test now distinguishes that span from lifecycle
+Internal spans and retains its override assertions.
 
-M3.3 resolves F6/F7's compatibility choices before changing their public behavior.
-Record the selected API and release implications here, then update EffectSpec and
-consumer call sites as necessary. Their original sketches are not settled public
-signatures. Each finding may be formally accepted as a documented trade-off, but
-must not be checked off solely because the old code still compiles.
+M3.1V adds four enabled PostgreSQL cases in the PGMQ `ChaosSpec`, using its existing
+ephemeral database fixture and an in-memory exporter around a real `runApp` handler.
+The app is stopped while the provider remains alive, so finalization finishes
+before the DLQ row and exported spans are inspected. Both trace and span IDs must
+match the failing Consumer span. Original producer headers are stashed, custom
+headers survive, and messages without original headers acquire valid consumer
+context. The original disabled test remains. Test-only API/exporter bounds are
+`^>=1.0`, verified against Hackage and upstream tags. The four cases and the full
+181-example adapter suite passed against published core; local-core verification
+is recorded in Progress and final outcomes. Core `PropagationSpec` also checks
+exact active/exported ID equality.
 
-M4 follow-up updates the current user guide and this plan after those milestones.
-Record exact validation results and limits, and distill any new durable ownership
-or API decisions into the ADR corpus following `agents/skills/exec-plan/ADR.md`.
-Do not recreate the deleted legacy integration plans to satisfy the original M4
-instructions. A separately scoped managed-provider helper or Kafka DLQ producer is
-not silently added to this audit's remaining implementation.
+M3.2 implements F8's ingestion and shutdown coverage. Eight exporter tests run via
+`--match Shibuya.Telemetry.Lifecycle`; they check kind, processor identity, error
+events/status, once-only calls, cached failures, timeout results, cancellation,
+startup tracer capture, and disabled mode. Full core lifecycle regressions run
+through `cabal test shibuya-core-test`: 271 examples passed.
+
+M3.3 resolves F6/F7 without breaking callback/getter signatures. The shared private
+no-op provider is verified across independent invocations, and the sentinel's
+non-recording/invalid-ID contract is tested. Injection rejects invalid contexts
+while valid active-span behavior remains. ADR 12 records these durable choices.
+
+M4 corrects and validates the current guide. Its finite-source example keeps the
+provider alive through waiting and unconditional stop cleanup and supplies the
+required shutdown timeout. The example compiles and executes. No deleted legacy
+plan, managed provider helper, Kafka DLQ producer, release publication, or new
+benchmark requirement is part of this implementation.
 
 
 ## Concrete Steps
@@ -538,14 +590,15 @@ Current implementation evidence is scoped: the core suite drives a mock adapter
 through `runWithMetrics` and asserts exactly one span and the attribute union.
 Kafka conversion tests assert the actual broker record's attributes but are not
 an end-to-end `runApp` parent-link test. The recorded 2026-05-05 Jaeger smoke is
-historical corroboration. F3 unit tests prove header merging; they do not prove
-which span is active at the database write. M3.1V supplies that missing proof.
+historical corroboration. F3 unit tests prove header merging; the new M3.1V PostgreSQL cases supply actual
+consumer-to-DLQ span identity proof.
 
-F8 is complete only when source and shutdown errors emit the specified spans
-without changing failure/cancellation behavior or creating a new span per message.
-F6 needs evidence addressing runner-level provider construction and the concrete
-`getTracer` contract. F7 needs an explicit supported disabled callback contract,
-with tests and docs reflecting whichever resolution is selected.
+F8 acceptance is demonstrated by eight lifecycle exporter cases and the full core
+regression suite: source/shutdown errors retain events and status without changing
+failure, timeout, or cancellation results. F6's independent-run provider identity
+and direct tracer use prove shared construction plus compatibility. F7's explicit
+sentinel contract, invalid injection tests, and enabled identity test cover both
+modes. The guide's exact code block compiles and executes with the current SDK.
 
 The documentation consolidation itself is accepted when there is one ID-9 file,
 all eight findings and original implementation commits are retained, source status
@@ -634,3 +687,17 @@ into this plan at the user's request. Preserved F1–F8 and implementation histo
 replaced stale paths/signatures and contradictory statuses, recognized plan 25's
 F4 resolution and plan 26's partial F7 improvement, separated missing tests from
 missing features, and retained open work without claiming new implementation.
+
+2026-10-12 implementation: Closed M3.1V with PostgreSQL span-identity tests and
+strengthened the core assertion; lifecycle and disabled-contract work is underway.
+
+2026-10-12 implementation: Lifecycle exporter and disabled-contract cases pass
+(38 telemetry examples total); full regression gates and guide validation remain.
+
+2026-10-12 implementation: Reconciled all finding statuses and milestone
+instructions with implemented behavior, recorded core and published-core adapter
+full-suite results, and distilled ADR 12. Final local-core adapter check is pending.
+
+2026-10-12 implementation: Corrected two PGMQ fixture constructions discovered
+when compiling against current core; they use default config record updates and
+retain behavior. Recorded the 104-example metrics integration regression pass.
