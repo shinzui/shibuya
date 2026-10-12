@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Shibuya.Metrics.ControlSpec qualified as Control
 import Shibuya.Metrics.CorsSpec qualified
 import Shibuya.Metrics.HealthSpec qualified
 import Shibuya.Metrics.JSONSpec qualified
@@ -12,6 +13,7 @@ import Test.Hspec (hspec)
 
 main :: IO ()
 main = hspec $ do
+  Control.spec
   Shibuya.Metrics.CorsSpec.spec
   Shibuya.Metrics.ServerSpec.spec
   Shibuya.Metrics.JSONSpec.spec

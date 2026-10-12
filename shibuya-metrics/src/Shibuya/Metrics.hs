@@ -109,6 +109,15 @@
 -- bounded partitions and sticky truncation, with lossless tagged cursor values.
 -- Paused intake is reported with live in-flight counts and the existing last-progress
 -- clock; drained pauses remain ready and stuck in-flight pauses do not.
+-- Control routes (enableJSON required): GET /control discovers enabled/operations;
+-- POST /control/processors/<id>/pause or /resume returns atomic intake intent.
+-- enableControl defaults False: actions return 403 control_disabled without mutation.
+-- Success is {processor,state:"running"} or {processor,state:"paused",pausedAt}.
+-- Actual POST Origin must be explicitly allowed, even when CORS is disabled.
+-- Refusals: 403 origin_not_allowed; 404 processor_not_found/not_found;
+-- 409 processor_terminal/processor_not_controllable/processor_draining;
+-- 405 method_not_allowed with Allow GET or POST. Lifecycle refusals include processor.
+-- Control adds no authentication or WebSocket mutation frames.
 module Shibuya.Metrics
   ( -- * Server Lifecycle
     startMetricsServer,

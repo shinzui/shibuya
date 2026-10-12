@@ -381,9 +381,9 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-12) EP-51 M1: Pause handle, ingester gate, `Paused` state, registry control entries, and the design's deterministic tests.
 - [x] (2026-10-12) EP-51 M2: Public application API, metrics-package updates for the new state, and resume-before-shutdown.
 - [x] (2026-10-12) EP-51 M3: Performance evidence for the gate, documentation, ADR, and changelog.
-- [ ] EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
-- [ ] EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
-- [ ] EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
+- [x] (2026-10-12) EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
+- [x] (2026-10-12) EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
+- [x] (2026-10-12) EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
 - [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline; record its outcome and exploratory eligibility explicitly.
 
 
@@ -550,7 +550,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 
 EP-47 through EP-51 are Complete (five of six children). Configurable browser access and
 bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
-IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52 is next and all hard dependencies are satisfied; IR-3 and IR-4 remain open under their owning children.
+IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52 is next and all hard dependencies are satisfied; IR-3 and IR-4 are closed with functional evidence; the integrated remote quick comparison remains.
 
 The EP-48 historical controlled observer evidence is retained. The bounded remote quick comparison now owns implementation performance validation; it does not certify a release. This MasterPlan remains In Progress.
 

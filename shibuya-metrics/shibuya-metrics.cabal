@@ -22,6 +22,7 @@ library
   exposed-modules:
     Shibuya.Metrics
     Shibuya.Metrics.Config
+    Shibuya.Metrics.Control
     Shibuya.Metrics.Cors
     Shibuya.Metrics.Error
     Shibuya.Metrics.Health
@@ -86,6 +87,7 @@ test-suite shibuya-metrics-test
 
   other-modules:
     Paths_shibuya_metrics
+    Shibuya.Metrics.ControlSpec
     Shibuya.Metrics.CorsSpec
     Shibuya.Metrics.HealthSpec
     Shibuya.Metrics.JSONSpec
@@ -108,11 +110,13 @@ test-suite shibuya-metrics-test
     containers,
     effectful >=2.6.1 && <2.8,
     hspec ^>=2.11.17,
+    http-client ^>=0.7.19,
     http-types,
     nqe ^>=0.6,
     shibuya-core,
     shibuya-metrics,
     stm,
+    streamly-core,
     text,
     time,
     wai,

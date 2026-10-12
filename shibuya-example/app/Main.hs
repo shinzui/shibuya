@@ -84,7 +84,7 @@ printMetrics appHandle = do
       Text.putStrLn $ "  Failed:    " <> Text.pack (show pm.stats.failed)
 
     formatState :: ProcessorState -> Text
-    formatState (Paused info _ _) = "Paused (in-flight: " <> show info.inFlight <> ")"
+    formatState (Paused info _ _) = "Paused (in-flight: " <> Text.pack (show info.inFlight) <> ")"
     formatState Idle = "Idle"
     formatState (Processing count _ _) = "Processing (" <> Text.pack (show count) <> " in flight)"
     formatState (Failed err _) = "Failed: " <> err

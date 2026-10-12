@@ -84,6 +84,8 @@ This plan delivers the progress item of the improvement request
 
 ## Surprises & Discoveries
 
+2026-10-12 negative control: Disabling recordAcknowledgedCursor in the isolated worktree fails the latest/replacement and concurrent-cap examples (four examples, two failures; seed 1047885589). The canonical decoder and basic bypass still pass.
+
 2026-10-12: The old JSON golden failed on the added progressing object (94 examples, one failure); updating that exact fixture makes metrics pass. Core tests need an explicit aeson test dependency, reusing the library version. Concurrent capacity 0/1/2, precision boundaries, successful finalization, retry/halt/exhaustion and batch cursor tests pass.
 
 

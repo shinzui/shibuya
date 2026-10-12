@@ -24,6 +24,9 @@ data MetricsServerConfig = MetricsServerConfig
     enablePrometheus :: !Bool,
     -- | Enable WebSocket endpoint (default: True)
     enableWebSocket :: !Bool,
+    -- | Enable reversible control POSTs (default False). The server performs
+    -- no authentication; use a trusted network or authenticating reverse proxy.
+    enableControl :: !Bool,
     -- | Exact browser Origins allowed for HTTP CORS and WebSocket upgrades.
     -- An empty list disables the policy (default). Entries must be serialized
     -- @scheme://host[:port]@ origins without whitespace, paths or trailing slashes.
@@ -61,6 +64,7 @@ defaultConfig =
       enableJSON = True,
       enablePrometheus = True,
       enableWebSocket = True,
+      enableControl = False,
       corsAllowedOrigins = [],
       wsPushIntervalUs = 100_000, -- 100ms
       wsMaxConnections = 100,

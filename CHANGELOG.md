@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add opt-in `enableControl` (False by default), discovery and pause/resume POST routes with structured errors and actual-request Origin enforcement. New `Shibuya.Metrics.Control` module; direct MetricsServerConfig construction must supply the flag.
+
+
 - Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
 
 

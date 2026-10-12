@@ -380,3 +380,20 @@ outcome <- pauseProcessor app (ProcessorId "orders")
 metrics <- getAppMetrics app
 _ <- resumeProcessor app (ProcessorId "orders")
 ```
+
+
+### Control operations
+
+Control lives in `shibuya-metrics`, with `defaultConfig {enableControl = True}` as explicit host opt-in. The default is False. `GET /control` returns `{"enabled":false,"operations":["pause","resume"]}` even when actions are disabled. With JSON endpoints disabled, all control paths return the generic 404. The server performs no authentication: use a trusted network or authenticating reverse proxy.
+
+```bash
+curl -s http://127.0.0.1:9090/control
+curl -s -X POST http://127.0.0.1:9090/control/processors/orders/pause
+curl -s -X POST http://127.0.0.1:9090/control/processors/orders/resume
+```
+
+A disabled action returns HTTP 403 with `{"error":"Control operations are disabled","code":"control_disabled"}` and performs no mutation. Enabled pause returns `{"processor":"orders","state":"paused","pausedAt":"<UTC timestamp>"}`; resume returns `{"processor":"orders","state":"running"}`. These represent intake intent at the atomic decision, not synchronous poll quiescence. Repeated operations without an intervening transition return the same body and original timestamp. Normal metrics/update frames carry paused state; there are no WebSocket control frames.
+
+Every supplied Origin on an enabled action must exactly match `corsAllowedOrigins`, including same-origin browser deployments and bodyless/text/plain POSTs that bypass preflight. Empty lists refuse any supplied Origin; headerless CLI requests remain supported. Duplicate Origins are refused. Origin policy is not authentication.
+
+Refusals use the existing error/code object: 403 `control_disabled` or `origin_not_allowed`; 404 `processor_not_found` or `not_found`; 409 `processor_terminal`, `processor_not_controllable` or `processor_draining`; 405 `method_not_allowed` with Allow GET for discovery or POST for actions. Processor lifecycle refusals include `processor`. Draining clears pause before adapter shutdown and rejects subsequent control. Cold Failed metrics alone are not terminal proof.

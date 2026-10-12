@@ -282,8 +282,8 @@ identify real APIs through Mori, verify releases, and prove its memory-ordering 
 At the end of this milestone the core tracks per-message duration and per-slot start times
 for a detailed handle, exposes them through `sampleMetrics` as `latency` and
 `oldestInFlight`, costs a basic handle one field read and a branch per message, and ships a
-default level justified by paired evidence. Nothing is exposed over HTTP yet; proof is the
-core test suite plus the comparator verdict files.
+basic default retained, with historical diagnostic overhead recorded. Nothing is exposed over HTTP yet; proof is the
+core test suite; EP-52 records the scoped final remote comparison.
 
 Add the types to `shibuya-core/src/Shibuya/Core/Metrics.hs` and export them. `MetricsDetail`
 is `MetricsBasic | MetricsDetailed !DetailOptions`; `DetailOptions` is a record with
@@ -368,24 +368,7 @@ at every ownership boundary, timestamp zero, repeated slot reuse, and a duration
 seconds whose finite buckets remain zero but overflow/count increment. Write each test before its
 implementation and record the failing run.
 
-Then measure using the paired capture commands below. The baseline is the parent of the
-accounting commit and the basic candidate is the committed candidate, with identical harness
-sources, external solver identities, compiler flags and RTS. A diagnostic build may flip
-only `defaultMetricsDetail` to detailed, recording the exact patch hash and asserting that a
-sample actually contains a latency summary. Keep the shipped constant basic even if the
-focused detailed comparison passes. Ten alternating pairs under both -N1 and -N4 are the
-minimum; rerun inconclusive cells at twenty pairs, and never accept a failed or inconclusive
-basic cell. Report detailed overhead explicitly and optimize without weakening correctness.
-
-Focused captures must include the eight message scenarios below plus `metrics-enabled`,
-`metrics-disabled`, `idle-worker`, `startup-shutdown`, `graceful-shutdown-drain`, and
-`batch-timeout`; update the focused budgets' requiredScenarios to exactly the captured set,
-without changing limits. The final integration gate in the MasterPlan compares all changes
-against the pre-initiative baseline using the complete canonical matrix. Repeat evidence if
-later edits change hooks, samplers, encoders, or configuration. Measure observer fan-out and
-long-lived detailed processors separately, including 1/4/64/256 concurrency, clock zero,
-slot reuse, and long total durations. Keep diagnostic commands, source/patch hashes and raw reports in temporary storage outside
-the repository; record only the concise verdict in this plan.
+Historical detailed diagnostics and inconclusive basic matrices are retained in Outcomes. Per-child repeated measurement is superseded by the owner-requested single final remote quick comparison under EP-52. Basic remains the default; functional acceptance here is the core suite and deterministic detailed-accounting tests.
 
 
 ### Milestone 2: exposure over JSON, Prometheus, and WebSocket, with fixtures and runner tests
@@ -442,11 +425,7 @@ handlers block on four separate `MVar`s released in reverse order: after all fou
 oldest must be the first message; after releasing it, the oldest must be the second. A batch
 processor built with `mkBatchProcessor` through `runApp` with `metricsDetail = MetricsDetailed
 defaultDetailOptions`: `latency.count` equals the number of emitted batches, not messages.
-Finally measure allocation with lifecycle-load's RTS statistics (`allocatedBytesPerMessage`),
-not tasty-bench CSV timing columns. The same benchmark source must be built against both
-production revisions; adding a case only to the candidate invalidates the comparison. Use
-an identical harness extension on both sides for higher concurrency and retain its hash.
-Basic allocation must meet the canonical 5% limit; detailed allocation is reported explicitly.
+RTS allocation diagnostics already recorded in Outcomes remain historical, not release acceptance. The bounded final remote comparison belongs to EP-52.
 
 
 Temporarily configure the example AppConfig with `metricsDetail = MetricsDetailed
@@ -498,7 +477,6 @@ Expected: no existing MessageId JSON instances. Build and test after each milest
 cabal build all
 cabal test shibuya-core
 cabal test shibuya-metrics --test-show-details=direct
-cabal bench shibuya-core-bench --benchmark-options="-p hot-path --stdev 3 --timeout 120 --csv /tmp/ep49-hotpath.csv +RTS -N1 -RTS"
 nix fmt
 ```
 

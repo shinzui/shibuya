@@ -6,9 +6,11 @@ description: >-
   shibuya-metrics as explicitly gated control operations, disabled by default, so an operator
   can safely stop a processor from taking new work without expiring leases or killing the
   process.
-timestamp: 2026-09-30T23:43:10Z
+timestamp: 2026-10-12T19:51:39Z
 requestId: IR-4
-status: accepted
+status: completed
+completedAt: 2026-10-12T19:51:39Z
+resolution: "EP-51 supplies public atomic admission pause/resume; EP-52 supplies opt-in discovery/actions and HTTP/WebSocket tests, with Origin enforcement and lifecycle refusals."
 origin: mori://shinzui/keiro-ui
 plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
@@ -16,6 +18,8 @@ plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.
 # Improvement Request: Implement Designed Processor Pause/Resume and Expose Gated Control Endpoints
 
 ## Status
+
+Completed on 2026-10-12. Core PauseSpec proves source admission, in-flight drain, message/batch control, concurrent lifecycle outcomes and shutdown. Metrics ControlSpec proves disabled refusal, discovery, origin enforcement, idempotence and real HTTP/WebSocket pause/drain/resume. Admission does not revoke an already admitted poll or adapter prefetch. Remote quick diagnostics do not certify a release.
 
 Proposed by the keiro runtime UI initiative
 (`mori://shinzui/keiro-ui/masterplans/1-keiro-runtime-ui-foundations`, filed under

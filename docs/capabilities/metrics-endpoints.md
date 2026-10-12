@@ -5,7 +5,7 @@ description: "Expose live processor metrics as a JSON HTTP endpoint, a Prometheu
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
-timestamp: 2026-10-12T19:32:42Z
+timestamp: 2026-10-12T19:50:09Z
 capabilityId: CAP-10
 provider: mori://shinzui/shibuya
 status: shipped
@@ -120,3 +120,5 @@ a delta, while HTTP and snapshots return current sampled age. See
 [latency and in-flight detail](../architecture/METRICS.md#latency-and-in-flight-detail).
 
 Acknowledged cursor progress is available in detailed mode as bounded latest/per-partition snapshots. Evidence: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs`, `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs`, `shibuya-core/test/Shibuya/App/BatchSpec.hs`, and the metrics ServerSpec/WebSocketSpec tests. Integer cursors are lossless tagged decimal text; no progress is fabricated for cursorless adapters.
+
+Reversible HTTP intake control is available through [CAP-11](gated-processor-control.md), disabled by default. Discovery is read-only; hosts explicitly enable control and own its authentication boundary.

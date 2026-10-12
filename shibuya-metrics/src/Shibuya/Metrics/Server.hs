@@ -29,6 +29,7 @@ import Network.Wai.Handler.WebSockets qualified as WaiWS
 import Network.WebSockets qualified as WS
 import Shibuya.App (Master)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
+import Shibuya.Metrics.Control (controlApp)
 import Shibuya.Metrics.Cors (corsMiddleware, isValidOrigin, originGuard)
 import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, HealthConfig (..))
@@ -128,7 +129,7 @@ combinedApp config master wsState depChecks =
 
 -- | HTTP application routing based on path.
 httpApp :: MetricsServerConfig -> Master -> [DependencyCheck] -> Application
-httpApp config master depChecks req respond = do
+httpApp config master depChecks = \req respond -> do
   let path = pathInfo req
       healthConfig =
         HealthConfig
@@ -158,9 +159,13 @@ httpApp config master depChecks req respond = do
     ["health", "ready"]
       | config.enableJSON ->
           jsonHandler req respond
+    ("control" : _)
+      | config.enableJSON -> controlHandler req respond
     -- WebSocket path info (for documentation, actual upgrade handled above)
     ["ws"]
       | config.enableWebSocket ->
           respond $ errorResponse status404 "WebSocket endpoint - use ws:// protocol" "websocket_upgrade_required" []
     -- Not found
     _ -> respond $ errorResponse status404 "Not found" "not_found" []
+  where
+    controlHandler = controlApp config master

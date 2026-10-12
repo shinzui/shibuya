@@ -75,19 +75,23 @@ control surface and its observability, and closes the request once EP-51 is Comp
 ## Progress
 
 
-- [ ] Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
-- [ ] Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
+- [x] (2026-10-12) Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
+- [x] (2026-10-12) Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
 - [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate; record exact revisions, report and eligibility limits.
-- [ ] Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; record wire-load sanity numbers; close IR-4 after EP-51 is Complete.
+- [x] (2026-10-12) Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; close IR-4 after EP-51 is Complete.
 
 
 ## Surprises & Discoveries
+
+2026-10-12: Real loopback HTTP and WebSocket tests pass through an application whose admitted poll is held before pause, then drains while the next admission waits; resume admits the next poll and graceful shutdown completes. The tests require http-client and streamly-core in the metrics test stanza; http-client 0.7.19 is verified against Hackage and upstream tag a0b418c12ff3c9878f21bff92bb174c239a9cfe3. No production dependency is added. The all-package build caught a Text/String mismatch in the example’s new paused formatter; corrected to Text.pack.
 
 
 2026-10-10 review: Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics.
 
 
 ## Decision Log
+
+Decision (2026-10-12): Use the existing shared error renderer and the core result payload directly, with method then control gate then actual Origin checks. Prepare the control handler once outside the request lambda. Boolean enableControl needs no validation rule. CAP-11 is allocated through okf id next; publication version remains a release-owner action.
 
 Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
@@ -132,7 +136,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Discovery, opt-in control routes, actual POST Origin enforcement, structured outcomes and real HTTP/WebSocket integration are implemented. Core (260 examples), metrics (104 examples) and both GC suites pass. IR-4 is closed with functional evidence. One bounded remote quick comparison remains; its uncalibrated profile will be reported as exploratory, not release certification. CAP-11 uses the current source version and requires the release owner to set the publication version at release.
 
 
 ## Context and Orientation
@@ -474,11 +478,7 @@ construction must choose it (breaking for construction, default preserved throug
 `POST /control/processors/<id>/resume` with their codes are additive; the new
 `Shibuya.Metrics.Control` module. Do not pick a version.
 
-Record wire-load sanity numbers: run the `metrics-wire-load` health-polling scenario once on
-the tree before Milestone 1 and once after Milestone 2, and paste `operationsPerSecond` and
-`latencyP95Micros` from both JSON reports into Concrete Steps. The control routes are off the
-message hot path and off the polled routes, so the numbers are a sanity check with no gate;
-a change above 10% in p95 must be explained in Surprises & Discoveries.
+Do not add local wire-load timing captures for this implementation; the owner-requested bounded remote quick comparison is the only new performance operation.
 
 Close IR-4, only once EP-51 is Complete in the MasterPlan registry. Edit
 `docs/improvement-requests/implement-designed-processor-pause-resume-and-expose-gated-control-endpoints.md`:
@@ -565,13 +565,6 @@ Content-Type: application/json
 ```
 
 Member order inside a body is whatever Aeson emits; compare decoded objects, not bytes.
-
-Wire-load sanity, before Milestone 1 and after Milestone 2, pasting the two numbers here:
-
-```bash
-SCENARIO=health OUTPUT_JSON=/tmp/wire-load-before.json cabal run shibuya-metrics:metrics-wire-load
-SCENARIO=health OUTPUT_JSON=/tmp/wire-load-after.json cabal run shibuya-metrics:metrics-wire-load
-```
 
 Capability and request bundle commands for Milestone 3:
 
