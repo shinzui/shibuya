@@ -87,7 +87,7 @@ and the fixtures this plan introduces.
 - [x] (2026-10-10 22:16Z) Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
 - [x] (2026-10-10 22:16Z) Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
 - [x] (2026-10-10 22:16Z) Milestone 2, WebSocket: the WebSocket push producer compares an age-zeroed projection; update frame test.
-- [x] (2026-10-10) Milestone 2, runner behavioral tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, RTS allocation check on the basic path remains in the paired measurement item.
+- [x] (2026-10-10) Milestone 2, runner behavioral tests: blocked handler age growth and clearing, `Async 4` oldest identification, batch processor duration, the historical basic-path RTS allocation checks are retained below; final quick comparison is owned by EP-52.
 - [x] (2026-10-10) Milestone 3, records: ADR, `docs/architecture/METRICS.md`, Haddock, `docs/user/getting-started.md`, CAP-9 and CAP-10 evidence with `okf log add`, three changelogs.
 
 
@@ -102,7 +102,7 @@ and the fixtures this plan introduces.
 
 The paired capture now supports `--stability-budgets`: compare fresh baseline runs against baseline runs in both directions before measuring the candidate. Use the unchanged budget and its minimum pair count; a non-pass exits 2 and skips candidate capture. Store control captures as ineligible for release comparison. Existing comparator tests pass (8); driver smoke checks prove stable controls proceed and unstable controls skip the candidate. The corrected checkpoint builds at O2 for both revisions and acknowledges every message for counts below, at and above inbox capacity. No new test cases or audit files were added to the repository.
 
-The user reports a very busy machine; observed load was about 34 on ten cores. Smoke-run timings are ignored. Do not run or accept local wall-time measurements while the machine remains busy. There is no existing CI workflow or registered self-hosted Actions runner. A quiet host must pass the baseline stability control before the fresh, bounded paired acceptance run. Dependent work remains blocked and no budget is waived.
+Historical 2026-10-10 local measurement gate (superseded for implementation by the 2026-10-12 decision below): The user reports a very busy machine; observed load was about 34 on ten cores. Smoke-run timings are ignored. Do not run or accept local wall-time measurements while the machine remains busy. There is no existing CI workflow or registered self-hosted Actions runner. A quiet host must pass the baseline stability control before the fresh, bounded paired acceptance run. Dependent work remains blocked and no budget is waived.
 
 2026-10-10 scope correction: Stop additional tests and performance sampling at the user's request. Remove all 176 generated EP-49 audit files from the repository, including the two previously committed files. Keep this verification summary and the reproducible commands below; future diagnostic output belongs in temporary storage.
 
@@ -611,3 +611,5 @@ Revision note (2026-10-10): API and performance review applied. Remove nonexiste
 
 
 Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.
+
+Revision note (2026-10-12 autonomous follow-up): Repair the existing isolated Kenshou CLI lane without relaxing bounds or expanding measurement scope. Both Linux inventories and bounds checks pass; remote payload compilation/publication is underway. Mark older implementation blocker language as superseded, retaining its diagnostic history.

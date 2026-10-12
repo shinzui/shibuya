@@ -77,11 +77,13 @@ control surface and its observability, and closes the request once EP-51 is Comp
 
 - [x] (2026-10-12) Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
 - [x] (2026-10-12) Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
-- [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate. Preparation attempted and blocked by the existing harness/cohort conflicts documented below; remote execution and report verification remain pending.
+- [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate. Both preparation inventories and bounds checks now pass after the narrow harness repair; payload publication, remote execution and report verification remain pending.
 - [x] (2026-10-12) Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; close IR-4 after EP-51 is Complete.
 
 
 ## Surprises & Discoveries
+
+2026-10-12 follow-up: The owner requested autonomous unblocking. Add a narrowly scoped runtime-suites build flag to the existing Kenshou cell CLI so the current Shibuya cohort can exclude incompatible unrelated scenario libraries. Match package selection and flags in the independent Cabal plan and Nix inventory; retain all dependency bounds. Kernel, cell execution and verification commands remain the same. Validate both isolated and default CLI builds, then retry preparation using the same request/profile/revisions and a fresh output directory. This supersedes the earlier decision to stop at the harness preparation failure.
 
 2026-10-12 preparation: The runbook’s historical `cohort/released.json` template rejects Shibuya 0.10.0.1 because the fixed Keiro release bounds Shibuya to 0.9. The existing `cohort/shibuya-current.json` template explicitly isolates the current Shibuya release lane; use it unchanged in a fresh request/preparation, keeping the same revisions and core profile. No bounds override was attempted. Both retained requests live in Kenshou scratch storage. The second preparation also fails: the generated bounds project includes every harness package, including kenshou-kiroku pinned to kiroku-store 0.8.0.1, conflicting with the lane’s kiroku-store 0.10.0.0. This is a harness-side preparation blocker; no lease, submission, execution session or receipt was created.
 
@@ -140,11 +142,13 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-Discovery, opt-in control routes, actual POST Origin enforcement, structured outcomes and real HTTP/WebSocket integration are implemented. Core (260 examples), metrics (104 examples) and both GC suites pass. IR-4 is closed with functional evidence. The bounded remote quick comparison is blocked in preparation by existing harness/cohort dependency conflicts; execution and verification remain pending. Neither attempt is performance evidence or release certification. CAP-11 uses the current source version and requires the release owner to set the publication version at release.
+Discovery, opt-in control routes, actual POST Origin enforcement, structured outcomes and real HTTP/WebSocket integration are implemented. Core (260 examples), metrics (104 examples) and both GC suites pass. IR-4 is closed with functional evidence. The initial preparation conflicts have been repaired in the existing isolated harness lane. Both inventories and bounds checks pass; payload publication, execution and verification remain pending. The retained failed preparations are not performance evidence or release certification. CAP-11 uses the current source version and requires the release owner to set the publication version at release.
 
 
 
 ### Remote quick comparison attempt (2026-10-12)
+
+Follow-up after owner-requested autonomous unblocking: `mori://shinzui/keiro-runtime-kenshou` commit `a1648293443ad88ff1695ed800ff44c99993574e` adds the isolated CLI lane. Default/full and isolated CLI builds pass, preparation integrity tests pass (13 examples), and matching file-backed CLI integration tests pass (5 examples, including session execution and report replay). Dependency bounds remain strict; no benchmark profile, statistical budget or variant changes. Fresh preparation `.dev/mp7-perf-preparation-isolated` passes both Linux inventories and independent bounds checks, with no unrelated dependency drift (283 packages; runtime-suites and keiro-schema disabled, no unrelated scenario suites, jailbreak false throughout), and is compiling/publishing the payloads with the same current-cohort request and source commits. Scratch artifact-level URI remains pending.
 
 Followed `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` with the clean harness commit `1ebfbdafbf0625910a0b4192f6fcddd76f6b1466`, baseline `454257abdda9cf7f80978f7f38a0600d3ca00cf1` and candidate `ca61711ef7431044f6432b3febc4ee9cc7366156`. The candidate is committed and available from the registered HTTPS upstream. Request: target component shibuya, supplied shibuya-core-quick profile only, selected-profiles coverage, purpose calibration, control none, seed 20261012, cell alpha, wait 90 seconds, execution budget 30 minutes. Cloud project tan-nb-exp; control bucket tan-nb-exp-cells-control; intended evidence base gs://kenshou-evidence-tan-nb-exp/performance. Initial cell status showed no lease or quarantine.
 
@@ -713,3 +717,5 @@ Revision note (2026-10-10): API and performance review applied. Require EP-47 an
 Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.
 
 Revision note (2026-10-12 completion checkpoint): Functional implementation, all-package build, core/metrics and GC suites, records and negative control are complete. Retain the two fast-lane preparation failures without a performance pass claim; remote execution and verification remain the sole pending milestone.
+
+Revision note (2026-10-12 autonomous follow-up): Repair the existing isolated Kenshou CLI lane without relaxing bounds or expanding measurement scope. Both Linux inventories and bounds checks pass; remote payload compilation/publication is underway. Mark older implementation blocker language as superseded, retaining its diagnostic history.

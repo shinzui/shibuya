@@ -384,12 +384,12 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-12) EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
 - [x] (2026-10-12) EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
 - [x] (2026-10-12) EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
-- [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline. Two preparations exited 4 on existing harness/cohort dependency conflicts before leasing; execution and verification remain pending (see EP-52).
+- [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline. The two initial preparation conflicts are repaired; both inventories and bounds checks pass. Payload publication, execution and verification remain pending (see EP-52).
 
 
 ## Surprises & Discoveries
 
-**Functional integration complete; remote preparation blocked (2026-10-12).** The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. Deterministic cursor, pause and endpoint negative controls fail when their production behavior is removed. EP-52 implements the final HTTP/WebSocket path. The bounded remote comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` reaches planning but both existing cohort choices fail preparation: the historical full runtime excludes Shibuya 0.10, and the current Shibuya lane conflicts with unrelated Kiroku harness packages included by preparation. Exact identities, retained requests and diagnostics are in EP-52. No cell was leased and no performance report exists. Do not expand this implementation into a performance harness refactor.
+**Functional integration complete; remote payload preparation underway (2026-10-12).** The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. Deterministic cursor, pause and endpoint negative controls fail when their production behavior is removed. EP-52 implements the final HTTP/WebSocket path. The bounded remote comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` reaches planning but both existing cohort choices fail preparation: the historical full runtime excludes Shibuya 0.10, and the current Shibuya lane conflicts with unrelated Kiroku harness packages included by preparation. Exact identities, retained requests and diagnostics are in EP-52. No cell was leased and no performance report exists. The owner subsequently requested autonomous unblocking: Kenshou commit `a1648293443ad88ff1695ed800ff44c99993574e` repairs the existing isolated cohort and cell commands, with no new benchmark profile or calibration batch. Both inventories and bounds checks now pass, and payload compilation/publication is underway.
 
 **EP-49 measurement corrected (2026-10-10).** Existing baseline captures are inconclusive
 against themselves. Correct the full-inbox GC checkpoint and require a baseline stability
@@ -550,7 +550,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 
 EP-47 through EP-51 are Complete (five of six children). Configurable browser access and
 bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
-IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52’s functional implementation is complete and all hard dependencies are satisfied. IR-3 and IR-4 are closed with functional evidence. EP-52 remains In Progress solely because remote performance preparation is blocked; execution and verification have not occurred.
+IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52’s functional implementation is complete and all hard dependencies are satisfied. IR-3 and IR-4 are closed with functional evidence. EP-52 remains In Progress solely for the remote comparison: the harness repair and inventory/bounds checks pass, and payload compilation/publication is underway; execution and verification have not occurred.
 
 The EP-48 historical controlled observer evidence is retained. The bounded remote quick comparison now owns implementation performance validation; it does not certify a release. This MasterPlan remains In Progress.
 
@@ -576,3 +576,5 @@ retain the mandatory integrated gate, and identify EP-49 as the next implementab
 Revision note (2026-10-12): Adopt the owner-requested bounded Kenshou remote quick comparison, remove per-child measurement gates, and mark EP-49 functionally complete without claiming its old inconclusive measurements passed.
 
 Revision note (2026-10-12 integration checkpoint): All feature work and functional validation are delivered. Record exact-revision remote preparation failures and leave the performance milestone pending; no measured pass or release certification is claimed.
+
+Revision note (2026-10-12 autonomous follow-up): Repair the existing isolated Kenshou CLI lane without relaxing bounds or expanding measurement scope. Both Linux inventories and bounds checks pass; remote payload compilation/publication is underway. Mark older implementation blocker language as superseded, retaining its diagnostic history.
