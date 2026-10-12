@@ -404,3 +404,18 @@ With `defaultAppConfig {metricsDetail = MetricsDetailed defaultDetailOptions}`, 
 ```
 
 Cursor integers use canonical decimal strings, preserving browser identity above 2^53; text cursors use kind `text`. This is completion progress, not a restart checkpoint or global maximum. Per-partition values follow source order only when adapter delivery and processing ordering preserve it. Concurrent completion may move latest backwards. Cursors are opaque and have no Prometheus series.
+
+
+### Pausing and resuming processors
+
+`pauseProcessor app (ProcessorId "orders")` and `resumeProcessor app (ProcessorId "orders")` return `ControlOutcome`. Successful operations return the intake state captured by the same transaction: `ControlApplied (IntakePaused timestamp)` or `ControlApplied IntakeRunning`. Repeating an operation returns `ControlAlreadyInState` and preserves the original pause timestamp. `isProcessorPaused` returns Nothing for unknown, terminal, draining or uncontrollable registrations.
+
+Pause is an intake admission request. The next source admission waits; an already admitted poll, inbox messages and in-flight handlers may drain. Adapter prefetch and lease renewal remain adapter responsibilities. A pause neither cancels handler work nor stops the process. Graceful shutdown atomically marks processors draining and resumes intake before adapter shutdown; new control requests then return `ControlDraining`.
+
+Paused metrics include live `inFlight`, `maxConcurrency`, `pausedAt` and the unchanged sampled `lastProgress`. Failed and stopped observations take precedence. Prometheus state is 5; health counts drained/progressing paused processors under `paused`. Paused in-flight work that exceeds the existing last-progress threshold remains stuck and fails readiness. New state constructors require consumers with exhaustive decoders to add paused support.
+
+```haskell
+outcome <- pauseProcessor app (ProcessorId "orders")
+metrics <- getAppMetrics app
+_ <- resumeProcessor app (ProcessorId "orders")
+```

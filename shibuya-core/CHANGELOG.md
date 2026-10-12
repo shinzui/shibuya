@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
+
+
 - Add optional acknowledged `progress` to processor JSON and WebSocket metrics, bounded per partition, with lossless tagged Cursor JSON. Basic detail remains the default. Direct `ProcessorMetrics` construction must supply `progress`.
 
 

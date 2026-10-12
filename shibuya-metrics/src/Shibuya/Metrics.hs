@@ -107,6 +107,8 @@
 -- See @docs/architecture/METRICS.md@ for the complete shared-convention mapping.
 -- Detailed processor metrics also carry optional acknowledged cursor progress: latest,
 -- bounded partitions and sticky truncation, with lossless tagged cursor values.
+-- Paused intake is reported with live in-flight counts and the existing last-progress
+-- clock; drained pauses remain ready and stuck in-flight pauses do not.
 module Shibuya.Metrics
   ( -- * Server Lifecycle
     startMetricsServer,

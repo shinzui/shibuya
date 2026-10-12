@@ -47,7 +47,7 @@ renderPrometheusMetrics metrics =
       renderHelp "shibuya_messages_failed_total" "Total messages that failed processing",
       renderType "shibuya_messages_failed_total" "counter",
       renderGaugeMetrics "shibuya_messages_failed_total" (fromIntegral . (.stats.failed)) metrics,
-      renderHelp "shibuya_processor_state" "Current processor state (1=idle, 2=processing, 3=failed, 4=stopped)",
+      renderHelp "shibuya_processor_state" "Current processor state (1=idle, 2=processing, 3=failed, 4=stopped, 5=paused)",
       renderType "shibuya_processor_state" "gauge",
       renderGaugeMetrics "shibuya_processor_state" (fromIntegral . stateToInt . (.state)) metrics,
       renderHelp "shibuya_processor_in_flight" "Number of messages currently being processed",
@@ -104,10 +104,12 @@ stateToInt Idle = 1
 stateToInt (Processing _ _ _) = 2
 stateToInt (Failed _ _) = 3
 stateToInt Stopped = 4
+stateToInt (Paused _ _ _) = 5
 
 -- | Get in-flight count from processor state.
 inFlightCount :: ProcessorState -> Int
 inFlightCount (Processing info _ _) = info.inFlight
+inFlightCount (Paused info _ _) = info.inFlight
 inFlightCount _ = 0
 
 renderLatency :: ProcessorId -> ProcessorMetrics -> Builder.Builder

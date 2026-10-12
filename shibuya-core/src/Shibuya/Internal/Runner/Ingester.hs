@@ -14,6 +14,7 @@ import Control.Concurrent.NQE.Process (Inbox, inboxToMailbox, send)
 import Effectful (Eff, IOE, liftIO, (:>))
 import Shibuya.Core.Ingested (Ingested)
 import Shibuya.Core.Metrics (MetricsHandle, incrementReceived)
+import Shibuya.Internal.Runner.Pause (PauseHandle, waitWhilePaused)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
@@ -43,12 +44,13 @@ runIngesterWithMetrics ::
   (IOE :> es) =>
   -- | Metrics handle (for updating received count)
   MetricsHandle ->
+  PauseHandle ->
   -- | Source stream from adapter
   Stream (Eff es) (Ingested es msg) ->
   -- | Target inbox (bounded for backpressure)
   Inbox (Ingested es msg) ->
   Eff es ()
-runIngesterWithMetrics metricsHandle source inbox = do
+runIngesterWithMetrics metricsHandle pauseHandle source inbox = do
   let mailbox = inboxToMailbox inbox
   Stream.fold Fold.drain $
     Stream.mapM
@@ -59,4 +61,4 @@ runIngesterWithMetrics metricsHandle source inbox = do
           liftIO $ send msg mailbox
           pure msg
       )
-      source
+      (Stream.zipWith (\() msg -> msg) (Stream.repeatM (liftIO (waitWhilePaused pauseHandle))) source)

@@ -55,6 +55,10 @@ module Shibuya.Core.Metrics
     newMetricsHandle,
     newMetricsHandleWithClock,
     sampleMetrics,
+    markPaused,
+    markResumed,
+    markPausedSTM,
+    markResumedSTM,
     incrementReceived,
     beginProcessing,
     AckDecisionMetric (..),
@@ -74,7 +78,7 @@ module Shibuya.Core.Metrics
 where
 
 import Control.Concurrent.MVar (MVar, modifyMVar, modifyMVar_, newMVar, readMVar)
-import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
+import Control.Concurrent.STM (STM, TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
 import Control.Exception (mask_)
 import Control.Monad (void, when)
 import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..), object, withObject, (.:), (.:?))
@@ -132,6 +136,8 @@ data ProcessorState
     Idle
   | -- | Currently processing (in-flight info, sampled burst start, sampled last progress)
     Processing !InFlightInfo !UTCTime !UTCTime
+  | -- | Intake paused (live in-flight info, pause time, sampled last progress)
+    Paused !InFlightInfo !UTCTime !UTCTime
   | -- | Failed with error (error message, timestamp)
     Failed !Text !UTCTime
   | -- | Processor has been stopped
@@ -146,6 +152,14 @@ instance ToJSON ProcessorState where
         "inFlight" Aeson..= info.inFlight,
         "maxConcurrency" Aeson..= info.maxConcurrency,
         "lastActivity" Aeson..= lastActivity,
+        "lastProgress" Aeson..= lastProgress
+      ]
+  toJSON (Paused info pausedAt lastProgress) =
+    object
+      [ "status" Aeson..= ("paused" :: Text),
+        "inFlight" Aeson..= info.inFlight,
+        "maxConcurrency" Aeson..= info.maxConcurrency,
+        "pausedAt" Aeson..= pausedAt,
         "lastProgress" Aeson..= lastProgress
       ]
   toJSON (Failed err timestamp) =
@@ -167,6 +181,7 @@ instance FromJSON ProcessorState where
         lastActivity <- v .: "lastActivity"
         lastProgress <- v .:? "lastProgress"
         pure $ Processing (InFlightInfo inFlightCount maxConc) lastActivity (fromMaybe lastActivity lastProgress)
+      "paused" -> Paused <$> (InFlightInfo <$> v .: "inFlight" <*> v .: "maxConcurrency") <*> v .: "pausedAt" <*> v .: "lastProgress"
       "failed" -> Failed <$> v .: "error" <*> v .: "timestamp"
       "stopped" -> pure Stopped
       other -> fail $ "Unknown processor state: " <> Text.unpack other
@@ -546,6 +561,7 @@ sampleMetrics handle = do
       sampledState = case coldSnapshot.state of
         Failed err timestamp -> Failed err timestamp
         Stopped -> Stopped
+        Paused _ since _ -> Paused (InFlightInfo inFlight maxConcurrency) since lastProgressAt
         _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt lastProgressAt
         _ -> Idle
   (latency, oldestInFlight) <- sampleDetail handle
@@ -557,6 +573,26 @@ sampleMetrics handle = do
         Nothing -> Nothing
         Just _ -> Just snapshot
   pure coldSnapshot {state = sampledState, stats = sampledStats, latency, oldestInFlight, progress}
+
+-- | Publish pause intent without resetting the last-progress clock.
+markPaused :: MetricsHandle -> UTCTime -> IO ()
+markPaused handle = atomically . markPausedSTM handle
+
+markPausedSTM :: MetricsHandle -> UTCTime -> STM ()
+markPausedSTM handle since = modifyTVar' handle.cold $ \m -> case m.state of
+  Failed {} -> m
+  Stopped -> m
+  Paused {} -> m
+  _ -> m {state = Paused (InFlightInfo 0 0) since since}
+
+-- | Clear only a pause; terminal and failure observations retain precedence.
+markResumed :: MetricsHandle -> IO ()
+markResumed = atomically . markResumedSTM
+
+markResumedSTM :: MetricsHandle -> STM ()
+markResumedSTM handle = modifyTVar' handle.cold $ \m -> case m.state of
+  Paused {} -> m {state = Idle}
+  _ -> m
 
 incrementReceived :: MetricsHandle -> IO ()
 incrementReceived handle =

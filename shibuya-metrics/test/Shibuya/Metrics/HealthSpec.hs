@@ -22,6 +22,7 @@ import Shibuya.Core.Metrics
     ProcessorState (..),
     beginProcessing,
     finishProcessing,
+    markPaused,
     newMetricsHandle,
     newMetricsHandleWithClock,
     sampleMetrics,
@@ -59,7 +60,7 @@ spec = do
         `shouldReturn` ReadinessStatus
           { ready = True,
             application = ConfiguredEmpty,
-            processors = ProcessorHealth {total = 0, healthy = 0, failed = 0, stuck = 0},
+            processors = ProcessorHealth {total = 0, healthy = 0, failed = 0, stuck = 0, paused = 0},
             dependencies = []
           }
 
@@ -68,7 +69,7 @@ spec = do
       readiness <- checkReadiness defaultHealthConfig master []
       readiness.ready `shouldBe` False
       readiness.application `shouldBe` Running
-      readiness.processors `shouldBe` ProcessorHealth {total = 1, healthy = 0, failed = 1, stuck = 0}
+      readiness.processors `shouldBe` ProcessorHealth {total = 1, healthy = 0, failed = 1, stuck = 0, paused = 0}
 
       (detailed, metrics) <- checkDetailedHealth defaultHealthConfig master []
       detailed `shouldBe` readiness
@@ -127,6 +128,23 @@ spec = do
       readiness.ready `shouldBe` True
       readiness.processors.stuck `shouldBe` 0
 
+    it "counts drained pauses separately while preserving stuck readiness failures" $ \master -> do
+      now <- getCurrentTime
+      clock <- newIORef 0
+      handle <- newMetricsHandleWithClock (readIORef clock) (addUTCTime (-120) now)
+      runEff $ registerProcessor master (ProcessorId "paused") handle
+      markPaused handle now
+      drained <- checkReadiness defaultHealthConfig master []
+      drained.ready `shouldBe` True
+      drained.processors.paused `shouldBe` 1
+      _ <- beginProcessing handle 1
+      _ <- sampleMetrics handle
+      writeIORef clock (seconds 120)
+      stuck <- checkReadiness defaultHealthConfig master []
+      stuck.ready `shouldBe` False
+      stuck.processors.stuck `shouldBe` 1
+      stuck.processors.paused `shouldBe` 0
+
     it "reports a genuinely non-progressing handler stuck" $ \master -> do
       now <- getCurrentTime
       clock <- newIORef 0
@@ -155,7 +173,7 @@ spec = do
       readiness <- checkReadiness defaultHealthConfig master []
       readiness.ready `shouldBe` False
       readiness.application `shouldBe` ApplicationFailed
-      readiness.processors `shouldBe` ProcessorHealth {total = 1, healthy = 0, failed = 1, stuck = 0}
+      readiness.processors `shouldBe` ProcessorHealth {total = 1, healthy = 0, failed = 1, stuck = 0, paused = 0}
 
     it "reports draining and stopped masters unavailable" $ \master -> do
       runEff $ markMasterDraining master

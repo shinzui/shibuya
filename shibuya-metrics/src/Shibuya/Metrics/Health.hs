@@ -40,7 +40,8 @@ import Data.Text qualified as Text
 import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import Shibuya.App (Master, getAllMetricsIO)
 import Shibuya.Core.Metrics
-  ( MetricsMap,
+  ( InFlightInfo (..),
+    MetricsMap,
     ProcessorId,
     ProcessorMetrics (..),
     ProcessorState (..),
@@ -141,7 +142,8 @@ data ProcessorHealth = ProcessorHealth
   { total :: !Int,
     healthy :: !Int,
     failed :: !Int,
-    stuck :: !Int
+    stuck :: !Int,
+    paused :: !Int
   }
   deriving stock (Eq, Show)
 
@@ -151,7 +153,8 @@ instance ToJSON ProcessorHealth where
       [ "total" .= ph.total,
         "healthy" .= ph.healthy,
         "failed" .= ph.failed,
-        "stuck" .= ph.stuck
+        "stuck" .= ph.stuck,
+        "paused" .= ph.paused
       ]
 
 -- | Status of an external dependency.
@@ -249,16 +252,17 @@ analyzeProcessorHealth :: HealthConfig -> UTCTime -> MetricsMap -> LifecycleSnap
 analyzeProcessorHealth config now metrics lifecycles =
   let processorIds = Map.keysSet metrics <> Map.keysSet lifecycles
       total = length processorIds
-      (healthy, failed, stuck) =
+      (healthy, failed, stuck, paused) =
         foldr
           (categorize config now metrics lifecycles)
-          (0, 0, 0)
+          (0, 0, 0, 0)
           processorIds
    in ProcessorHealth
         { total = total,
           healthy = healthy,
           failed = failed,
-          stuck = stuck
+          stuck = stuck,
+          paused = paused
         }
 
 -- | Categorize a processor as healthy, failed, or stuck.
@@ -268,22 +272,25 @@ categorize ::
   MetricsMap ->
   LifecycleSnapshot ->
   ProcessorId ->
-  (Int, Int, Int) ->
-  (Int, Int, Int)
-categorize config now metrics lifecycles pid counts@(h, f, s) =
+  (Int, Int, Int, Int) ->
+  (Int, Int, Int, Int)
+categorize config now metrics lifecycles pid counts@(h, f, s, p) =
   case Map.lookup pid lifecycles of
-    Just LifecycleFailed {} -> (h, f + 1, s)
+    Just LifecycleFailed {} -> (h, f + 1, s, p)
     _ -> case Map.lookup pid metrics of
       Nothing -> counts
       Just pm -> case pm.state of
-        Idle -> (h + 1, f, s)
+        Idle -> (h + 1, f, s, p)
         Stopped -> counts
-        Failed _ _ -> (h, f + 1, s)
+        Failed _ _ -> (h, f + 1, s, p)
+        Paused info _ lastProgress
+          | info.inFlight > 0 && diffUTCTime now lastProgress > config.stuckThreshold -> (h, f, s + 1, p)
+          | otherwise -> (h, f, s, p + 1)
         Processing _ _ lastProgress ->
           let timeSinceProgress = diffUTCTime now lastProgress
            in if timeSinceProgress > config.stuckThreshold
-                then (h, f, s + 1)
-                else (h + 1, f, s)
+                then (h, f, s + 1, p)
+                else (h + 1, f, s, p)
 
 classifyApplication :: MasterPhase -> LifecycleSnapshot -> ApplicationStatus
 classifyApplication masterPhase lifecycles

@@ -70,6 +70,7 @@ fixtureMetrics =
       ),
       (ProcessorId "failed", fixtureProcessor (Failed "boom" (at 90)) 20),
       (ProcessorId "idle", fixtureProcessor Idle 0),
+      (ProcessorId "paused", fixtureProcessor (Paused (InFlightInfo 1 2) (at 45) (at 44)) 60),
       (ProcessorId "processing", fixtureProcessor (Processing (InFlightInfo 2 4) (at 60) (at 75)) 10),
       (ProcessorId "stopped", fixtureProcessor Stopped 30)
     ]
@@ -131,6 +132,10 @@ registerPrometheusFixtures master = do
   incrementReceived failed
   _ <- beginProcessing failed 1
   finishProcessing failed (Left "fixture failure")
+
+  paused <- registerIdleProcessor master (ProcessorId "paused")
+  _ <- beginProcessing paused 2
+  Metrics.markPaused paused fixedTime
 
   stopped <- registerIdleProcessor master (ProcessorId "stopped")
   replicateM_ 4 $ incrementReceived stopped

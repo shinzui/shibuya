@@ -33,6 +33,17 @@ module Shibuya.Internal.Runner.Master
 
     -- * Processor Management
     registerProcessor,
+    registerProcessorWithPause,
+    ProcessorEntry (..),
+    PauseState (..),
+    ControlOutcome (..),
+    pauseProcessorIO,
+    resumeProcessorIO,
+    isProcessorPausedIO,
+    pauseProcessor,
+    resumeProcessor,
+    isProcessorPaused,
+    drainAndResume,
     unregisterProcessor,
     markMasterRunning,
     markMasterDraining,
@@ -49,13 +60,17 @@ import Control.Concurrent.NQE.Process (Process (..), newMailbox)
 import Control.Concurrent.NQE.Supervisor (Strategy (..), Supervisor)
 import Control.Concurrent.NQE.Supervisor qualified as Supervisor
 import Control.Concurrent.STM
-  ( TVar,
+  ( STM,
+    TVar,
     atomically,
     modifyTVar',
     newTVarIO,
     readTVar,
+    retry,
+    writeTVar,
   )
 import Control.Exception qualified as Exception
+import Control.Monad (forM_, void, when)
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -67,7 +82,9 @@ import Shibuya.Core.Metrics
     ProcessorMetrics,
     sampleMetrics,
   )
+import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (MessageId)
+import Shibuya.Internal.Runner.Pause
 import Shibuya.Prelude
 import UnliftIO (cancel)
 
@@ -91,7 +108,8 @@ data MasterState = MasterState
   deriving (Generic)
 
 data MasterRegistry = MasterRegistry
-  { liveMetrics :: !(Map ProcessorId MetricsHandle),
+  { liveMetrics :: !(Map ProcessorId ProcessorEntry),
+    draining :: !Bool,
     lifecycles :: !LifecycleSnapshot
   }
   deriving (Generic)
@@ -148,7 +166,7 @@ startMaster strategy = liftIO $ Exception.mask_ $ do
   -- to 'acquireOwned', which then owns cleanup; there is no interruptible gap
   -- that needs an extra exception frame here.
   let sup = Process supAsync mailbox
-  registryVar <- newTVarIO $ MasterRegistry Map.empty Map.empty
+  registryVar <- newTVarIO $ MasterRegistry Map.empty False Map.empty
   phaseRef <- newIORef MasterStarting
   let propagate = case strategy of
         KillAll -> True
@@ -160,9 +178,11 @@ startMaster strategy = liftIO $ Exception.mask_ $ do
 -- | Stop the master and all child processors.
 -- Cancels the supervisor, which cancels all children via NQE's stopAll.
 stopMaster :: (IOE :> es) => Master -> Eff es ()
-stopMaster master = liftIO $ do
-  atomicWriteIORef master.state.phaseRef MasterStopped
-  cancel (getProcessAsync master.state.supervisor)
+stopMaster master = do
+  drainAndResume master
+  liftIO $ do
+    atomicWriteIORef master.state.phaseRef MasterStopped
+    cancel (getProcessAsync master.state.supervisor)
 
 -- | Get metrics for all processors.
 getAllMetrics :: (IOE :> es) => Master -> Eff es MetricsMap
@@ -172,7 +192,7 @@ getAllMetrics = liftIO . getAllMetricsIO
 getAllMetricsIO :: Master -> IO MetricsMap
 getAllMetricsIO master = do
   registry <- atomically $ readTVar master.state.registry
-  traverse sampleMetrics registry.liveMetrics
+  traverse (sampleMetrics . (.metrics)) registry.liveMetrics
 
 -- | Get metrics for a specific processor.
 getProcessorMetrics :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe ProcessorMetrics)
@@ -182,7 +202,7 @@ getProcessorMetrics master = liftIO . getProcessorMetricsIO master
 getProcessorMetricsIO :: Master -> ProcessorId -> IO (Maybe ProcessorMetrics)
 getProcessorMetricsIO master pid = do
   registry <- atomically $ readTVar master.state.registry
-  traverse sampleMetrics (Map.lookup pid registry.liveMetrics)
+  traverse (sampleMetrics . (.metrics)) (Map.lookup pid registry.liveMetrics)
 
 -- | Read the master lifecycle phase.
 getMasterPhase :: (IOE :> es) => Master -> Eff es MasterPhase
@@ -203,14 +223,21 @@ getLifecycleSnapshotIO master = (.lifecycles) <$> atomically (readTVar master.st
 -- | Register a processor with the master.
 -- The processor should call this with its metrics handle.
 registerProcessor :: (IOE :> es) => Master -> ProcessorId -> MetricsHandle -> Eff es ()
-registerProcessor master pid metricsHandle =
-  liftIO $
-    atomically $
-      modifyTVar' master.state.registry $ \registry ->
-        registry
-          { liveMetrics = Map.insert pid metricsHandle registry.liveMetrics,
-            lifecycles = Map.insert pid LifecycleRunning registry.lifecycles
-          }
+registerProcessor master pid metricsHandle = registerProcessorWithPause master pid metricsHandle Nothing
+
+-- | Register real intake control; the legacy wrapper has no control capability.
+registerProcessorWithPause :: (IOE :> es) => Master -> ProcessorId -> MetricsHandle -> Maybe PauseHandle -> Eff es ()
+registerProcessorWithPause master pid metricsHandle pauseHandle = liftIO $ atomically $ do
+  registry <- readTVar master.state.registry
+  when registry.draining $ do
+    forM_ pauseHandle $ \h -> void (requestResumeSTM h)
+    Metrics.markResumedSTM metricsHandle
+  writeTVar
+    master.state.registry
+    registry
+      { liveMetrics = Map.insert pid (ProcessorEntry metricsHandle pauseHandle) registry.liveMetrics,
+        lifecycles = Map.insert pid (if registry.draining then LifecycleDraining else LifecycleRunning) registry.lifecycles
+      }
 
 -- | Unregister a processor from the master.
 unregisterProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ()
@@ -270,3 +297,96 @@ markProcessorFailedIO master pid failure messageId =
       registry
         { lifecycles = Map.insert pid (LifecycleFailed failure messageId) registry.lifecycles
         }
+
+-- | Live observation and optional intake control have the same registry owner.
+data ProcessorEntry = ProcessorEntry {metrics :: !MetricsHandle, pause :: !(Maybe PauseHandle)}
+
+data PauseState = IntakeRunning | IntakePaused !UTCTime
+  deriving stock (Eq, Show, Generic)
+
+-- | Outcome and successful intake state captured by the same STM transaction.
+data ControlOutcome
+  = ControlApplied !PauseState
+  | ControlAlreadyInState !PauseState
+  | ControlNotFound
+  | ControlNotControllable
+  | ControlTerminal
+  | ControlDraining
+  deriving stock (Eq, Show, Generic)
+
+controllable :: Master -> ProcessorId -> STM (Either ControlOutcome ProcessorEntry)
+controllable master pid = do
+  registry <- readTVar master.state.registry
+  pure $ case Map.lookup pid registry.lifecycles of
+    Nothing -> Left ControlNotFound
+    Just LifecycleStopped -> Left ControlTerminal
+    Just LifecycleFailed {} -> Left ControlTerminal
+    Just LifecycleDraining -> Left ControlDraining
+    _ | registry.draining -> Left ControlDraining
+    _ -> case Map.lookup pid registry.liveMetrics of
+      Just entry | Just _ <- entry.pause -> Right entry
+      _ -> Left ControlNotControllable
+
+-- | Pause intake atomically with lifecycle validation and visible intent.
+pauseProcessorIO :: Master -> ProcessorId -> IO ControlOutcome
+pauseProcessorIO master pid = do
+  now <- getCurrentTime
+  atomically $
+    controllable master pid >>= \case
+      Left outcome -> pure outcome
+      Right entry -> case entry.pause of
+        Nothing -> pure ControlNotControllable
+        Just handle -> do
+          changed <- requestPauseSTM handle now
+          pausedAt <- readTVar handle.pauseState
+          case pausedAt of
+            Nothing -> retry -- cannot occur in this transaction
+            Just since -> do
+              Metrics.markPausedSTM entry.metrics since
+              pure $ (if changed then ControlApplied else ControlAlreadyInState) (IntakePaused since)
+
+-- | Resume only live non-draining processors; terminal state is retained.
+resumeProcessorIO :: Master -> ProcessorId -> IO ControlOutcome
+resumeProcessorIO master pid =
+  atomically $
+    controllable master pid >>= \case
+      Left outcome -> pure outcome
+      Right entry -> case entry.pause of
+        Nothing -> pure ControlNotControllable
+        Just handle -> do
+          changed <- requestResumeSTM handle
+          Metrics.markResumedSTM entry.metrics
+          pure $ (if changed then ControlApplied else ControlAlreadyInState) IntakeRunning
+
+isProcessorPausedIO :: Master -> ProcessorId -> IO (Maybe Bool)
+isProcessorPausedIO master pid =
+  atomically $
+    controllable master pid >>= \case
+      Left _ -> pure Nothing
+      Right entry -> case entry.pause of
+        Nothing -> pure Nothing
+        Just handle -> Just . maybe False (const True) <$> readTVar handle.pauseState
+
+pauseProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ControlOutcome
+pauseProcessor master = liftIO . pauseProcessorIO master
+
+resumeProcessor :: (IOE :> es) => Master -> ProcessorId -> Eff es ControlOutcome
+resumeProcessor master = liftIO . resumeProcessorIO master
+
+isProcessorPaused :: (IOE :> es) => Master -> ProcessorId -> Eff es (Maybe Bool)
+isProcessorPaused master = liftIO . isProcessorPausedIO master
+
+-- | Shutdown owns admission from this transaction onward. No later control can
+-- close a gate again while adapters are shutting down.
+drainAndResume :: (IOE :> es) => Master -> Eff es ()
+drainAndResume master = liftIO $ atomically $ do
+  registry <- readTVar master.state.registry
+  forM_ (Map.elems registry.liveMetrics) $ \entry -> do
+    forM_ entry.pause $ \handle -> void (requestResumeSTM handle)
+    Metrics.markResumedSTM entry.metrics
+  writeTVar
+    master.state.registry
+    registry
+      { draining = True,
+        lifecycles = Map.map (\case LifecycleRunning -> LifecycleDraining; other -> other) registry.lifecycles
+      }

@@ -15,6 +15,7 @@ import Shibuya.PublicApiSpec qualified
 import Shibuya.Runner.BatchProcessorSpec qualified
 import Shibuya.Runner.BatcherSpec qualified
 import Shibuya.Runner.PartitionOrderingSpec qualified
+import Shibuya.Runner.PauseSpec qualified as Pause
 import Shibuya.Runner.SupervisedSpec qualified
 import Shibuya.RunnerSpec qualified
 import Shibuya.Telemetry.EffectSpec qualified
@@ -24,6 +25,7 @@ import Test.Hspec
 
 main :: IO ()
 main = hspec $ do
+  Pause.spec
   Shibuya.Core.MetricsSpec.spec
   Shibuya.App.BatchSpec.spec
   Shibuya.App.LifecycleSpec.spec

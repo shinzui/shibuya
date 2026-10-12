@@ -103,9 +103,10 @@ import Shibuya.Internal.Runner.Master
     MasterState (..),
     markProcessorFailedIO,
     markProcessorStoppedIO,
-    registerProcessor,
+    registerProcessorWithPause,
     unregisterProcessor,
   )
+import Shibuya.Internal.Runner.Pause (PauseHandle, newPauseHandle)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Prelude
 import Shibuya.Telemetry.Effect
@@ -152,7 +153,8 @@ data SupervisedProcessor = SupervisedProcessor
     -- | Whether processing is complete
     done :: !(TVar Bool),
     -- | The async handle if running under supervision
-    child :: !(Maybe (Async ()))
+    child :: !(Maybe (Async ())),
+    pause :: !(Maybe PauseHandle)
   }
 
 -- | Get current metrics for the processor.
@@ -216,10 +218,11 @@ runSupervisedWith detail master inboxSize procId ordering concurrency adapter ha
 
   -- Initialize state
   metricsHandle <- liftIO $ Metrics.newMetricsHandleWith detail (concurrencyBound concurrency) now
+  pauseHandle <- liftIO newPauseHandle
   doneVar <- liftIO $ newTVarIO False
 
   -- Register with Master
-  registerProcessor master procId metricsHandle
+  registerProcessorWithPause master procId metricsHandle (Just pauseHandle)
 
   -- Add as supervised child using NQE's Supervisor
   -- ConcUnlift Persistent allows the runInIO function to be used in the async child
@@ -230,7 +233,7 @@ runSupervisedWith detail master inboxSize procId ordering concurrency adapter ha
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     let processorAction =
           runInIO $
-            runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler
+            runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering concurrency adapter handler
         unregisterAction = runInIO $ unregisterProcessor master procId
      in addChild master.state.supervisor $
           superviseProcessorLifecycleIO master procId processorAction
@@ -247,6 +250,7 @@ runSupervisedWith detail master inboxSize procId ordering concurrency adapter ha
       { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
+        pause = Just pauseHandle,
         child = Just supervisedChild
       }
 
@@ -271,9 +275,10 @@ runWithMetrics inboxSize procId adapter handler = do
 
   -- Initialize state
   metricsHandle <- liftIO $ newMetricsHandle now
+  pauseHandle <- liftIO newPauseHandle
   doneVar <- liftIO $ newTVarIO False
 
-  runIngesterAndProcessor metricsHandle procId inboxSize Unordered Serial adapter handler
+  runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize Unordered Serial adapter handler
     `finally` liftIO (atomically (writeTVar doneVar True))
 
   pure
@@ -281,6 +286,7 @@ runWithMetrics inboxSize procId adapter handler = do
       { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
+        pause = Just pauseHandle,
         child = Nothing
       }
 
@@ -290,6 +296,7 @@ runWithMetrics inboxSize procId adapter handler = do
 runIngesterAndProcessor ::
   (IOE :> es, Tracing :> es) =>
   MetricsHandle ->
+  PauseHandle ->
   ProcessorId ->
   Natural ->
   OrderingPolicy ->
@@ -297,7 +304,7 @@ runIngesterAndProcessor ::
   Adapter es msg ->
   Handler es msg ->
   Eff es ()
-runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adapter handler = do
+runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering concurrency adapter handler = do
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
@@ -311,7 +318,7 @@ runIngesterAndProcessor metricsHandle procId inboxSize ordering concurrency adap
     -- 'unsafeUnmask' is scoped inside the surrounding withAsync/finally owner;
     -- cancellation therefore reaches adapter code without bypassing cleanup.
     let ingesterWithSignal =
-          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox))
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle pauseHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
@@ -376,15 +383,17 @@ runSupervisedBatchWith detail master inboxSize procId concurrency batchConfig ad
   now <- liftIO getCurrentTime
 
   metricsHandle <- liftIO $ Metrics.newMetricsHandleWith detail (concurrencyBound concurrency) now
+  pauseHandle <- liftIO newPauseHandle
   doneVar <- liftIO $ newTVarIO False
 
-  registerProcessor master procId metricsHandle
+  registerProcessorWithPause master procId metricsHandle (Just pauseHandle)
 
   supervisedChild <- withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
     let processorAction =
           runInIO $
             runIngesterAndProcessorBatch
               metricsHandle
+              pauseHandle
               procId
               inboxSize
               concurrency
@@ -406,6 +415,7 @@ runSupervisedBatchWith detail master inboxSize procId concurrency batchConfig ad
       { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
+        pause = Just pauseHandle,
         child = Just supervisedChild
       }
 
@@ -448,10 +458,12 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
   now <- liftIO getCurrentTime
 
   metricsHandle <- liftIO $ newMetricsHandle now
+  pauseHandle <- liftIO newPauseHandle
   doneVar <- liftIO $ newTVarIO False
 
   runIngesterAndProcessorBatch
     metricsHandle
+    pauseHandle
     procId
     inboxSize
     concurrency
@@ -465,6 +477,7 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
       { metrics = metricsHandle,
         processorId = procId,
         done = doneVar,
+        pause = Just pauseHandle,
         child = Nothing
       }
 
@@ -489,6 +502,7 @@ runWithMetricsBatch inboxSize procId concurrency batchConfig adapter batchHandle
 runIngesterAndProcessorBatch ::
   (IOE :> es, Tracing :> es) =>
   MetricsHandle ->
+  PauseHandle ->
   ProcessorId ->
   Natural ->
   Concurrency ->
@@ -496,7 +510,7 @@ runIngesterAndProcessorBatch ::
   Adapter es msg ->
   BatchHandler es msg ->
   Eff es ()
-runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchConfig adapter batchHandler = do
+runIngesterAndProcessorBatch metricsHandle pauseHandle procId inboxSize concurrency batchConfig adapter batchHandler = do
   inbox <- liftIO $ newBoundedInbox inboxSize
   streamDoneVar <- liftIO $ newTVarIO False
   stopSignal <- liftIO newProcessorSignal
@@ -504,7 +518,7 @@ runIngesterAndProcessorBatch metricsHandle procId inboxSize concurrency batchCon
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
-          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle adapter.source inbox))
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle pauseHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do

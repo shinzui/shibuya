@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-10-12
+* **Update**: CAP-9 records public source-admission pause/resume, lifecycle outcomes and shutdown behavior
 * **Update**: Record optional progress HTTP and WebSocket evidence
 * **Update**: Record bounded acknowledged cursor progress and runner evidence
 

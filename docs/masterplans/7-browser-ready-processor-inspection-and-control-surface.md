@@ -163,8 +163,8 @@ binds this repository, and children cite only ADR-0007 for the contract.
 | 48 | Align the metrics WebSocket protocol with bounded delivery and in-band errors | [EP-48](../plans/48-align-the-metrics-websocket-protocol-with-bounded-delivery-and-in-band-errors.md) | None | EP-47 gates only the IR-5 closure milestone | Complete |
 | 49 | Expose per-processor latency distribution and oldest in-flight detail | [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md) | None | None | Complete |
 | 50 | Expose acknowledged cursor progress per processor and partition | [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md) | EP-49 | None | Complete |
-| 51 | Implement source-level processor pause and resume | [EP-51](../plans/51-implement-source-level-processor-pause-and-resume.md) | None | None | Not Started |
-| 52 | Expose gated pause and resume control endpoints | [EP-52](../plans/52-expose-gated-pause-and-resume-control-endpoints.md) | EP-47, EP-51 | EP-48/EP-49/EP-50 gate final integrated acceptance only | Not Started |
+| 51 | Implement source-level processor pause and resume | [EP-51](../plans/51-implement-source-level-processor-pause-and-resume.md) | None | None | Complete |
+| 52 | Expose gated pause and resume control endpoints | [EP-52](../plans/52-expose-gated-pause-and-resume-control-endpoints.md) | EP-47, EP-51 | EP-48/EP-49/EP-50 gate final integrated acceptance only | In Progress |
 
 Row numbers are the child plans' own sequence numbers under `docs/plans/`, so EP-47 is
 `docs/plans/47-...`. Wave A is EP-47, EP-49, and EP-51. Wave B is EP-48, EP-50, and EP-52.
@@ -378,9 +378,9 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-12) EP-50 M1: Record acknowledged cursors in a per-processor slot and a bounded partition table, and measure.
 - [x] (2026-10-12) EP-50 M2: Expose progress in JSON and WebSocket frames, absent when no cursor exists.
 - [x] (2026-10-12) EP-50 M3: Documentation, ADR extension, changelog, and IR-3 closure.
-- [ ] EP-51 M1: Pause handle, ingester gate, `Paused` state, registry control entries, and the design's deterministic tests.
-- [ ] EP-51 M2: Public application API, metrics-package updates for the new state, and resume-before-shutdown.
-- [ ] EP-51 M3: Performance evidence for the gate, documentation, ADR, and changelog.
+- [x] (2026-10-12) EP-51 M1: Pause handle, ingester gate, `Paused` state, registry control entries, and the design's deterministic tests.
+- [x] (2026-10-12) EP-51 M2: Public application API, metrics-package updates for the new state, and resume-before-shutdown.
+- [x] (2026-10-12) EP-51 M3: Performance evidence for the gate, documentation, ADR, and changelog.
 - [ ] EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
 - [ ] EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
 - [ ] EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
@@ -548,9 +548,9 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-EP-47 through EP-50 are Complete (four of six children). Configurable browser access and
+EP-47 through EP-51 are Complete (five of six children). Configurable browser access and
 bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
-IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-51 is next in registry order, and EP-52 awaits EP-51; IR-3 and IR-4 remain open under their owning children.
+IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52 is next and all hard dependencies are satisfied; IR-3 and IR-4 remain open under their owning children.
 
 The EP-48 historical controlled observer evidence is retained. The bounded remote quick comparison now owns implementation performance validation; it does not certify a release. This MasterPlan remains In Progress.
 

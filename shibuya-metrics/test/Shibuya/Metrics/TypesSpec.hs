@@ -4,8 +4,8 @@ import Data.Aeson (FromJSON, ToJSON, Value, eitherDecode, encode, object, toJSON
 import Data.Aeson.Types (parseEither)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
-import Shibuya.Core.Metrics (ProcessorId (..))
-import Shibuya.Metrics.TestSupport (fixtureMetrics)
+import Shibuya.Core.Metrics (InFlightInfo (..), ProcessorId (..), ProcessorState (..))
+import Shibuya.Metrics.TestSupport (fixedTime, fixtureMetrics)
 import Shibuya.Metrics.Types
   ( ClientMessage (..),
     ProcessorTerminalStatus (..),
@@ -15,6 +15,7 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 spec :: Spec
 spec = do
+  describe "paused state JSON" $ messageCase (Paused (InFlightInfo 1 2) fixedTime fixedTime) (object ["status" .= ("paused" :: String), "inFlight" .= (1 :: Int), "maxConcurrency" .= (2 :: Int), "pausedAt" .= fixedTime, "lastProgress" .= fixedTime])
   describe "ClientMessage JSON contract" $ do
     messageCase SubscribeAll $ object ["type" .= ("subscribe_all" :: String)]
     messageCase (Subscribe [ProcessorId "alpha"]) $

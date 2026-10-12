@@ -70,12 +70,14 @@ without the functions this plan adds. The parent initiative is
 ## Progress
 
 
-- [ ] Milestone 1: Add `Shibuya.Internal.Runner.Pause`, gate the ingester before each pull, add the `Paused` state and its sampling rule, add pause handles to the master registry with `ControlOutcome`, and land the deterministic core tests (the six from the design plus the live-adapter, halt, failure, batch, terminal, and unknown-id cases).
-- [ ] Milestone 2: Export `pauseProcessor`, `resumeProcessor`, and `isProcessorPaused` from `Shibuya.App` and `Shibuya`, resume every paused processor before adapter shutdown in `stopAppGracefully`, update Health and Prometheus for the new state, update the golden fixtures deliberately, and add round-trip and public-API tests.
-- [ ] Milestone 3: Record the integrated remote quick-comparison ownership under EP-52, then write the documentation, the ADR, and the three changelog entries.
+- [x] (2026-10-12) Milestone 1: Add `Shibuya.Internal.Runner.Pause`, gate the ingester before each pull, add the `Paused` state and its sampling rule, add pause handles to the master registry with `ControlOutcome`, and land the deterministic core tests (the six from the design plus the live-adapter, halt, failure, batch, terminal, and unknown-id cases).
+- [x] (2026-10-12) Milestone 2: Export `pauseProcessor`, `resumeProcessor`, and `isProcessorPaused` from `Shibuya.App` and `Shibuya`, resume every paused processor before adapter shutdown in `stopAppGracefully`, update Health and Prometheus for the new state, update the golden fixtures deliberately, and add round-trip and public-API tests.
+- [x] (2026-10-12) Milestone 3: Record the integrated remote quick-comparison ownership under EP-52, then write the documentation, the ADR, and the three changelog entries.
 
 
 ## Surprises & Discoveries
+
+2026-10-12: In an isolated worktree the historical mapM-after-pull mutation fails `requests nothing further when paused before source admission`: expected Nothing, got Just (), seed 2080769168, one example/one failure. The unmodified core and metrics suites pass. JSON and Prometheus goldens first fail on paused additions (seed 1369957205), then pass after deliberate updates. The Streamly producer state machine confirms first-stream Yield precedes stepping the source. Ingester is exposed as an explicitly internal module for the source-admission test.
 
 
 2026-10-10 review: Pause is admission intent, not synchronous source quiescence. State,
@@ -94,6 +96,8 @@ and Orientation for the excerpt.
 
 
 ## Decision Log
+
+Decision (2026-10-12): Add a registry-wide draining bit alongside per-processor lifecycles, keeping registration/control and shutdown admission coherent in one transaction. Forced stop also clears pause before cancellation. Golden changes add only the paused fixture, health count, state value 5 and HELP text; existing series are retained.
 
 Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
@@ -149,7 +153,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Public intake pause/resume is implemented and tested for message and batch runners. Atomic control captures original timestamps and lifecycle outcomes; graceful and forced stop take admission ownership before adapter shutdown/cancellation. Paused state reaches JSON, WebSocket, Prometheus and health without hiding stuck handlers. Core (260 examples) and metrics (96 examples), including both GC suites, pass. The old after-pull gate fails the isolated negative control. Performance diagnostics belong to EP-52’s bounded remote quick comparison, with release certification separate.
 
 
 ## Context and Orientation

@@ -1,3 +1,5 @@
+Implementation note (2026-10-12): [EP-51](51-implement-source-level-processor-pause-and-resume.md) implements intake admission pause with a wait-before-pull gate, transactional lifecycle/control and drain-before-adapter-shutdown semantics. The historical mapM-after-pull proposal below is superseded.
+
 ---
 slug: PROCESSOR_PAUSE_DESIGN
 title: "Processor Pause/Resume Design"

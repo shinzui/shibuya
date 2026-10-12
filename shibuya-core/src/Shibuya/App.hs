@@ -15,6 +15,11 @@ module Shibuya.App
     stopApp,
     stopAppGracefully,
     waitApp,
+    pauseProcessor,
+    resumeProcessor,
+    isProcessorPaused,
+    ControlOutcome (..),
+    PauseState (..),
 
     -- * Shutdown Configuration
     ShutdownConfig (..),
@@ -83,17 +88,20 @@ import Shibuya.Internal.App
     mkProcessor,
   )
 import Shibuya.Internal.Runner.Master
-  ( Master,
+  ( ControlOutcome (..),
+    Master,
+    PauseState (..),
+    drainAndResume,
     getAllMetrics,
     getAllMetricsIO,
     getProcessorMetrics,
     getProcessorMetricsIO,
     markMasterDraining,
     markMasterRunning,
-    markProcessorDraining,
     startMaster,
     stopMaster,
   )
+import Shibuya.Internal.Runner.Master qualified as Master
 import Shibuya.Internal.Runner.Supervised
   ( SupervisedProcessor (..),
     runSupervisedBatchWith,
@@ -388,8 +396,7 @@ stopAppGracefully config appHandle =
 
     shutdownAndDrain = do
       markMasterDraining appHandle.master
-      forM_ (Map.keys appHandle.processors) $
-        markProcessorDraining appHandle.master
+      drainAndResume appHandle.master
 
       -- Catch only synchronous adapter failures. External cancellation and the
       -- total timeout must abort this phase so the master is force-stopped.
@@ -439,3 +446,15 @@ waitApp appHandle = liftIO $ atomically $ do
   -- Block until all done TVars are True
   forM_ (Map.elems appHandle.processors) $ \(sp, _) ->
     readTVar sp.done >>= check
+
+-- | Pause source admissions; already admitted polls and inbox work may drain.
+pauseProcessor :: (IOE :> es) => AppHandle es -> ProcessorId -> Eff es ControlOutcome
+pauseProcessor app = Master.pauseProcessor app.master
+
+-- | Resume intake. Successful state is captured by the control transaction.
+resumeProcessor :: (IOE :> es) => AppHandle es -> ProcessorId -> Eff es ControlOutcome
+resumeProcessor app = Master.resumeProcessor app.master
+
+-- | Nothing for unknown, terminal, draining or uncontrollable processors.
+isProcessorPaused :: (IOE :> es) => AppHandle es -> ProcessorId -> Eff es (Maybe Bool)
+isProcessorPaused app = Master.isProcessorPaused app.master

@@ -305,3 +305,5 @@ activity.
 - Ingester completes when stream exhausts
 - Processor drains remaining messages then exits
 - `waitApp` returns when all processors done
+
+The ingester checks processor pause intent before each source admission. Already admitted polls and adapter prefetch may still drain.

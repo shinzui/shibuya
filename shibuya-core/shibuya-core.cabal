@@ -39,8 +39,10 @@ library
     Shibuya.Internal.Runner.BatchProcessor
     Shibuya.Internal.Runner.Batcher
     Shibuya.Internal.Runner.Finalize
+    Shibuya.Internal.Runner.Ingester
     Shibuya.Internal.Runner.KeyedScheduler
     Shibuya.Internal.Runner.Master
+    Shibuya.Internal.Runner.Pause
     Shibuya.Internal.Runner.Supervised
     Shibuya.Policy
     Shibuya.Stream
@@ -51,7 +53,6 @@ library
 
   other-modules:
     Shibuya.Internal.Runner.Halt
-    Shibuya.Internal.Runner.Ingester
     Shibuya.Prelude
 
   default-extensions:
@@ -128,6 +129,7 @@ test-suite shibuya-core-test
     Shibuya.Runner.BatchProcessorSpec
     Shibuya.Runner.BatcherSpec
     Shibuya.Runner.PartitionOrderingSpec
+    Shibuya.Runner.PauseSpec
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec
     Shibuya.Telemetry.EffectSpec
