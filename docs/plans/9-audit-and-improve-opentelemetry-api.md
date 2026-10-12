@@ -5,1424 +5,632 @@ title: "Audit and improve Shibuya's OpenTelemetry API for adapters"
 kind: exec-plan
 created_at: 2026-05-05T22:19:16Z
 intention: "intention_01kh0akd82ekat0be54p2f72kv"
+provenance:
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-12T23:33:00Z
+      mode: "update"
+      note: "Consolidate audit findings into plan 9 and reconcile implemented, superseded, and remaining work against current core and adapter sources."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-10-12T23:33:00Z
+      verdict: "comments"
+      note: "Verified F1-F8 against three source trees; dead config resolved, F6/F7 compatibility decisions and F8 implementation remain, and enabled DLQ identity proof is missing."
 ---
-
 
 # Audit and improve Shibuya's OpenTelemetry API for adapters
 
-This ExecPlan is a living document. The sections Progress, Surprises &
-Discoveries, Decision Log, and Outcomes & Retrospective must be kept up to
-date as work proceeds.
 
-This document is maintained in accordance with `.claude/skills/exec-plan/PLANS.md`.
+This living ExecPlan follows `agents/skills/exec-plan/PLANS.md`. It contains the
+original eight audit findings, their implementation evidence, and the remaining
+work. The former companion findings document has been consolidated here so that
+there is one plan with ID 9. Historical evidence is explicitly dated; it is not a
+claim that the current checkout passed the same gates.
 
 
 ## Purpose / Big Picture
 
-Shibuya is a Haskell supervised queue-processing framework (see
-`/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya/CLAUDE.md`). It already
-ships an OpenTelemetry (OTel) tracing surface in `shibuya-core` (modules
-under `Shibuya.Telemetry.*`) and is consumed by two real adapters that live
-in sibling repositories:
 
--   `shibuya-pgmq-adapter` at
-    `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter`,
-    which talks to PostgreSQL's `pgmq` queue extension.
--   `shibuya-kafka-adapter` at
-    `/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter`,
-    which talks to Apache Kafka via `kafka-effectful` /
-    `hw-kafka-client`.
+Shibuya processes queued messages under supervision. OpenTelemetry (OTel) records
+named, timed operations called spans; spans share a trace ID and identify their
+parent so an operator can follow a message from producer through consumer and
+onward to a dead-letter queue (DLQ), which stores messages a handler cannot process.
 
-The point of this work is to step back and ask, after the dust has settled
-on the two recent attribute-conventions alignment plans
-(`docs/plans/2-align-opentelemetry-semantic-conventions.md` here, and
-`shibuya-kafka-adapter/docs/plans/10-align-kafka-adapter-otel-semantic-conventions.md`
-in the sibling repo), three questions:
+This audit covers four boundaries: the public `Tracing` effect (A), ownership and
+attributes of per-message spans (B), incoming parent-context propagation (C), and
+outgoing producer/DLQ propagation (D). The aim is one framework-owned Consumer span
+per individually processed message, enriched by the adapter, with usable parent
+links and predictable disabled-tracing behavior. Batch tracing is not assessed by
+this audit's per-message acceptance tests.
 
-1.  **Is the public OpenTelemetry API in `shibuya-core` good?** That is:
-    is it clear, minimal, hard to misuse, and predictable in cost when
-    enabled or disabled?
-2.  **Is it easy for an adapter author to integrate OpenTelemetry**,
-    specifically in the two ways an adapter ever touches tracing — the
-    consume side (extracting parent context from queue-native headers,
-    enriching the framework's per-message span with broker-specific
-    attributes) and the produce side (injecting the current trace
-    context into queue-native headers when the adapter sends to a
-    DLQ/retry queue)?
-3.  **What concrete improvements should land** to remove the worst
-    rough edges that the audit surfaces, in priority order?
-
-The audit is not a code-change plan in itself. Milestone 1 produces an
-audit document — checked into `docs/plans/9-audit-and-improve-opentelemetry-api.md`'s
-own Outcomes & Retrospective and Surprises sections, plus a short
-companion file `docs/plans/9-otel-audit-findings.md` that we will
-generate during M1 — that names every wart, with file:line evidence,
-and ranks them. Milestones 2..N then implement the highest-priority
-fixes one by one.
-
-After this work, a reader of the plan and the codebase will be able to:
-
--   Read `docs/plans/9-otel-audit-findings.md` and see, for each
-    identified API problem and each adapter integration friction, a
-    file:line citation and a one-paragraph fix proposal.
--   Run `cabal build all` in `shibuya-core`, in
-    `shibuya-pgmq-adapter`, and in `shibuya-kafka-adapter` and observe
-    no regression.
--   Run `cabal test shibuya-core-test`, `cabal test
-    shibuya-pgmq-adapter-test` (the integration-tagged subset that
-    does not require a real PostgreSQL), and `cabal test
-    shibuya-kafka-adapter-test:unit` (the broker-free portion) and
-    see all green, including any new tests added by the
-    improvement milestones.
--   For each improvement landed, see a Jaeger trace (or an in-memory
-    span exporter test) demonstrating the change in observable
-    behaviour: span name, kind, attribute set, parenting.
-
-Concretely this means that, by the end of any improvement milestone
-that touches the consumer hot path, an adapter author can integrate
-OpenTelemetry tracing for a new adapter in **one** place — by
-populating `Envelope.traceContext` from queue-native headers in
-`Convert.hs` — and not need a second adapter-side `traced` wrapper at
-all, unless they want to add broker-specific attributes that the
-framework does not know about. Today, by contrast, the Kafka adapter
-ships a 100-line `Shibuya.Adapter.Kafka.Tracing` module specifically
-to bolt Kafka-typed attributes onto the consumer span, the pgmq
-adapter does not have an equivalent at all, and an unwary caller who
-combines `traced` with `runApp` ends up with two nested
-Consumer-kind "process" spans per message (see Surprise S2 below).
+The 2026-10-12 review confirms F1/F2/F3/F5 implementations. F4's dead configuration
+was removed by a later API cleanup; the proposed convenience helper was never
+implemented. F6 and F8 remain open. F7's allocation was improved, but its disabled
+callback still receives a span with zero IDs. The most consequential outstanding
+validation is a tracing-enabled PostgreSQL DLQ test. This update changes documents,
+not runtime code.
 
 
 ## Progress
 
-Use a checklist to summarize granular steps. Every stopping point must be
-documented here, even if it requires splitting a partially completed task
-into two ("done" vs. "remaining"). This section must always reflect the
-actual current state of the work.
 
--   [x] M1.1 — Audit `shibuya-core/src/Shibuya/Telemetry/*` against
-    the goals stated in `docs/plans/OPENTELEMETRY_INTEGRATION.md`. Read
-    every public export, classify it as load-bearing or vestigial,
-    and record findings in the new file
-    `docs/plans/9-otel-audit-findings.md`. Done 2026-05-05.
--   [x] M1.2 — Audit the consumer-side telemetry path in
-    `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs` and
-    `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs`.
-    Specifically: how `traceparent`/`tracestate` round-trips into
-    `Envelope.traceContext`; how the DLQ path
-    (`mkAckHandle`, `AckDeadLetter` branch) preserves or fails to
-    preserve trace context; whether per-poll errors are traceable.
-    Done 2026-05-05; landed as Finding F3 (DLQ writes forward the
-    original producer's `traceparent` and never inject the failing
-    consumer's).
--   [x] M1.3 — Audit the consumer-side telemetry path in
-    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs`,
-    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs`,
-    and the opt-in `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs`.
-    Specifically: whether the `traced` stream transformer and the
-    framework-owned `processOne` span overlap (Surprise S2 below),
-    whether broker-specific typed attributes
-    (`messaging.kafka.destination.partition`,
-    `messaging.kafka.message.offset`) belong on the framework span
-    instead of on a separate adapter-owned span, and whether the
-    asymmetry with pgmq (no equivalent module exists there) is
-    deliberate. Done 2026-05-05; landed as Findings F1 and F2 (with
-    a refinement: the two spans are siblings under the same parent,
-    not nested, because `withExtractedContext` replaces the active
-    context).
--   [x] M1.4 — Cross-reference the audit findings against the
-    superseded plans
-    (`docs/plans/OPENTELEMETRY_INTEGRATION.md`,
-    `docs/plans/PGMQ_OPENTELEMETRY_INSTRUMENTATION.md`,
-    `shibuya-kafka-adapter/docs/plans/8-investigate-hw-kafka-client-instrumentation.md`,
-    `shibuya-kafka-adapter/docs/plans/9-add-shibuya-kafka-tracing-module.md`)
-    so that no finding "rediscovers" a deliberate prior decision
-    without saying so. Done 2026-05-05; every Finding cites the
-    relevant prior plan in its "Prior decisions" line.
--   [x] M1.5 — Write `docs/plans/9-otel-audit-findings.md` with a
-    triaged findings table, each finding tagged P0/P1/P2 with a
-    one-paragraph proposed fix, and commit it. Done 2026-05-05.
--   [/] M2 — Implement the P0 fix(es) named by the audit, with tests
-    and a Jaeger demo. Each P0 lands as its own commit with the
-    `ExecPlan:` and `Intention:` trailers. Update Surprises and
-    Decision Log when implementation reveals a fact the audit missed.
-    -   [x] M2.1 — `shibuya-core` 0.5.0.0: add
-        `Envelope.attributes :: HashMap Text Attribute`, have
-        `processOne` merge envelope-supplied attrs over framework
-        defaults (left-biased union — adapter wins), update tests,
-        bump versions, update CHANGELOGs. Done 2026-05-05; the new
-        `SemanticSpec` case "applies envelope.attributes onto the
-        framework span (P0 fix, plan 9 F1/F2)" passes; the original
-        case "emits a process span with conventions-aligned
-        attributes and events" still passes.
-    -   [x] M2.2 — `shibuya-pgmq-adapter`: bumped to
-        `shibuya-core ^>=0.5`, populate `Envelope.attributes`
-        (empty HashMap for pgmq today; future hook), tests +
-        version bumped. Landed in shibuya-pgmq-adapter commit
-        `274c0eb`. Decision Log entry on 2026-05-05 relaxed the
-        "no path-based pins" rule to allow gitignored
-        `cabal.project.local` for development.
-    -   [x] M2.3 — `shibuya-kafka-adapter`: bumped to
-        `shibuya-core ^>=0.5`, populate `Envelope.attributes` from
-        the Kafka `ConsumerRecord` (system + typed
-        `messaging.kafka.*`), `Shibuya.Adapter.Kafka.Tracing`
-        deleted, OtelDemo migrated to `runWithMetrics`, version
-        bumped. Landed in shibuya-kafka-adapter commit `0440544`.
--   [x] M3.1 — F3 (P1) DLQ trace propagation: added
-    `currentTraceHeaders` in shibuya-core (commit `193de1d`) and
-    consumed it in pgmq's `mkAckHandle (AckDeadLetter _)` branch
-    (shibuya-pgmq-adapter commit `274c0eb`). Five new
-    `mergeDlqHeaders` spec cases pass.
--   [ ] M3.2..M3.4 — F4 (`runAppTraced` bracket), F6
-    (`runTracingNoop` allocation), F7 (`withSpan'` dummy span), F8
-    (ingester poll-loop visibility) deferred to a follow-up plan.
-    See "Gaps" in Outcomes for rationale.
--   [x] M4 — Refresh `docs/plans/OPENTELEMETRY_INTEGRATION.md` to
-    reflect the audited and updated state of the API (added a
-    "Current State (2026-05-05)" section and inline `[SUPERSEDED]`
-    banners; populated the Phase 1/2/3 deliverable checklists with
-    shipped vs. open status). Ran `nix fmt`, `nix flake check`,
-    and the unit-tagged `cabal test` matrix in all three repos —
-    all green (see "Acceptance gates" in Outcomes). Outcomes &
-    Retrospective filled. Done 2026-05-05.
+- [x] (2026-05-05) M1 — Audited the framework and both adapters; recorded F1–F8 and mapped the original S1–S7 hypotheses. Audit commit `8234f1a`.
+- [x] (2026-05-05; source rechecked 2026-10-12) M2.1 — F1/F2 core fix: strict `Envelope.attributes :: HashMap Text Attribute`, explicit adapter-over-default merge, and a one-span in-memory regression test. Commit `7c6586b`.
+- [x] (2026-05-05; source rechecked 2026-10-12) M2.2 — PGMQ migration adds the empty attribute map. `mori://shinzui/shibuya-pgmq-adapter` commit `274c0eb` (commit artifact URI pending).
+- [x] (2026-05-05; source rechecked 2026-10-12) M2.3 — Kafka contributes typed attributes during conversion; duplicate tracing wrapper and its test removed. `mori://shinzui/shibuya-kafka-adapter` commit `0440544` (commit artifact URI pending). Its current OTel demo uses `runApp`.
+- [x] (2026-05-05; source rechecked 2026-10-12) M3.1 — F3/F5: core `currentTraceHeaders` (`193de1d`) and PGMQ DLQ header merge (`mori://shinzui/shibuya-pgmq-adapter`, commit `274c0eb`; commit artifact URI pending).
+- [x] (2026-05-05, historical evidence) M4 — Refreshed the then-current integration document (`d5024b1`) and recorded build/test/Jaeger results below. This does not close deferred findings or prove a tracing-enabled DLQ round trip.
+- [x] (2026-07-02; verified 2026-10-12) F4 dead-config remedy — Plan 25 removed `TracingConfig` and corrected the umbrella-module example (`a96ad52`). Caller-managed tracing remains the supported contract.
+- [x] (2026-07-02; verified 2026-10-12) F7 allocation improvement — Plan 26 hoisted the disabled span into a shared constant (`8e55ab4`); zero-ID callback semantics remain.
+- [x] (2026-10-12) Reviewed both former documents against all three working trees; consolidated findings into this plan, corrected current paths/interfaces, and updated inbound references.
+- [ ] M3.1 validation remainder — Add an enabled-tracing PostgreSQL test proving the DLQ header identifies the failing consumer span, including direct-queue and topic-route delivery. Preserve the existing disabled-tracing test.
+- [ ] F6 — Resolve provider allocation on every `runTracingNoop` invocation while accounting for the public `getTracer` contract; this is startup overhead, not the per-message allocation fixed by plan 26.
+- [ ] F7 — Decide and implement an explicit disabled-span API contract, or formally accept/document the invalid-ID sentinel. The proposed `Maybe Span` callback has not landed.
+- [ ] F8 — Add and verify ingester-lifetime and adapter-shutdown trace coverage while preserving cancellation, timeout, and failure behavior.
+- [ ] Documentation follow-up — Correct the OTel 1.0 provider-shutdown example in `docs/user/opentelemetry.md`; then record updated acceptance for any remaining implementation work. A managed tracing helper is optional, not a prerequisite for closing the removed dead-config defect.
 
 
 ## Surprises & Discoveries
 
-Document unexpected behaviours, bugs, optimizations, or insights discovered
-during implementation. Provide concise evidence.
 
-The list below is the **pre-implementation** set of suspicions that
-prompted this plan. They are recorded here so M1 has a target to
-verify or refute. Each entry calls out a file path the audit must
-revisit; if the suspicion does not survive close inspection, M1 must
-say so explicitly and update the entry.
+### Original hypotheses and their disposition
 
-### S1 — `runTracingNoop` allocates a real `TracerProvider` on every call
 
-Evidence: `shibuya-core/src/Shibuya/Telemetry/Effect.hs:104-116`. The
-"noop" runner creates a fresh `TracerProvider` with no processors and
-makes a `Tracer` from it on every call. Every guarded operation
-(`withSpan`, `addAttribute`, etc.) then has the same `tracingEnabled`
-flag check anyway. This is harmless for a single `runApp` boot but
-suggests the `Bool` flag is the real shutoff and the `Tracer`
-allocation is wasted work.
+S1 (no-op provider allocation) became F6. S2 (duplicate Consumer spans) became F1,
+with an important correction: the old Kafka wrapper reattached the original parent
+context, so the spans were siblings, not nested. S3 (attributes split across spans)
+became F2. S4 (no symmetric PGMQ `traced` module) was refuted as a separate defect:
+adapters need to contribute context and attributes, not open a second process span.
+The DLQ concern within S4 became F3. S5 (dead config/provider wiring) became F4.
+S6 (dummy span IDs) became F7. S7 (no convenient active-span injection helper) became
+F3/F5. F8 was identified while reading the ingester and shutdown paths.
 
-### S2 — `Shibuya.Adapter.Kafka.Tracing.traced` and `processOne` open *two* nested Consumer spans per message when used together
+### Implementation discoveries retained from 2026-05-05
 
-Evidence:
-`shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs:90-101`
-wraps the `Ingested.ack.finalize` with a `withSpan' (processSpanName
-topicName) consumerSpanArgs $ \\sp -> ... finalize decision`.
-`shibuya-core/src/Shibuya/Runner/Supervised.hs:374-452` (the
-`processOne` body) already opens `withSpan' (processSpanName pidText)
-consumerSpanArgs $ \\traceSpan -> ... ingested.ack.finalize decision
-...`. Inside `runApp`, both fire: the outer span from `processOne`
-brackets the handler call AND the call to `finalize`, and the inner
-span from `traced` brackets just the call to `finalize`. Both use
-`SpanKind=Consumer`. Both follow the `<destination> <operation>`
-naming pattern. This is double-counting.
 
-The Kafka adapter's
-`shibuya-kafka-adapter-jitsurei/app/OtelDemo.hs` does **not** use
-`runApp`; it drives the stream by hand and calls `finalize AckOk`
-inline, so the demo only sees a single span, which is why the
-double-span condition has not been observed in the existing Jaeger
-verification. M1.3 must verify this with a runApp-style test.
+Adding OTel `Attribute` values prevented deriving `NFData` for `Envelope`. The
+manual instance in `shibuya-core/src/Shibuya/Core/Types.hs:162` forces the other
+fields deeply and the attribute map only to weak head normal form (the outer
+constructor). The old plan overstated this as equivalent to deeply forcing every
+attribute; it is not a general guarantee, particularly for collection values.
 
-### S3 — Adapter-specific typed attributes are scattered across the wrong span
+Sequentially adding framework defaults and adapter attributes originally failed
+the override test. The implementation assembles a single map using left-biased
+`HashMap.union envelope.attributes frameworkAttrs`, then calls `addAttributes`
+once. This makes precedence explicit without depending on the SDK's repeated-write
+behavior. The original root cause was not established, so it remains a historical
+observation, not an assertion about current SDK merge semantics.
 
-Evidence: the per-message processing span is opened in
-`Shibuya/Runner/Supervised.hs:374`, and is the canonical
-"this-is-a-process-operation" span for the framework. However
-`messaging.kafka.destination.partition` and
-`messaging.kafka.message.offset` are only set by
-`Shibuya/Adapter/Kafka/Tracing.hs`'s `populateAttrs` on the **inner**
-span. So a user who turns on tracing without importing the adapter's
-`traced` (which is the path described in
-`docs/plans/OPENTELEMETRY_INTEGRATION.md`'s Quick Start) sees the
-processOne span without those Kafka attributes. Conversely, a user
-who imports `traced` sees them only on the inner span, not on the
-processOne span.
+The initial prohibition on all local dependency overrides was relaxed during the
+adapter migrations: gitignored development overrides were allowed, while release
+verification used published packages. Do not repeat the obsolete instruction to
+wait for the original 0.5.0.0 publication before inspecting these fixes.
 
-The clean separation would be: the framework owns the span, the
-adapter contributes attributes to it. There is no API for the
-adapter to do that today — `Envelope` carries `traceContext` only,
-not adapter-specific span attributes.
+### Review discoveries on 2026-10-12
 
-### S4 — The pgmq adapter has no symmetric `traced` module
 
-Evidence: `find shibuya-pgmq-adapter -name "Tracing.hs"` returns
-nothing; `grep -n 'Tracing\|withSpan' shibuya-pgmq-adapter/...src/.../*.hs`
-returns nothing. The pgmq adapter relies on
-(i) `Convert.extractTraceHeaders` to populate
-`Envelope.traceContext` and (ii) the framework's `processOne` span
-to carry messaging.* attributes, which it does correctly. So pgmq
-emits a single Consumer span per message, with no Kafka-specific
-typed attributes — there is no `messaging.pgmq.*` set, and there are
-no spec-defined PGMQ keys upstream.
+The findings table still said F3/F5 were open and adapter migration awaited
+publication, despite the main plan recording completed commits. Both code paths
+remain present. Later work moved runners to `Shibuya.Internal.Runner.*`, changed
+`runApp` to take `AppConfig`, removed `Shibuya.Telemetry.Config`, and upgraded OTel.
+The old instructions referenced deleted source modules and obsolete signatures.
 
-This asymmetry is **probably correct** (PGMQ just doesn't have
-broker-specific attribute conventions the way Kafka does), but
-`docs/plans/PGMQ_OPENTELEMETRY_INSTRUMENTATION.md` does mention DLQ
-trace preservation and producer-side `sendMessageTraced`. M1.2 must
-check whether DLQ writes from the consumer hot path retain the
-**consumer's** trace context (so the next consumer of the DLQ sees a
-linked trace), or whether they only forward the **original
-producer's** headers (in which case the consumer's DLQ-write step is
-invisible).
+F4's proposed bracket returned an `AppHandle` immediately after `runApp`. Since
+`runApp` starts asynchronous processors and returns immediately, a provider bracket
+around that call alone would shut tracing down while the application was still
+running. Any future convenience helper must scope the entire application lifetime,
+including waiting, stopping, and exceptional cleanup. It must not revive the removed
+configuration type without revisiting plan 25's explicit decision.
 
-### S5 — `runApp` does not bracket tracing initialization
+F6's original proposal also missed `getTracer`: it is public, returns a concrete
+`Tracer`, and is exercised in `EffectSpec`. Replacing the stored tracer with
+`Nothing` requires a deliberate compatibility design. F7's zero IDs are invalid
+trace-context sentinels; they are not valid W3C IDs. `PropagationSpec` explicitly
+tests rejection of zero trace/span IDs.
 
-Evidence: `shibuya-core/src/Shibuya/App.hs:159-167`. `runApp`
-requires `(IOE :> es, Tracing :> es)` but does not initialize a
-`TracerProvider` itself; the caller must wrap with
-`runTracing tracer` or `runTracingNoop`. This is a fine library
-choice (no opinion on exporters) but means every example wires
-tracing by hand. The `TracingConfig` type defined in
-`Shibuya/Telemetry/Config.hs:16-23` is unused: `runApp` never reads
-it. The plan
-`docs/plans/OPENTELEMETRY_INTEGRATION.md:300-334` proposed a
-`withTracing :: TracingConfig -> (Tracer -> IO a) -> IO a` bracket;
-that helper does not exist in the source tree.
+The existing PGMQ database test called “preserves trace headers when moving to DLQ”
+runs under `runTracingNoop`. It proves original-header preservation only. The core
+`currentTraceHeaders` active-span test checks header presence but does not compare
+the encoded span ID with an exported span. Neither replaces the missing runtime
+consumer-to-DLQ identity assertion.
 
-### S6 — `withSpan'` synthesises a "dummy" span when tracing is disabled
-
-Evidence:
-`shibuya-core/src/Shibuya/Telemetry/Effect.hs:163-166` and
-`shibuya-core/src/Shibuya/Telemetry/Effect.hs:294-312`. When
-`tracingEnabled = False`, `withSpan'` constructs a `FrozenSpan` with
-all-zero `traceId`/`spanId` and hands it to the user callback. The
-user's `addAttribute span k v` calls then check the same `Bool` flag
-and short-circuit, so this is functionally fine, but the user is
-holding a span handle whose IDs are misleading if they ever inspect
-it (e.g., for logging). A truer `Maybe Span` would force the user to
-handle the disabled case explicitly.
-
-### S7 — There is no in-tree producer-side helper, by design
-
-Evidence: `grep -rn injectTraceContext shibuya-core/src` shows the
-function defined at
-`shibuya-core/src/Shibuya/Telemetry/Propagation.hs:45` but used only
-in the kafka-adapter-jitsurei OtelProducerDemo
-(`shibuya-kafka-adapter/shibuya-kafka-adapter-jitsurei/app/OtelProducerDemo.hs`).
-On the pgmq side, the producer helper `sendMessageTraced` lives in
-the upstream `pgmq-effectful` package, not in `shibuya-pgmq-adapter`.
-This is consistent with each adapter's role (consume-only) but
-means there is no documented framework recommendation about how a
-DLQ write from the consumer path should be traced.
-
-### M1 — audit completed, findings filed (2026-05-05)
-
-Audit deliverable lives at
-`docs/plans/9-otel-audit-findings.md`. Eight Findings filed:
-
--   **F1 (P0):** `traced` + `runApp` emits two duplicate Consumer
-    spans per message — confirms S2, with a refinement: the two
-    spans are *siblings* under the same parent, not nested, because
-    `Shibuya.Telemetry.Effect.withExtractedContext` calls
-    `Ctx.attachContext (Ctx.insertSpan parentSpan Ctx.empty)` which
-    *replaces* the active thread-local context with one containing
-    only the parent span from headers
-    (`shibuya-core/src/Shibuya/Telemetry/Effect.hs:281-286`). The
-    inner `withSpan'` therefore parents to the headers' parent, not
-    to the framework's outer span.
--   **F2 (P1):** Kafka-typed attributes only on the adapter span,
-    not the framework's. `messaging.system` differs between the two
-    spans (`"shibuya"` on `processOne`, `"kafka"` on `traced`'s
-    span), so a `messaging.system=kafka` filter elides the framework
-    span entirely.
--   **F3 (P1):** pgmq DLQ writes forward the original producer's
-    `traceparent` verbatim and never inject the failing consumer's
-    trace context
-    (`shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs:201-252`).
-    This is the most operationally damaging gap.
--   **F4 (P1):** `runApp` does not bracket tracing init;
-    `TracingConfig.enabled` is dead code (no module reads it).
--   **F5 (P2):** `injectTraceContext` is exported but called by no
-    in-tree adapter, only the kafka jitsurei demo. The right fix is
-    to add a `currentTraceHeaders` helper alongside it (deferred to
-    F3's implementation).
--   **F6 (P2):** `runTracingNoop` allocates a `TracerProvider` per
-    call (S1 confirmed).
--   **F7 (P2):** `withSpan'` synthesises an all-zero `FrozenSpan`
-    when disabled (S6 confirmed).
--   **F8 (P2):** Ingester poll-loop and adapter shutdown are
-    invisible in traces.
-
-S4 (pgmq has no symmetric `traced` module) is **refuted as a
-distinct finding**: the asymmetry is correct, and once F1 lands the
-kafka `traced` module disappears too.
-
-### M2.1 — `Attribute` lacks an upstream `NFData` instance (2026-05-05)
-
-While implementing F1's fix in `shibuya-core`, `Envelope`'s
-`deriving anyclass (NFData)` clause stopped working as soon as the
-new `attributes :: HashMap Text Attribute` field was added.
-`hs-opentelemetry-api`'s `OpenTelemetry.Attributes.Attribute`
-derives `(Read, Show, Eq, Ord, Data, Generic, TH.Lift)` and a
-`Hashable` anyclass — but no `NFData`. The bench harness at
-`shibuya-core-bench/bench/Bench/Framework.hs:104` (the
-`map (.envelope) msgs \`deepseq\` …` line) requires
-`NFData (Envelope BenchMessage)`, so dropping the derivation was
-not an option. Rather than ship an orphan `NFData Attribute`
-instance from inside `shibuya-core`, the chosen fix is a manual
-`instance NFData (Envelope msg)` body that deeply-forces every
-existing field and reduces `attributes` to WHNF — every
-`Attribute` leaf is `Text`/`Bool`/`Double`/`Int64`, all of which
-are NF-equivalent at WHNF when the enclosing `HashMap` is itself
-in WHNF, so the bench-harness's deepseq behavior is unchanged for
-the practical shape of the attribute values that adapters
-populate. Recorded so a future contributor who edits
-`Shibuya.Core.Types` knows why the instance is hand-written.
-
-### M2.1 — `addAttribute` ordering against the adapter's HashMap is non-obvious (2026-05-05)
-
-The first attempt at F1's fix in `processOne` left the existing
-`addAttribute traceSpan attrMessagingSystem ("shibuya" :: Text)`
-calls in place and then called
-`addAttributes traceSpan ingested.envelope.attributes` afterwards.
-`OpenTelemetry.Attributes.addAttributes` (upstream) implements its
-merge as `HashMap.union (mapped attrs) attributeMap` — left-biased
-in the new batch — so the adapter's `messaging.system="kafka"`
-*should* win over the framework's prior `"shibuya"` write. In
-practice the new test
-`SemanticSpec.applies envelope.attributes onto the framework span`
-still saw `"shibuya"` on the span. The exact reason was not
-chased to ground; the surface-level fix is to assemble the
-framework-default attribute set into a single
-`HashMap Text Attribute` and union the adapter's HashMap over it
-with `HashMap.union envelope.attributes frameworkDefaults`
-(left-biased, adapter wins), then call `addAttributes` once.
-This makes the precedence rule explicit at the call site rather
-than relying on the upstream's per-call merge order against the
-mutable Span's IORef. The new test now passes; the original
-SemanticSpec case ("emits a process span with conventions-aligned
-attributes and events") still passes too. Shibuya-specific
-attributes (`shibuya.inflight.count`, `shibuya.ack.decision`) are
-still set via individual `addAttribute` calls because they are
-not duplicated against any adapter-supplied keys.
+The legacy integration documents were removed in `3fcfb36` after archival. Current
+implementation instructions therefore point to `docs/user/opentelemetry.md` and
+real source/tests; historical document contents remain in Git history. Both original
+ID-9 documents lacked provenance, so their original model attribution is unknown.
 
 
 ## Decision Log
 
-Record every decision made while working on the plan.
 
--   Decision: Run the audit as Milestone 1 with a written deliverable
-    (`docs/plans/9-otel-audit-findings.md`) before any code changes,
-    even though that file does not exist yet.
-    Rationale: every prior plan in the docs/plans/ tree that touches
-    OpenTelemetry (plan 2 on attribute conventions, the Kafka
-    adapter's plans 8/9/10) has converged on a tighter scope after a
-    careful read-back of code and prior decisions. Without an audit
-    deliverable in this plan, M2+M3 risk re-litigating the same
-    Kafka-vs-Shibuya namespace question that plans 9 and 10 in the
-    Kafka repo already answered.
-    Date: 2026-05-05.
+On 2026-05-05, the audit was deliberately written before code changes and treated
+core and adapters as one target: the defects crossed repository boundaries. It
+separated API ergonomics, span ownership, incoming context, and outgoing context
+rather than treating all tracing concerns as one feature. F1/F2 were implemented
+together, F3 followed, and F5 accompanied its propagation helper. F4/F6/F7/F8 were
+left for later work.
 
--   Decision: Treat the cross-repo state as one audit target rather
-    than splitting per repository.
-    Rationale: the API is in `shibuya-core` and the consumers are in
-    sibling repos. The friction is in the seam, so the audit must
-    look at both ends of the seam at once. The improvement
-    milestones may still split per-repo (and need to commit
-    per-repo, since the adapters are separate cabal packages), but
-    the analysis stays unified.
-    Date: 2026-05-05.
+On 2026-05-05, the attribute hook was chosen over documenting `traced` as mutually
+exclusive with `runApp`, or detecting an existing span by name. The framework owns
+the process span; the adapter supplies data. The field is a strict, non-optional
+`HashMap Text Attribute` with `mempty` as its default. A single left-biased merge
+makes adapter overrides explicit. The Kafka wrapper was deleted rather than retained
+as a second way to open a process span.
 
--   Decision: The audit considers four separable concerns and treats
-    them independently when producing recommendations: (a) the
-    `Tracing` effect surface itself, (b) the per-message span shape
-    contract between the framework and adapters, (c) the parent
-    context propagation contract via `Envelope.traceContext`, and
-    (d) the producer/DLQ-side propagation contract.
-    Rationale: today these are entangled. Plan 2 fixed (b) at the
-    attribute level; plan 9 (Kafka-side) fixed (c) for Kafka and
-    accidentally created the double-span problem at (b); pgmq has
-    (c) on consume but nothing for (d). Audit findings need to be
-    pinned to one of these four buckets so the priority decision is
-    not "fix everything".
-    Date: 2026-05-05.
+On 2026-05-05, PGMQ DLQ propagation chose the consumer's context for active
+`traceparent`/`tracestate` headers, retaining replaced producer headers under
+`x-shibuya-upstream-*`. With tracing disabled or no active span, original headers
+pass through. The implementation uses the same merge before either DLQ route.
+`injectTraceContext` remains the lower-level primitive; `currentTraceHeaders` is the
+recommended helper when an adapter does not already hold a span handle.
 
--   Decision: M2 will implement F1 (P0). The fix is the
-    `Envelope.attributes` hook described in F1's Proposed fix line.
-    F2 (P1) lands in the same change set because the fix is the same
-    code path. F3 (P1) and F4 (P1) are M3. The remaining P2 findings
-    (F5, F6, F7, F8) are folded into M3 opportunistically or
-    deferred to a follow-up.
-    Rationale: F1's fix removes `Shibuya.Adapter.Kafka.Tracing` (or
-    shrinks it to a one-line `populateAttributes :: Envelope v ->
-    Envelope v` helper), which is the single largest API
-    simplification the audit found. F3 is the highest-impact P1 from
-    an operational standpoint (DLQ post-mortems are the core use
-    case for distributed tracing in queue systems). F4 is the
-    highest-impact P1 for new-adapter authors.
-    Date: 2026-05-05.
+On 2026-05-05, local development overrides were permitted when gitignored; release
+checks still used published dependencies. This supersedes the earlier decision to
+block all adapter work until publication.
 
--   Decision: `Envelope.attributes` is `HashMap Text Attribute`
-    (mempty default), not `Maybe (HashMap Text Attribute)`.
-    Rationale: empty hashmap is the natural "nothing to contribute"
-    signal and avoids the `forM_ envAttrs (addAttributes traceSpan)`
-    unwrap in `processOne`. Construction sites pay one extra line
-    (`attributes = HashMap.empty`) which is consistent with the
-    rest of the codebase's `Envelope` literals in tests and the
-    bench harness.
-    Date: 2026-05-05.
+On 2026-10-12, the review adopted plan 25's existing F4 resolution: remove the dead
+config and let callers choose `runTracing` or `runTracingNoop`. A convenience helper
+is an optional future design, not missing implementation of that resolution. The
+review retains F6/F7/F8 and the DLQ integration-test gap as open, without implementing
+them in this documentation task or silently treating deferral as completion.
 
--   Decision: M2 splits per repo per the plan's idempotence section.
-    `shibuya-core` 0.5.0.0 lands first (this commit). The two
-    adapter repos' edits (M2.2, M2.3) wait until 0.5.0.0 publishes
-    to Hackage, because the plan forbids path-based pins for
-    cross-repo integration testing.
-    Rationale: respects the plan's published-package-as-source-of-
-    truth invariant. Cost: M2.2 / M2.3 cannot be locally verified
-    against 0.5.0.0 until publication. Acceptable trade-off because
-    the shibuya-core test added in M2.1 (the new SemanticSpec case)
-    already exercises the `Envelope.attributes` → `processOne` →
-    in-memory exporter round trip end-to-end, which is the
-    behavioral proof that F1's fix works.
-    Date: 2026-05-05.
-
--   Decision: in `processOne`, framework-default `messaging.*`
-    attributes are now built up into a single `HashMap` and
-    union'd with `Envelope.attributes` (adapter's HashMap left,
-    framework defaults right — left-biased so adapter wins), then
-    flushed via one `addAttributes` call. `shibuya.*` attributes
-    (`inflight.count`, `inflight.max`, `ack.decision`) are still
-    set via individual `addAttribute` calls because they have no
-    duplication against adapter-supplied keys.
-    Rationale: the upstream `Span`-level `addAttributes` does
-    implement a left-biased merge per
-    `OpenTelemetry.Attributes.addAttributes`, but the precedence
-    rule is easier to read when made explicit at the call site
-    rather than spread across multiple per-attribute calls against
-    the mutable Span. The first attempt (sequential
-    `addAttribute … "shibuya"` then `addAttributes envAttrs`)
-    surfaced as the test failure documented in Surprises.
-    Date: 2026-05-05.
+On 2026-10-12, at the user's request, the findings companion was folded into this
+file, keeping ID, slug, intention, and the surviving plan's creation timestamp. All
+F1–F8 IDs remain stable. Inbound references now target this plan; no replacement
+number or second plan identity is introduced.
 
 
 ## Outcomes & Retrospective
 
-Summarize outcomes, gaps, and lessons learned at major milestones or at
-completion. Compare the result against the original purpose.
 
-### Outcomes (2026-05-05)
+### Verified implementation state
 
-The plan set out to (a) audit Shibuya's OpenTelemetry API surface,
-(b) name the worst frictions for adapter authors, and (c) implement
-the highest-priority fixes. After the work landed:
 
--   **Audit deliverable** — `docs/plans/9-otel-audit-findings.md`
-    enumerates eight findings with file:line evidence and severity
-    triage. Pre-implementation Surprises S1..S7 are mapped onto
-    Findings F1..F8 (S4 refuted as a distinct finding; absorbed by
-    F1's fix). The status column on the triage table tracks what
-    landed.
--   **F1 (P0) — duplicate Consumer span** — fixed by adding
-    `Envelope.attributes :: HashMap Text Attribute` to
-    `Shibuya.Core.Types` (shibuya-core 0.5.0.0, commit `7c6586b`).
-    `processOne` now merges adapter-supplied attributes over its
-    framework defaults (left-biased union) and flushes via a single
-    `addAttributes` call. The Kafka adapter populates the typed
-    `messaging.kafka.*` attributes plus
-    `messaging.system="kafka"`; `Shibuya.Adapter.Kafka.Tracing` and
-    its test are deleted (kafka-adapter 0.5.0.0, commit `0440544`).
-    The pgmq adapter populates `HashMap.empty` (no spec-defined
-    typed conventions today; pgmq-adapter 0.5.0.0, commit `274c0eb`).
--   **F2 (P1)** — subsumed by F1's fix (typed Kafka attributes now
-    land on the framework span).
--   **F3 (P1) — DLQ writes carry the original producer's
-    traceparent** — fixed by adding
-    `Shibuya.Telemetry.Propagation.currentTraceHeaders` to
-    shibuya-core (commit `193de1d`) and consuming it in pgmq's
-    `mkAckHandle (AckDeadLetter _)` branch. The consumer's
-    traceparent now becomes the active value on the DLQ message;
-    the producer's is preserved under
-    `x-shibuya-upstream-traceparent`. Five new
-    `Shibuya.Adapter.Pgmq.InternalSpec` cases assert the merge
-    contract directly. Kafka has no DLQ today (deferred).
--   **F4 / F6 / F7 / F8 (P1/P2)** — open. The audit's "what's
-    next" recommendation: F4 (`runAppTraced` bracket) is the
-    highest-impact remaining fix for new-adapter authors; F8
-    (ingester-loop visibility) is the next highest-impact.
--   **F5 (P2)** — resolved as documentation: `injectTraceContext`
-    stays exported as the lower-level primitive;
-    `currentTraceHeaders` is the recommended higher-level entry.
--   **Cross-repo discipline** — the plan's original rule "do not
-    introduce path-based pins to test the integration before
-    publishing" was relaxed mid-work to "do not commit path-based
-    pins; gitignored `cabal.project.local` is fine for development."
-    The pgmq adapter already followed that pattern; the kafka
-    adapter adopted it for this work.
-    `cabal.project.local` is gitignored in both adapters; committed
-    `cabal.project` continues to point at Hackage.
+The audit and the highest-priority span-ownership changes landed. Core commit
+`7c6586b` supplies the hook; Kafka conversion supplies system/partition/offset;
+PGMQ supplies an empty map; core tests verify one exported span and adapter override
+precedence. Core `193de1d` and the PGMQ migration supply outgoing consumer context.
+F1/F2/F3/F5 therefore need no repeat implementation. F3 needs stronger integration
+proof. F4's misleading config was removed by `a96ad52`; a new lifecycle helper was
+not delivered and is not implied by that deletion. F6/F8 remain unimplemented.
+F7 still exposes zero IDs despite the shared-span improvement in `8e55ab4`.
 
-### Acceptance gates (2026-05-05)
+The reviewed clean source baselines were this repository at
+`3fcfb367994fbf200d76f47b932882bdf10227db`,
+`mori://shinzui/shibuya-pgmq-adapter` at commit
+`c443ac349ad5d75c4820a1688e5bd34d8911f136`, and
+`mori://shinzui/shibuya-kafka-adapter` at commit
+`c04758990927bbda6d0616ae9609c263ec73758b` (commit artifact URIs pending).
+Observed checkout versions were core 0.10.0.1, PGMQ adapter 0.16.1.0, and Kafka
+adapter 0.9.1.0. These are source observations, not claims about latest releases.
 
-Run from the project root of each repo:
+### Historical acceptance, retained without reasserting it
 
-| Gate | shibuya | shibuya-pgmq-adapter | shibuya-kafka-adapter |
-|------|---------|----------------------|-----------------------|
-| `cabal build all` | ✅ | ✅ | ✅ |
-| `cabal test` (full suite) | ✅ 116/116 | ✅ 125/125 (incl. DB integration + chaos, against existing local Postgres) | ✅ 26/26 (incl. Redpanda integration) |
-| `nix flake check` | ✅ | ✅ | ✅ |
-| Live Jaeger smoke | ✅ (covered transitively via the two adapter demos) | ✅ (`shibuya-pgmq-simulator` + `shibuya-pgmq-consumer`) | ✅ (`otel-producer-demo` + `otel-demo`) |
-| Hackage publication | _pending_ | _pending_ | _pending_ |
 
-All in-tree verification is green. Hackage publication is the
-remaining operator action.
+The 2026-05-05 main plan recorded core 116/116, PGMQ 125/125, and Kafka 26/26 tests,
+plus builds and flake checks, as passing. It recorded a Kafka Jaeger trace
+`8754d1c69c6577bbe7a6595293c77dde` containing producer `shibuya.send.message` and one
+`orders process` Consumer span, parented to `5e9480617881e53d`, with system `kafka`,
+partition 0, and offset 3. It also recorded five PGMQ messages with a representative
+producer → publish → process → delete shape. That PGMQ smoke exercised successful
+consumption, not enabled-tracing DLQ forwarding.
 
-Live Jaeger smoke transcript (run 2026-05-05; `~/.local/bin/jaeger`
-+ Redpanda via `just process-up`):
+The adapter migration plans later recorded publication of their 0.5.0.0 packages
+and verification against published core, superseding this plan's old
+“publication pending” note. This review does not perform a release audit. The
+adapter plans' older smoke-status prose is not fully synchronized with the main
+plan's recorded transcript, so those historical claims are not promoted to fresh
+runtime proof here.
 
--   **Kafka producer→consumer round trip.** `otel-producer-demo`
-    emitted two records (`upstream-key`, `diy-key`) with
-    `traceparent` headers. `otel-demo` consumed both. Inspecting
-    the Jaeger trace `8754d1c69c6577bbe7a6595293c77dde` (the
-    DIY-branch trace) showed exactly two spans: a producer span
-    `shibuya.send.message` (kind=producer) and a single consumer
-    span `orders process` (kind=consumer) parented as `CHILD_OF`
-    the producer's `5e9480617881e53d` span. The `orders process`
-    span carried both the spec-aligned messaging.* attributes
-    AND the typed `messaging.kafka.destination.partition=0`,
-    `messaging.kafka.message.offset=3`, `messaging.system=kafka`
-    contributed by the adapter via `Envelope.attributes` —
-    confirming F1 (no duplicate sibling Consumer span) and F2
-    (typed Kafka attrs land on the framework span, not on a
-    separate one).
--   **pgmq end-to-end.** `shibuya-pgmq-simulator` enqueued 5
-    orders messages with W3C traceparent headers via
-    `sendMessageTraced`. `shibuya-pgmq-consumer` processed all
-    five. A representative trace's spans:
-    `pgmq.produce` (producer) → `publish orders` (producer,
-    pgmq-effectful) → `orders process` (consumer, framework
-    processOne, single span) → `pgmq.delete orders` (internal,
-    ack/delete). The `orders process` span was correctly
-    `CHILD_OF` the producer side, confirming
-    `Envelope.traceContext` round-trip via
-    `Convert.extractTraceHeaders` works under `runApp`.
+### Validation in this review
 
-### Findings landed by commit
 
-| Repo | Commit | Findings |
-|------|--------|----------|
-| shibuya | `8234f1a` | M1 — audit deliverable filed |
-| shibuya | `7c6586b` | M2.1 — F1 (P0), F2 (P1) |
-| shibuya | `193de1d` | M3.1 — F5 (P2) infrastructure for F3 |
-| shibuya | `d5024b1` | M4 — refresh `OPENTELEMETRY_INTEGRATION.md` |
-| shibuya-kafka-adapter | `0440544` | F1 (P0) adapter half — typed attrs in `Convert.hs`; `Tracing` module deleted |
-| shibuya-pgmq-adapter | `274c0eb` | F3 (P1) — DLQ trace propagation in `mkAckHandle` |
+The focused core telemetry run passed: 28 examples, 0 failures. It includes
+no-op effect operations, propagation parsing, `currentTraceHeaders`, and the
+one-span/adapter-attribute regression. The PGMQ merge run passed all six examples
+after explicitly enabling test suites. Kafka's conversion run passed all 22 tests
+inside its development shell; the first attempt from the inherited shell failed
+to link `librdkafka`, before tests ran. The commands are in Concrete Steps.
 
-### Gaps (open work)
+```text
+Core telemetry: 28 examples, 0 failures
+PGMQ mergeDlqHeaders: 6 examples, 0 failures
+Kafka Convert: All 22 tests passed
+```
 
--   **F4 (P1) — `runApp` does not bracket tracing init.**
-    Recommended follow-up: add a `runAppTraced :: TracingConfig ->
-    SupervisionStrategy -> Int -> [(ProcessorId, QueueProcessor
-    (Tracing : es))] -> Eff es (Either AppError (AppHandle (Tracing
-    : es)))` bracket helper in `Shibuya.App` that owns
-    `initializeGlobalTracerProvider` /
-    `shutdownTracerProvider` and dispatches to `runTracing`
-    (when `cfg.enabled`) or `runTracingNoop`. Shibuya-core local;
-    no cross-repo coordination.
--   **F6 (P2)** — `runTracingNoop` allocates a `TracerProvider`
-    per call. Cosmetic; works correctly today.
--   **F7 (P2)** — `withSpan'`'s all-zero dummy `FrozenSpan`.
-    Cosmetic. Fix is a breaking type change
-    (`Span -> Eff es a` → `Maybe Span -> Eff es a`).
--   **F8 (P2)** — Ingester poll-loop and adapter-shutdown spans.
-    Useful when source-stream errors are the symptom but rare
-    enough that priority is low.
--   **Kafka DLQ propagation** — kafka-adapter does not implement
-    DLQ today; the analogous F3 work for kafka is its own future
-    plan when DLQ lands.
--   **Postgres-backed integration test for F3** — the runtime
-    "consumer-traceparent wins under `runTracing`" assertion in
-    `ChaosSpec` is deferred. The unit-level `mergeDlqHeaders` spec
-    covers the merge contract directly.
--   **Live Jaeger smoke (cleared 2026-05-05)** — both adapters'
-    demos were exercised end-to-end against a live Jaeger v2 +
-    Redpanda + Postgres stack. Trace shapes match the audit's
-    "Proposed fix" predictions for F1 and F2. Recipes remain
-    documented in each adapter's README and in plan 1 / plan 12
-    Concrete Steps for future verification.
-
-### Lessons
-
--   The original strict reading of "no path-based pins" was
-    operationally too conservative. The pgmq adapter's existing
-    `cabal.project.local` pattern (committed comment naming the
-    unreleased version) is the established practice and works well.
-    The Decision Log entries in the per-repo plans capture the
-    revised interpretation.
--   `hs-opentelemetry-api`'s `Attribute` lacking `NFData` is the
-    kind of upstream gap that surfaces only when downstream code
-    derives `NFData` via `Generic`. The fix (manual instance) is
-    cheap; the discovery is worth recording so future contributors
-    do not delete the manual instance assuming derivation works.
--   The upstream `addAttributes`'s left-biased union is correct in
-    isolation but produced surprising results when interleaved
-    with prior `addAttribute` calls on the same Span. Building
-    the framework defaults into a HashMap and unioning the
-    adapter's HashMap over them at the call site makes the
-    precedence rule easier to read and reason about. Plan 9 M2.1
-    Surprise records the attempt-and-correction cycle.
+Document checks passed for whitespace, the single surviving ID-9 file, language-tagged
+fences, local Markdown links, and removal of companion-file references from this
+repository and both adapter documentation trees. No new PostgreSQL/Redpanda/Jaeger
+smoke, full multi-repository test matrix, performance benchmark, or release gate
+is claimed by this documentation update.
 
 
 ## Context and Orientation
 
-A reader who has never seen this codebase needs four facts to follow
-the rest of this plan.
 
-### Repository layout
+Core lives in this repository. `shibuya-core/src/Shibuya/Core/Types.hs` owns
+`Envelope`, the message metadata plus payload. `traceContext` carries incoming
+W3C headers (trace and parent IDs); `attributes` carries adapter-specific data for
+the framework span. `shibuya-core/src/Shibuya/Telemetry/Effect.hs` owns the static
+`Tracing` effect and enabled/disabled runners. A static effect is effectful's
+mechanism for making a tracer available to functions via an `Eff` effect stack.
+`Propagation.hs` extracts/injects headers. `Semantic.hs` owns wire keys and names.
+The umbrella `shibuya-core/src/Shibuya/Telemetry.hs` re-exports those three modules.
+There is no Config module now.
 
-The "shibuya project" is a multi-repo whose top-level layout sits
-under
-`/Users/shinzui/Keikaku/bokuno/shibuya-project/`. The directories
-that matter here are:
+`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs` owns `processOne`, which
+extracts the parent, opens the process span, merges attributes, runs the handler
+and framework-owned finalization, and records results. An `AckDecision` is the
+handler's verdict, such as acknowledge, retry, dead-letter, or halt; the adapter's
+acknowledgement handle applies that verdict to the broker.
+`shibuya-core/src/Shibuya/Internal/Runner/Ingester.hs` streams messages into bounded
+inboxes. `shibuya-core/src/Shibuya/App.hs` starts processors and owns graceful
+shutdown. Both single-message and batch startup paths use the ingester.
 
-    shibuya/                       This repo. Holds shibuya-core
-                                   (the library), shibuya-example,
-                                   shibuya-pgmq-example (consumer +
-                                   simulator using pgmq), and the
-                                   docs/plans/ tree where this plan
-                                   lives.
+The adapters are `mori://shinzui/shibuya-pgmq-adapter` and
+`mori://shinzui/shibuya-kafka-adapter`. Resolve their checkout roots with
+`mori registry show <qualified-project> --full`; commands below run from those
+roots. In cross-repository source citations below, a canonical project URI is
+paired with its project-relative path and line. Source-file artifact URI coverage
+is pending. Migration history is in
+`mori://shinzui/shibuya-pgmq-adapter/plans/1-migrate-to-shibuya-core-0.5-and-dlq-trace`
+and `mori://shinzui/shibuya-kafka-adapter/plans/12-migrate-to-shibuya-core-0.5`.
+The registry did not resolve these plan artifact URIs during this review; their
+files were verified in the registered checkouts.
 
-    shibuya-pgmq-adapter/          A sibling repo holding the cabal
-                                   package shibuya-pgmq-adapter
-                                   (PostgreSQL pgmq adapter) plus
-                                   its bench package and tests.
-
-    shibuya-kafka-adapter/         A sibling repo holding the cabal
-                                   package shibuya-kafka-adapter
-                                   (Apache Kafka adapter), its
-                                   bench, its `jitsurei` (literally
-                                   "real-world example") executable
-                                   crate where the OtelDemo and
-                                   OtelProducerDemo live, and tests.
-
-The current working directory for every command in this plan is
-`/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya` unless
-explicitly stated otherwise. The two adapters are out-of-tree but
-on-disk, and `cabal` resolves them via `shibuya-core` on Hackage
-(`shibuya-core 0.4.0.0`), not via path-local pins.
-
-### shibuya-core's telemetry surface
-
-The library `shibuya-core` (cabal file at
-`shibuya-core/shibuya-core.cabal`, version 0.4.0.0) exposes a
-single tracing entry-point module
-`Shibuya.Telemetry`
-(`shibuya-core/src/Shibuya/Telemetry.hs`) that re-exports four
-sub-modules:
-
--   `Shibuya.Telemetry.Config` — defines
-    `data TracingConfig = TracingConfig { enabled :: !Bool, serviceName ::
-    !Text, serviceVersion :: !(Maybe Text) }` and a
-    `defaultTracingConfig :: TracingConfig` whose `enabled` is
-    `False`. Used by **no** other module in shibuya-core. It is
-    documentation-only today.
--   `Shibuya.Telemetry.Effect` — defines the `Tracing` static
-    effect, runners `runTracing :: Tracer -> Eff (Tracing : es) a ->
-    Eff es a` and `runTracingNoop :: Eff (Tracing : es) a -> Eff es
-    a`, span operations `withSpan` /
-    `withSpan'`, mutators `addAttribute` /
-    `addAttributes` / `addEvent` / `recordException` /
-    `setStatus`, and the helper
-    `withExtractedContext :: Maybe SpanContext -> Eff es a -> Eff
-    es a` that runs an action under an extracted parent context.
-    Re-exports a curated subset of the upstream `OpenTelemetry.Trace.Core`
-    types (`Span`, `SpanArguments`, `SpanKind`, `SpanStatus`,
-    `NewEvent`, `Tracer`, `defaultSpanArguments`, `toAttribute`)
-    so adapters do not have to depend on
-    `hs-opentelemetry-api` directly to build a `SpanArguments`.
--   `Shibuya.Telemetry.Propagation` — defines
-    `extractTraceContext :: TraceHeaders -> Maybe SpanContext` (W3C
-    `traceparent`/`tracestate` headers → SDK `SpanContext`) and
-    `injectTraceContext :: Span -> IO TraceHeaders` (live span →
-    headers). Both delegate to
-    `OpenTelemetry.Propagator.W3CTraceContext`'s `decodeSpanContext`
-    / `encodeSpanContext`.
--   `Shibuya.Telemetry.Semantic` — defines the spec-aligned
-    attribute-key constants (derived via `unkey` from typed
-    `AttributeKey` values in
-    `OpenTelemetry.SemanticConventions`), span-name helpers
-    (`processSpanName`, `ingestSpanName`), and `SpanArguments`
-    helpers (`consumerSpanArgs`, `internalSpanArgs`). This was the
-    target of the recent
-    `docs/plans/2-align-opentelemetry-semantic-conventions.md`.
-
-A reader who has not seen the framework should understand four
-non-obvious terms used heavily below:
-
--   **Effect** — in this codebase, an effectful effect (lower-case)
-    in the sense of the `effectful` library: a marker phantom type
-    `Tracing :: Effect`, with a single instance dispatch and a
-    record of static state (the `Tracer` and the `Bool` enabled
-    flag). Operations on the effect take `(Tracing :> es, IOE :>
-    es) =>` constraints.
--   **Span** — a single timed, named operation in a distributed
-    trace. The framework opens one per message in
-    `processOne`. Adapters may open additional spans inside the
-    handler if they wish, but should not duplicate the per-message
-    span.
--   **SpanContext** — the ID triple (traceId, spanId, traceFlags,
-    traceState) of a span, sufficient to wire it as a parent to
-    another span. This is what gets serialised into the
-    `traceparent` header.
--   **`Envelope.traceContext`** — a field of type `Maybe TraceHeaders`
-    on `Envelope` (defined at
-    `shibuya-core/src/Shibuya/Core/Types.hs:50-66`). `TraceHeaders`
-    is `[(ByteString, ByteString)]`. The adapter populates this
-    from the queue-native headers; the framework's `processOne`
-    decodes it and uses `withExtractedContext` to set up the span
-    parent.
-
-### What the adapters do today
-
-Both adapters share a similar shape:
-
--   A `Convert.hs` module turns the broker-native message into an
-    `Envelope`. Both adapters' `Convert.hs` have a function called
-    `extractTraceHeaders` that picks `traceparent` and (optionally)
-    `tracestate` out of the message headers and returns a `Maybe
-    TraceHeaders`. Both populate `Envelope.traceContext` with that.
--   An `Internal.hs` (Kafka)/`Internal.hs` (pgmq) module wires the
-    polling loop and the `AckHandle` finalize logic. Neither
-    creates spans; both rely on `processOne` to do that.
--   pgmq stops there. Its public module
-    `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq.hs` does **not**
-    open any spans of its own.
--   Kafka adds an opt-in module
-    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs`
-    exposing one function:
-    `traced :: TopicName -> Stream (Eff es) (Ingested es v) -> Stream
-    (Eff es) (Ingested es v)`. This rewrites each `Ingested.ack`
-    so its `finalize` opens a Consumer-kind span named
-    `"<topic> process"` parented on
-    `Envelope.traceContext`, populates the messaging attributes
-    (`messaging.system="kafka"`, `messaging.destination.name=<topic>`,
-    `messaging.operation="process"`,
-    `messaging.message.id=<envelope.messageId>`) plus the
-    Kafka-specific typed attributes
-    (`messaging.kafka.destination.partition`,
-    `messaging.kafka.message.offset`) when they parse out of the
-    envelope, then calls the original `finalize`. See
-    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs:84-101`.
-
-The Kafka demo
-`shibuya-kafka-adapter/shibuya-kafka-adapter-jitsurei/app/OtelDemo.hs`
-uses `traced` *without* `runApp` — it folds the adapter's source
-stream by hand and calls `finalize AckOk` inline. This is why the
-double-span condition described in Surprise S2 has not bitten the
-existing Jaeger verification.
-
-### What the framework does today on the consume path
-
-`shibuya-core/src/Shibuya/Runner/Supervised.hs:360-468` defines
-`processOne`, the per-message body that the supervised runner calls
-for each `Ingested es msg` arriving on the bounded inbox. It:
-
-1.  Decodes `envelope.traceContext` into a `Maybe SpanContext` via
-    `Shibuya.Telemetry.Propagation.extractTraceContext`. (line 371)
-2.  Calls `withExtractedContext parentCtx $
-    withSpan' (processSpanName pidText) consumerSpanArgs $ \\traceSpan
-    -> ...` (lines 374–375). The span name is built from
-    `ProcessorId pidText`, e.g. `"orders process"`.
-3.  Sets four `messaging.*` attributes
-    (`messaging.system="shibuya"`, `messaging.destination.name=pidText`,
-    `messaging.operation="process"`, `messaging.message.id=msgIdText`).
-    (lines 378–381)
-4.  Optionally sets `shibuya.partition` from
-    `envelope.partition`. (lines 384–386)
-5.  Sets `shibuya.inflight.count` and `shibuya.inflight.max` from
-    the metrics state. (lines 401–402)
-6.  Emits `shibuya.handler.started` event. (line 405)
-7.  Catches handler exceptions via `catchAny`, calls
-    `recordException` and stashes a `HandlerException` error.
-    (lines 408–418)
-8.  Emits `shibuya.handler.completed` (or `eventAckDecision` on
-    error) and sets `shibuya.ack.decision`. (lines 421–442)
-9.  Sets the span's status from the `AckDecision`. (lines 432–443)
-10. Decrements inflight count and updates stats. (lines 446–447)
-11. On `AckHalt`, sets the haltRef so the stream loop exits. (line
-    451)
-
-The span explicitly wraps both `handler ingested` (line 411) and
-`ingested.ack.finalize decision` (line 412), so the Kafka adapter's
-`traced` wrapper, when it fires inside `processOne`, opens its own
-inner span around just `finalize`. This is the double-span condition
-in S2.
-
-### What is *not* covered by `processOne`
-
--   The ingester's poll loop. `Shibuya/Runner/Ingester.hs:39-60`
-    runs the adapter's source stream with a metrics counter; it
-    does **not** open any span. Errors thrown by the source stream
-    (e.g., a Postgres connection drop in pgmq, a fatal Kafka error
-    from `pollMessageBatch`) are not visible in traces today.
--   Adapter shutdown. `Adapter.shutdown` is invoked from
-    `Shibuya/App.hs:241-258` during graceful shutdown but is not
-    span-wrapped.
--   Adapter-side DLQ writes. The pgmq adapter's
-    `mkAckHandle (AckDeadLetter reason)` branch
-    (`shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs:201-252`)
-    sends the message body to the DLQ via
-    `sendMessageWithHeaders` or `sendMessage`. The original
-    message's headers (including the original producer's
-    `traceparent`) are forwarded verbatim, so the DLQ message
-    still carries the **original producer's** trace context. The
-    consumer of the DLQ will therefore see its own consumer span
-    parented on the original producer, **not** on the failing
-    consumer's processOne span. This may be intentional ("the
-    failure is logically attributed to the producer's trace") or
-    accidental ("we forgot to inject the consumer's traceparent");
-    M1.2 must say which.
-
-### Test entry points
-
--   `cabal test shibuya-core-test` runs in
-    `shibuya-core/test/`. The most relevant tests are
-    `Shibuya.Telemetry.EffectSpec`,
-    `Shibuya.Telemetry.PropagationSpec`,
-    `Shibuya.Telemetry.SemanticSpec`. The last drives `processOne`
-    through `runWithMetrics` against an in-memory exporter and
-    asserts span/attribute names. It is the closest existing
-    template for any new test added by M2/M3.
--   `cabal test shibuya-kafka-adapter-test` runs in
-    `shibuya-kafka-adapter/shibuya-kafka-adapter/test/`. The
-    relevant test is
-    `Shibuya.Adapter.Kafka.TracingTest`, which inlines a tiny
-    in-memory `SpanProcessor` (the package
-    `hs-opentelemetry-exporter-in-memory` is currently unused in
-    the kafka-adapter test stanza).
--   `cabal test shibuya-pgmq-adapter-test` runs in
-    `shibuya-pgmq-adapter/shibuya-pgmq-adapter/test/`. There is no
-    tracing-specific spec yet; the relevant audit-time check is
-    that `Shibuya.Adapter.Pgmq.ConvertSpec` and
-    `Shibuya.Adapter.Pgmq.ChaosSpec` cover trace-header round-trip
-    and DLQ trace preservation respectively.
-
-### A glossary of terms used below that are not ordinary English
-
--   **Ack / `AckDecision`** — the handler's verdict on a message:
-    `AckOk`, `AckRetry RetryDelay`, `AckDeadLetter
-    DeadLetterReason`, `AckHalt HaltReason`. The framework calls
-    `ingested.ack.finalize decision` inside `processOne` to apply
-    that verdict to the queue.
--   **DLQ** — dead-letter queue. When a handler returns
-    `AckDeadLetter`, the adapter forwards the message to a
-    configured "graveyard" queue rather than letting the broker
-    redeliver it.
--   **Lease** — for adapters with visibility-timeout semantics
-    (pgmq), a handle the handler can use to extend the timeout
-    while it is still working. Kafka has no lease (`Nothing`).
--   **`SpanKind`** — a tag on a span saying what role it plays in a
-    distributed trace. Shibuya uses `Consumer` for the per-message
-    processing span. The spec defines `Producer`, `Consumer`,
-    `Server`, `Client`, `Internal`.
--   **`processSpanName`** — the helper from
-    `Shibuya.Telemetry.Semantic` that produces the span name string
-    `"<destination> process"` per the spec recommendation.
+Relevant local context is [plan 25](25-pre-1-0-public-api-cleanup.md), which removes
+the redundant configuration path, [plan 26](26-reduce-per-message-hot-path-overhead.md),
+which hoists tracing constants, and [plan 10](10-upgrade-to-hs-opentelemetry-1-0.md),
+which upgrades the SDK-facing code. No dedicated OTel ADR was found in the local
+ADR heading scan. [ADR 3](../adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md)
+requires explicit failure outcomes, unconditional master cleanup, bounded graceful
+shutdown, and once-only adapter shutdown. F8 must preserve these guarantees.
 
 
 ## Plan of Work
 
-### Milestone 1 — Audit, write up findings, decide priorities
 
-**Scope.** Read-only investigation. Produce a single new file,
-`docs/plans/9-otel-audit-findings.md`, that names every issue
-identified, cites it with file paths and line numbers, ranks each
-issue P0/P1/P2, and proposes a fix in one paragraph. No code
-changes in this milestone.
+### Finding F1 — Duplicate Consumer spans (B, original P0): implemented
 
-**What will exist at the end.** A committed
-`docs/plans/9-otel-audit-findings.md` whose first paragraph names
-the audit scope (the four buckets in the third Decision Log entry)
-and whose body has one section per finding. Surprises S1..S7 above
-are the audit's starting hypotheses; the milestone confirms,
-refutes, or refines each one.
 
-**What to read.** In order:
+The old Kafka `traced` wrapper opened a second span around finalization and
+reattached the incoming producer context. A user combining it with `runApp` got
+sibling Consumer spans instead of one process operation. The fix is present in
+`shibuya-core/src/Shibuya/Core/Types.hs:140` and
+`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs:680`: the framework owns the
+span and merges envelope attributes once, with adapter keys taking precedence.
+`shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs:101` exercises one message and
+requires exactly one exported span.
 
-1.  `shibuya-core/src/Shibuya/Telemetry.hs` and every module it
-    re-exports.
-2.  `shibuya-core/src/Shibuya/Runner/Supervised.hs` (the only
-    consumer of the `Tracing` effect inside the framework).
-3.  `shibuya-core/src/Shibuya/Runner/Ingester.hs` (to confirm the
-    poll loop is not span-wrapped).
-4.  `shibuya-core/src/Shibuya/App.hs` (to confirm `runApp` does not
-    bracket tracing initialization, and that `TracingConfig` is
-    unused in the framework).
-5.  `shibuya-core/src/Shibuya/Core/Types.hs` (the `Envelope` and
-    `TraceHeaders` types).
-6.  `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs` and
-    `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs`,
-    paying particular attention to the `mkAckHandle (AckDeadLetter
-    _)` branch and whether DLQ writes carry the consumer's trace
-    context or the original producer's.
-7.  `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs`,
-    `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs`,
-    and `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs`.
-    Confirm Surprise S2 by reading the two `withSpan'` call sites
-    (one in `Tracing.hs`, one in `Supervised.hs`).
-8.  The four tests
-    `shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs`,
-    `shibuya-core/test/Shibuya/Telemetry/EffectSpec.hs`,
-    `shibuya-core/test/Shibuya/Telemetry/PropagationSpec.hs`, and
-    `shibuya-kafka-adapter/shibuya-kafka-adapter/test/Shibuya/Adapter/Kafka/TracingTest.hs`,
-    to understand how the two repos exercise tracing today.
-9.  The historical plans
-    `docs/plans/OPENTELEMETRY_INTEGRATION.md`,
-    `docs/plans/PGMQ_OPENTELEMETRY_INSTRUMENTATION.md`,
-    `docs/plans/2-align-opentelemetry-semantic-conventions.md`,
-    `shibuya-kafka-adapter/docs/plans/8-investigate-hw-kafka-client-instrumentation.md`,
-    `shibuya-kafka-adapter/docs/plans/9-add-shibuya-kafka-tracing-module.md`,
-    `shibuya-kafka-adapter/docs/plans/10-align-kafka-adapter-otel-semantic-conventions.md`.
-    Any finding that was deliberately decided in one of these
-    plans must say so explicitly with a citation.
+In `mori://shinzui/shibuya-kafka-adapter`,
+`shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs:69` supplies the map;
+`Shibuya.Adapter.Kafka.Tracing` and `TracingTest` are absent from source and Cabal
+module lists. `shibuya-kafka-adapter-jitsurei/app/OtelDemo.hs:89` brackets the provider
+and now runs the finite source through `runApp`/`waitApp`. The historical alternatives
+(mutual-exclusion documentation or guessing whether a matching span already exists)
+were rejected because they retain ambiguous span ownership. No further F1 code is
+needed; preserve the one-span regression.
 
-**Findings template.** For each finding the audit document writes:
 
-    ### Finding F<n>: <one-line title>
+### Finding F2 — Kafka attributes on the wrong span (B, original P1): implemented
 
-    Bucket: A | B | C | D (per Decision Log entry 3).
-    Severity: P0 | P1 | P2.
-    Evidence: <file:line citations, 1-3 lines max>.
 
-    What it is: <one short paragraph>.
-    Why it matters: <one short paragraph>.
-    Proposed fix: <one short paragraph; concrete, names the file>.
-    Alternatives considered: <one short paragraph or N/A>.
-    Prior decisions: <citations to plans, or "none">.
+F2 shared F1's fix. In `mori://shinzui/shibuya-kafka-adapter`,
+`shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs:81` constructs
+`messaging.system="kafka"` and typed integer partition/offset attributes;
+`shibuya-kafka-adapter/test/Shibuya/Adapter/Kafka/ConvertTest.hs:100` tests them.
+The core semantic test verifies those values override defaults on its sole span.
+The current operation key is `messaging.operation.type`, not the original audit's
+`messaging.operation`. In `mori://shinzui/shibuya-pgmq-adapter`,
+`shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs:126` supplies an empty map,
+so framework defaults apply. No symmetric PGMQ tracing wrapper is missing.
 
-**Severity calibration.** P0 = correctness or double-counting bug
-that distorts the trace shape under normal use (S2 is the obvious
-candidate). P1 = silent loss of information or strong API friction
-that drives users to write boilerplate (S3, S4, the producer/DLQ
-gap). P2 = polish (S1, S6).
 
-**Acceptance.** The findings file exists, every Surprise S1..S7 has
-been turned into either a confirmed Finding F<n> or an explicit
-"refuted: <evidence>" line, and the file's Triage table at the top
-ranks every Finding by severity with a one-cell summary. M2 and M3
-read this table to decide what to implement.
+### Finding F3 — DLQ forwards the original parent (D, original P1): implemented; integration proof open
 
-Commands at end of milestone (working directory
-`/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya`):
 
-    git add docs/plans/9-audit-and-improve-opentelemetry-api.md \
-            docs/plans/9-otel-audit-findings.md
-    nix fmt
-    git commit  # message below
+The original defect forwarded the producer header rather than injecting the
+failing consumer span. This omitted the consumer from the DLQ message's parent
+chain; it did not necessarily create a different trace ID. Core
+`shibuya-core/src/Shibuya/Telemetry/Propagation.hs:82` now obtains active context.
+In `mori://shinzui/shibuya-pgmq-adapter`,
+`shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs:283` calls it before
+`deadLetterTransactionally`. Both direct-queue and topic-route sends consume the
+merged headers. `mergeDlqHeaders` at line 385 replaces active context, saves
+upstream values under `x-shibuya-upstream-*`, preserves other fields, and forwards
+original headers unchanged when no consumer context exists.
 
-Commit message:
+`shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/InternalSpec.hs:403` in that same
+canonical project has six current merge cases (five original plus a later non-UTF8
+case). `shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ChaosSpec.hs:337` tests the
+no-op fallback against the database. The remaining enabled-tracing test is defined
+in milestone M3.1V below. It is a validation gap, not an absent merge implementation.
 
-    docs(plans): record OTel API audit findings (plan 9, M1)
 
-    Read-only audit of the shibuya-core OpenTelemetry surface and
-    its two real consumers (shibuya-pgmq-adapter,
-    shibuya-kafka-adapter). Captures findings with file:line
-    evidence and triage ranking; no code changes.
+### Finding F4 — Dead config and provider lifecycle (A, original P1): dead config resolved; helper not implemented
 
-    ExecPlan: docs/plans/9-audit-and-improve-opentelemetry-api.md
-    Intention: intention_01kh0akd82ekat0be54p2f72kv
 
-### Milestone 2 — Implement P0 fix(es)
+Plan 25 deliberately removed `TracingConfig` rather than wiring it into an exporter
+configuration path already served by `OTEL_*` and the choice of runner. Source
+`shibuya-core/src/Shibuya/App.hs:209` still requires `Tracing :> es`; callers own the
+provider lifetime. There is no `runAppTraced` or `withTracing` helper. The original
+helper proposal is superseded as a required fix, and its handle-returning bracket
+would have been too short-lived.
 
-**Scope.** Whatever M1 ranked P0. The most likely candidate at
-plan-creation time is Surprise S2 (the double-span condition between
-`Shibuya.Adapter.Kafka.Tracing.traced` and `processOne`). The
-implementation is gated on M1's verification — if S2 turns out
-not to be a real issue under `runApp`, M2 picks the next-highest
-Finding.
+An optional future helper must keep the provider alive through processor completion
+and shutdown, and test success, startup failure, exception, and cancellation. Keep
+this separate from the remaining documentation correction: the Quick Start in
+`docs/user/opentelemetry.md:20` still passes `shutdownTracerProvider` to `bracket`
+without supplying the timeout argument required by the current API. The Kafka demo
+uses the current explicit `Just 5_000_000` timeout. Update that guide with a tested
+full-lifetime example; do not reintroduce `TracingConfig` merely to match old prose.
 
-**If the P0 is S2 (double-span)**, the candidate fixes are, in rough
-order of preference:
 
-1.  **Make the framework's per-message span the only one, and let
-    the adapter contribute attributes to it.** Add a new optional
-    field on `Envelope`, e.g.
-    `attributes :: !(Maybe (HashMap Text Attribute))`, populated
-    by the adapter's `Convert.hs`. `processOne` reads it after
-    opening the span and calls `addAttributes traceSpan attrs`.
-    The Kafka adapter's `traced` module is then either deleted (if
-    it adds nothing beyond what `Envelope.attributes` carries) or
-    reduced to a populator for `Envelope.attributes` only — no
-    span, no `withSpan'`, no risk of double-counting. Tests in M2
-    must run a runApp-style scenario through both adapters'
-    `traced`+ `processOne` paths and assert exactly one Consumer
-    span per message, with the union of spec-aligned and
-    adapter-specific attributes on it.
-2.  **Document `traced` as mutually exclusive with `runApp`.** If
-    the audit determines that `traced` is intended only for the
-    raw-stream case (the OtelDemo path) and the double-counting is
-    only a documentation problem, M2 instead adds a Haddock note
-    on `traced` and on `runApp` saying so, and a runtime check (a
-    `assert :: Tracing :> es => ...` in `traced` that complains if
-    invoked under `runApp` — though in practice we have no signal
-    distinguishing the two scopes, so this option is weak).
-3.  **Have `traced` detect the inner-span case and skip.**
-    `OpenTelemetry.Context.lookupSpan` on the thread-local context
-    returns the current active span, if any. `traced` could check
-    that and, if a span of the same name is already active, leave
-    the `AckHandle` alone. This is brittle (relies on span-name
-    equality) and is mentioned only for completeness.
+### Finding F5 — No convenient active-context injection (D, original P2): implemented
 
-The first option is the cleanest and is the recommended starting
-point unless M1 turns up evidence the audit missed.
 
-**What will exist at the end.** A code change set across one or
-more of `shibuya-core`, `shibuya-pgmq-adapter`,
-`shibuya-kafka-adapter` that fixes the named P0 with a passing
-test. The change is committed across one or more `git commit`s,
-each carrying both `ExecPlan:` and `Intention:` trailers.
+`shibuya-core/src/Shibuya/Telemetry/Propagation.hs:77` exposes
+`currentTraceHeaders :: (Tracing :> es, IOE :> es) => Eff es (Maybe TraceHeaders)`.
+It returns `Nothing` with tracing disabled or no active span, otherwise calls the
+retained `injectTraceContext`. PGMQ consumes it in the actual DLQ path, so the
+original claim that adapters never exercise injection is obsolete. Haddocks explain
+both APIs. `PropagationSpec` covers the three branches; exact active-span identity
+should be strengthened as part of M3.1V.
 
-**Acceptance.** All three repos build. The P0's accompanying test
-fails on the pre-fix code and passes on the post-fix code (a
-`git stash; cabal test; git stash pop` red/green cycle is the
-gold standard, recorded in Surprises). The Jaeger smoke
-(`just process-up`, produce a message, watch the trace) shows
-exactly one Consumer-kind span per processed message.
 
-### Milestone 3 — Implement P1 fix(es)
+### Finding F6 — No-op provider allocation (A, P2): open
 
-**Scope.** Same as M2 but for everything M1 ranked P1. The likely
-candidates at plan-creation time:
 
--   **DLQ trace propagation (Surprise S2's twin on the produce
-    side)** — if M1.2 confirms that pgmq's DLQ write forwards the
-    *original producer's* `traceparent` rather than injecting the
-    *consumer's*, the right fix is to add `Shibuya.Telemetry.Propagation`
-    helpers usable from inside an adapter's `mkAckHandle`, and to
-    use them in
-    `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Internal.hs`'s
-    `AckDeadLetter` branch. The new headers replace or augment the
-    forwarded `traceparent`; the decision (replace vs. augment) is
-    a Decision Log entry to be made in M3 with an explicit
-    rationale referencing what
-    `docs/plans/PGMQ_OPENTELEMETRY_INSTRUMENTATION.md` says about
-    DLQ trace preservation.
--   **`runApp` does not bracket tracing initialization (S5)** — add
-    a `runAppTraced :: TracingConfig -> ...` helper in
-    `shibuya-core/src/Shibuya/App.hs` that brackets
-    `initializeGlobalTracerProvider`/`shutdownTracerProvider`
-    and feeds the `Tracer` to `runTracing`. Update
-    `shibuya-pgmq-example` and the Kafka jitsurei `OtelDemo` to use
-    it, and document the wiring in `docs/plans/OPENTELEMETRY_INTEGRATION.md`.
--   **Ingester polling errors are invisible (gap noted in
-    "What is *not* covered by `processOne`")** — if M1 elevates
-    this to P1, add an `ingestSpanName`-named span in
-    `runIngesterWithMetrics` that scopes the source-stream
-    consumption. Cost-aware: the span must close after the
-    *stream* exits, not per-message; per-message would dwarf
-    `processOne`'s span count.
+`shibuya-core/src/Shibuya/Telemetry/Effect.hs:103` still calls
+`createTracerProvider [] emptyTracerProviderOptions` for every `runTracingNoop`.
+The stored representation retains a strict `Tracer` even though guarded span
+operations skip it. This is per runner invocation, not per message. No measured
+startup-cost claim is made here. Plan 26's constant hoisting did not remove it.
 
-The exact set lands as it lands; M3 picks them in order.
+The proposed optional-tracer representation has not landed. Before implementing
+it, settle how `getTracer` (`Effect.hs:245`) continues to supply a concrete tracer
+under no-op mode; `EffectSpec` already exercises that contract. An unannounced
+change to `Maybe Tracer`, an exception, or an undefined value is not an acceptable
+internal optimization. Record the chosen compatibility approach and demonstrate
+unchanged no-op action results and `getTracer` behavior, plus removal of repeated
+provider construction. This finding remains a design-and-implementation backlog
+item rather than a ready-to-apply signature change.
 
-**Acceptance.** Every P1 has a passing test plus, where externally
-observable, a Jaeger-shape diff in
-`docs/plans/9-otel-audit-findings.md`'s Surprises section.
 
-### Milestone 4 — Refresh the legacy plan and close out
+### Finding F7 — Disabled callback exposes zero IDs (A, P2): partially improved; contract open
 
-**Scope.**
 
-1.  Update `docs/plans/OPENTELEMETRY_INTEGRATION.md` so its
-    "Current state" matches reality at the end of M3. The legacy
-    plan's "Implementation Phases" already happened; mark it
-    superseded for any section that no longer matches. Do not
-    delete it — it is the design archive.
-2.  Run the local gates on all three repos:
+`shibuya-core/src/Shibuya/Telemetry/Effect.hs:159` calls `f dummySpan` when disabled.
+The value at line 294 is now a shared `NOINLINE` constant wrapping a zero-ID
+`SpanContext`, not a freshly built full span on each callback. The callback type
+remains `Span -> Eff es a`; the proposed `Maybe Span` change never landed.
 
-        # In /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya
-        nix fmt
-        nix flake check
-        cabal build all
-        cabal test shibuya-core-test
+The remaining concern is callers inspecting or injecting that invalid sentinel
+for correlation. `currentTraceHeaders` already guards disabled mode. A future
+resolution must choose explicit documentation/acceptance of the sentinel or an
+API that represents absence; an additive helper can avoid forcing an immediate
+breaking change. Do not claim a breaking signature change is the only possible
+fix. Cover inspection/injection behavior and retain enabled-span behavior before
+marking this contract resolved.
 
-        # In /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-pgmq-adapter
-        nix flake check
-        cabal build all
-        cabal test shibuya-pgmq-adapter-test
 
-        # In /Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya-kafka-adapter
-        nix flake check
-        cabal build all
-        cabal test shibuya-kafka-adapter-test
+### Finding F8 — No framework ingestion/shutdown spans (B, P2): open
 
-3.  Fill in the Outcomes & Retrospective section of this plan.
 
-**Acceptance.** All gates clean. Outcomes section names every
-landed Finding by F<n> and the commit it landed in. Anything
-left un-landed is recorded under "Gaps" with a one-line reason
-and, if applicable, a follow-up plan filename.
+`shibuya-core/src/Shibuya/Internal/Runner/Ingester.hs:53` folds the source with
+metrics and pause support but has no tracing constraint or span.
+`shibuya-core/src/Shibuya/App.hs:363` coordinates shutdown, and its adapter calls
+at line 413 have no spans. `ingestSpanName` remains unused by the runner. This
+finding concerns framework-owned spans; underlying broker instrumentation and
+lifecycle metrics may still provide information. The old statement that failures
+are visible only in logs is obsolete after lifecycle observability work.
+
+The proposed implementation is an Internal-kind span for each source-stream
+lifetime, plus a separate Internal span per adapter shutdown attempt. Avoid adding
+an extra per-message ingestion span. Ensure recorded exceptions and status survive
+failure/cancellation, do not mask the original failure, and preserve ADR 3's
+shutdown semantics. Account for both single-message and batch ingester call sites.
+The shutdown API currently requires only `IOE`, so adding `Tracing` requires an
+explicit compatibility decision. Long-lived spans are normally exported on end;
+this proposal alone does not promise live visibility of an operation that never
+finishes.
+
+
+### Milestones and remaining execution order
+
+
+M1 (audit) and M2 (F1/F2 plus both adapter migrations) are complete. M2 acceptance
+is a single exported process span with the union of framework/adapter attributes,
+not just successful compilation. Retain the core semantic test and adapter
+conversion tests when changing these paths.
+
+M3.1V is the next concrete validation milestone. In the PGMQ project's
+`shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ChaosSpec.hs`, add an in-memory
+exporter around a real `runApp` consumer whose handler dead-letters a message with
+a known producer context. Wait for finalization and stop the app while the provider
+is alive. Read the DLQ row and the exported process span; decode the active header
+and compare both trace ID and span ID with that span. Check the stashed producer
+header and custom headers. Exercise direct-queue and topic-route delivery, and a
+message with no original headers. Preserve the separate no-op test. Add the
+exporter/API dependencies to the adapter test stanza if required, using Mori and
+registry/upstream release verification before selecting bounds. Strengthen core
+`PropagationSpec` to compare the header against the active exported span as well.
+Acceptance is equality of IDs, not simply the presence of a `traceparent` string.
+
+M3.2 addresses F8 using the files and constraints above. Add in-memory exporter
+tests for a finite source, a source exception, normal adapter shutdown, and a
+shutdown exception/timeout. Assert span kind, processor identity, error event and
+status, once-only shutdown, preserved thrown failures, and zero exported spans
+under no-op mode. Run existing lifecycle tests to guard the cancellation contract.
+This milestone does not depend on inventing a managed tracing helper.
+
+M3.3 resolves F6/F7's compatibility choices before changing their public behavior.
+Record the selected API and release implications here, then update EffectSpec and
+consumer call sites as necessary. Their original sketches are not settled public
+signatures. Each finding may be formally accepted as a documented trade-off, but
+must not be checked off solely because the old code still compiles.
+
+M4 follow-up updates the current user guide and this plan after those milestones.
+Record exact validation results and limits, and distill any new durable ownership
+or API decisions into the ADR corpus following `agents/skills/exec-plan/ADR.md`.
+Do not recreate the deleted legacy integration plans to satisfy the original M4
+instructions. A separately scoped managed-provider helper or Kafka DLQ producer is
+not silently added to this audit's remaining implementation.
 
 
 ## Concrete Steps
 
-Working directory for every command is
-`/Users/shinzui/Keikaku/bokuno/shibuya-project/shibuya` unless
-otherwise noted.
 
-### Bootstrapping
+Run core commands from the repository root. These checks select the relevant
+existing tests and need no live broker:
 
-    git status   # Expected: only "?? .agents/" or similar untracked
-    git rev-parse --abbrev-ref HEAD   # Expected: master
+```bash
+cabal test shibuya-core-test --test-options='--match Shibuya.Telemetry' --test-show-details=direct
+```
 
-### Milestone 1
+Discover the adapter roots before running their commands:
 
-The audit is read-only. The only "build" step is the editor.
+```bash
+mori registry show shinzui/shibuya-pgmq-adapter --full
+mori registry show shinzui/shibuya-kafka-adapter --full
+```
 
-    # 1. Create the findings document.
-    $EDITOR docs/plans/9-otel-audit-findings.md
+From the PGMQ checkout root, select the pure merge tests; `--enable-tests` avoids
+a solver plan that omits the suite. Successful output must name six merge cases.
 
-    # 2. Read every file listed under "Plan of Work / Milestone 1 /
-    #    What to read" and produce one Finding per Surprise (S1..S7),
-    #    refuting or confirming each. Add new Findings for anything
-    #    discovered along the way that is not in S1..S7.
+```bash
+cabal test shibuya-pgmq-adapter-test --enable-tests --test-options='--match mergeDlqHeaders' --test-show-details=direct
+```
 
-    # 3. Commit.
-    git add docs/plans/9-audit-and-improve-opentelemetry-api.md \
-            docs/plans/9-otel-audit-findings.md
-    nix fmt
-    git commit  # message: see "Plan of Work / Milestone 1 / Commands"
+From the Kafka checkout root, use its development shell for native librdkafka:
 
-### Milestone 2 (template; exact files depend on M1)
+```bash
+nix develop -c cabal test shibuya-kafka-adapter-test --test-options='--pattern Convert' --test-show-details=direct
+```
 
-If the P0 is S2 with the recommended fix (Envelope-attribute hook):
+For actual runtime implementation, additionally run `cabal build all`, the affected
+full test suites, `nix fmt`, and `nix flake check` in each changed repository.
+PostgreSQL/Redpanda integration suites require their repository's documented local
+services; a broker-free filter is not a substitute for M3.1V. New enabled-tracing
+DLQ tests should have a stable `DLQ consumer trace` name so they can be selected:
 
-    # In shibuya-core:
-    $EDITOR shibuya-core/src/Shibuya/Core/Types.hs        # add `attributes` field
-    $EDITOR shibuya-core/src/Shibuya/Runner/Supervised.hs # call addAttributes
-    $EDITOR shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs # extend test
+```bash
+# PGMQ repository root, after implementing M3.1V and starting its test database.
+cabal test shibuya-pgmq-adapter-test --enable-tests --test-options='--match "DLQ consumer trace"' --test-show-details=direct
+```
 
-    cabal build shibuya-core
-    cabal test  shibuya-core-test
-    nix fmt
+Do not run or report the last selector as proof until tests with that name exist.
+Use the existing `ChaosSpec` database fixtures and supported ephemeral-database
+workflow; do not reset a user's unrelated database. For F8 core lifecycle regression:
 
-    git add shibuya-core/...
-    git commit  # ExecPlan + Intention trailers
-
-    # In shibuya-pgmq-adapter (separate repo, separate commit):
-    cd ../shibuya-pgmq-adapter
-    $EDITOR shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Convert.hs
-
-    cabal build all
-    cabal test shibuya-pgmq-adapter-test
-    nix fmt
-
-    git add ...
-    git commit
-
-    # In shibuya-kafka-adapter (separate repo, separate commit):
-    cd ../shibuya-kafka-adapter
-    $EDITOR shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Convert.hs
-    $EDITOR shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Tracing.hs  # may shrink to deletion
-    $EDITOR shibuya-kafka-adapter/test/Shibuya/Adapter/Kafka/TracingTest.hs
-
-    cabal build all
-    cabal test shibuya-kafka-adapter-test
-    nix fmt
-
-    git add ...
-    git commit
-
-### Milestone 3 (template; exact files depend on M1)
-
-Each P1 lands as its own commit per repo, same shape as M2.
-
-### Milestone 4
-
-    nix fmt
-    nix flake check
-    cabal build all
-    cabal test shibuya-core-test
-
-    cd ../shibuya-pgmq-adapter && nix flake check && cabal test shibuya-pgmq-adapter-test
-    cd ../shibuya-kafka-adapter && nix flake check && cabal test shibuya-kafka-adapter-test
-    cd ../shibuya
-
-    $EDITOR docs/plans/OPENTELEMETRY_INTEGRATION.md   # mark superseded sections
-    $EDITOR docs/plans/9-audit-and-improve-opentelemetry-api.md
-    # Fill Outcomes & Retrospective.
-
-    git add docs/plans/OPENTELEMETRY_INTEGRATION.md \
-            docs/plans/9-audit-and-improve-opentelemetry-api.md
-    git commit
+```bash
+# Shibuya repository root.
+cabal test shibuya-core-test --test-show-details=direct
+```
 
 
 ## Validation and Acceptance
 
-End-to-end validation differs per milestone.
 
-**M1.** Acceptance is the existence of
-`docs/plans/9-otel-audit-findings.md` with the Triage table at the
-top, every Finding cited with at least one file:line, and every
-Surprise S1..S7 either confirmed-as-Finding or refuted with
-evidence. A reader who reads only the findings file should be able
-to predict, within reason, the M2 and M3 milestones. There is no
-runtime check at this stage — the audit is a written deliverable.
+Current implementation evidence is scoped: the core suite drives a mock adapter
+through `runWithMetrics` and asserts exactly one span and the attribute union.
+Kafka conversion tests assert the actual broker record's attributes but are not
+an end-to-end `runApp` parent-link test. The recorded 2026-05-05 Jaeger smoke is
+historical corroboration. F3 unit tests prove header merging; they do not prove
+which span is active at the database write. M3.1V supplies that missing proof.
 
-**M2 / M3.** For any landed Finding that affects span shape,
-attribute set, span name, or parent linkage:
+F8 is complete only when source and shutdown errors emit the specified spans
+without changing failure/cancellation behavior or creating a new span per message.
+F6 needs evidence addressing runner-level provider construction and the concrete
+`getTracer` contract. F7 needs an explicit supported disabled callback contract,
+with tests and docs reflecting whichever resolution is selected.
 
-1.  The accompanying HSpec or HUnit test (in
-    `shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs` for
-    framework changes, in
-    `shibuya-pgmq-adapter/.../test/Shibuya/Adapter/Pgmq/...Spec.hs`
-    for pgmq adapter changes, in
-    `shibuya-kafka-adapter/.../test/Shibuya/Adapter/Kafka/TracingTest.hs`
-    for Kafka adapter changes) drives the affected code path
-    through an in-memory exporter and asserts the exact wire-name
-    of every changed attribute, the exact span name, and the
-    parent linkage. The test must fail on the pre-fix code and
-    pass on the post-fix code; the Surprises section records both
-    transcripts.
-
-2.  Where externally observable, a Jaeger smoke check is run:
-
-        # Only relevant for the kafka or pgmq adapter changes.
-        # Working directory: the adapter repo whose flake.nix
-        # configures process-compose for jaeger.
-        just process-up
-
-        # Then publish a message with a known traceparent and run
-        # the demo executable; example for kafka:
-        rpk topic produce orders --key k1 \
-            -H 'traceparent=00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01' \
-            <<< 'hello-otel'
-        cabal run otel-demo
-
-        curl -s "http://127.0.0.1:16686/api/traces/0af7651916cd43dd8448eb211c80319c" \
-          | jq '.data[0].spans | map({operationName, references, tags: (.tags | map({key, value}))})'
-
-    The acceptance observation is named in the Finding's "Proposed
-    fix" line: a specific span count, a specific attribute, an
-    absent attribute, or a specific parent reference. For example,
-    if the P0 is S2's recommended fix, acceptance is "exactly one
-    Consumer-kind span per processed message, named
-    `<topic> process`, carrying both the spec-aligned messaging
-    attributes and the Kafka-typed
-    `messaging.kafka.destination.partition` /
-    `messaging.kafka.message.offset` attributes".
-
-**M4.** Acceptance is the green local-gates run named in the
-milestone, plus a filled-out Outcomes & Retrospective.
+The documentation consolidation itself is accepted when there is one ID-9 file,
+all eight findings and original implementation commits are retained, source status
+matches current code, every newly written code fence has a language tag, local
+links resolve, and inbound references to the removed companion are updated.
+No model authorship is inferred for pre-provenance work; this review/update records
+only its own verified runtime identity.
 
 
 ## Idempotence and Recovery
 
-The audit milestone (M1) is fully idempotent: re-reading the source
-files and re-rewriting the findings document converges on the same
-state. If the audit document is lost, regenerating it from the same
-file list is safe.
 
-The implementation milestones (M2/M3) edit code across three
-separate cabal packages in three separate git repos. Each repo's
-edits are independent on the file system and can be rolled back
-with `git revert` per repo without affecting the others. The two
-cross-repo invariants to preserve are:
+Re-reading the source and rerunning focused tests is safe; these commands do not
+require publishing packages or changing committed pins. Preserve developer-local
+configuration. If native libraries are missing, use the relevant development shell
+and report setup failure separately from a failed behavioral assertion.
 
--   `shibuya-pgmq-adapter` and `shibuya-kafka-adapter` both depend
-    on `shibuya-core ^>=0.4`. If M2 or M3 require bumping
-    `shibuya-core`'s version (for example, by adding a field to
-    `Envelope`), the bump must be a minor (`0.5.x`) and both
-    adapters must update their `^>=` bound in the same milestone.
-    The cabal package on Hackage is the single point of truth; do
-    not introduce path-based pins to "test" the integration before
-    publishing.
--   The `Envelope` record is `derive stock (... Functor ...)`. Any
-    new field must be a non-functor field (i.e., not `... msg`)
-    or the `Functor` instance breaks. New fields should be
-    additive, with `Maybe` or `Monoid` defaults so existing
-    constructors compile after the bump.
-
-If a hook fails on commit (the project's `CLAUDE.md` warns about
-treefmt), the recovery is the standard `nix fmt`, re-stage,
-recommit dance.
+The deleted findings document and original long-form plan remain recoverable from
+Git at the reviewed baseline. Restore only the needed historical text, rather than
+reintroducing a second ID-9 plan. Keep current branch and unrelated edits intact.
+For later implementation, make reversible per-repository commits with Conventional
+Commit subjects. Local commits reference this repository-relative ExecPlan path;
+adapter commits use `ExecPlan: mori://shinzui/shibuya/plans/9-audit-and-improve-opentelemetry-api`
+and the active `Intention: intention_01kh0akd82ekat0be54p2f72kv` trailer where this
+plan governs their work.
 
 
 ## Interfaces and Dependencies
 
-Packages used by this work:
 
--   `hs-opentelemetry-api ^>=0.3` (already a dependency of every
-    relevant cabal stanza in all three repos). Provides `Span`,
-    `SpanContext`, `Tracer`, `Attribute`, `AttributeKey`.
--   `hs-opentelemetry-semantic-conventions ^>=0.1` (already a
-    dependency of `shibuya-core` and
-    `shibuya-kafka-adapter`). Adapters that need typed
-    broker-specific keys depend on this.
--   `hs-opentelemetry-propagator-w3c ^>=0.1` (already a dependency
-    of `shibuya-core`).
--   `hs-opentelemetry-exporter-in-memory ^>=0.0` (already a
-    test-stanza dependency of `shibuya-core`). Used by any new
-    test that needs to capture spans.
--   No new dependencies are anticipated by this plan. If M2/M3
-    require one, that is a Decision Log entry.
+The implemented interfaces are:
 
-Interface shape after each milestone:
+```haskell
+-- shibuya-core/src/Shibuya/Core/Types.hs (field on Envelope)
+attributes :: !(HashMap Text Attribute)
 
--   End of M1: no API change. New file
-    `docs/plans/9-otel-audit-findings.md`.
--   End of M2: depends on the fix landed. If the fix is the
-    `Envelope.attributes` hook, the change is
-    in `shibuya-core/src/Shibuya/Core/Types.hs`:
+-- shibuya-core/src/Shibuya/Telemetry/Propagation.hs
+extractTraceContext :: TraceHeaders -> Maybe SpanContext
+injectTraceContext :: Span -> IO TraceHeaders
+currentTraceHeaders :: (Tracing :> es, IOE :> es) => Eff es (Maybe TraceHeaders)
 
-        data Envelope msg = Envelope
-          { messageId    :: !MessageId
-          , cursor       :: !(Maybe Cursor)
-          , partition    :: !(Maybe Text)
-          , enqueuedAt   :: !(Maybe UTCTime)
-          , traceContext :: !(Maybe TraceHeaders)
-          , attempt      :: !(Maybe Attempt)
-          , attributes   :: !(Maybe (HashMap Text Attribute))   -- NEW
-          , payload      :: !msg
-          }
+-- shibuya-core/src/Shibuya/Telemetry/Effect.hs
+runTracing :: (IOE :> es) => Tracer -> Eff (Tracing : es) a -> Eff es a
+runTracingNoop :: (IOE :> es) => Eff (Tracing : es) a -> Eff es a
+getTracer :: (Tracing :> es) => Eff es Tracer
+withSpan' :: (Tracing :> es, IOE :> es) => Text -> SpanArguments -> (Span -> Eff es a) -> Eff es a
 
-    and a corresponding `addAttributes traceSpan` call in
-    `shibuya-core/src/Shibuya/Runner/Supervised.hs::processOne`. The
-    Kafka adapter's `Tracing.hs` either disappears or shrinks to a
-    `populateAttributes :: Envelope v -> Envelope v` helper that
-    sets the `attributes` field; the `Stream.mapM` /
-    `withSpan'` body is gone.
--   End of M3: depends on which P1s landed. Most likely candidates:
+-- shibuya-core/src/Shibuya/App.hs
+runApp :: (IOE :> es, Tracing :> es) => AppConfig -> [(ProcessorId, QueueProcessor es)] -> Eff es (Either AppError (AppHandle es))
+```
 
-        -- DLQ trace injection
-        -- shibuya-core/src/Shibuya/Telemetry/Propagation.hs (if
-        -- not already present):
-        currentTraceHeaders :: (Tracing :> es, IOE :> es) => Eff es TraceHeaders
+These are excerpts, not a complete standalone module. In particular, the first
+line is a strict record-field declaration. `TraceHeaders` is a list of byte-string
+key/value pairs. No `TracingConfig`, `runAppTraced`, or `Maybe Span` callback is
+present. `Envelope.attributes` is not optional.
 
-        -- A runApp helper that brackets the tracer:
-        -- shibuya-core/src/Shibuya/App.hs:
-        runAppTraced
-          :: (IOE :> es)
-          => TracingConfig
-          -> SupervisionStrategy
-          -> Int
-          -> [(ProcessorId, QueueProcessor (Tracing : es))]
-          -> Eff es (Either AppError (AppHandle (Tracing : es)))
+The checked-in core Cabal file currently uses `hs-opentelemetry-api ^>=1.0`,
+`hs-opentelemetry-propagator-w3c ^>=1.0`, semantic conventions `^>=1.40`, and the
+in-memory exporter `^>=1.0` for tests. Core does not currently depend on the SDK
+initializer. Both adapter library stanzas target core `^>=0.10.0.0`. These describe
+the working tree; no new bounds or pins are chosen by this review.
 
-    The exact signatures are decided in the Decision Log when
-    the work lands.
+Upstream ownership is `mori://iand675/hs-opentelemetry`; curated lifecycle guidance
+is `mori://iand675/hs-opentelemetry/docs/tracer-provider-guide`. Use Mori to locate
+its source before changing APIs, and verify package-registry releases and upstream
+tags before choosing any future compatibility bounds. The public getter is
+`Shibuya.Telemetry.Effect.getTracer`; do not confuse it with an upstream function
+of the same name when designing F6.
 
--   End of M4: no further interface change. Outcomes section
-    summarises landed work.
+Kafka DLQ creation remains a separate missing feature: in
+`mori://shinzui/shibuya-kafka-adapter`,
+`shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs:329` warns that a
+dead-lettered message is dropped because no DLQ producer exists, then follows its
+offset path. PGMQ's F3 propagation fix does not implement Kafka DLQ delivery.
 
-No new public API in `shibuya-core` should ever land without a
-matching update to `docs/plans/OPENTELEMETRY_INTEGRATION.md`'s
-"Quick Start" or "Configuration" sections so the legacy plan stays
-in sync.
 
----
+## Revision history
 
-Revision history:
 
--   2026-05-05: Initial draft. Scoped to (a) audit Shibuya's OTel
-    API and (b) implement the highest-priority improvements that
-    fall out of the audit. Intention
-    `intention_01kh0akd82ekat0be54p2f72kv` attached. Surprises
-    S1..S7 are the audit's pre-implementation hypotheses,
-    targeting the consume-side and produce-side seams between
-    `shibuya-core` and the two real adapters
-    (`shibuya-pgmq-adapter`, `shibuya-kafka-adapter`).
+2026-05-05: Initial audit and implementation sequence, with intention
+`intention_01kh0akd82ekat0be54p2f72kv`. Findings, core/adapter migrations, propagation
+helper, and historical acceptance were recorded during that work.
+
+2026-10-12: Reviewed current source and targeted tests; merged the companion audit
+into this plan at the user's request. Preserved F1–F8 and implementation history,
+replaced stale paths/signatures and contradictory statuses, recognized plan 25's
+F4 resolution and plan 26's partial F7 improvement, separated missing tests from
+missing features, and retained open work without claiming new implementation.

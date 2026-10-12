@@ -336,7 +336,7 @@
   `messaging.system` default — without opening a second span. The
   per-record `Shibuya.Adapter.Kafka.Tracing.traced` wrapper that
   previously bolted these on can now be removed; see the audit
-  document `docs/plans/9-otel-audit-findings.md` (Finding F1, P0)
+  document `docs/plans/9-audit-and-improve-opentelemetry-api.md` (Finding F1, P0)
   for the full motivation.
 - `Shibuya.Telemetry.Propagation.currentTraceHeaders ::
   (Tracing :> es, IOE :> es) => Eff es (Maybe TraceHeaders)` looks
@@ -346,7 +346,7 @@
   is disabled or there is no active span. The intended call sites
   are adapter-side DLQ writes (so the failing-consumer's trace
   links to the resulting DLQ message) and ad-hoc producer paths.
-  See the audit document `docs/plans/9-otel-audit-findings.md`
+  See the audit document `docs/plans/9-audit-and-improve-opentelemetry-api.md`
   (Findings F3 and F5).
 
 ## 0.4.0.0 — 2026-04-29
