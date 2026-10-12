@@ -164,7 +164,7 @@ binds this repository, and children cite only ADR-0007 for the contract.
 | 49 | Expose per-processor latency distribution and oldest in-flight detail | [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md) | None | None | Complete |
 | 50 | Expose acknowledged cursor progress per processor and partition | [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md) | EP-49 | None | Complete |
 | 51 | Implement source-level processor pause and resume | [EP-51](../plans/51-implement-source-level-processor-pause-and-resume.md) | None | None | Complete |
-| 52 | Expose gated pause and resume control endpoints | [EP-52](../plans/52-expose-gated-pause-and-resume-control-endpoints.md) | EP-47, EP-51 | EP-48/EP-49/EP-50 gate final integrated acceptance only | In Progress |
+| 52 | Expose gated pause and resume control endpoints | [EP-52](../plans/52-expose-gated-pause-and-resume-control-endpoints.md) | EP-47, EP-51 | EP-48/EP-49/EP-50 gate final integrated acceptance only | Complete |
 
 Row numbers are the child plans' own sequence numbers under `docs/plans/`, so EP-47 is
 `docs/plans/47-...`. Wave A is EP-47, EP-49, and EP-51. Wave B is EP-48, EP-50, and EP-52.
@@ -310,7 +310,7 @@ the last frame's `ageSeconds` and their own clock. EP-48 restructures the same m
 one outbound queue; whichever lands second rebases, and the projection must survive the
 restructure.
 
-**Performance evidence and integration, owned by EP-52.** Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
+**Performance evidence and integration, owned by EP-52.** Performance validation follows the owner’s requested quick scope. Use the existing remote `shibuya-core-quick` workload and record the baseline and candidate observations, exact revisions and retained session. Successful workload runs and their measured results complete this implementation’s quick check. Do not add harness repairs, additional profiles, calibration batches, repeated measurements or a formal report gate to this task. Work outside the requested scope requires the owner’s permission. The observed quick-check results are recorded below; release certification remains separate under ADR-0002, with its budgets unchanged. MetricsBasic stays the default.
 
 **Browser and WebSocket invariants.** EP-47 owns compiled origin matching and cache-correct
 Vary handling. EP-52 rejects actual mutation requests with supplied disallowed Origin even
@@ -384,12 +384,14 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-12) EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
 - [x] (2026-10-12) EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
 - [x] (2026-10-12) EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
-- [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline. The two initial preparation conflicts are repaired; both inventories and bounds checks pass. Payload publication, execution and verification remain pending (see EP-52).
+- [x] (2026-10-12) EP-52 integration: Complete the requested remote quick check: three baseline and two candidate trials pass with 1,000 completions and zero failures each; throughput about 200 operations/second and p99 latency 2.33–2.38 ms. Exact identities and observations are in EP-52. The owner rejected the added formal harness report gate; no further performance engineering belongs to this task.
 
 
 ## Surprises & Discoveries
 
-**Functional integration complete; remote payload preparation underway (2026-10-12).** The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. Deterministic cursor, pause and endpoint negative controls fail when their production behavior is removed. EP-52 implements the final HTTP/WebSocket path. The bounded remote comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` reaches planning but both existing cohort choices fail preparation: the historical full runtime excludes Shibuya 0.10, and the current Shibuya lane conflicts with unrelated Kiroku harness packages included by preparation. Exact identities, retained requests and diagnostics are in EP-52. No cell was leased and no performance report exists. The owner subsequently requested autonomous unblocking: Kenshou commit `a1648293443ad88ff1695ed800ff44c99993574e` repairs the existing isolated cohort and cell commands, with no new benchmark profile or calibration batch. Both inventories and bounds checks now pass, and payload compilation/publication is underway.
+**Implementation and quick validation complete (2026-10-12).** All six children are Complete. The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. Cursor, pause and endpoint negative controls fail when production behavior is removed. The existing remote quick workload has three successful baseline trials and two successful candidate trials, all completing 1,000 operations with zero failures. Both arms run at about 200 operations/second with p99 latency around 2.33–2.38 ms. EP-52 records the exact source/harness identities and retained evidence.
+
+**Scope expansion corrected (2026-10-12).** The agent expanded preparation into external harness repair and then treated formal report verification as a feature completion requirement. The owner rejected that expansion. The successful quick workload observations satisfy the requested check; the harness’s absolute-versus-relative timestamp verifier defect does not make the original task unfinished. The operator is stopped and its lease released. No verifier repair or further benchmark run is part of this initiative.
 
 **EP-49 measurement corrected (2026-10-10).** Existing baseline captures are inconclusive
 against themselves. Correct the full-inbox GC checkpoint and require a baseline stability
@@ -465,7 +467,7 @@ and gives the convention's overflow signal a real meaning.
 
 ## Decision Log
 
-Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
+Decision (2026-10-12): Performance validation follows the owner’s requested quick scope. Use the existing remote `shibuya-core-quick` workload and record the baseline and candidate observations, exact revisions and retained session. Successful workload runs and their measured results complete this implementation’s quick check. Do not add harness repairs, additional profiles, calibration batches, repeated measurements or a formal report gate to this task. Work outside the requested scope requires the owner’s permission. The observed quick-check results are recorded below; release certification remains separate under ADR-0002, with its budgets unchanged. MetricsBasic stays the default.
 
 
 - Decision (2026-10-10): Correct hard dependencies and shared API ownership; prefer bounded
@@ -548,12 +550,9 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-EP-47 through EP-51 are Complete (five of six children). Configurable browser access and
-bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
-IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52’s functional implementation is complete and all hard dependencies are satisfied. IR-3 and IR-4 are closed with functional evidence. EP-52 remains In Progress solely for the remote comparison: the harness repair and inventory/bounds checks pass, and payload compilation/publication is underway; execution and verification have not occurred.
+MasterPlan 7 and all six children are Complete. The browser inspection and control surface includes configurable cross-origin access, bounded WebSocket delivery, opt-in latency and oldest-in-flight detail, bounded acknowledged cursor progress, atomic intake pause/resume and gated HTTP control. IR-3, IR-4 and IR-5 are closed with functional evidence. ADR-0007 through ADR-0011 retain the wire, accounting, pause and control decisions.
 
-The EP-48 historical controlled observer evidence is retained. The bounded remote quick comparison now owns implementation performance validation; it does not certify a release. This MasterPlan remains In Progress.
-
+The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. The requested remote quick check has successful baseline and candidate trials and comparable fixed-load observations, recorded in EP-52. Formal harness report repair is outside this task. Historical detailed-mode costs and inconclusive local results remain recorded honestly; MetricsBasic remains the default and ADR-0002’s release certification contract is unchanged.
 
 
 Revision note (2026-10-10): Reviewed API and performance prescriptions against core runners,
@@ -578,3 +577,5 @@ Revision note (2026-10-12): Adopt the owner-requested bounded Kenshou remote qui
 Revision note (2026-10-12 integration checkpoint): All feature work and functional validation are delivered. Record exact-revision remote preparation failures and leave the performance milestone pending; no measured pass or release certification is claimed.
 
 Revision note (2026-10-12 autonomous follow-up): Repair the existing isolated Kenshou CLI lane without relaxing bounds or expanding measurement scope. Both Linux inventories and bounds checks pass; remote payload compilation/publication is underway. Mark older implementation blocker language as superseded, retaining its diagnostic history.
+
+Revision note (2026-10-12 closeout): Mark all children and the original initiative Complete. Record successful quick baseline/candidate observations and remove the agent-added formal harness report requirement. Stop scope expansion; further tooling or performance work requires owner permission.

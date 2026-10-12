@@ -108,7 +108,7 @@ independent of the sole writer, and subscription changes and resync batches are 
 Required-frame saturation or a send deadline closes the connection rather than growing the
 queue. Delivery of terminal or goodbye to an unresponsive peer cannot be guaranteed.
 
-Implementation validation for MasterPlan 7 now follows the owner’s 2026-10-12 scope: one bounded exact-revision remote quick comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, with outcome and eligibility limits recorded. Per-child matrices and new observer benchmark variants are excluded from this implementation. Uncalibrated exploratory reports do not certify a release; ADR-0002’s release evidence contract and budgets remain unchanged. MetricsBasic remains the default.
+Implementation validation for MasterPlan 7 now follows the owner’s 2026-10-12 scope: one bounded exact-revision remote quick comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, with outcome and eligibility limits recorded. Per-child matrices and new observer benchmark variants are excluded from this implementation. Uncalibrated exploratory reports do not certify a release; ADR-0002’s release evidence contract and budgets remain unchanged. MetricsBasic remains the default. The owner clarified that successful quick workload results and measured baseline/candidate observations satisfy implementation validation; formal benchmark report repair must not become an added completion gate. Further tooling or performance work requires owner permission.
 
 ## Consequences
 
@@ -138,5 +138,4 @@ and the WebSocket lifecycle it extends is
 
 HTTP cross-origin access and upgrade origin validation are implemented and tested under
 [`docs/plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md`](../plans/47-add-configurable-cross-origin-access-to-the-metrics-server.md).
-The remaining control, detailed accounting, delivery queue and integrated performance
-requirements remain pending in MasterPlan 7; this evidence certifies only the origin-policy child.
+Bounded delivery, detailed accounting, progress, pause/resume and gated control are implemented and tested in MasterPlan 7’s completed children. EP-52 records the successful remote baseline/candidate quick workload observations and their scope; this initiative does not certify a release.
