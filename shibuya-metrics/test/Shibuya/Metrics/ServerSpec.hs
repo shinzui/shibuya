@@ -1,22 +1,28 @@
 module Shibuya.Metrics.ServerSpec (spec) where
 
 import Control.Exception (SomeException, throwIO)
-import Data.Aeson (decode, object, (.=))
+import Data.Aeson (Value (..), decode, object, (.=))
+import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Char (toLower)
 import Data.List (isInfixOf)
+import Effectful (runEff)
 import Network.HTTP.Types (Status, hContentType, status200, status404, status503)
 import Network.Wai (Application, requestHeaders)
 import Network.Wai.Test (SResponse (..), defaultRequest, request, runSession, setPath)
 import Shibuya.App (Master)
 import Shibuya.Core.Metrics (ProcessorId (..))
+import Shibuya.Core.Metrics qualified as Metrics
+import Shibuya.Core.Types (Cursor (..))
+import Shibuya.Internal.Runner.Master (registerProcessor)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Error (errorResponse)
 import Shibuya.Metrics.Health (DependencyCheck, DependencyStatus (..))
 import Shibuya.Metrics.Server (combinedApp, startMetricsServer)
 import Shibuya.Metrics.TestSupport
-  ( getResponse,
+  ( fixedTime,
+    getResponse,
     registerIdleProcessor,
     withMaster,
   )
@@ -61,6 +67,20 @@ spec = around withMaster $ do
           )
 
   describe "combinedApp HTTP routes" $ do
+    it "exposes progress only after a detailed cursor acknowledgement" $ \master -> do
+      h <- Metrics.newMetricsHandleWith (Metrics.MetricsDetailed Metrics.defaultDetailOptions) 1 fixedTime
+      runEff $ registerProcessor master (ProcessorId "progressing") h
+      _ <- registerIdleProcessor master (ProcessorId "idle")
+      Metrics.recordAcknowledgedCursor h Nothing (Just (CursorInt 4210))
+      app <- appFor defaultConfig master []
+      yes <- getResponse app "/metrics/progressing"
+      no <- getResponse app "/metrics/idle"
+      let hasProgress body = case decode body of
+            Just (Object obj) -> KM.member "progress" obj
+            _ -> False
+      hasProgress yes.simpleBody `shouldBe` True
+      hasProgress no.simpleBody `shouldBe` False
+
     it "preserves headerless defaults on every read route with an Origin" $ \master -> do
       _ <- registerIdleProcessor master (ProcessorId "known")
       app <- appFor defaultConfig master []

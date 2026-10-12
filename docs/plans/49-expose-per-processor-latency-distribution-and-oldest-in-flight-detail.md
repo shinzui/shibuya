@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-10T22:08:53Z
       mode: "implement"
       note: "Implement bounded opt-in latency and in-flight accounting with measured acceptance."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-12T19:32:42Z
+      mode: "implement"
+      note: "Implement browser inspection/control with bounded remote quick performance scope."
 ---
 
 
@@ -77,7 +82,7 @@ and the fixtures this plan introduces.
 - [x] (2026-10-10 22:16Z) Milestone 1, accounting: add `MetricsDetail`, `DetailOptions`, `defaultMetricsDetail`, `LatencySummary`, `LatencyBucket`, `OldestInFlight`, the slot table, and the sharded histogram to `shibuya-core/src/Shibuya/Core/Metrics.hs`; use existing base and containers dependencies.
 - [x] (2026-10-10 22:16Z) Milestone 1, hooks: add `claimInFlightSlot` and `releaseInFlightSlot`; call them from `processOne` and `processOneBatchWithDetail`; add `runSupervisedWith` and `runSupervisedBatchWith`; add `metricsDetail` to `AppConfig`.
 - [x] (2026-10-10 22:16Z) Milestone 1, unit tests: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` for claim, release, bucketing, concurrent publication and cancellation cleanup, and sampling with an injected clock; suite green.
-- [ ] Milestone 1, measurement: basic-path performance acceptance remains inconclusive under `-N1` and `-N4`; see Outcomes & Retrospective. Further sampling stopped at the user's request.
+- [x] (2026-10-12) Milestone 1, measurement scope revised: retain historical inconclusive results and detailed cost diagnostics; one final remote quick comparison belongs to EP-52, with no per-child measurement gate.
 - [x] (2026-10-10 22:16Z) Milestone 1, default: `defaultMetricsDetail` remains `MetricsBasic`; detailed overhead reported; decision recorded below.
 - [x] (2026-10-10 22:16Z) Milestone 2, JSON: `ProcessorMetrics` encoders omit `Nothing` members; `MessageId` JSON instances; golden fixture gains a detailed processor.
 - [x] (2026-10-10 22:16Z) Milestone 2, Prometheus: `shibuya_message_processing_seconds` histogram and `shibuya_processor_oldest_in_flight_seconds` gauge; golden updated deliberately.
@@ -105,6 +110,8 @@ The user reports a very busy machine; observed load was about 34 on ten cores. S
 
 
 ## Decision Log
+
+Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 
 - Decision (2026-10-10 implementation): Preserve the existing generic value-based JSON encoding order; omit absent members without switching to direct generic encoding. Add one detailed fixture and retain the four basic objects byte-for-byte. Prometheus counts use exact integer text so lifetime counts are not rounded through Double; numeric semantics are unchanged. Use a strict bounded IntMap of noncumulative bin counts per locked slot, then accumulate at sampling time. Expose slotMisses as a read-only diagnostic on the handle. These choices preserve basic wire bytes, exact count arithmetic and synchronized identity/start publication without a new dependency.
@@ -154,7 +161,7 @@ Against baseline `db8e783`, the corrected focused basic matrices each pass 68 of
 
 Detailed diagnostics show the opt-in cost: serial allocation increases about 47% under `-N1` and 46% under `-N4`, with throughput about 27% and 14% lower. Batch allocation increases about 0.4%. In real WebSocket fan-out at 1/16/64 clients, all thirty detailed runs completed 500,000 observations with zero slot misses and no retained oldest attempt; allocation increased about 55/58/72% and throughput fell about 23/22/23% (O1, `-N4`, ten alternating pairs). These are workload diagnostics, not an acceptance claim.
 
-The functional tests need no expansion. EP-49 remains In Progress because its performance gate has not passed; EP-50 remains blocked. The corrected measurement must run on a quiet host that first passes the baseline stability control. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
+The functional tests need no expansion. EP-49 is Complete under the revised implementation validation scope; EP-50 may proceed. The old inconclusive performance results remain inconclusive and do not certify a release. The corrected measurement must run on a quiet host that first passes the baseline stability control. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
 
 
 ## Context and Orientation
@@ -496,62 +503,7 @@ nix fmt
 ```
 
 `cabal test shibuya-core` runs `shibuya-core-test`, `shibuya-core-gc-test`, and
-`shibuya-core-gc-finished-test`; all three must pass. Milestone 1 measurement, with the
-identities substituted:
-
-```bash
-set -e
-git worktree add --detach /tmp/ep49-baseline <parent-of-milestone-1-commit>
-git worktree add --detach /tmp/ep49-detailed <milestone-1-commit>
-# In /tmp/ep49-detailed only: set defaultMetricsDetail = MetricsDetailed defaultDetailOptions.
-# Apply the same committed checkpoint harness to the older production baseline.
-for tree in /tmp/ep49-baseline /tmp/ep49-detailed; do
-  cp shibuya-core-bench/bench/Bench/Lifecycle.hs "$tree/shibuya-core-bench/bench/Bench/Lifecycle.hs"
-done
-for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do
-  (cd "$tree" && shasum -a 256 shibuya-core-bench/bench/Bench/Lifecycle.hs shibuya-core-bench/bench/Test/LifecycleLoad.hs)
-done
-for tree in /tmp/ep49-baseline . /tmp/ep49-detailed; do (cd "$tree" && cabal build shibuya-core-bench:lifecycle-load && jq -r '.["install-plan"][] | select(.style != "local") | "\(.["pkg-name"])-\(.["pkg-version"])"' dist-newstyle/cache/plan.json | sort -u | shasum -a 256); done
-mkdir -p /tmp/shibuya-ep49-measurements
-jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path","metrics-enabled","metrics-disabled","idle-worker","startup-shutdown","graceful-shutdown-drain","batch-timeout"]' \
-  docs/audits/lifecycle-release/performance-budgets.json \
-  > /tmp/shibuya-ep49-measurements/focused-budgets.json
-for rts in N1 N4; do
-  caps=${rts#N}
-  bun scripts/audit/capture-performance-paired.ts \
-    --baseline-executable "$(cd /tmp/ep49-baseline && cabal list-bin shibuya-core-bench:lifecycle-load)" \
-    --baseline-output /tmp/shibuya-ep49-measurements/baseline-${rts,,}.json \
-    --baseline-label ep49-baseline-${rts,,} --baseline-production-sha <parent-sha> \
-    --candidate-executable "$(cabal list-bin shibuya-core-bench:lifecycle-load)" \
-    --candidate-output /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
-    --candidate-label ep49-basic-${rts,,} --candidate-production-sha <milestone-1-sha> \
-    --rts -$rts --capabilities $caps --iterations 10 \
-    --stability-budgets /tmp/shibuya-ep49-measurements/focused-budgets.json \
-    --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path,metrics-enabled,metrics-disabled,idle-worker,startup-shutdown,graceful-shutdown-drain,batch-timeout \
-    --machine-id MacBookPro18,2 --platform Darwin-arm64 --compiler ghc-9.12.4 --optimization O2 \
-    --harness-sha <combined-identical-harness-file-hash> --solver-plan-hash <normalized-solver-hash>
-  bun scripts/audit/compare-performance.ts \
-    --baseline /tmp/shibuya-ep49-measurements/baseline-${rts,,}.json \
-    --candidate /tmp/shibuya-ep49-measurements/basic-${rts,,}.json \
-    --budgets /tmp/shibuya-ep49-measurements/focused-budgets.json \
-    --output /tmp/shibuya-ep49-measurements/verdict-basic-${rts,,}.json
-done
-```
-
-Run the unchanged baseline stability control before either candidate measurement; if it fails
-or is inconclusive, stop and diagnose the host or fixture. Do not repeatedly increase the
-pair count to chase a pass. Build the same version-4 checkpoint harness against both
-production revisions, so old version-3 datasets cannot be reused as corrected evidence.
-
-Repeat the capture and comparison with the `/tmp/ep49-detailed` executable as the
-candidate, labels `ep49-detailed-*`, `--candidate-production-sha <milestone-1-sha>+detailed-default`,
-outputs `detailed-*.json` and `verdict-detailed-*.json`. The harness file hashes and the three
-solver hashes printed by the loops must be identical; if the solver hash differs, stop and
-resolve the dependency difference before capturing. The comparator exits 0 for pass, 1 for
-fail, and 2 for inconclusive; a `${rts,,}` expansion needs bash 4 or later, otherwise write
-the lowercase names by hand. Remove the worktrees afterwards with `git worktree remove
---force`. The final EP-52 integration gate runs the entire canonical matrix, including
-serial-fixed-rate and the health/WebSocket proxies, plus actual sustained observer load.
+`shibuya-core-gc-finished-test`; all three must pass. Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 Milestone 2 transcript to capture with the example explicitly configured detailed:
 
@@ -600,9 +552,7 @@ A batch processor reports one latency observation per batch.
 `cabal test shibuya-core` and `cabal test shibuya-metrics` pass with the new examples
 counted; the `MetricsSpec` examples, the two golden examples, and the `WebSocketSpec` age
 example were each observed failing before their implementation or by mutation, and the
-failing runs are recorded in Surprises & Discoveries with seeds. The basic-candidate verdict
-files report `pass` for every cell under both `-N1` and `-N4`; the detailed verdict files
-exist and the shipped `defaultMetricsDetail` remains `MetricsBasic`. RTS allocation measurements for the basic path meet the canonical 5% limit. The ADR, architecture
+failing runs are recorded in Surprises & Discoveries with seeds. The integrated remote quick comparison is recorded by EP-52. Existing detailed cost diagnostics remain explicit and the shipped default stays MetricsBasic. The ADR, architecture
 section, Haddock, usage guide, capability records, and three changelogs exist and the
 capability bundle validates.
 
@@ -680,3 +630,6 @@ order and rebase the second. Coordination context is
 
 
 Revision note (2026-10-10): API and performance review applied. Remove nonexistent primitive atomic APIs, publish complete slots under per-slot locks, make cleanup exception-safe, and keep detailed accounting opt-in. Zero-allocation claims require measurement, not prose. Functional implementation is delivered; performance acceptance remains pending.
+
+
+Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.

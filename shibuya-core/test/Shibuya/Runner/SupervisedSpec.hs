@@ -101,6 +101,28 @@ spec = do
       processorMetrics `shouldBe` Just Nothing
 
   describe "Shibuya.Internal.Runner.Supervised" $ do
+    it "records only successful acknowledgement and dead-letter cursors" $ do
+      forM_ [AckOk, AckDeadLetter MaxRetriesExceeded, AckRetry (RetryDelay 0), AckHalt (HaltFatal "stop")] $ \decision -> do
+        final <- cursorOutcome decision False
+        let expected = case decision of
+              AckOk -> Just (CursorInt 5)
+              AckDeadLetter _ -> Just (CursorInt 5)
+              _ -> Nothing
+        (final >>= (.latest)) `shouldBe` expected
+      cursorOutcome AckOk True `shouldReturn` Nothing
+
+    it "preserves source cursor order per partition in detailed ordered processing" $ do
+      final <- runEff $ runTracingNoop $ do
+        master <- startMaster IgnoreAll
+        tracking <- newTrackingAck
+        let adapter = trackedListAdapter tracking [((mkEnvelope (MessageId (Text.pack (show n))) n) {cursor = Just (CursorInt n), partition = Just (if odd n then "a" else "b")}) | n <- [1 .. 20]]
+        proc <- runSupervisedWith (Metrics.MetricsDetailed Metrics.defaultDetailOptions) master 100 (ProcessorId "cursor-ordered") PartitionedInOrder (Async 4) adapter (\_ -> pure AckOk)
+        liftIO $ atomically $ readTVar proc.done >>= check
+        m <- getMetrics proc
+        stopMaster master
+        pure m.progress
+      fmap (.partitions) final `shouldBe` Just (Map.fromList [("a", CursorInt 19), ("b", CursorInt 20)])
+
     it "reports growing oldest age and clears it after finalization" $ do
       started <- UIO.newEmptyMVar
       release <- UIO.newEmptyMVar
@@ -1320,3 +1342,17 @@ failingHandler _ = error "Intentional failure"
 
 alwaysAckOk :: Handler es msg
 alwaysAckOk _ = pure AckOk
+
+cursorOutcome :: AckDecision -> Bool -> IO (Maybe Metrics.ProgressSnapshot)
+cursorOutcome decision failFinalizer = runEff $ runTracingNoop $ do
+  master <- startMaster IgnoreAll
+  let message =
+        mkIngested
+          ((mkEnvelope (MessageId "cursor") ()) {cursor = Just (CursorInt 5), partition = Just "p"})
+          (AckHandle (\_ -> when failFinalizer (liftIO $ UIO.throwIO (userError "finalization failed"))))
+      adapter = Adapter "cursor" (Stream.fromList [message]) (pure ())
+  proc <- runSupervisedWith (Metrics.MetricsDetailed Metrics.defaultDetailOptions) master 10 (ProcessorId "cursor") Unordered Serial adapter (\_ -> pure decision)
+  liftIO $ atomically $ readTVar proc.done >>= check
+  m <- getMetrics proc
+  stopMaster master
+  pure m.progress

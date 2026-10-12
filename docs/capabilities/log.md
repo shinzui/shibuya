@@ -1,5 +1,9 @@
 # Bundle Update Log
 
+## 2026-10-12
+* **Update**: Record optional progress HTTP and WebSocket evidence
+* **Update**: Record bounded acknowledged cursor progress and runner evidence
+
 ## 2026-10-10
 * **Update**: Record optional latency and oldest-in-flight members and series evidence
 * **Update**: Record bounded opt-in latency and in-flight accounting evidence

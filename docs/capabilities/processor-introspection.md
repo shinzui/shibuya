@@ -5,7 +5,7 @@ description: "Read live per-processor state, in-flight information, stream stati
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
-timestamp: 2026-10-10T22:17:52Z
+timestamp: 2026-10-12T19:32:42Z
 capabilityId: CAP-9
 provider: mori://shinzui/shibuya
 status: shipped
@@ -72,3 +72,5 @@ and finalization retries, once per attempt or emitted batch; interrupted attempt
 Identity and monotonic start are published together in bounded synchronized slots. Sampling
 is best effort across slots. See [the accounting decision](../adr/0009-account-for-in-flight-detail-and-latency-with-bounded-synchronized-slots-behind-an-opt-in-detail-level.md)
 and [the metrics architecture](../architecture/METRICS.md#latency-and-in-flight-detail).
+
+Acknowledged cursor progress is available in detailed mode as bounded latest/per-partition snapshots. Evidence: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs`, `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs`, `shibuya-core/test/Shibuya/App/BatchSpec.hs`, and the metrics ServerSpec/WebSocketSpec tests. Integer cursors are lossless tagged decimal text; no progress is fabricated for cursorless adapters.

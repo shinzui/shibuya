@@ -393,3 +393,14 @@ data AppError
 ### Restart Semantics
 
 Failed processors are not automatically restarted. With `IgnoreFailures`, other processors continue running but the failed processor stays stopped. Implement application-level restart logic if needed.
+
+
+### Acknowledged cursor progress
+
+With `defaultAppConfig {metricsDetail = MetricsDetailed defaultDetailOptions}`, adapters that set `Envelope.cursor` expose optional `progress` in processor JSON and WebSocket snapshots/updates. `latest` is the last successful AckOk or AckDeadLetter finalization recorded; retry, halt, failed finalization and missing cursors leave it unchanged. `partitions` holds at most `maxTrackedPartitions` keys, atomically enforcing capacity even with concurrent finalizers. Known keys still update after capacity is reached; `truncated` stays true when an additional key cannot fit. Capacity zero provides latest-only reporting. Basic mode and detailed processors without recorded cursors omit progress.
+
+```json
+{"progress":{"latest":{"kind":"integer","value":"4210"},"partitions":{"p-0":{"kind":"integer","value":"4210"}},"truncated":false}}
+```
+
+Cursor integers use canonical decimal strings, preserving browser identity above 2^53; text cursors use kind `text`. This is completion progress, not a restart checkpoint or global maximum. Per-partition values follow source order only when adapter delivery and processing ordering preserve it. Concurrent completion may move latest backwards. Cursors are opaque and have no Prometheus series.

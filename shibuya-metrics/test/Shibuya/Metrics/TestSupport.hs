@@ -42,7 +42,7 @@ import Shibuya.Core.Metrics
     newMetricsHandle,
   )
 import Shibuya.Core.Metrics qualified as Metrics
-import Shibuya.Core.Types (MessageId (..))
+import Shibuya.Core.Types (Cursor (..), MessageId (..))
 import Shibuya.Internal.Runner.Master
   ( markMasterRunning,
     registerProcessor,
@@ -63,6 +63,11 @@ fixtureMetrics =
             oldestInFlight = Just (Metrics.OldestInFlight (MessageId "m-7") (at 40) 12.5)
           }
       ),
+      ( ProcessorId "progressing",
+        (fixtureProcessor (Processing (InFlightInfo 1 4) (at 40) (at 40)) 50)
+          { progress = Just (Metrics.ProgressSnapshot (Just (CursorInt 4210)) (Map.fromList [("p-0", CursorInt 4210), ("p-1", CursorText "0198f2f3")]) False)
+          }
+      ),
       (ProcessorId "failed", fixtureProcessor (Failed "boom" (at 90)) 20),
       (ProcessorId "idle", fixtureProcessor Idle 0),
       (ProcessorId "processing", fixtureProcessor (Processing (InFlightInfo 2 4) (at 60) (at 75)) 10),
@@ -79,6 +84,7 @@ fixtureProcessor state offset =
       batch = BatchStats (offset + 4) (offset + 5) (offset + 6) (offset + 7) (offset + 8) (offset + 9),
       latency = Nothing,
       oldestInFlight = Nothing,
+      progress = Nothing,
       startedAt = fixedTime
     }
 

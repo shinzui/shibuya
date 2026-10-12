@@ -3,7 +3,8 @@
 -- Detailed accounting is opt-in through 'MetricsDetailed': a bounded synchronized
 -- slot per concurrent attempt measures handler plus finalization duration and
 -- publishes oldest identity/start/age. Interrupted attempts are abandoned; basic
--- handles retain counters without detail clocks or ownership brackets.
+-- handles retain counters without detail clocks or ownership brackets. Detailed
+-- progress records successful acknowledgements with a bounded partition snapshot.
 module Shibuya.Core.Metrics
   ( -- * Processor State
     ProcessorState (..),
@@ -40,6 +41,8 @@ module Shibuya.Core.Metrics
     LatencyBucket (..),
     LatencySummary (..),
     OldestInFlight (..),
+    ProgressSnapshot (..),
+    recordAcknowledgedCursor,
     latencyBucketBoundsSeconds,
     latencyBucketLabels,
     InFlightSlots,
@@ -82,13 +85,14 @@ import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIO
 import Data.IntMap.Strict qualified as IntMap
 import Data.List (minimumBy)
 import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import Data.Text qualified as Text
 import Data.Time.Clock (addUTCTime)
 import Data.Word (Word64)
 import GHC.Clock (getMonotonicTimeNSec)
-import Shibuya.Core.Types (MessageId)
+import Shibuya.Core.Types (Cursor, MessageId)
 import Shibuya.Prelude
 
 -- | Processor identifier.
@@ -238,6 +242,38 @@ data OldestInFlight = OldestInFlight
   deriving stock (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
+-- | Last successful finalization recorded, with bounded partition detail.
+-- Cursors are opaque; concurrent completion order need not be source order.
+data ProgressSnapshot = ProgressSnapshot
+  { latest :: !(Maybe Cursor),
+    partitions :: !(Map Text Cursor),
+    truncated :: !Bool
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance ToJSON ProgressSnapshot where
+  toJSON = Aeson.genericToJSON omitNothingOptions
+
+instance FromJSON ProgressSnapshot where
+  parseJSON = Aeson.genericParseJSON omitNothingOptions
+
+data ProgressTable = ProgressTable
+  {snapshot :: !(TVar ProgressSnapshot), maxPartitions :: !Int}
+
+-- | Record only after successful AckOk or AckDeadLetter finalization.
+-- Missing cursors and basic handles do not enter STM.
+recordAcknowledgedCursor :: MetricsHandle -> Maybe Text -> Maybe Cursor -> IO ()
+recordAcknowledgedCursor handle partition cursor = case (handle.progressTable, cursor) of
+  (Just table, Just position) -> atomically $ modifyTVar' table.snapshot $ \old ->
+    let (partitions, truncated) = case partition of
+          Nothing -> (old.partitions, old.truncated)
+          Just key
+            | Map.member key old.partitions || Map.size old.partitions < table.maxPartitions ->
+                (Map.insert key position old.partitions, old.truncated)
+            | otherwise -> (old.partitions, True)
+     in ProgressSnapshot (Just position) partitions truncated
+  _ -> pure ()
+
 latencyBucketBoundsSeconds :: [Double]
 latencyBucketBoundsSeconds = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60]
 
@@ -358,7 +394,8 @@ data ProcessorMetrics = ProcessorMetrics
     -- | When the processor started
     startedAt :: !UTCTime,
     latency :: !(Maybe LatencySummary),
-    oldestInFlight :: !(Maybe OldestInFlight)
+    oldestInFlight :: !(Maybe OldestInFlight),
+    progress :: !(Maybe ProgressSnapshot)
   }
   deriving stock (Eq, Show, Generic)
 
@@ -380,7 +417,8 @@ emptyProcessorMetrics now =
       batch = emptyBatchStats,
       startedAt = now,
       latency = Nothing,
-      oldestInFlight = Nothing
+      oldestInFlight = Nothing,
+      progress = Nothing
     }
 
 -- | Map of processor IDs to their metrics.
@@ -411,6 +449,7 @@ data MetricsHandle = MetricsHandle
     stateActiveRef :: !(IORef Bool),
     detail :: !MetricsDetail,
     slots :: !(Maybe InFlightSlots),
+    progressTable :: !(Maybe ProgressTable),
     cold :: !(TVar ProcessorMetrics)
   }
 
@@ -448,6 +487,11 @@ newMetricsHandleWithClockAndDetail clock detail maxConcurrency now = do
       misses <- newIORef 0
       pure (Just (InFlightSlots cells misses))
   progressOriginNs <- clock
+  progressTable <- case detail of
+    MetricsBasic -> pure Nothing
+    MetricsDetailed options -> do
+      snapshot <- newTVarIO (ProgressSnapshot Nothing Map.empty False)
+      pure (Just (ProgressTable snapshot options.maxTrackedPartitions))
   received <- Counter.newCounter 0
   processed <- Counter.newCounter 0
   failed <- Counter.newCounter 0
@@ -477,6 +521,7 @@ newMetricsHandleWithClockAndDetail clock detail maxConcurrency now = do
         stateActiveRef = stateActiveRef,
         detail = detail,
         slots = slots,
+        progressTable = progressTable,
         cold = cold
       }
 
@@ -504,7 +549,14 @@ sampleMetrics handle = do
         _ | inFlight > 0 -> Processing (InFlightInfo inFlight maxConcurrency) burstStartedAt lastProgressAt
         _ -> Idle
   (latency, oldestInFlight) <- sampleDetail handle
-  pure coldSnapshot {state = sampledState, stats = sampledStats, latency, oldestInFlight}
+  progress <- case handle.progressTable of
+    Nothing -> pure Nothing
+    Just table -> do
+      snapshot <- readTVarIO table.snapshot
+      pure $ case snapshot.latest of
+        Nothing -> Nothing
+        Just _ -> Just snapshot
+  pure coldSnapshot {state = sampledState, stats = sampledStats, latency, oldestInFlight, progress}
 
 incrementReceived :: MetricsHandle -> IO ()
 incrementReceived handle =

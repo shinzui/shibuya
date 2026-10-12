@@ -354,3 +354,14 @@ and observer count. The default remains basic, and basic-path performance accept
 still pending in [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md).
 Preserve the static loop specialization and opaque mode accessor described in
 [ADR-0009](../adr/0009-account-for-in-flight-detail-and-latency-with-bounded-synchronized-slots-behind-an-opt-in-detail-level.md).
+
+
+### Acknowledged cursor progress
+
+With `defaultAppConfig {metricsDetail = MetricsDetailed defaultDetailOptions}`, adapters that set `Envelope.cursor` expose optional `progress` in processor JSON and WebSocket snapshots/updates. `latest` is the last successful AckOk or AckDeadLetter finalization recorded; retry, halt, failed finalization and missing cursors leave it unchanged. `partitions` holds at most `maxTrackedPartitions` keys, atomically enforcing capacity even with concurrent finalizers. Known keys still update after capacity is reached; `truncated` stays true when an additional key cannot fit. Capacity zero provides latest-only reporting. Basic mode and detailed processors without recorded cursors omit progress.
+
+```json
+{"progress":{"latest":{"kind":"integer","value":"4210"},"partitions":{"p-0":{"kind":"integer","value":"4210"}},"truncated":false}}
+```
+
+Cursor integers use canonical decimal strings, preserving browser identity above 2^53; text cursors use kind `text`. This is completion progress, not a restart checkpoint or global maximum. Per-partition values follow source order only when adapter delivery and processing ordering preserve it. Concurrent completion may move latest backwards. Cursors are opaque and have no Prometheus series.

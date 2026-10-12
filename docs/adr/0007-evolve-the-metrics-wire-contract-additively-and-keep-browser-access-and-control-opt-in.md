@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Date: 2026-10-10
+Date: 2026-10-12
 
 ## Context
 
@@ -108,11 +108,7 @@ independent of the sole writer, and subscription changes and resync batches are 
 Required-frame saturation or a send deadline closes the connection rather than growing the
 queue. Delivery of terminal or goodbye to an unresponsive peer cannot be guaranteed.
 
-Completion requires the full integrated basic performance matrix against the pre-initiative
-baseline, identical harnesses with real cursor inputs, and sustained real observer load.
-Detailed allocation and contention are measured, not claimed absent. API review cannot
-certify performance. These constraints refine the planned extension; implementation remains
-pending in MasterPlan 7.
+Implementation validation for MasterPlan 7 now follows the owner’s 2026-10-12 scope: one bounded exact-revision remote quick comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, with outcome and eligibility limits recorded. Per-child matrices and new observer benchmark variants are excluded from this implementation. Uncalibrated exploratory reports do not certify a release; ADR-0002’s release evidence contract and budgets remain unchanged. MetricsBasic remains the default.
 
 ## Consequences
 

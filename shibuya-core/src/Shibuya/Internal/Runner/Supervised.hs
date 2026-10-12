@@ -762,6 +762,12 @@ processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPu
                       [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
                   setStatus traceSpan $ OTel.Error $ handlerErrorToText err
 
+            let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+            when detailed $ case (finalizeResult, result) of
+              (Right (), Right AckOk) -> recordCursor
+              (Right (), Right (AckDeadLetter _)) -> recordCursor
+              _ -> pure ()
+
             -- Decrement in-flight and update stats.
             liftIO $
               case finalizeResult of

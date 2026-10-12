@@ -105,6 +105,8 @@
 -- heap are not covered by the encoded-payload budget. Closed decoders must add the
 -- new @error@ tag; raw JSON consumers may ignore unknown frame types.
 -- See @docs/architecture/METRICS.md@ for the complete shared-convention mapping.
+-- Detailed processor metrics also carry optional acknowledged cursor progress: latest,
+-- bounded partitions and sticky truncation, with lossless tagged cursor values.
 module Shibuya.Metrics
   ( -- * Server Lifecycle
     startMetricsServer,

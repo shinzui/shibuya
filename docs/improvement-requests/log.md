@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-10-12
+* **Update**: Complete processor inspection with latency, oldest detail and cursor progress
+
 ## 2026-10-10
 * **Update**: IR-5 completed: configurable cross-origin access (EP-47), the contract suite (EP-39), and bounded WebSocket delivery with in-band errors and a conformance mapping (EP-48); controlled local acceptance evidence recorded.
 

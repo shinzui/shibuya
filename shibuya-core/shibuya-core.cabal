@@ -135,6 +135,7 @@ test-suite shibuya-core-test
     Shibuya.Telemetry.SemanticSpec
 
   build-depends:
+    aeson,
     QuickCheck ^>=2.15,
     base ^>=4.21.0.0,
     bytestring,

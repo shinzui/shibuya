@@ -24,12 +24,14 @@ module Shibuya.Core.Types
 where
 
 import Control.DeepSeq (NFData (..))
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, (.:), (.=))
 import Data.ByteString (ByteString)
 import Data.HashMap.Strict (HashMap)
 import Data.String (IsString)
+import Data.Text qualified as Text
 import OpenTelemetry.Attributes (Attribute (..))
 import Shibuya.Prelude
+import Text.Read (readMaybe)
 
 -- | Stable identity for idempotency & observability.
 -- Every message has a unique identifier.
@@ -45,6 +47,26 @@ data Cursor
   | CursorText !Text
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData)
+
+-- | Decimal text preserves integer identity in browser clients above 2^53.
+instance ToJSON Cursor where
+  toJSON (CursorInt n) = object ["kind" .= ("integer" :: Text), "value" .= Text.pack (show n)]
+  toJSON (CursorText t) = object ["kind" .= ("text" :: Text), "value" .= t]
+
+instance FromJSON Cursor where
+  parseJSON = withObject "Cursor" $ \v -> do
+    kind <- v .: "kind"
+    value <- v .: "value"
+    case (kind :: Text) of
+      "text" -> pure (CursorText value)
+      "integer" -> case readMaybe (Text.unpack value) :: Maybe Integer of
+        Just n
+          | Text.pack (show n) == value,
+            n >= toInteger (minBound :: Int),
+            n <= toInteger (maxBound :: Int) ->
+              pure (CursorInt (fromInteger n))
+        _ -> fail "Cursor integer must be canonical decimal text in the Int range"
+      _ -> fail "Unknown cursor kind"
 
 -- | Zero-indexed delivery attempt count.
 -- 0 means first delivery; 1 means first retry; and so on.

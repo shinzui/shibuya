@@ -99,6 +99,7 @@ module Shibuya
     LatencySummary (..),
     LatencyBucket (..),
     OldestInFlight (..),
+    ProgressSnapshot (..),
 
     -- * Tracing
     Tracing,
@@ -156,6 +157,7 @@ import Shibuya.Core.Metrics
     ProcessorId (..),
     ProcessorMetrics (..),
     ProcessorState (..),
+    ProgressSnapshot (..),
     StreamStats (..),
     defaultDetailOptions,
     defaultMetricsDetail,

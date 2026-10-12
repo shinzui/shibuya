@@ -2,12 +2,15 @@ module Shibuya.Core.MetricsSpec (spec) where
 
 import Control.Concurrent (forkIO, newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (forM_, replicateM, replicateM_)
+import Data.Aeson (eitherDecode, encode)
 import Data.IORef
+import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust)
+import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Data.Word (Word64)
 import Shibuya.Core.Metrics
-import Shibuya.Core.Types (MessageId (..))
+import Shibuya.Core.Types (Cursor (..), MessageId (..))
 import Test.Hspec
 import UnliftIO qualified as UIO
 
@@ -136,6 +139,43 @@ spec = describe "Detailed metrics" $ do
     let noClock = error "clock acquired before validation"
     newMetricsHandleWithClockAndDetail noClock (MetricsDetailed (DetailOptions (-1))) 1 epoch `shouldThrow` anyIOException
     newMetricsHandleWithClockAndDetail noClock (MetricsDetailed defaultDetailOptions) 0 epoch `shouldThrow` anyIOException
+
+  describe "acknowledged cursor progress" $ do
+    it "omits missing cursors and ignores basic accounting" $ do
+      basic <- newMetricsHandle epoch
+      (_, detailed) <- handle 1
+      recordAcknowledgedCursor basic (Just "a") (Just (CursorInt 7))
+      recordAcknowledgedCursor detailed (Just "a") Nothing
+      mapM_ (\h -> sampleMetrics h >>= \m -> m.progress `shouldBe` Nothing) [basic, detailed]
+
+    it "records latest completion, replaces known keys and keeps truncation sticky" $ do
+      h <- newMetricsHandleWith (MetricsDetailed (DetailOptions 2)) 1 epoch
+      recordAcknowledgedCursor h Nothing (Just (CursorInt 7))
+      sampleMetrics h >>= \m -> m.progress `shouldBe` Just (ProgressSnapshot (Just (CursorInt 7)) Map.empty False)
+      forM_ [("a", 8), ("b", 9), ("c", 10), ("a", 3)] $ \(key, n) -> recordAcknowledgedCursor h (Just key) (Just (CursorInt n))
+      sampleMetrics h >>= \m -> m.progress `shouldBe` Just (ProgressSnapshot (Just (CursorInt 3)) (Map.fromList [("a", CursorInt 3), ("b", CursorInt 9)]) True)
+      recordAcknowledgedCursor h (Just "a") Nothing
+      sampleMetrics h >>= \m -> fmap (.latest) m.progress `shouldBe` Just (Just (CursorInt 3))
+
+    it "atomically caps concurrent partitions at capacity zero, one and two" $ do
+      forM_ [0, 1, 2] $ \capacity -> do
+        h <- newMetricsHandleWith (MetricsDetailed (DetailOptions capacity)) 1 epoch
+        UIO.mapConcurrently_ (\n -> recordAcknowledgedCursor h (Just (Text.pack (show n))) (Just (CursorInt n))) [1 .. 64]
+        m <- sampleMetrics h
+        let snapshot = fromJust m.progress
+        Map.size snapshot.partitions `shouldBe` capacity
+        snapshot.truncated `shouldBe` True
+        snapshot.latest `shouldSatisfy` maybe False (const True)
+
+    it "round trips lossless tagged cursor identities and rejects noncanonical integers" $ do
+      forM_ [CursorInt minBound, CursorInt maxBound, CursorInt 9007199254740993, CursorText "9007199254740993", CursorText ""] $ \cursor ->
+        eitherDecode (encode cursor) `shouldBe` Right cursor
+      forM_ ["01", "-0", "+1", "1.5", " 1", "9223372036854775808"] $ \value ->
+        (eitherDecode ("{\"kind\":\"integer\",\"value\":\"" <> value <> "\"}") :: Either String Cursor) `shouldSatisfy` either (const True) (const False)
+      (eitherDecode "{\"kind\":\"integer\",\"value\":1}" :: Either String Cursor) `shouldSatisfy` either (const True) (const False)
+      (eitherDecode "{\"kind\":\"unknown\",\"value\":\"1\"}" :: Either String Cursor) `shouldSatisfy` either (const True) (const False)
+      forM_ [ProgressSnapshot Nothing Map.empty False, ProgressSnapshot (Just (CursorText "a")) Map.empty True] $ \snapshot ->
+        eitherDecode (encode snapshot) `shouldBe` Right snapshot
 
 epoch :: UTCTime
 epoch = UTCTime (fromGregorian 2026 1 1) 0

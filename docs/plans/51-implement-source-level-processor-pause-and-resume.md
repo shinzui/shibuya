@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-12T19:32:42Z
+      mode: "implement"
+      note: "Implement browser inspection/control with bounded remote quick performance scope."
 ---
 
 
@@ -67,7 +72,7 @@ without the functions this plan adds. The parent initiative is
 
 - [ ] Milestone 1: Add `Shibuya.Internal.Runner.Pause`, gate the ingester before each pull, add the `Paused` state and its sampling rule, add pause handles to the master registry with `ControlOutcome`, and land the deterministic core tests (the six from the design plus the live-adapter, halt, failure, batch, terminal, and unknown-id cases).
 - [ ] Milestone 2: Export `pauseProcessor`, `resumeProcessor`, and `isProcessorPaused` from `Shibuya.App` and `Shibuya`, resume every paused processor before adapter shutdown in `stopAppGracefully`, update Health and Prometheus for the new state, update the golden fixtures deliberately, and add round-trip and public-API tests.
-- [ ] Milestone 3: Capture paired performance evidence for the gate under `-N1` and `-N4`, then write the documentation, the ADR, and the three changelog entries.
+- [ ] Milestone 3: Record the integrated remote quick-comparison ownership under EP-52, then write the documentation, the ADR, and the three changelog entries.
 
 
 ## Surprises & Discoveries
@@ -89,6 +94,8 @@ and Orientation for the excerpt.
 
 
 ## Decision Log
+
+Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 
 - Decision (2026-10-10): Make pause state and lifecycle transitions atomic, return the resulting PauseState, reject control during draining, and document already-admitted pulls. Preserve registerProcessor for unchanged harnesses.
@@ -524,19 +531,7 @@ pause shows `"status":"paused"` in `/metrics/<id>` and `5.0` in `/metrics/promet
 ### Milestone 3: performance evidence, documentation, ADR, changelogs
 
 
-The gate adds one `readTVarIO` per message to the ingester and one `Maybe` field per
-processor. Prove it is within budget before closing. Build the `lifecycle-load` executable
-from the last commit before this plan (baseline) and from the candidate, from clean
-worktrees, and run `scripts/audit/capture-performance-paired.ts` for the scenarios
-`serial-small-inbox`, `serial-full-inbox`, `ahead-uniform-keys`, `async-hot-key`,
-`batch-size`, and `retry-path` under `-N1` and `-N4`, at least ten alternating pairs each,
-then `scripts/audit/compare-performance.ts` against
-a focused copy of the canonical budgets with only requiredScenarios narrowed to those six.
-Also measure startup/shutdown, idle, and graceful drain in the final integrated matrix. Every cell must pass the 5%
-throughput, 5% allocation and live-memory, and 10% latency limits; an inconclusive cell is
-rerun with twenty pairs; a failing cell is fixed, never waived. Store the datasets and the
-verdict under `docs/audits/lifecycle-release/artifacts/ep51-pause-gate/` with a short
-`README.md` naming both SHAs, the solver plan hash, compiler, machine, and commands.
+Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 Then document. Add a "Pause and resume" section to `docs/architecture/METRICS.md`
 describing the `Paused` state, its JSON, the gauge value, the health count, and precedence.
@@ -598,41 +593,7 @@ git worktree remove --force /tmp/shibuya-ep51-gate
 Expected: the mutated run fails that example with a pull count one higher than the paused
 count; the unmodified run passes. Record both transcripts in Surprises & Discoveries.
 
-Milestone 3 paired capture (adjust SHAs, hashes, and machine fields to the real values;
-read `docs/audits/lifecycle-release/README.md` first):
-
-```bash
-git worktree add --detach /tmp/shibuya-ep51-baseline <last-commit-before-this-plan>
-(cd /tmp/shibuya-ep51-baseline && cabal build shibuya-core-bench:lifecycle-load)
-cabal build shibuya-core-bench:lifecycle-load
-mkdir -p docs/audits/lifecycle-release/artifacts/ep51-pause-gate
-jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","batch-size","retry-path"]' \
-  docs/audits/lifecycle-release/performance-budgets.json \
-  > docs/audits/lifecycle-release/artifacts/ep51-pause-gate/focused-budgets.json
-BASE=$(cd /tmp/shibuya-ep51-baseline && cabal list-bin shibuya-core-bench:lifecycle-load)
-CAND=$(cabal list-bin shibuya-core-bench:lifecycle-load)
-for RTS in -N1 -N4; do
-  bun scripts/audit/capture-performance-paired.ts \
-    --baseline-executable "$BASE" --candidate-executable "$CAND" \
-    --baseline-output docs/audits/lifecycle-release/artifacts/ep51-pause-gate/baseline${RTS}.json \
-    --candidate-output docs/audits/lifecycle-release/artifacts/ep51-pause-gate/candidate${RTS}.json \
-    --baseline-label baseline --candidate-label candidate \
-    --baseline-production-sha <baseline-sha> --candidate-production-sha <candidate-sha> \
-    --harness-sha <identical-benchmark-tree-hash> --solver-plan-hash <normalized-external-solver-hash> \
-    --machine-id <machine> --platform <platform> --compiler ghc-9.12.4 --optimization O2 \
-    --capabilities ${RTS#-N} --rts "$RTS" --iterations 10 \
-    --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,batch-size,retry-path
-  bun scripts/audit/compare-performance.ts \
-    --baseline docs/audits/lifecycle-release/artifacts/ep51-pause-gate/baseline${RTS}.json \
-    --candidate docs/audits/lifecycle-release/artifacts/ep51-pause-gate/candidate${RTS}.json \
-    --budgets docs/audits/lifecycle-release/artifacts/ep51-pause-gate/focused-budgets.json \
-    --output docs/audits/lifecycle-release/artifacts/ep51-pause-gate/verdict${RTS}.json
-done
-git worktree remove --force /tmp/shibuya-ep51-baseline
-```
-
-Expected: each verdict reports `pass` for every metric of every scenario; any `fail` or
-`inconclusive` is recorded and resolved before Milestone 3 closes.
+Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 If CAP-9 evidence is touched:
 
@@ -669,8 +630,7 @@ On the wire, `GET /metrics/<id>` for a paused processor returns
 `{"status":"paused","pausedAt":"...","lastProgress":"...","inFlight":0,"maxConcurrency":1}` under `state`,
 `GET /health/ready` returns `200` with `"paused":1` in `processors`, and
 `GET /metrics/prometheus` contains `shibuya_processor_state{processor="<id>"} 5.0`. Both
-golden files differ from their pre-plan versions only by the recorded additions. The
-paired performance verdicts pass under `-N1` and `-N4` without a waiver. `cabal test
+golden files differ from their pre-plan versions only by the recorded additions. The bounded remote quick comparison is owned by EP-52 and carries explicit eligibility limits. `cabal test
 shibuya-core` and `cabal test shibuya-metrics` pass with the new examples counted, and the
 negative control for the wait-before-pull test was seen failing.
 
@@ -768,3 +728,6 @@ rebase the later one, keeping every golden change deliberate and recorded.
 
 
 Revision note (2026-10-10): API and performance review applied. Make pause state and lifecycle transitions atomic, return the resulting PauseState, reject control during draining, and document already-admitted pulls. Preserve registerProcessor for unchanged harnesses. Implementation and performance measurements remain pending.
+
+
+Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.

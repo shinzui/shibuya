@@ -33,6 +33,7 @@ module Shibuya.Internal.Runner.BatchProcessor
 where
 
 import Control.Applicative ((<|>))
+import Control.Monad (when)
 import Data.Foldable (for_, traverse_)
 import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty (NonEmpty)
@@ -207,6 +208,11 @@ processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitP
                     let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
                         d = fromMaybe resolvedAck.fallback explicitDecision
                     finalResult <- finalizeWithRetry traceSpan ingested d
+                    let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+                    when detailed $ case (finalResult, d) of
+                      (Right (), AckOk) -> recordCursor
+                      (Right (), AckDeadLetter _) -> recordCursor
+                      _ -> pure ()
                     pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
                 )
                 (NE.toList batch)

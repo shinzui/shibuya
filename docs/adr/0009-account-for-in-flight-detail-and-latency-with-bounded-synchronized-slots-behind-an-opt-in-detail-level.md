@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Date: 2026-10-10
+Date: 2026-10-12
 
 ## Context
 
@@ -66,3 +66,8 @@ The implementation, deterministic tests, mutation checks and paired performance 
 are maintained in [EP-49](../plans/49-expose-per-processor-latency-distribution-and-oldest-in-flight-detail.md).
 Performance acceptance remains pending until that plan records its measured verdicts; this
 record fixes the architecture, without certifying a release or changing any budget.
+
+
+## Bounded acknowledged cursor progress
+
+Detailed handles retain a single strict STM snapshot containing latest cursor, a bounded partition Map and sticky truncation. Membership, capacity and insertion occur in one transaction. Recording follows successful AckOk or AckDeadLetter finalization, per retained message in batch order. Zero capacity allows latest-only tracking. Missing cursors do nothing. Cursors are opaque; the last recording wins, with no promise of numeric maximum or restart durability. Tagged integer decimal strings preserve browser precision. No cursor Prometheus series is emitted. Basic mode bypasses the hook through static worker specialization. Tests and wire evidence are recorded in [EP-50](../plans/50-expose-acknowledged-cursor-progress-per-processor-and-partition.md); the integrated quick remote comparison belongs to EP-52 and does not certify a release.

@@ -6,9 +6,11 @@ description: >-
   cursor progress where the adapter supplies one, and oldest-in-flight visibility — aggregated
   off the hot path — so an inspection UI can answer how fast a processor runs, how far it has
   gotten, and what it is stuck on.
-timestamp: 2026-09-30T23:43:10Z
+timestamp: 2026-10-12T19:33:26Z
 requestId: IR-3
-status: accepted
+status: completed
+completedAt: 2026-10-12T19:33:26Z
+resolution: "EP-49 delivers latency and oldest detail; EP-50 delivers bounded acknowledged cursor progress with core, batch, HTTP and WebSocket tests; camelCase contract follows ADR-0007."
 origin: mori://shinzui/keiro-ui
 plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.md
 ---
@@ -16,6 +18,8 @@ plan: docs/masterplans/7-browser-ready-processor-inspection-and-control-surface.
 # Improvement Request: Expose Processor Progress, Latency, and In-Flight Detail for Inspection UIs
 
 ## Status
+
+Completed on 2026-10-12. Detailed inspection is implemented and tested in the core MetricsSpec, SupervisedSpec and App/BatchSpec and the metrics golden, ServerSpec and WebSocketSpec. Basic mode remains the default. Remote quick performance diagnostics belong to EP-52 and do not certify a release.
 
 Proposed by the keiro runtime UI initiative
 (`mori://shinzui/keiro-ui/masterplans/1-keiro-runtime-ui-foundations`, filed under

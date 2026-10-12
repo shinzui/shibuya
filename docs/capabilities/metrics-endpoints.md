@@ -5,7 +5,7 @@ description: "Expose live processor metrics as a JSON HTTP endpoint, a Prometheu
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
-timestamp: 2026-10-10T22:17:52Z
+timestamp: 2026-10-12T19:32:42Z
 capabilityId: CAP-10
 provider: mori://shinzui/shibuya
 status: shipped
@@ -118,3 +118,5 @@ With core detail enabled, JSON and WebSocket metrics include optional `latency` 
 preserved. WebSocket clients extrapolate age from the last frame; age alone does not trigger
 a delta, while HTTP and snapshots return current sampled age. See
 [latency and in-flight detail](../architecture/METRICS.md#latency-and-in-flight-detail).
+
+Acknowledged cursor progress is available in detailed mode as bounded latest/per-partition snapshots. Evidence: `shibuya-core/test/Shibuya/Core/MetricsSpec.hs`, `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs`, `shibuya-core/test/Shibuya/App/BatchSpec.hs`, and the metrics ServerSpec/WebSocketSpec tests. Integer cursors are lossless tagged decimal text; no progress is fabricated for cursorless adapters.

@@ -26,7 +26,7 @@ import Shibuya.Core.Metrics
     newMetricsHandleWithClock,
   )
 import Shibuya.Core.Metrics qualified as Metrics
-import Shibuya.Core.Types (MessageId (..))
+import Shibuya.Core.Types (Cursor (..), MessageId (..))
 import Shibuya.Internal.Runner.Master (markProcessorFailedIO, registerProcessor, unregisterProcessor)
 import Shibuya.Metrics.Config (MetricsServerConfig (..), defaultConfig)
 import Shibuya.Metrics.Outbound qualified as Out
@@ -99,6 +99,17 @@ spec = around withMaster $ do
           receiveServer conn `shouldReturn` expected
 
   describe "detailed metrics updates" $ do
+    it "publishes a cursor change without counter changes" $ \master -> do
+      handle <- Metrics.newMetricsHandleWith (Metrics.MetricsDetailed Metrics.defaultDetailOptions) 1 fixedTime
+      runEff $ registerProcessor master (ProcessorId "progress") handle
+      withServer defaultConfig {wsPushIntervalUs = 10_000} master $ \port -> WS.runClient "127.0.0.1" port "/ws" $ \conn -> do
+        _ <- receiveServer conn
+        Metrics.recordAcknowledgedCursor handle Nothing (Just (CursorInt 1))
+        update <- timeout 1_000_000 (receiveServer conn)
+        case update of
+          Just (ProcessorUpdate _ pm) -> fmap (.latest) pm.progress `shouldBe` Just (Just (CursorInt 1))
+          other -> expectationFailure (show other)
+
     it "suppresses age-only changes and publishes release with latency" $ \master -> do
       clock <- newIORef 0
       handle <-

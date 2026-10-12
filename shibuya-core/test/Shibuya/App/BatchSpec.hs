@@ -63,6 +63,8 @@ spec = describe "Shibuya.App.Batch" $ do
                 fmap (.count) m.latency `shouldBe` Just 1
                 m.batch.batchesEmitted `shouldBe` 1
                 m.batch.batchedMessages `shouldBe` 2
+                fmap (.latest) m.progress `shouldBe` Just (Just (CursorInt 2))
+                fmap (.partitions) m.progress `shouldBe` Just (Map.fromList [("p-0", CursorInt 2), ("p-1", CursorInt 1)])
                 putMVar proceed () >> takeMVar started
               metrics2 <- getAppMetrics app
               liftIO $ fmap (.count) (metrics2 Map.! ProcessorId "batch-detail").latency `shouldBe` Just 2
@@ -169,6 +171,7 @@ createTrackedMessages tracking n = mapM mk [1 .. n]
           env =
             (mkEnvelope msgId ("message-" <> show i))
               { cursor = Just (CursorInt i),
+                partition = Just (if even i then "p-0" else "p-1"),
                 enqueuedAt = Just testTime
               }
       pure $ mkIngested env (trackingAckHandle tracking msgId)

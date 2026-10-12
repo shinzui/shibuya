@@ -28,6 +28,11 @@ provenance:
       at: 2026-10-10T22:45:50Z
       mode: "update"
       note: "Align cursor hook ownership with EP-49 static detail specialization and opaque mode selection."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-12T19:32:42Z
+      mode: "implement"
+      note: "Implement browser inspection/control with bounded remote quick performance scope."
 ---
 
 
@@ -68,22 +73,28 @@ This plan delivers the progress item of the improvement request
 ## Progress
 
 
-- [ ] Milestone 1: `Cursor` JSON instances, `ProgressSnapshot`, `ProgressTable`, `recordAcknowledgedCursor`, the two hook sites, and `sampleMetrics` assembling the snapshot.
-- [ ] Milestone 1: Paired performance capture and comparison at the shipped default level under `-N1` and `-N4`, plus the diagnostic detailed-level pair when the default is basic; every cell of the shipped default passes.
-- [ ] Milestone 2: Concurrent cap tests (including capacity 0/1), integer precision boundaries, and finalization outcome tests.
-- [ ] Milestone 2: Core unit tests in `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` and runner tests in `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs` and the batch spec, each defect test seen failing first.
-- [ ] Milestone 2: Metrics-package fixtures, golden update, round-trip, route, and WebSocket tests.
-- [ ] Milestone 3: ADR extension, architecture documentation, Haddock, capability evidence, changelogs.
-- [ ] Milestone 3: IR-3 closed with evidence after EP-49 is Complete; bundle validated.
+- [x] (2026-10-12) Milestone 1: `Cursor` JSON instances, `ProgressSnapshot`, `ProgressTable`, `recordAcknowledgedCursor`, the two hook sites, and `sampleMetrics` assembling the snapshot.
+- [x] (2026-10-12) Milestone 1: Per-child performance matrix replaced by the single integrated remote quick comparison owned by EP-52; retain the basic default.
+- [x] (2026-10-12) Milestone 2: Concurrent cap tests (including capacity 0/1), integer precision boundaries, and finalization outcome tests.
+- [x] (2026-10-12) Milestone 2: Core unit tests in `shibuya-core/test/Shibuya/Core/MetricsSpec.hs` and runner tests in `shibuya-core/test/Shibuya/Runner/SupervisedSpec.hs` and the batch spec, each defect test seen failing first.
+- [x] (2026-10-12) Milestone 2: Metrics-package fixtures, golden update, round-trip, route, and WebSocket tests.
+- [x] (2026-10-12) Milestone 3: ADR extension, architecture documentation, Haddock, capability evidence, changelogs.
+- [x] (2026-10-12) Milestone 3: IR-3 closed with evidence after EP-49 is Complete; bundle validated.
 
 
 ## Surprises & Discoveries
+
+2026-10-12: The old JSON golden failed on the added progressing object (94 examples, one failure); updating that exact fixture makes metrics pass. Core tests need an explicit aeson test dependency, reusing the library version. Concurrent capacity 0/1/2, precision boundaries, successful finalization, retry/halt/exhaustion and batch cursor tests pass.
 
 
 2026-10-10 review: Use lossless browser cursor JSON, atomically enforce partition capacity, and populate cursor-bearing benchmark inputs. EP-49 is a hard dependency and basic remains the default.
 
 
 ## Decision Log
+
+Decision (2026-10-12): Add only the progressing golden object; all prior fixture objects and Prometheus output remain unchanged. Use one strict STM snapshot for bounded progress and preserve static detailed-worker specialization.
+
+Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 
 - Decision (2026-10-10): Use lossless browser cursor JSON, atomically enforce partition capacity, and populate cursor-bearing benchmark inputs. EP-49 is a hard dependency and basic remains the default.
@@ -125,7 +136,7 @@ This plan delivers the progress item of the improvement request
 ## Outcomes & Retrospective
 
 
-(To be filled during and after implementation.)
+Bounded acknowledged cursor progress is implemented in detailed mode, including both finalization paths, tagged lossless JSON, HTTP and WebSocket exposure. All core suites and metrics tests pass. Existing basic processor objects remain unchanged; the golden adds only the progressing fixture. Per-child performance measurement is excluded by the revised owner scope; EP-52 owns one final remote quick comparison.
 
 
 ## Context and Orientation
@@ -347,37 +358,9 @@ produces `results`, after `finalizeWithRetry` returns for a message and only whe
 with that message's envelope; because the loop walks the retained list in batch order, a
 partition's cursors are recorded in order.
 
-Capture paired datasets using `scripts/audit/capture-performance-paired.ts`. The existing
-`Bench/Lifecycle.hs:createMessages` sets partition but leaves `mkEnvelope.cursor = Nothing`,
-so the existing eight workloads do not exercise cursor updates at all. Before comparison,
-prepare one harness-only revision that sets a cursor fixture on these workloads, including
-unpartitioned, repeated-key, hot-key and over-capacity inputs. Apply exactly that harness
-source to the baseline (EP-49 complete) and candidate; record its tree/patch hash on both,
-not a fabricated common SHA. Keep the original cursorless suite as the basic-path control.
-Assert outside the timed region that detailed candidate snapshots actually contain expected
-cursors and that the high-cardinality table reaches its cap with truncated true.
+Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
-The default remains `defaultMetricsDetail = MetricsBasic` in both the App and direct runners.
-Capture at least ten alternating pairs per scenario under -N1 and -N4; twenty for inconclusive
-cells. Default comparisons must pass the canonical limits. For detailed diagnostic builds,
-flip `defaultMetricsDetail` in both production trees, not just `defaultAppConfig` (most harness
-paths call `runSupervised` directly); record exact patch hashes and verify detailed latency
-and progress are present. Report detailed overhead against the EP-49 detailed baseline and
-against the pre-initiative baseline in the final integration gate. Do not weaken progress
-semantics by restricting recording to ordered processors or dropping partitions to make a
-benchmark pass. Optimize or retain the explicit opt-in cost.
-
-Use a focused copy of the canonical budget file with only requiredScenarios narrowed to
-the captured eight scenarios; the full canonical file rejects missing scenarios. Preserve all
-limits, exclusions, confidence parameters and minimumPairs. Hash normalized external package
-identities from each solver plan, not raw plan.json files containing worktree paths. Store
-raw datasets, the comparator reports and source identities under
-`docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/`.
-
-
-Acceptance for this milestone: `cabal build all` succeeds, the existing core and metrics
-suites pass, and the comparator prints `pass` for every cell of the shipped default under
-both capability counts.
+Acceptance: `cabal build all` and the core and metrics suites pass.
 
 
 ### Milestone 2: Expose progress and test every promise
@@ -514,45 +497,7 @@ cabal --project-dir=/tmp/shibuya-ep50-red test shibuya-core --test-show-details=
 git worktree remove --force /tmp/shibuya-ep50-red
 ```
 
-Performance capture. Build both executables with identical harness source; the baseline
-worktree is at the EP-49 landing commit, the candidate is this tree:
-
-```bash
-git worktree add --detach /tmp/shibuya-ep50-baseline <ep49-landing-sha>
-cabal --project-dir=/tmp/shibuya-ep50-baseline build shibuya-core-bench:lifecycle-load -O2
-cabal build shibuya-core-bench:lifecycle-load -O2
-mkdir -p docs/audits/lifecycle-release/artifacts/ep50-cursor-progress
-jq '.requiredScenarios = ["serial-small-inbox","serial-full-inbox","ahead-uniform-keys","async-hot-key","async-high-cardinality","batch-size","retry-path","dead-letter-path"]' \
-  docs/audits/lifecycle-release/performance-budgets.json \
-  > docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/focused-budgets.json
-BASE=$(cabal --project-dir=/tmp/shibuya-ep50-baseline list-bin shibuya-core-bench:lifecycle-load)
-CAND=$(cabal list-bin shibuya-core-bench:lifecycle-load)
-for RTS in -N1 -N4; do
-  bun scripts/audit/capture-performance-paired.ts \
-    --baseline-executable "$BASE" --candidate-executable "$CAND" \
-    --baseline-output docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/baseline${RTS}.json \
-    --candidate-output docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/candidate${RTS}.json \
-    --baseline-label ep49-landed --candidate-label ep50-default \
-    --baseline-production-sha <ep49-landing-sha> --candidate-production-sha "$(git rev-parse HEAD)" \
-    --harness-sha "$(git rev-parse HEAD:shibuya-core-bench)" \
-    --solver-plan-hash <normalized-external-solver-hash> \
-    --machine-id "$(hostname)" --platform "$(uname -sm)" --compiler "$(ghc --numeric-version)" \
-    --optimization O2 --rts "$RTS" --capabilities "${RTS#-N}" --iterations 10 \
-    --scenarios serial-small-inbox,serial-full-inbox,ahead-uniform-keys,async-hot-key,async-high-cardinality,batch-size,retry-path,dead-letter-path
-  bun scripts/audit/compare-performance.ts \
-    --baseline docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/baseline${RTS}.json \
-    --candidate docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/candidate${RTS}.json \
-    --budgets docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/focused-budgets.json \
-    --output docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/verdict${RTS}.json
-done
-```
-
-The capture script prints `captured 10 paired -N1 samples for <scenario>` per scenario and
-then `wrote 80 baseline and 80 candidate samples`; the comparator prints one line per
-scenario and metric ending in `pass`, `fail`, or `inconclusive`, and exits nonzero on any
-`fail`. Verify the harness SHA and solver-plan hash are identical between the two builds
-before trusting a verdict. Repeat with identical cursor-bearing harness sources and the diagnostic detailed-default build when the shipped
-default is basic, labelling the outputs `diagnostic-detailed`.
+Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 Records and bundles:
 
@@ -603,9 +548,7 @@ plan.
 `cabal test shibuya-core` passes all three suites with the new MetricsSpec, SupervisedSpec,
 and BatchProcessorSpec examples; `cabal test shibuya-metrics` passes with the updated golden
 file, round trips, route, and WebSocket examples. Each defect test is recorded as having
-failed first. The comparator verdict for the shipped default level is `pass` in every cell
-under `-N1` and `-N4`, with datasets and verdicts committed under
-`docs/audits/lifecycle-release/artifacts/ep50-cursor-progress/`. Both capability bundles and
+failed first. EP-52 records the integrated remote quick comparison. Both capability bundles and
 the improvement-request bundle validate, and IR-3's frontmatter reads `status: completed`.
 
 
@@ -673,3 +616,6 @@ code change from this plan beyond tests, fixtures, and documentation.
 
 
 Revision note (2026-10-10): API and performance review applied. Use lossless browser cursor JSON, atomically enforce partition capacity, and populate cursor-bearing benchmark inputs. EP-49 is a hard dependency and basic remains the default. Implementation and performance measurements remain pending.
+
+
+Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.

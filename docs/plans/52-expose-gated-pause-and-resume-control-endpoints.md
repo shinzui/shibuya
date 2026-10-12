@@ -23,6 +23,11 @@ provenance:
       at: 2026-10-10T19:49:01Z
       mode: "update"
       note: "Apply API and performance review: bounded concurrent state, explicit control semantics, basic default, and candidate-bound integrated regression gates."
+    - model: "gpt-6.1-sol"
+      harness: "codex-cli"
+      at: 2026-10-12T19:32:42Z
+      mode: "implement"
+      note: "Implement browser inspection/control with bounded remote quick performance scope."
 ---
 
 
@@ -72,7 +77,7 @@ control surface and its observability, and closes the request once EP-51 is Comp
 
 - [ ] Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
 - [ ] Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
-- [ ] Milestone 3: Final integrated basic performance matrix and real observer-load checks pass against the pre-initiative baseline; detailed overhead reported.
+- [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate; record exact revisions, report and eligibility limits.
 - [ ] Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; record wire-load sanity numbers; close IR-4 after EP-51 is Complete.
 
 
@@ -83,6 +88,8 @@ control surface and its observability, and closes the request once EP-51 is Comp
 
 
 ## Decision Log
+
+Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 
 - Decision (2026-10-10): Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics.
@@ -408,35 +415,7 @@ shows the pause, the drained `m1`, the WebSocket update, the resume, and the cle
 ### Milestone 3: integrated performance, records and closure
 
 
-Final integration gate: after EP-47, EP-48, EP-49, EP-50 and EP-51 are Complete, build
-baseline from the clean commit before the first child implementation and candidate from the
-final integrated commit. Run identical lifecycle-load harness sources and normalized external
-solver identities under -N1 and -N4, ten alternating pairs (twenty if inconclusive), across
-every requiredScenarios entry in docs/audits/lifecycle-release/performance-budgets.json.
-Use capture-performance-paired.ts and compare-performance.ts; all basic-default cells must
-pass 5% throughput, 5% allocation/live-memory and 10% tail/shutdown limits. Failed or
-inconclusive cells block this milestone. Keep defaultMetricsDetail basic. Repeat detailed
-runs with explicit configuration/patch hashes and report overhead without declaring them free.
-
-Apply identical harness-only additions to both builds for cursor-bearing messages and real
-HTTP/Prometheus/WebSocket observers at 1/16/64 clients during core processing; include slow
-clients, byte/frame saturation, memory plateau and finite shutdown. Existing proxy sampling
-and churn benchmarks alone are insufficient. Verify detailed samples actually contain latency
-and progress. Preserve all reports, identities and commands under
-`docs/audits/lifecycle-release/artifacts/mp7-integrated/`. Performance scripts accept identity
-arguments; independently compare the actual hashes. This gate is required even if each child
-passed against its immediate parent. Record exact executable paths and run the comparator:
-
-```bash
-bun scripts/audit/compare-performance.ts \
-  --baseline docs/audits/lifecycle-release/artifacts/mp7-integrated/baseline-N1.json \
-  --candidate docs/audits/lifecycle-release/artifacts/mp7-integrated/basic-N1.json \
-  --budgets docs/audits/lifecycle-release/performance-budgets.json \
-  --output docs/audits/lifecycle-release/artifacts/mp7-integrated/verdict-N1.json
-```
-
-Repeat for N4. Exit 0 means pass, 1 fail, 2 inconclusive. Observer variants use a focused
-budget copy with matching requiredScenarios and unchanged limits. No agent waives a cell.
+Performance validation follows the user’s 2026-10-12 instruction to use the existing remote fast lane and avoid overengineering. Run one bounded exact-revision comparison for the integrated candidate through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2`, using the supplied `shibuya-core-quick` profile and the runbook’s prepare/run/verify workflow. Baseline is the clean pre-initiative commit; candidate is the final committed implementation. Keep request, exact revisions, harness identity, session/receipt and report references in EP-52. Use temporary or Kenshou-owned scratch storage for raw output, not a new Shibuya audit framework. Do not expand profiles, run calibration batches, add benchmark variants, or repeat statistically valid results to chase a pass. The current quick profiles are uncalibrated: use `purpose: calibration`, report `gatingEligible: false`, and do not call an exploratory result release certification. Report regressions, incomplete coverage and infrastructure failures plainly. Functional child acceptance no longer waits for per-child performance matrices; release certification remains separate under ADR-0002. MetricsBasic stays the default; deterministic feature tests establish detailed cursor and timing correctness. This scope supersedes the older local full-matrix and observer-load prescriptions for this implementation.
 
 Goal: everything a reader needs to use the control plane is written down where the other
 routes are documented, the durable decision is an ADR, and IR-4 is closed with evidence.
@@ -725,3 +704,6 @@ entry.
 
 
 Revision note (2026-10-10): API and performance review applied. Require EP-47 and EP-51, reject disallowed origins on the actual POST, and render atomic core results without racing a second metrics sample. Document draining refusal and admission semantics. Implementation and performance measurements remain pending.
+
+
+Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.

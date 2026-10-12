@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add optional acknowledged `progress` to processor JSON and WebSocket metrics, bounded per partition, with lossless tagged Cursor JSON. Basic detail remains the default. Direct `ProcessorMetrics` construction must supply `progress`.
+
+
 ### Breaking Changes
 
 - `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`, and
