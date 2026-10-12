@@ -60,7 +60,7 @@ You can see it working by running a processor over a mock adapter whose envelope
 integer cursors, requesting `GET /metrics/<processorId>` from the metrics server, and
 watching the `progress.latest` value advance as messages are acknowledged; the WebSocket
 `update` frame for that processor carries the same member. Detailed recording uses one atomic bounded snapshot update per acknowledged message.
-Its allocation and contention must be measured; the basic default bypasses the table entirely.
+Its allocation and contention are an opt-in cost; the basic default bypasses the table entirely. The final focused comparison is owned by EP-52.
 
 This plan delivers the progress item of the improvement request
 `docs/improvement-requests/expose-processor-progress-latency-and-in-flight-detail-for-inspection-uis.md`
@@ -131,7 +131,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 
 - Decision: Reuse EP-49's `MetricsDetail` switch instead of adding a second switch.
   Rationale: One switch is simpler for host applications and for the read side, and the
-  shipped default is decided by measurement in EP-49 and re-verified here.
+  shipped default remains basic, preserving the EP-49 decision and historical uncertainty.
   Date: 2026-09-30
 
 

@@ -161,7 +161,7 @@ Against baseline `db8e783`, the corrected focused basic matrices each pass 68 of
 
 Detailed diagnostics show the opt-in cost: serial allocation increases about 47% under `-N1` and 46% under `-N4`, with throughput about 27% and 14% lower. Batch allocation increases about 0.4%. In real WebSocket fan-out at 1/16/64 clients, all thirty detailed runs completed 500,000 observations with zero slot misses and no retained oldest attempt; allocation increased about 55/58/72% and throughput fell about 23/22/23% (O1, `-N4`, ten alternating pairs). These are workload diagnostics, not an acceptance claim.
 
-The functional tests need no expansion. EP-49 is Complete under the revised implementation validation scope; EP-50 may proceed. The old inconclusive performance results remain inconclusive and do not certify a release. The corrected measurement must run on a quiet host that first passes the baseline stability control. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
+The functional tests need no expansion. EP-49 is Complete under the revised implementation validation scope; EP-50 may proceed. The old inconclusive performance results remain inconclusive and do not certify a release. Any future release certification needs its own quiet-host stability control under ADR-0002. Raw scratch artifacts were removed from the project at the user's request; this summary does not substitute for candidate-bound release evidence.
 
 
 ## Context and Orientation

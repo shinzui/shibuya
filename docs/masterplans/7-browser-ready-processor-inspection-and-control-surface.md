@@ -140,7 +140,7 @@ created with this MasterPlan, is the shared contract every child cites: frozen s
 additive evolution, camelCase members with snake_case values and codes, the `code` member on
 error bodies, the core/metrics package boundary, opt-in cross-origin access and control, and
 the hot-path budget rule. `docs/adr/0002-require-candidate-bound-machine-checkable-release-evidence.md`
-supplies the paired-measurement budgets the core children must meet.
+supplies release performance budgets; the implementation uses the focused remote scope recorded below.
 `docs/adr/0003-make-processor-termination-and-shutdown-outcomes-explicit.md` defines the
 retained lifecycle snapshot and the halt-versus-failure distinction that pause must respect.
 `docs/adr/0004-make-websocket-lifecycle-and-terminal-delivery-explicit.md` defines slot
@@ -375,30 +375,31 @@ Check an item only when the owning child records its acceptance evidence.
 - [x] (2026-10-12) EP-49 M1: Prototype synchronized detailed accounting, prove cancellation cleanup, retain existing detailed cost diagnostics and the basic default; integrated quick comparison owned by EP-52.
 - [x] (2026-10-10) EP-49 M2: Expose the latency summary and oldest in-flight detail in JSON, Prometheus, and WebSocket frames.
 - [x] (2026-10-10) EP-49 M3: Documentation, ADR, changelog, and capability evidence.
-- [x] (2026-10-12) EP-50 M1: Record acknowledged cursors in a per-processor slot and a bounded partition table, and measure.
+- [x] (2026-10-12) EP-50 M1: Record acknowledged cursors in a per-processor slot and a bounded partition table, with deterministic finalization and capacity tests.
 - [x] (2026-10-12) EP-50 M2: Expose progress in JSON and WebSocket frames, absent when no cursor exists.
 - [x] (2026-10-12) EP-50 M3: Documentation, ADR extension, changelog, and IR-3 closure.
 - [x] (2026-10-12) EP-51 M1: Pause handle, ingester gate, `Paused` state, registry control entries, and the design's deterministic tests.
 - [x] (2026-10-12) EP-51 M2: Public application API, metrics-package updates for the new state, and resume-before-shutdown.
-- [x] (2026-10-12) EP-51 M3: Performance evidence for the gate, documentation, ADR, and changelog.
+- [x] (2026-10-12) EP-51 M3: Gate regression tests, documentation, ADR, and changelog; integrated quick comparison owned by EP-52.
 - [x] (2026-10-12) EP-52 M1: `enableControl` configuration, `GET /control` discovery, and structured refusal when disabled.
 - [x] (2026-10-12) EP-52 M2: Pause and resume routes with structured outcomes, tested in both gate positions end to end.
 - [x] (2026-10-12) EP-52 M3: Documentation, capability record, ADR, changelog, and IR-4 closure.
-- [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline; record its outcome and exploratory eligibility explicitly.
+- [ ] EP-52 integration: Run and verify the bounded remote quick comparison against the pre-initiative baseline. Two preparations exited 4 on existing harness/cohort dependency conflicts before leasing; execution and verification remain pending (see EP-52).
 
 
 ## Surprises & Discoveries
 
+**Functional integration complete; remote preparation blocked (2026-10-12).** The all-package build, 260 core examples, 104 metrics examples and both GC suites pass. Deterministic cursor, pause and endpoint negative controls fail when their production behavior is removed. EP-52 implements the final HTTP/WebSocket path. The bounded remote comparison through `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` reaches planning but both existing cohort choices fail preparation: the historical full runtime excludes Shibuya 0.10, and the current Shibuya lane conflicts with unrelated Kiroku harness packages included by preparation. Exact identities, retained requests and diagnostics are in EP-52. No cell was leased and no performance report exists. Do not expand this implementation into a performance harness refactor.
+
 **EP-49 measurement corrected (2026-10-10).** Existing baseline captures are inconclusive
 against themselves. Correct the full-inbox GC checkpoint and require a baseline stability
 control before candidate measurement. The user reports a busy local machine; its timing
-results cannot certify the feature. Keep EP-49's gate and EP-50's hard dependency in place.
+results cannot certify the feature. This historical gate was replaced by the owner’s 2026-10-12 focused validation decision.
 
 **EP-49 functionally implemented (2026-10-10).** Opt-in latency and oldest-in-flight
 accounting, wire exposure and records are delivered. The core (250 examples), metrics
 (92 examples), GC suites and build pass. Basic allocation regressions were corrected, but
-the focused performance matrices remain inconclusive; EP-49 stays In Progress and EP-50
-remains blocked. Additional sampling stopped at the user's request. Generated EP-49 audit
+the focused performance matrices remained inconclusive at that checkpoint. EP-49 and EP-50 are now Complete under the 2026-10-12 scope; no historical measurement is reclassified as a pass. Additional sampling stopped at the user's request. Generated EP-49 audit
 files were removed from the project; the child retains a concise verification summary.
 
 
@@ -408,8 +409,7 @@ ADR-0008 owns delivery semantics and IR-5 is closed. Tests include terminal admi
 itself drops a delta: stop deltas immediately and retire the terminal before recovery.
 The controlled local observer gate passes 30/90/30 matched pairs at 1/16/64 clients with four
 capabilities and migration disabled. Earlier default-scheduler confidence intervals remain
-inconclusive and are preserved; the EP-52 integrated gate must still meet its complete basic
-matrix and real-observer budgets. Local queue limits do not isolate shared CPU/GC costs.
+inconclusive and are preserved; the original complete basic matrix and real-observer prescription was superseded by the 2026-10-12 focused remote scope. Local queue limits do not isolate shared CPU/GC costs.
 
 **EP-47 implemented (2026-10-10).** HTTP origin policy, preflight validation, shared errors
 and WebSocket Origin refusal are complete. The new configured-origin field is independently
@@ -550,7 +550,7 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 
 EP-47 through EP-51 are Complete (five of six children). Configurable browser access and
 bounded WebSocket alignment have tests, documentation, ADRs, and local acceptance evidence;
-IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52 is next and all hard dependencies are satisfied; IR-3 and IR-4 are closed with functional evidence; the integrated remote quick comparison remains.
+IR-5 is completed. EP-49 is functionally complete under the revised focused validation scope. EP-52’s functional implementation is complete and all hard dependencies are satisfied. IR-3 and IR-4 are closed with functional evidence. EP-52 remains In Progress solely because remote performance preparation is blocked; execution and verification have not occurred.
 
 The EP-48 historical controlled observer evidence is retained. The bounded remote quick comparison now owns implementation performance validation; it does not certify a release. This MasterPlan remains In Progress.
 
@@ -574,3 +574,5 @@ retain the mandatory integrated gate, and identify EP-49 as the next implementab
 
 
 Revision note (2026-10-12): Adopt the owner-requested bounded Kenshou remote quick comparison, remove per-child measurement gates, and mark EP-49 functionally complete without claiming its old inconclusive measurements passed.
+
+Revision note (2026-10-12 integration checkpoint): All feature work and functional validation are delivered. Record exact-revision remote preparation failures and leave the performance milestone pending; no measured pass or release certification is claimed.

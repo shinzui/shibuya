@@ -77,11 +77,15 @@ control surface and its observability, and closes the request once EP-51 is Comp
 
 - [x] (2026-10-12) Milestone 1: Add `enableControl` to `MetricsServerConfig`, the `Shibuya.Metrics.Control` module with `GET /control` discovery, and the structured refusal of every action while the gate is off, with tests in `ControlSpec`.
 - [x] (2026-10-12) Milestone 2: Implement the pause and resume action routes with structured outcomes, test both gate positions through `combinedApp`, and prove the whole path end to end through a real application, a real port, and a real WebSocket connection.
-- [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate; record exact revisions, report and eligibility limits.
+- [ ] Milestone 3: Run and verify one bounded remote quick comparison for the final integrated candidate. Preparation attempted and blocked by the existing harness/cohort conflicts documented below; remote execution and report verification remain pending.
 - [x] (2026-10-12) Milestone 3: Update the protocol reference, user guide, architecture document, capability bundle, changelogs, and ADR; close IR-4 after EP-51 is Complete.
 
 
 ## Surprises & Discoveries
+
+2026-10-12 preparation: The runbook’s historical `cohort/released.json` template rejects Shibuya 0.10.0.1 because the fixed Keiro release bounds Shibuya to 0.9. The existing `cohort/shibuya-current.json` template explicitly isolates the current Shibuya release lane; use it unchanged in a fresh request/preparation, keeping the same revisions and core profile. No bounds override was attempted. Both retained requests live in Kenshou scratch storage. The second preparation also fails: the generated bounds project includes every harness package, including kenshou-kiroku pinned to kiroku-store 0.8.0.1, conflicting with the lane’s kiroku-store 0.10.0.0. This is a harness-side preparation blocker; no lease, submission, execution session or receipt was created.
+
+2026-10-12 negative control: In an isolated worktree, replacing the endpoint’s core call with `pure ControlNotControllable` makes the repeated pause/resume test fail (expected HTTP 200, got 409; one example, one failure; seed 1672937579). The production call is intact and the full suite passes.
 
 2026-10-12: Real loopback HTTP and WebSocket tests pass through an application whose admitted poll is held before pause, then drains while the next admission waits; resume admits the next poll and graceful shutdown completes. The tests require http-client and streamly-core in the metrics test stanza; http-client 0.7.19 is verified against Hackage and upstream tag a0b418c12ff3c9878f21bff92bb174c239a9cfe3. No production dependency is added. The all-package build caught a Text/String mismatch in the example’s new paused formatter; corrected to Text.pack.
 
@@ -136,8 +140,17 @@ Decision (2026-10-12): Performance validation follows the user’s 2026-10-12 in
 ## Outcomes & Retrospective
 
 
-Discovery, opt-in control routes, actual POST Origin enforcement, structured outcomes and real HTTP/WebSocket integration are implemented. Core (260 examples), metrics (104 examples) and both GC suites pass. IR-4 is closed with functional evidence. One bounded remote quick comparison remains; its uncalibrated profile will be reported as exploratory, not release certification. CAP-11 uses the current source version and requires the release owner to set the publication version at release.
+Discovery, opt-in control routes, actual POST Origin enforcement, structured outcomes and real HTTP/WebSocket integration are implemented. Core (260 examples), metrics (104 examples) and both GC suites pass. IR-4 is closed with functional evidence. The bounded remote quick comparison is blocked in preparation by existing harness/cohort dependency conflicts; execution and verification remain pending. Neither attempt is performance evidence or release certification. CAP-11 uses the current source version and requires the release owner to set the publication version at release.
 
+
+
+### Remote quick comparison attempt (2026-10-12)
+
+Followed `mori://shinzui/keiro-runtime-kenshou/okf/runbooks/concepts/RB-2` with the clean harness commit `1ebfbdafbf0625910a0b4192f6fcddd76f6b1466`, baseline `454257abdda9cf7f80978f7f38a0600d3ca00cf1` and candidate `ca61711ef7431044f6432b3febc4ee9cc7366156`. The candidate is committed and available from the registered HTTPS upstream. Request: target component shibuya, supplied shibuya-core-quick profile only, selected-profiles coverage, purpose calibration, control none, seed 20261012, cell alpha, wait 90 seconds, execution budget 30 minutes. Cloud project tan-nb-exp; control bucket tan-nb-exp-cells-control; intended evidence base gs://kenshou-evidence-tan-nb-exp/performance. Initial cell status showed no lease or quarantine.
+
+Retained output belongs to `mori://shinzui/keiro-runtime-kenshou`; artifact-level URIs for these scratch paths are pending. Initial request `.dev/mp7-perf-request.json` and preparation `.dev/mp7-perf-preparation` use the runbook’s released template; its baseline `work/baseline/resolution.log` records Keiro 0.17.0.0 refusing Shibuya 0.10.0.1. Fresh request `.dev/mp7-perf-request-current.json` (request digest sha256:7acef831f97f8fc229336f1c629a4b7d2ee5d0ec9a0b4724c5e4b4a34ab2dfee) and preparation `.dev/mp7-perf-preparation-current` use the existing shibuya-current template unchanged. Its baseline `work/baseline/resolution.log` records kenshou-kiroku’s kiroku-store ==0.8.0.1 conflicting with the template’s ==0.10.0.0; generated `bounds.project` shows the unrelated harness packages are included. Both preparations exited 4 before leasing. The harness working tree remains clean.
+
+Both plans accept the exact revisions and select one configuration, estimating 770 execution seconds. They report coverage complete for the requested profile, changeCoverage incomplete (368 affected scenarios uncovered), and gatingEligible false. Browser, observer-load, detailed-mode, batch and other adapter coverage are excluded by the deliberately narrow requested scope. These are planning facts, not measured results. No prepared descriptor, execution session, receipt, durable report or verification result exists. Do not substitute a local matrix or alter solver bounds to claim a pass. Resume this milestone only after a compatible existing fast-lane preparation is available; preserve both failed preparations for diagnosis.
 
 ## Context and Orientation
 
@@ -584,8 +597,7 @@ ExecPlan: docs/plans/52-expose-gated-pause-and-resume-control-endpoints.md
 Intention: intention_01m3ta8zgtebmaz00g0snjzy5a
 ```
 
-Record the exact example counts, seeds if Hspec prints them, and the wire-load numbers in this
-section as you go.
+Record the exact example counts, negative-control seeds and bounded remote comparison outcome as work proceeds.
 
 
 ## Validation and Acceptance
@@ -593,8 +605,7 @@ section as you go.
 
 With `defaultConfig`, `GET /control` answers 200 with `enabled: false` and the operations
 list, and a `POST` to either action path answers 403 with code `control_disabled` while the
-named processor's pause state is unchanged; both are covered by tests that were seen failing
-before the routes existed. With `enableControl = True`, pausing a registered processor answers
+named processor's pause state is unchanged; both are covered by refusal tests. The success-path negative control above proves that bypassing the core operation is detected. With `enableControl = True`, pausing a registered processor answers
 200 with state `paused` and a `pausedAt` time and the processor is paused; repeating the
 request returns the identical body; resuming answers 200 with state `running` and the
 processor is not paused; unknown, non-controllable, and terminal processors answer 404
@@ -700,3 +711,5 @@ Revision note (2026-10-10): API and performance review applied. Require EP-47 an
 
 
 Revision note (2026-10-12): Replace per-child/full-matrix performance work with the owner-requested existing bounded remote quick workflow, preserve historical uncertainty, and keep release certification separate.
+
+Revision note (2026-10-12 completion checkpoint): Functional implementation, all-package build, core/metrics and GC suites, records and negative control are complete. Retain the two fast-lane preparation failures without a performance pass claim; remote execution and verification remain the sole pending milestone.
