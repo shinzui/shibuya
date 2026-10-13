@@ -45,6 +45,7 @@ module Shibuya.App
   )
 where
 
+import Control.Concurrent.Async qualified as Async
 import Control.Concurrent.NQE.Supervisor qualified as NQE
 import Control.Concurrent.STM
   ( STM,
@@ -57,8 +58,11 @@ import Control.Concurrent.STM
     readTMVar,
     readTVar,
     registerDelay,
+    retry,
+    throwSTM,
     writeTVar,
   )
+import Control.Exception qualified as IOException
 import Control.Monad (forM, forM_, void)
 import Data.Bifunctor (first)
 import Data.Foldable (traverse_)
@@ -70,6 +74,8 @@ import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), l
 import Effectful.Exception qualified as Exception
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
+import OpenTelemetry.Context qualified as TraceContext
+import OpenTelemetry.Context.ThreadLocal qualified as TraceContext
 import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch
@@ -418,9 +424,35 @@ stopAppGracefully config appHandle =
     traceShutdown procId action = case appHandle.shutdownTracer of
       Nothing -> action
       Just tracer -> withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-        OTel.inSpan' tracer (procId.unProcessorId <> " shutdown") internalSpanArgs $ \sp -> do
-          OTel.addAttribute sp attrShibuyaProcessorId procId.unProcessorId
-          runInIO action
+        UIO.mask $ \restore -> do
+          context <- TraceContext.getContext
+          ready <- newEmptyTMVarIO
+          finished <- newEmptyTMVarIO
+          -- SDK hooks catch SomeException, including cancellation. Keep them
+          -- on a separate owned thread; only the caller runs adapter effects.
+          -- Even if span creation swallows cancellation, it can only observe
+          -- the published outcome, never start adapter cleanup afterwards.
+          let trace = UIO.bracket (TraceContext.attachContext context) TraceContext.detachContext $ \_ ->
+                OTel.inSpan' tracer (procId.unProcessorId <> " shutdown") internalSpanArgs $ \sp -> do
+                  OTel.addAttribute sp attrShibuyaProcessorId procId.unProcessorId
+                  atomically $ putTMVar ready sp
+                  result <- atomically $ readTMVar finished
+                  either IOException.throwIO pure result
+          UIO.withAsync trace $ \worker -> do
+            result <- IOException.try @SomeException $ restore $ do
+              sp <-
+                atomically $
+                  readTMVar ready `orElse` (Async.waitCatchSTM worker >>= either throwSTM (const retry))
+              UIO.bracket (TraceContext.attachContext $ TraceContext.insertSpan sp context) TraceContext.detachContext $ \_ ->
+                runInIO action
+            atomically $ putTMVar finished result
+            case result of
+              -- Do not wait for export after the caller has been cancelled.
+              -- withAsync still cancels and joins the tracing worker.
+              Left failure | Exception.isAsyncException failure -> IOException.throwIO failure
+              _ -> do
+                traced <- restore $ UIO.waitCatch worker
+                either IOException.throwIO (const $ either IOException.throwIO pure traced) result
 
     shutdownAdapter (_, qp) = case qp of
       QueueProcessor {adapter} -> adapter.shutdown

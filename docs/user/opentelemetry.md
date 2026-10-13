@@ -47,14 +47,18 @@ main = bracket OTelSdk.initializeTracerProvider
                       (AckHandle (const $ pure ()))
           adapter = listAdapter [message]  -- replace with your broker adapter
           processor = mkProcessor adapter (const $ pure AckOk)
-      result <- runApp defaultAppConfig [(ProcessorId "orders", processor)]
-      case result of
-        Left err -> liftIO $ ioError $ userError $ show err
-        Right app -> Exception.finally (waitApp app) (stopApp app)
+      let acquireApp = do
+            result <- runApp defaultAppConfig [(ProcessorId "orders", processor)]
+            case result of
+              Left err -> liftIO $ ioError $ userError $ show err
+              Right app -> pure app
+      Exception.bracket acquireApp stopApp waitApp
 ```
 
 The provider stays alive through `waitApp` and `stopApp`, including exceptional
-cleanup. `runApp` returns immediately; a bracket ending immediately after that
+cleanup. The inner bracket masks the handoff from successful startup to registered
+cleanup, so cancellation cannot leave a running app without a stop action.
+`runApp` returns immediately; a bracket ending immediately after that
 call would shut the provider down while processors were still running. This
 complete finite-source example requires `hs-opentelemetry-sdk` in your executable's
 Cabal dependencies as well as `shibuya-core`, `effectful-core`, and

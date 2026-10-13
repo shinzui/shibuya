@@ -2,8 +2,8 @@ module Shibuya.Telemetry.LifecycleSpec (spec) where
 
 import Control.Concurrent (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (atomically, retry)
-import Control.Exception (SomeException, bracket, displayException)
-import Control.Monad (forM_, void)
+import Control.Exception (SomeException, bracket, displayException, try)
+import Control.Monad (forM_, void, when)
 import Data.Foldable (toList)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (modifyIORef', newIORef, readIORef)
@@ -12,9 +12,12 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.Exception qualified as Exception
+import Effectful.State.Static.Local qualified as State
 import OpenTelemetry.Attributes (emptyAttributes, getAttributeMap, toAttribute)
 import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
+import OpenTelemetry.Processor.Span (SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
+import OpenTelemetry.Trace.Id.Generator (IdGenerator (..))
 import OpenTelemetry.Util (appendOnlyBoundedCollectionValues)
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock (listAdapter)
@@ -24,7 +27,7 @@ import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (mkIngested)
 import Shibuya.Core.Types (MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.Master (ProcessorLifecycle (..), getLifecycleSnapshot)
-import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop)
+import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop, withSpan')
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import UnliftIO qualified as UIO
@@ -75,6 +78,40 @@ spec = describe "Shibuya.Telemetry.Lifecycle" $ do
     readIORef calls `shouldReturn` 1
     expectSpan "lifecycle shutdown" spans >>= expectError
 
+  forM_ [False, True] $ \onEnd -> do
+    let hookName = if onEnd then "onEnd" else "onStart"
+    it ("retains the shutdown deadline when " <> hookName <> " swallows cancellation") $ do
+      calls <- newIORef (0 :: Int)
+      ((first, second), _) <- withExporterUsing (blockingShutdownHook onEnd (pure ())) $ \tracer -> runEff $ runTracing tracer $ do
+        let adapter = (listAdapter []) {shutdown = liftIO $ modifyIORef' calls (+ 1)}
+        app <- start $ mkProcessor adapter (const $ pure AckOk)
+        waitApp app
+        first <- stopAppGracefully defaultShutdownConfig {totalShutdownTimeout = 0.05} app
+        second <- stopAppGracefully defaultShutdownConfig app
+        pure (first, second)
+      (first, second) `shouldBe` (False, False)
+      readIORef calls `shouldReturn` if onEnd then 1 else 0
+
+    it ("retains caller cancellation when " <> hookName <> " swallows it") $ do
+      entered <- newEmptyMVar
+      calls <- newIORef (0 :: Int)
+      ((first, second), _) <- withExporterUsing (blockingShutdownHook onEnd (putMVar entered ())) $ \tracer -> do
+        app <- runEff $ runTracing tracer $ do
+          let adapter = (listAdapter []) {shutdown = liftIO $ modifyIORef' calls (+ 1)}
+          app <- start $ mkProcessor adapter (const $ pure AckOk)
+          waitApp app
+          pure app
+        first <- UIO.withAsync (runEff $ runTracing tracer $ stopApp app) $ \stopper -> do
+          takeMVar entered
+          UIO.cancel stopper
+          UIO.waitCatch stopper
+        second <- try @SomeException $ runEff $ runTracing tracer $ stopApp app
+        pure (first, second)
+      forM_ [first, second] $ \case
+        Left failure -> Exception.isAsyncException failure `shouldBe` True
+        Right () -> expectationFailure "shutdown swallowed caller cancellation"
+      readIORef calls `shouldReturn` if onEnd then 1 else 0
+
   it "records shutdown deadline cancellation without changing the False result" $ do
     ((first, second), spans) <- withExporter $ \tracer -> runEff $ runTracing tracer $ do
       let adapter = (listAdapter []) {shutdown = liftIO $ atomically retry}
@@ -108,6 +145,29 @@ spec = describe "Shibuya.Telemetry.Lifecycle" $ do
       runEff $ runTracingNoop $ stopApp app
     expectSpan "lifecycle shutdown" spans >>= expectIdentity
 
+  it "retains adapter shutdown updates to caller-local effects" $ do
+    (updates, _) <- withExporter $ \tracer -> runEff $ State.execState (0 :: Int) $ runTracing tracer $ do
+      let adapter = (listAdapter []) {shutdown = State.modify @Int (+ 1)}
+      app <- start $ mkProcessor adapter (const $ pure AckOk)
+      waitApp app
+      stopApp app
+    updates `shouldBe` 1
+
+  it "parents shutdown to the caller's active span" $ do
+    (parentContext, spans) <- withExporter $ \tracer -> runEff $ runTracing tracer $ do
+      app <- start $ mkProcessor (listAdapter []) (const $ pure AckOk)
+      waitApp app
+      withSpan' "stop caller" OTel.defaultSpanArguments $ \parent -> do
+        stopApp app
+        liftIO $ OTel.getSpanContext parent
+    shutdownSpan <- expectSpan "lifecycle shutdown" spans
+    case OTel.spanParent shutdownSpan of
+      Nothing -> expectationFailure "shutdown lost its caller's parent context"
+      Just parent -> do
+        actual <- OTel.getSpanContext parent
+        OTel.traceId actual `shouldBe` OTel.traceId parentContext
+        OTel.spanId actual `shouldBe` OTel.spanId parentContext
+
   it "exports no lifecycle spans with tracing disabled" $ do
     (_, spans) <- withExporter $ \_ -> runEff $ runTracingNoop $ do
       app <- start $ mkProcessor (listAdapter []) (const $ pure AckOk)
@@ -122,10 +182,24 @@ start processor =
     Right app -> pure app
 
 withExporter :: (OTel.Tracer -> IO a) -> IO (a, [OTel.ImmutableSpan])
-withExporter action = do
+withExporter = withExporterUsing id
+
+-- Block only the shutdown span so startup and ingestion remain independent.
+blockingShutdownHook :: Bool -> IO () -> SpanProcessor -> SpanProcessor
+blockingShutdownHook onEnd entered processor =
+  if onEnd
+    then processor {spanProcessorOnEnd = \sp -> block sp >> spanProcessorOnEnd processor sp}
+    else processor {spanProcessorOnStart = \sp ctx -> block sp >> spanProcessorOnStart processor sp ctx}
+  where
+    block sp = do
+      hot <- readIORef (OTel.spanHot sp)
+      when (OTel.hotName hot == "lifecycle shutdown") $ entered >> atomically retry
+
+withExporterUsing :: (SpanProcessor -> SpanProcessor) -> (OTel.Tracer -> IO a) -> IO (a, [OTel.ImmutableSpan])
+withExporterUsing configure action = do
   (processor, spansRef) <- inMemoryListExporter
   result <- bracket
-    (OTel.createTracerProvider [processor] OTel.emptyTracerProviderOptions)
+    (OTel.createTracerProvider [configure processor] OTel.emptyTracerProviderOptions {OTel.tracerProviderOptionsIdGenerator = DefaultIdGenerator})
     (\p -> void $ OTel.shutdownTracerProvider p (Just 5_000_000))
     $ \provider -> do
       let tracer = OTel.makeTracer provider (OTel.InstrumentationLibrary "lifecycle-test" "" "" emptyAttributes) OTel.tracerOptions

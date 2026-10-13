@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve shutdown deadlines and caller cancellation when tracing callbacks catch
+  asynchronous exceptions; prevent cancelled shutdowns from starting more adapter
+  cleanup. Bracket app acquisition and cleanup in the OpenTelemetry guide.
+
 - Trace source-stream lifetimes and once-only adapter shutdowns as Internal spans
   carrying `shibuya.processor.id`, including exception and cancellation outcomes.
   Keep the existing stop API by capturing the startup tracer.
