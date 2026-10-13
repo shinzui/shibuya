@@ -17,7 +17,7 @@ import Effectful (Eff, IOE, liftIO, (:>))
 import OpenTelemetry.Context qualified as Ctx
 import OpenTelemetry.Context.ThreadLocal qualified as Ctx
 import OpenTelemetry.Propagator.W3CTraceContext qualified as W3C
-import OpenTelemetry.Trace.Core (Span, SpanContext)
+import OpenTelemetry.Trace.Core (Span, SpanContext, getSpanContext, isValid)
 import Shibuya.Core.Types (TraceHeaders)
 import Shibuya.Telemetry.Effect (Tracing, isTracingEnabled)
 
@@ -40,6 +40,8 @@ extractTraceContext headers =
 
 -- | Inject current span's context into headers for propagation.
 -- Use this when producing messages that should carry trace context.
+-- Returns an empty list for an invalid context, including the disabled
+-- @withSpan'@ sentinel; zero IDs must never be propagated as W3C headers.
 --
 -- Example:
 --
@@ -49,11 +51,12 @@ extractTraceContext headers =
 -- @
 injectTraceContext :: Span -> IO TraceHeaders
 injectTraceContext otelSpan = do
-  (traceparent, tracestate) <- W3C.encodeSpanContext otelSpan
-  pure
-    [ ("traceparent", traceparent),
-      ("tracestate", tracestate)
-    ]
+  context <- getSpanContext otelSpan
+  if not (isValid context)
+    then pure []
+    else do
+      (traceparent, tracestate) <- W3C.encodeSpanContext otelSpan
+      pure [("traceparent", traceparent), ("tracestate", tracestate)]
 
 -- | Look up the currently-active OTel span and encode its context as
 -- W3C trace headers, ready to attach to an outgoing message.
@@ -87,4 +90,6 @@ currentTraceHeaders = do
       ctx <- Ctx.getContext
       case Ctx.lookupSpan ctx of
         Nothing -> pure Nothing
-        Just sp -> Just <$> injectTraceContext sp
+        Just sp -> do
+          headers <- injectTraceContext sp
+          pure $ if null headers then Nothing else Just headers

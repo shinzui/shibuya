@@ -133,6 +133,7 @@ test-suite shibuya-core-test
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec
     Shibuya.Telemetry.EffectSpec
+    Shibuya.Telemetry.LifecycleSpec
     Shibuya.Telemetry.PropagationSpec
     Shibuya.Telemetry.SemanticSpec
 
