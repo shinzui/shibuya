@@ -2,13 +2,6 @@
 
 ## Unreleased
 
-- Trace source-stream lifetimes and once-only adapter shutdowns as Internal spans
-  carrying `shibuya.processor.id`, including exception and cancellation outcomes.
-  Keep the existing stop API by capturing the startup tracer.
-- Share the private `runTracingNoop` compatibility tracer across invocations.
-  Document the non-recording, zero-ID callback sentinel; propagation now omits
-  invalid contexts rather than emitting unusable W3C headers.
-
 - Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
 
 

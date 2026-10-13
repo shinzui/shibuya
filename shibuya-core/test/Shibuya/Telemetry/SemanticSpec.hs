@@ -29,7 +29,6 @@ import OpenTelemetry.Trace.Core
   ( Event (..),
     ImmutableSpan (..),
     InstrumentationLibrary (..),
-    SpanKind (..),
     SpanStatus (..),
     createTracerProvider,
     emptyTracerProviderOptions,
@@ -80,7 +79,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       pure ()
 
     _ <- shutdownTracerProvider provider (Just 5_000_000)
-    spans <- filter ((== Consumer) . spanKind) <$> readIORef spansRef
+    spans <- readIORef spansRef
     case spans of
       [s] -> do
         hot <- readIORef (spanHot s)
@@ -131,7 +130,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       pure ()
 
     _ <- shutdownTracerProvider provider (Just 5_000_000)
-    spans <- filter ((== Consumer) . spanKind) <$> readIORef spansRef
+    spans <- readIORef spansRef
     case spans of
       [s] -> do
         hot <- readIORef (spanHot s)
@@ -166,7 +165,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
       pure ()
 
     _ <- shutdownTracerProvider provider (Just 5_000_000)
-    spans <- filter ((== Consumer) . spanKind) <$> readIORef spansRef
+    spans <- readIORef spansRef
     case spans of
       [s] -> do
         hot <- readIORef (spanHot s)

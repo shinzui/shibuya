@@ -57,7 +57,6 @@ import OpenTelemetry.Context.ThreadLocal qualified as Ctx
 import OpenTelemetry.Trace.Core qualified as OTel
 import OpenTelemetry.Trace.Id qualified as OTel.Id
 import OpenTelemetry.Trace.TraceState qualified as OTel.TraceState
-import System.IO.Unsafe (unsafePerformIO)
 
 --------------------------------------------------------------------------------
 -- Effect Definition
@@ -96,20 +95,16 @@ runTracing ::
 runTracing t = evalStaticRep (TracingRep t True)
 
 -- | Run with tracing disabled (near-zero overhead).
--- All tracing operations become no-ops. The compatibility tracer returned by
--- 'getTracer' is shared across invocations, independent of the global provider.
+-- All tracing operations become no-ops.
 runTracingNoop ::
   (IOE :> es) =>
   Eff (Tracing : es) a ->
   Eff es a
-runTracingNoop = evalStaticRep (TracingRep noopTracer False)
-
--- One private provider without processors or background resources. Sharing it
--- preserves the concrete getTracer API without repeated provider construction.
-noopTracer :: OTel.Tracer
-noopTracer = unsafePerformIO $ do
-  provider <- OTel.createTracerProvider [] OTel.emptyTracerProviderOptions
-  pure $ OTel.makeTracer provider instrumentationLib OTel.tracerOptions
+runTracingNoop action = do
+  -- Create a minimal no-op tracer
+  noopProvider <- liftIO $ OTel.createTracerProvider [] OTel.emptyTracerProviderOptions
+  let noopTracer = OTel.makeTracer noopProvider instrumentationLib OTel.tracerOptions
+  evalStaticRep (TracingRep noopTracer False) action
   where
     instrumentationLib =
       OTel.InstrumentationLibrary
@@ -118,7 +113,6 @@ noopTracer = unsafePerformIO $ do
           OTel.librarySchemaUrl = "",
           OTel.libraryAttributes = Attr.emptyAttributes
         }
-{-# NOINLINE noopTracer #-}
 
 --------------------------------------------------------------------------------
 -- Span Operations
@@ -148,10 +142,6 @@ withSpan name args action = do
 
 -- | Create a span with access to the Span handle.
 -- Use this when you need to add attributes or events to the span.
--- When tracing is disabled, the callback receives a shared non-recording span
--- with invalid all-zero IDs. It represents absence, cannot be correlated, and
--- must not be used as a parent. Shibuya's injection helper returns no headers
--- for this sentinel. Use 'isTracingEnabled' to branch on presence explicitly.
 --
 -- Example:
 --

@@ -37,13 +37,11 @@ spec = describe "pause and resume" $ do
     inbox <- newBoundedInbox 10
     let action =
           runEff $
-            runTracingNoop $
-              runIngesterWithMetrics
-                (ProcessorId "pause-ingester")
-                h
-                pause
-                (Stream.repeatM (liftIO (atomically $ putTMVar polled ()) >> pure (mkIngested (mkEnvelope (MessageId "a") ()) (AckHandle (\_ -> pure ())))))
-                inbox
+            runIngesterWithMetrics
+              h
+              pause
+              (Stream.repeatM (liftIO (atomically $ putTMVar polled ()) >> pure (mkIngested (mkEnvelope (MessageId "a") ()) (AckHandle (\_ -> pure ())))))
+              inbox
     UIO.withAsync action $ \_ -> do
       UIO.timeout 100_000 (atomically $ takeTMVar polled) `shouldReturn` Nothing
       requestResume pause `shouldReturn` True

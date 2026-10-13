@@ -18,48 +18,21 @@ on `runApp`'s effect stack; the caller decides whether to plug in a
 real tracer or a noop.
 
 ```haskell
-{-# LANGUAGE OverloadedStrings #-}
-
 import Control.Exception (bracket)
-import Control.Monad (void)
-import Effectful (liftIO, runEff)
-import Effectful.Exception qualified as Exception
-import OpenTelemetry.Attributes (emptyAttributes)
-import OpenTelemetry.Trace.Core qualified as OTel
-import OpenTelemetry.Trace qualified as OTelSdk
-import Shibuya.App (defaultAppConfig, mkProcessor, runApp, stopApp, waitApp,
-                    ProcessorId (..))
-import Shibuya.Adapter.Mock (listAdapter)
-import Shibuya.Core.Ack (AckDecision (..))
-import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (mkIngested)
-import Shibuya.Core.Types (MessageId (..), mkEnvelope)
+import OpenTelemetry.Trace (initializeGlobalTracerProvider, makeTracer,
+                            shutdownTracerProvider, tracerOptions)
 import Shibuya.Telemetry.Effect (runTracing)
+import Shibuya.App (defaultAppConfig, runApp, waitApp)
 
 main :: IO ()
-main = bracket OTelSdk.initializeTracerProvider
-  (\provider -> void $ OTel.shutdownTracerProvider provider (Just 5_000_000)) $
-  \provider -> do
-    let library = OTel.InstrumentationLibrary "my-service" "" "" emptyAttributes
-        tracer = OTel.makeTracer provider library OTel.tracerOptions
-    runEff $ runTracing tracer $ do
-      let message = mkIngested (mkEnvelope (MessageId "demo") ())
-                      (AckHandle (const $ pure ()))
-          adapter = listAdapter [message]  -- replace with your broker adapter
-          processor = mkProcessor adapter (const $ pure AckOk)
-      result <- runApp defaultAppConfig [(ProcessorId "orders", processor)]
-      case result of
-        Left err -> liftIO $ ioError $ userError $ show err
-        Right app -> Exception.finally (waitApp app) (stopApp app)
+main = bracket initializeGlobalTracerProvider shutdownTracerProvider $ \provider -> do
+  let tracer = makeTracer provider "my-service" tracerOptions
+  runEff . runTracing tracer $ do
+    adapter <- pgmqAdapter config           -- or kafkaAdapter config
+    Right appHandle <- runApp defaultAppConfig
+      [ (ProcessorId "orders", QueueProcessor adapter myHandler Unordered Serial) ]
+    waitApp appHandle
 ```
-
-The provider stays alive through `waitApp` and `stopApp`, including exceptional
-cleanup. `runApp` returns immediately; a bracket ending immediately after that
-call would shut the provider down while processors were still running. This
-complete finite-source example requires `hs-opentelemetry-sdk` in your executable's
-Cabal dependencies as well as `shibuya-core`, `effectful-core`, and
-`hs-opentelemetry-api`. Run with GHC2024 and `-threaded`. An infinite broker source
-needs an application stop signal instead of waiting forever for source exhaustion.
 
 To turn tracing off without removing the wiring, swap `runTracing
 tracer` for `runTracingNoop`:
@@ -69,14 +42,7 @@ runEff . runTracingNoop $ do
   ...
 ```
 
-`runTracingNoop` short-circuits every Shibuya span-API call. Its concrete
-`getTracer` compatibility value shares one private provider across invocations,
-independent of any globally configured exporter. `withSpan'` still calls your
-callback with a shared non-recording sentinel whose trace and span IDs are all
-zero. These invalid IDs represent absence and cannot be used for correlation or
-parenting. `injectTraceContext` returns `[]` for invalid contexts;
-`currentTraceHeaders` returns `Nothing`. Use `isTracingEnabled` if your callback
-needs an explicit presence check. There is no
+`runTracingNoop` short-circuits every span-API call. There is no
 `OTEL_SDK_DISABLED=true` knob inside Shibuya; that's for the SDK
 layer (when one is present).
 
@@ -143,21 +109,6 @@ occurrence-specific value in a code. Neither the code nor detail is added to
 Shibuya metrics; reason-keyed metrics would create an application-controlled
 cardinality surface. Use trace queries or structured dead-letter storage for
 reason-level investigation.
-
-
-## Lifecycle spans
-
-Each source-stream lifetime emits one Internal-kind `shibuya.ingest` span, including
-batch processors. Each adapter shutdown attempt emits one Internal-kind
-`"<ProcessorId> shutdown"` span. Both carry `shibuya.processor.id`. Source and
-shutdown exceptions, including cancellation and the shutdown deadline, produce an
-`exception` event and Error status. Repeated stop calls share the original outcome
-and do not create more shutdown spans. Shutdown uses the tracer selected by
-`runApp`, retaining the existing stop API.
-
-These spans end on completion, failure, or cancellation. A source that runs forever
-has no completed ingestion span to export until it stops; use lifecycle metrics
-for live state. Tracing disabled emits neither lifecycle span.
 
 
 ## `Envelope.traceContext` vs. `Envelope.attributes`
@@ -333,9 +284,7 @@ deployments.
 ### DLQ writes (kafka)
 
 The Kafka adapter does not implement DLQ today; `AckDeadLetter`
-just stores the offset (see `mori://shinzui/shibuya-kafka-adapter`,
-project-relative `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs`;
-source artifact URI pending).
+just stores the offset (see `kafka-adapter/src/Shibuya/Adapter/Kafka/Internal.hs`).
 When DLQ lands, it should follow the same pattern as pgmq.
 
 

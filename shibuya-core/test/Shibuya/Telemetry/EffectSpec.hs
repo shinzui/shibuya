@@ -7,7 +7,6 @@ import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import Effectful (liftIO, runEff)
 import OpenTelemetry.Trace.Core qualified as OTel
-import OpenTelemetry.Trace.Id (Base (..), spanIdBaseEncodedText, traceIdBaseEncodedText)
 import Shibuya.Telemetry.Effect
   ( addAttribute,
     addEvent,
@@ -18,9 +17,7 @@ import Shibuya.Telemetry.Effect
     withSpan,
     withSpan',
   )
-import Shibuya.Telemetry.Propagation (injectTraceContext)
 import Shibuya.Telemetry.Semantic (consumerSpanArgs, mkEvent)
-import System.Mem.StableName (makeStableName)
 import Test.Hspec
 
 spec :: Spec
@@ -57,26 +54,6 @@ spec = describe "Shibuya.Telemetry.Effect" $ do
         _tracer <- getTracer
         pure ("got tracer" :: String)
       result `shouldBe` "got tracer"
-
-    it "shares the compatibility provider across independent invocations" $ do
-      first <- runEff $ runTracingNoop getTracer
-      second <- runEff $ runTracingNoop getTracer
-      let firstProvider = OTel.getTracerTracerProvider first
-          secondProvider = OTel.getTracerTracerProvider second
-      firstProvider `seq` secondProvider `seq` pure ()
-      a <- makeStableName firstProvider
-      b <- makeStableName secondProvider
-      (a == b) `shouldBe` True
-      OTel.inSpan' second "direct noop tracer" OTel.defaultSpanArguments OTel.isRecording
-        `shouldReturn` False
-
-    it "provides an invalid non-recording sentinel that cannot be propagated" $ do
-      runEff $ runTracingNoop $ withSpan' "disabled" consumerSpanArgs $ \sp -> liftIO $ do
-        OTel.isRecording sp `shouldReturn` False
-        ctx <- OTel.getSpanContext sp
-        traceIdBaseEncodedText Base16 (OTel.traceId ctx) `shouldBe` "00000000000000000000000000000000"
-        spanIdBaseEncodedText Base16 (OTel.spanId ctx) `shouldBe` "0000000000000000"
-        injectTraceContext sp `shouldReturn` []
 
     it "handles exceptions in actions correctly" $ do
       ref <- newIORef (0 :: Int)

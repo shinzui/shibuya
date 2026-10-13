@@ -318,7 +318,7 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
     -- 'unsafeUnmask' is scoped inside the surrounding withAsync/finally owner;
     -- cancellation therefore reaches adapter code without bypassing cleanup.
     let ingesterWithSignal =
-          unsafeUnmask (runInIO (runIngesterWithMetrics procId metricsHandle pauseHandle adapter.source inbox))
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle pauseHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
@@ -518,7 +518,7 @@ runIngesterAndProcessorBatch metricsHandle pauseHandle procId inboxSize concurre
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let ingesterWithSignal =
-          unsafeUnmask (runInIO (runIngesterWithMetrics procId metricsHandle pauseHandle adapter.source inbox))
+          unsafeUnmask (runInIO (runIngesterWithMetrics metricsHandle pauseHandle adapter.source inbox))
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do

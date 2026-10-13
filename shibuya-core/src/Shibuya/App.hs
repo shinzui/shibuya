@@ -70,7 +70,6 @@ import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), l
 import Effectful.Exception qualified as Exception
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
-import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch
 import Shibuya.Core.Error (ConfigError (..), HandlerError (..), PolicyError (..), RuntimeError (..))
@@ -109,8 +108,7 @@ import Shibuya.Internal.Runner.Supervised
     runSupervisedWith,
   )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..), validatePolicy)
-import Shibuya.Telemetry.Effect (Tracing, getTracer, isTracingEnabled)
-import Shibuya.Telemetry.Semantic (attrShibuyaProcessorId, internalSpanArgs)
+import Shibuya.Telemetry.Effect (Tracing)
 import UnliftIO (SomeException, displayException)
 import UnliftIO qualified as UIO
 
@@ -228,8 +226,6 @@ runApp config namedProcessors =
           ( \master -> do
               processors <- spawnProcessors config.metricsDetail master (fromIntegral config.inboxSize) namedProcessors
               markMasterRunning master
-              enabled <- isTracingEnabled
-              shutdownTracer <- if enabled then Just <$> getTracer else pure Nothing
               shutdownStarted <- liftIO $ newTVarIO False
               shutdownResult <- liftIO newEmptyTMVarIO
               pure
@@ -237,8 +233,7 @@ runApp config namedProcessors =
                   { master = master,
                     processors = Map.fromList processors,
                     shutdownStarted,
-                    shutdownResult,
-                    shutdownTracer
+                    shutdownResult
                   }
           )
       case startupResult of
@@ -406,21 +401,14 @@ stopAppGracefully config appHandle =
       -- Catch only synchronous adapter failures. External cancellation and the
       -- total timeout must abort this phase so the master is force-stopped.
       shutdownResults <-
-        forM (Map.toList appHandle.processors) $ \(procId, processor) ->
-          Exception.trySync (traceShutdown procId (shutdownAdapter processor))
+        forM (Map.elems appHandle.processors) $ \processor ->
+          Exception.trySync (shutdownAdapter processor)
 
       case [failure | Left failure <- shutdownResults] of
         firstFailure : _ -> Exception.throwIO firstFailure
         [] -> do
           let drainTimeoutMicros = nominalToMicros config.drainTimeout
           liftIO $ waitForDrainWithTimeout drainTimeoutMicros (Map.elems appHandle.processors)
-
-    traceShutdown procId action = case appHandle.shutdownTracer of
-      Nothing -> action
-      Just tracer -> withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
-        OTel.inSpan' tracer (procId.unProcessorId <> " shutdown") internalSpanArgs $ \sp -> do
-          OTel.addAttribute sp attrShibuyaProcessorId procId.unProcessorId
-          runInIO action
 
     shutdownAdapter (_, qp) = case qp of
       QueueProcessor {adapter} -> adapter.shutdown
