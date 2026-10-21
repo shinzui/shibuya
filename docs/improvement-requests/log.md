@@ -1,5 +1,8 @@
 # Bundle Update Log
 
+## 2026-10-21
+* **Addition**: IR-9 requests a long-running example serving detailed metrics with configurable control and CORS, filed by the keiro runtime console.
+
 ## 2026-10-12
 * **Update**: IR-4 completed: public atomic intake pause/resume and opt-in HTTP control with real socket evidence
 * **Update**: Complete processor inspection with latency, oldest detail and cursor progress
