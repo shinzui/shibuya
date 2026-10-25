@@ -3,7 +3,6 @@ dist-*
 cabal-dev
 
 .direnv
-.envrc
 
 .pre-commit-config.yaml
 
