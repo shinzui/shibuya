@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-25",
+  "release": "de42f07a874bd7d59aff7e41e7ac07b7333f1397",
+  "candidate": "848eb31cbc385e6805a52b249ff56d10c51d362f",
+  "compiler": "GHC 9.12.4",
+  "host": "Apple M5 Ultra",
+  "capabilities": 36,
+  "default_rts": [
+    "-N",
+    "-T",
+    "-A32m"
+  ],
+  "library_optimization": "-O1",
+  "benchmark_optimization": "-O2",
+  "dependencies_different": {},
+  "benchmark_harness_commit": "016576f92855f134f96f3efcfa3146fbed4998b1",
+  "normal_binary_sha256": {
+    "release-bench": "76d4da1b17fafcba432dee8417620536c9f488ce350ecefa84f1448c79d2e756",
+    "candidate-bench": "d0d865d2a72b1c5ae69e6d7d8475a44eca4653427987cba0e0f5f9b846d06394"
+  },
+  "static_marker_binary_sha256": {
+    "release-static-bench": "f685e644149b0ee4960f7dfba3edf557e5e9526b6c7173c79e9807ca9c72c84d",
+    "candidate-static-bench": "724afa64b8d724ec9f4cbdb798ac0564ac16d996711cb250d06dc17cdbc3cd02"
+  },
+  "allocating_marker_binary_sha256": {
+    "release-instrumented-bench": "0d2118e47e5f2a7dfed488ba1df237fc1ef7268ec121fab25393a25b3d858089",
+    "candidate-instrumented-bench": "ca1f664088d5fa827d6d571c013e50a444b2e53630b55633ffc628871482d23d"
+  },
+  "raw_artifacts": "/tmp/shibuya-phase-investigation",
+  "scope": "Eight existing benchmark cases, unchanged 10% default-RTS gate; diagnostics are separate and are not release acceptance evidence. No builds, tests or event-log parsing ran concurrently with benchmark measurements. Host is not exclusively reserved."
+}

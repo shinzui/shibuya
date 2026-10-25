@@ -1,0 +1,60 @@
+PERFORMANCE FIX ATTEMPTS — 2026-10-25
+
+Outcome: no production fix retained. The counter-specific rollback was not a
+safe whole-suite fix; it regressed other existing processing workloads. All
+experimental source/documentation/test changes were restored. The pre-existing
+cancellation ExecPlan 53 is preserved.
+
+All measurements use the existing benchmark workloads and default RTS settings.
+Standard gate: 10% slowdown limit, 120-second timeout; focused comparisons use
+stdev 3, full runs stdev 5. Event logging and the received-counter removal are
+explicit diagnostics, not gate results. No thresholds, dependencies, or fixtures
+were changed. The same GHC 9.12.4/package configuration was used throughout.
+
+Experiments (in chronological order):
+1. Prepare processor state/unlift before the ingester fork, retaining shared
+   tracer. counter-100 57.8 us versus release 44.7 us (+29%); rejected.
+2. Replace tracing representation with disabled/enabled constructors, retaining
+   shared provider and concrete getter. counter-100 50.9 us (+13%); rejected.
+3. Select tracing mode once and specialize no-op metadata/events/status away.
+   Focused counter group passed: 47.4 us versus 44.7 us (+6%). However the full
+   62-case comparison failed counter-100: 49.4 us versus 42.4 us (+16%).
+   Reduced allocations ~6-7%, but not a reliable counter regression fix.
+   All 278 core, 104 metrics, and both isolated GC suites passed this candidate.
+4. Restore only per-invocation no-op tracer/provider construction, with matching
+   identity test and documentation changes. All correctness/GC suites passed.
+   Full comparison: 54/62 pass, including counter-100 42.8 vs 42.4 us, and both
+   larger counters. Several unchanged controls also slowed. Back-to-back stdev-3
+   retries cleared those controls and lifecycle.serial-small-inbox, but confirmed
+   regressions in runWithMetrics-100 (+24.0%), runWithMetrics-1000 (+13.5%), and
+   cpu-bound-serial.1000-msgs (+10.3%). The rollback is therefore rejected as a
+   whole-suite fix despite resolving counter-100.
+5. Wait for inbox data or source completion before processor setup. Processing
+   cases improved, but counter-100 59.5 vs 43.5 us (+36%); rejected.
+   Event log showed first post-fork yielding dropped to ~4.8%, but processor
+   migration rose to ~0.612 per iteration while ingester migration was ~0.117.
+   The wait moved migration to the processor rather than eliminating the cost.
+   An unmeasured source-only edit unmasking this wait was also discarded.
+6. Combine per-invocation tracer rollback with tracing specialization. Other
+   focused cases pass/improve, but counter-100 49.2 vs 43.5 us (+13%); rejected.
+7. Retain shared tracer and also hoist the disabled span-wrapper lookup to
+   processor startup. This further reduced allocations, but counter-100 measured
+   54.5 vs 43.5 us (+25%); rejected.
+8. Diagnostic only: omit received-metric increment in the unpaused ingester.
+   Same counter workload; deliberately incomplete metrics, never a proposed fix.
+   Matched current runtime 49.84 us; omitted increment 52.41 us. This provides no
+   support for received-counter contention being the dominant cause. Reverted.
+
+Evidence and limitations:
+- All CSV/logs and patches, including failed results, remain in this directory.
+- results.json consolidates the CSV measurements. File names identify variants.
+- retry-cases.json and retry-results.json retain the eight full-rollback failures
+  and their paired retries. Do not report the full rollback gate as passing.
+- Baseline timing varied across captures; do not mix baselines to claim a pass.
+  Some long cases hit the timeout before reaching requested precision; retain
+  the CSV 2*Stdev values when interpreting them.
+- No test pass is claimed for an experimental candidate that was only benchmarked.
+- The original counter-specific cause isolation still stands, but identifying a
+  rollback for one benchmark did not establish a safe general fix.
+- A reliable fix remains unverified. No artificial allocation padding, scheduler
+  affinity, changed RTS defaults, removed metrics, or relaxed gates is retained.

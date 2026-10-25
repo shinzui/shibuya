@@ -1,0 +1,1998 @@
+[
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 78.41570615768433,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "42989986",
+        "2*Stdev (ps)": "630918",
+        "Allocated": "311195",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 3.3177850246429443,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "50310949",
+        "2*Stdev (ps)": "2754904",
+        "Allocated": "312992",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 4.6577699184417725,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "375196728",
+        "2*Stdev (ps)": "16821170",
+        "Allocated": "3110061",
+        "Copied": "463",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 4.739604949951172,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "381154736",
+        "2*Stdev (ps)": "11343458",
+        "Allocated": "3108824",
+        "Copied": "452",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.948692798614502,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3846589062",
+        "2*Stdev (ps)": "210564232",
+        "Allocated": "31762090",
+        "Copied": "21221",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 3.1530380249023438,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "4179203125",
+        "2*Stdev (ps)": "167198488",
+        "Allocated": "31772190",
+        "Copied": "24581",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 20.309969902038574,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "49210012",
+        "2*Stdev (ps)": "2413366",
+        "Allocated": "232279",
+        "Copied": "204",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 18.799962759017944,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "44208699",
+        "2*Stdev (ps)": "2416690",
+        "Allocated": "232396",
+        "Copied": "204",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 3.93892502784729,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "319717578",
+        "2*Stdev (ps)": "16171750",
+        "Allocated": "2261202",
+        "Copied": "406",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 4.247395038604736,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "364664013",
+        "2*Stdev (ps)": "11249560",
+        "Allocated": "2273330",
+        "Copied": "386",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.7128140926361084,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3889385937",
+        "2*Stdev (ps)": "181879672",
+        "Allocated": "22932138",
+        "Copied": "16409",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 1.4126360416412354,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3975298437",
+        "2*Stdev (ps)": "233061172",
+        "Allocated": "22921641",
+        "Copied": "13944",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 4.786283731460571,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "380948388",
+        "2*Stdev (ps)": "18298852",
+        "Allocated": "2896924",
+        "Copied": "298",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.3684048652648926,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "375278906",
+        "2*Stdev (ps)": "15461186",
+        "Allocated": "2897684",
+        "Copied": "304",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 5.643822193145752,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3763177734",
+        "2*Stdev (ps)": "208260034",
+        "Allocated": "29611952",
+        "Copied": "7102",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "release-gate",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 2.8876309394836426,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-phase-investigation/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3786457031",
+        "2*Stdev (ps)": "177278264",
+        "Allocated": "29619376",
+        "Copied": "6382",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 1,
+    "variant": "candidate",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 11.851600885391235,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-repeat1-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "55159085",
+        "2*Stdev (ps)": "2737722",
+        "Allocated": "312895",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 1,
+    "variant": "release",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 38.11353611946106,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-repeat1-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "42206885",
+        "2*Stdev (ps)": "2271114",
+        "Allocated": "311188",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 1,
+    "variant": "candidate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 2.1539549827575684,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-repeat1-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "360439843",
+        "2*Stdev (ps)": "16225468",
+        "Allocated": "2273060",
+        "Copied": "358",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 1,
+    "variant": "release",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 1.9961340427398682,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-repeat1-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "314801855",
+        "2*Stdev (ps)": "13430820",
+        "Allocated": "2261314",
+        "Copied": "365",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 2,
+    "variant": "release",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 38.226354122161865,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-repeat2-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "42376423",
+        "2*Stdev (ps)": "2190390",
+        "Allocated": "311188",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 2,
+    "variant": "candidate",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 50.7808198928833,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-repeat2-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "58933841",
+        "2*Stdev (ps)": "1759142",
+        "Allocated": "312875",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 2,
+    "variant": "release",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 3.960371971130371,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-repeat2-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "320613574",
+        "2*Stdev (ps)": "11378616",
+        "Allocated": "2261251",
+        "Copied": "389",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "repeat-control",
+    "round": 2,
+    "variant": "candidate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 2.163464069366455,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-repeat2-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "362061718",
+        "2*Stdev (ps)": "13680194",
+        "Allocated": "2272846",
+        "Copied": "378",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 3.7988438606262207,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "63297875",
+        "2*Stdev (ps)": "2578138",
+        "Allocated": "322629",
+        "Copied": "207",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 2.2519478797912598,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "65131176",
+        "2*Stdev (ps)": "3473548",
+        "Allocated": "323459",
+        "Copied": "207",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 2.5909671783447266,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-3.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-3.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "48564953",
+        "2*Stdev (ps)": "3828938",
+        "Allocated": "240584",
+        "Copied": "209",
+        "Peak Memory": "1272971264"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 1.4529058933258057,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-3.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-3.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "53940673",
+        "2*Stdev (ps)": "4643006",
+        "Allocated": "241780",
+        "Copied": "207",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 1.1725621223449707,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "384458398",
+        "2*Stdev (ps)": "27487040",
+        "Allocated": "2273608",
+        "Copied": "370",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.1854979991912842,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "374455468",
+        "2*Stdev (ps)": "29364988",
+        "Allocated": "2270674",
+        "Copied": "377",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 2.5655272006988525,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-6.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-6.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "446278125",
+        "2*Stdev (ps)": "25419550",
+        "Allocated": "2889656",
+        "Copied": "280",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.397480010986328,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-6.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-6.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "370788378",
+        "2*Stdev (ps)": "21951898",
+        "Allocated": "2897898",
+        "Copied": "285",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 1.3180100917816162,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-1.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-1.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "405832421",
+        "2*Stdev (ps)": "33701736",
+        "Allocated": "3119853",
+        "Copied": "480",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 1.298292875289917,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-1.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-1.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "413116015",
+        "2*Stdev (ps)": "27681822",
+        "Allocated": "3123678",
+        "Copied": "494",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 1.5510590076446533,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-2.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-2.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3951018750",
+        "2*Stdev (ps)": "358546512",
+        "Allocated": "31773848",
+        "Copied": "19966",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 1.5383918285369873,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-2.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-2.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3982323437",
+        "2*Stdev (ps)": "226164300",
+        "Allocated": "31778614",
+        "Copied": "22841",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.770249128341675,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-5.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-5.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "4035654687",
+        "2*Stdev (ps)": "118095832",
+        "Allocated": "22955463",
+        "Copied": "16461",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 2.7892861366271973,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-5.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-5.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "4029732812",
+        "2*Stdev (ps)": "166146838",
+        "Allocated": "22948967",
+        "Copied": "16969",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 1.4801738262176514,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-instrumented-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-phase-7.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-phase-7.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3679381250",
+        "2*Stdev (ps)": "214187360",
+        "Allocated": "29619246",
+        "Copied": "5955",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "allocating-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 1.480252981185913,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-instrumented-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-phase-7.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-phase-7.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3875196875",
+        "2*Stdev (ps)": "288326990",
+        "Allocated": "29612464",
+        "Copied": "5564",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 1.9051249027252197,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "47603051",
+        "2*Stdev (ps)": "3762772",
+        "Allocated": "312087",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 1.9573609828948975,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "53126928",
+        "2*Stdev (ps)": "4288380",
+        "Allocated": "313125",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 2.6302008628845215,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-3.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-3.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "49307067",
+        "2*Stdev (ps)": "2432324",
+        "Allocated": "232430",
+        "Copied": "206",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 2.3730249404907227,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-3.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-3.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "42744665",
+        "2*Stdev (ps)": "2257848",
+        "Allocated": "232715",
+        "Copied": "204",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 1.1817889213562012,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "373183593",
+        "2*Stdev (ps)": "35226804",
+        "Allocated": "2262945",
+        "Copied": "403",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.1280419826507568,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "359522851",
+        "2*Stdev (ps)": "28746574",
+        "Allocated": "2274266",
+        "Copied": "351",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 2.4286298751831055,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-6.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-6.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "383865917",
+        "2*Stdev (ps)": "34513184",
+        "Allocated": "2895177",
+        "Copied": "299",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.434340238571167,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-6.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-6.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "382609765",
+        "2*Stdev (ps)": "24346500",
+        "Allocated": "2896379",
+        "Copied": "290",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 1.311466932296753,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-1.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-1.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "398465820",
+        "2*Stdev (ps)": "34825010",
+        "Allocated": "3111332",
+        "Copied": "415",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 2.4613397121429443,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-1.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-1.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "385725390",
+        "2*Stdev (ps)": "27328068",
+        "Allocated": "3108723",
+        "Copied": "402",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 1.5655288696289062,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-2.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-2.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "4000226562",
+        "2*Stdev (ps)": "229930676",
+        "Allocated": "31776718",
+        "Copied": "20383",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 1.523332118988037,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-2.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-2.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3885321875",
+        "2*Stdev (ps)": "324809836",
+        "Allocated": "31776502",
+        "Copied": "20414",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 1.3684048652648926,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-5.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-5.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3815920312",
+        "2*Stdev (ps)": "284658440",
+        "Allocated": "22920063",
+        "Copied": "9944",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 1.4115002155303955,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-5.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-5.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3927365625",
+        "2*Stdev (ps)": "368755560",
+        "Allocated": "22921645",
+        "Copied": "14499",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 1.524925947189331,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-static-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-static-7.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-static-7.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3943050000",
+        "2*Stdev (ps)": "224347494",
+        "Allocated": "29612845",
+        "Copied": "7603",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "static-markers-diagnostic",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 1.50429105758667,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-static-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "5",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-static-7.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-static-7.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3838492187",
+        "2*Stdev (ps)": "359762374",
+        "Allocated": "29616655",
+        "Copied": "6880",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "events",
+    "variant": "release",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 4.580976247787476,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-events-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-events-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "40085528",
+        "2*Stdev (ps)": "1463980",
+        "Allocated": "311169",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "events",
+    "variant": "candidate",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 12.08076024055481,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-events-0.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-events-0.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "57168395",
+        "2*Stdev (ps)": "3858186",
+        "Allocated": "312768",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "events",
+    "variant": "release",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 2.0804669857025146,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-events-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/release-events-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "329883789",
+        "2*Stdev (ps)": "14831418",
+        "Allocated": "2261206",
+        "Copied": "391",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "events",
+    "variant": "candidate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 2.157839059829712,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "20",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-events-4.csv",
+      "+RTS",
+      "-l",
+      "-ol/tmp/shibuya-phase-investigation/candidate-events-4.eventlog",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "362905664",
+        "2*Stdev (ps)": "17350052",
+        "Allocated": "2272715",
+        "Copied": "382",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "nomigrate",
+    "variant": "release",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 7.151860952377319,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-nomigrate-4.csv",
+      "+RTS",
+      "-qm",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "245546655",
+        "2*Stdev (ps)": "7335240",
+        "Allocated": "2258323",
+        "Copied": "412",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "nomigrate",
+    "variant": "candidate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 1.8275859355926514,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-nomigrate-4.csv",
+      "+RTS",
+      "-qm",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "240153808",
+        "2*Stdev (ps)": "14036566",
+        "Allocated": "2258069",
+        "Copied": "384",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "n1",
+    "variant": "release",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 3.6350388526916504,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/release-n1-4.csv",
+      "+RTS",
+      "-N1",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "221962109",
+        "2*Stdev (ps)": "8416262",
+        "Allocated": "2258848",
+        "Copied": "6153",
+        "Peak Memory": "36700160"
+      }
+    ]
+  },
+  {
+    "group": "scheduler-diagnostic",
+    "kind": "n1",
+    "variant": "candidate",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 3.624858856201172,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-phase-investigation/candidate-n1-4.csv",
+      "+RTS",
+      "-N1",
+      "-RTS"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "221725244",
+        "2*Stdev (ps)": "10662594",
+        "Allocated": "2258598",
+        "Copied": "6157",
+        "Peak Memory": "36700160"
+      }
+    ]
+  }
+]

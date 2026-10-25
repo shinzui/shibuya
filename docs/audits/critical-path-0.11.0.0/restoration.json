@@ -1,0 +1,11 @@
+{
+  "normal_rebuild_completed": true,
+  "source_matches_candidate_commit": true,
+  "diagnostic_source_changes_remaining": false,
+  "diagnostic_marker_strings": [],
+  "rebuilt_binary_sha256": "226789d6f756d5cbd44c67a1dfa1f77af2638146a861cc7ce0ca8f689d2b8cad",
+  "measured_binary_sha256": "d0d865d2a72b1c5ae69e6d7d8475a44eca4653427987cba0e0f5f9b846d06394",
+  "byte_identical_to_measured_binary": false,
+  "note": "The normal rebuild has a different binary hash despite identical source and dependency unit IDs. Gate measurements identify the retained immutable candidate-bench; no fresh measurement is claimed for the restored build.",
+  "build_log": "/tmp/shibuya-phase-investigation/restored-build.log"
+}

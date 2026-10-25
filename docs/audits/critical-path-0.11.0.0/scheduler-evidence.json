@@ -1,0 +1,5755 @@
+{
+  "candidate-events-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-events-0.eventlog",
+    "bytes": 542433263,
+    "dominant_parent": 43,
+    "parents": [
+      [
+        43,
+        262143
+      ],
+      [
+        null,
+        92
+      ],
+      [
+        1,
+        37
+      ],
+      [
+        39,
+        5
+      ],
+      [
+        40,
+        1
+      ],
+      [
+        41,
+        1
+      ]
+    ],
+    "parent": {
+      "count": 1,
+      "running_us": 8705609.0,
+      "run_segments": 505080,
+      "stop_status": {
+        "6": 109,
+        "3": 209526,
+        "2": 1,
+        "12": 278739,
+        "1": 16704,
+        "5": 1
+      },
+      "migrations": 101749,
+      "blackholes": []
+    },
+    "children": {
+      "count": 262143,
+      "running_us": 3448637.0,
+      "run_segments": 454862,
+      "stop_status": {
+        "3": 191232,
+        "5": 262143,
+        "1": 1487
+      },
+      "migrations": 76394,
+      "blackholes": []
+    },
+    "after_fork_stop": {
+      "2": 1,
+      "12": 202719,
+      "3": 59347,
+      "1": 76
+    },
+    "per_iteration": {
+      "child_running_us": 13.155556318497919,
+      "parent_running_us": 33.20938953166783,
+      "child_elapsed_us": 15.155758498224252,
+      "child_migrations": 0.2914210945934089,
+      "parent_stops": {
+        "6": 0.0004158035881179356,
+        "3": 0.7992813082935649,
+        "2": 3.8147118175957395e-06,
+        "12": 1.063308957324819,
+        "1": 0.06372094620111923,
+        "5": 3.8147118175957395e-06
+      },
+      "child_stops": {
+        "3": 0.7294949703024685,
+        "5": 1.0,
+        "1": 0.005672476472764865
+      }
+    }
+  },
+  "candidate-events-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-events-4.eventlog",
+    "bytes": 22338187,
+    "dominant_parent": 43,
+    "parents": [
+      [
+        43,
+        8191
+      ],
+      [
+        1,
+        37
+      ],
+      [
+        null,
+        32
+      ],
+      [
+        39,
+        5
+      ],
+      [
+        40,
+        1
+      ],
+      [
+        41,
+        1
+      ]
+    ],
+    "parent": {
+      "count": 1,
+      "running_us": 1906136.0,
+      "run_segments": 24457,
+      "stop_status": {
+        "6": 79,
+        "3": 12391,
+        "2": 1,
+        "12": 8191,
+        "1": 3794,
+        "5": 1
+      },
+      "migrations": 4044,
+      "blackholes": []
+    },
+    "children": {
+      "count": 8191,
+      "running_us": 805252.0,
+      "run_segments": 13875,
+      "stop_status": {
+        "3": 5290,
+        "5": 8191,
+        "1": 394
+      },
+      "migrations": 4139,
+      "blackholes": []
+    },
+    "after_fork_stop": {
+      "2": 1,
+      "12": 4053,
+      "3": 4135,
+      "1": 2
+    },
+    "per_iteration": {
+      "child_running_us": 98.30936393602735,
+      "parent_running_us": 232.71102429495787,
+      "child_elapsed_us": 104.37614454889513,
+      "child_migrations": 0.5053107068733976,
+      "parent_stops": {
+        "6": 0.00964473202295202,
+        "3": 1.5127579050177025,
+        "2": 0.00012208521548040532,
+        "12": 1.0,
+        "1": 0.4631913075326578,
+        "5": 0.00012208521548040532
+      },
+      "child_stops": {
+        "3": 0.6458307898913441,
+        "5": 1.0,
+        "1": 0.0481015748992797
+      }
+    }
+  },
+  "candidate-phase-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-0.eventlog",
+    "bytes": 67702152,
+    "iterations": 32767,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.3637195959349345,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.36356700338755454,
+        "unscheduled_us": 0.00015259254737998596,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 6.103701895199438e-05,
+          "2": 3.051850947599719e-05,
+          "1": 0.000640888698995941
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.49525437177648246,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.49482711264381846,
+        "unscheduled_us": 0.0004272591326639607,
+        "migrations_per_iteration": 3.051850947599719e-05,
+        "stops_per_iteration": {
+          "3": 0.0004272591326639607,
+          "1": 0.0006714072084719382
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.467085787530137,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3207190160832545,
+        "unscheduled_us": 0.14636677144688254,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.20822779015472884,
+          "1": 0.00024414807580797754
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.7960142826624348,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.38865321817682424,
+        "unscheduled_us": 0.40736106448561055,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.554704428235725,
+          "1": 0.0003662221137119663
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 46.513687551499984,
+          "p50": 46.0,
+          "p95": 58.0
+        },
+        "scheduled_us": 33.18259224219489,
+        "unscheduled_us": 13.331095309305093,
+        "migrations_per_iteration": 0.00012207403790398877,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.8445997497482223,
+          "1": 0.06808679464094973
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.33634449293496504,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.33628345591601305,
+        "unscheduled_us": 6.103701895199438e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0003967406231879635,
+          "3": 9.155552842799158e-05
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.2056947538682211,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2056031983397931,
+        "unscheduled_us": 9.155552842799158e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00021362956633198035
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 49.17780083620716,
+          "p50": 49.0,
+          "p95": 61.0
+        },
+        "scheduled_us": 35.29224524674215,
+        "unscheduled_us": 13.88555558946501,
+        "migrations_per_iteration": 0.00015259254737998596,
+        "stops_per_iteration": {
+          "3": 1.60811181981872,
+          "2": 3.051850947599719e-05,
+          "12": 1.0,
+          "1": 0.07061983092745751
+        }
+      }
+    },
+    "source": {
+      "count": 32767,
+      "elapsed_us": {
+        "mean": 16.31397442548906,
+        "p50": 17.0,
+        "p95": 23.0
+      },
+      "scheduled_us": 16.307596057008574,
+      "fork_delay_us": {
+        "mean": 3.5727103488265635,
+        "p50": 4.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.879726554155095
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 32762,
+        "elapsed_us": {
+          "mean": 48.90104389231427,
+          "p50": 49.0,
+          "p95": 61.0
+        }
+      },
+      "child_migrated": {
+        "count": 28826,
+        "elapsed_us": {
+          "mean": 51.52334697842226,
+          "p50": 50.0,
+          "p95": 62.0
+        }
+      },
+      "parent_migrated": {
+        "count": 5,
+        "elapsed_us": {
+          "mean": 1862.6,
+          "p50": 2309.0,
+          "p95": 2358.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 3941,
+        "elapsed_us": {
+          "mean": 32.02156812991627,
+          "p50": 30.0,
+          "p95": 41.0
+        }
+      }
+    }
+  },
+  "candidate-phase-1.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-1.eventlog",
+    "bytes": 21269548,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.3516483516483517,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.35115995115995113,
+        "unscheduled_us": 0.0004884004884004884,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0002442002442002442,
+          "2": 0.0002442002442002442,
+          "1": 0.0009768009768009768
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.47228327228327227,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.46642246642246643,
+        "unscheduled_us": 0.005860805860805861,
+        "migrations_per_iteration": 0.0004884004884004884,
+        "stops_per_iteration": {
+          "3": 0.002686202686202686,
+          "1": 0.0002442002442002442
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.495970695970696,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3155067155067155,
+        "unscheduled_us": 0.18046398046398046,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.22832722832722832,
+          "1": 0.0004884004884004884
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.715018315018315,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.34065934065934067,
+        "unscheduled_us": 0.37435897435897436,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3963369963369963,
+          "1": 0.0004884004884004884
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 289.85494505494506,
+          "p50": 287.0,
+          "p95": 317.0
+        },
+        "scheduled_us": 264.56727716727715,
+        "unscheduled_us": 25.287667887667887,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "12": 1.0007326007326007,
+          "3": 0.9736263736263736,
+          "1": 0.6886446886446886
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2884004884004884,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2884004884004884,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.20903540903540904,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.20903540903540904,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 292.3873015873016,
+          "p50": 289.0,
+          "p95": 320.0
+        },
+        "scheduled_us": 266.53846153846155,
+        "unscheduled_us": 25.84884004884005,
+        "migrations_per_iteration": 0.0007326007326007326,
+        "stops_per_iteration": {
+          "3": 1.6012210012210013,
+          "2": 0.0002442002442002442,
+          "12": 1.0007326007326007,
+          "1": 0.6913308913308913
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 91.91550671550671,
+        "p50": 91.0,
+        "p95": 126.0
+      },
+      "scheduled_us": 91.58021978021978,
+      "fork_delay_us": {
+        "mean": 3.916239316239316,
+        "p50": 4.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.8075702075702076
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 4092,
+        "elapsed_us": {
+          "mean": 292.3572825024438,
+          "p50": 289.0,
+          "p95": 320.0
+        }
+      },
+      "child_migrated": {
+        "count": 3307,
+        "elapsed_us": {
+          "mean": 297.2056244330209,
+          "p50": 296.0,
+          "p95": 322.0
+        }
+      },
+      "parent_migrated": {
+        "count": 3,
+        "elapsed_us": {
+          "mean": 333.3333333333333,
+          "p50": 329.0,
+          "p95": 329.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 788,
+        "elapsed_us": {
+          "mean": 272.1662436548223,
+          "p50": 269.0,
+          "p95": 280.0
+        }
+      }
+    }
+  },
+  "candidate-phase-2.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-2.eventlog",
+    "bytes": 13222317,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.44031311154598823,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4383561643835616,
+        "unscheduled_us": 0.0019569471624266144,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0019569471624266144,
+          "2": 0.0019569471624266144
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.6712328767123288,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.6536203522504892,
+        "unscheduled_us": 0.01761252446183953,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "3": 0.015655577299412915
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.7886497064579256,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.38943248532289626,
+        "unscheduled_us": 0.39921722113502933,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.26418786692759294
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 1.7886497064579256,
+          "p50": 1.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 0.3913894324853229,
+        "unscheduled_us": 1.3972602739726028,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3522504892367906
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2825.3463796477495,
+          "p50": 2763.0,
+          "p95": 3131.0
+        },
+        "scheduled_us": 2707.9236790606656,
+        "unscheduled_us": 117.42270058708415,
+        "migrations_per_iteration": 0.023483365949119372,
+        "stops_per_iteration": {
+          "12": 0.9960861056751468,
+          "3": 1.111545988258317,
+          "1": 7.082191780821918
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.4911937377690802,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4911937377690802,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.2759295499021526,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2759295499021526,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2829.802348336595,
+          "p50": 2766.0,
+          "p95": 3134.0
+        },
+        "scheduled_us": 2710.563600782779,
+        "unscheduled_us": 119.23874755381604,
+        "migrations_per_iteration": 0.025440313111545987,
+        "stops_per_iteration": {
+          "3": 1.74559686888454,
+          "2": 0.0019569471624266144,
+          "12": 0.9960861056751468,
+          "1": 7.082191780821918
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 876.4637964774951,
+        "p50": 840.0,
+        "p95": 1209.0
+      },
+      "scheduled_us": 871.679060665362,
+      "fork_delay_us": {
+        "mean": 6.228962818003914,
+        "p50": 7.0,
+        "p95": 10.0
+      },
+      "migrations_per_iteration": 0.8845401174168297
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 498,
+        "elapsed_us": {
+          "mean": 2806.7911646586344,
+          "p50": 2761.0,
+          "p95": 3114.0
+        }
+      },
+      "child_migrated": {
+        "count": 452,
+        "elapsed_us": {
+          "mean": 2830.891592920354,
+          "p50": 2767.5,
+          "p95": 3134.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 59,
+        "elapsed_us": {
+          "mean": 2821.4576271186443,
+          "p50": 2758.0,
+          "p95": 3003.0
+        }
+      },
+      "parent_migrated": {
+        "count": 13,
+        "elapsed_us": {
+          "mean": 3711.3076923076924,
+          "p50": 3739.0,
+          "p95": 4342.0
+        }
+      }
+    }
+  },
+  "candidate-phase-3.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-3.eventlog",
+    "bytes": 68729349,
+    "iterations": 32767,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.3335367900631733,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.33341471602526934,
+        "unscheduled_us": 0.00012207403790398877,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "2": 3.051850947599719e-05,
+          "1": 0.0004577776421399579
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.43839838862269964,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4377880184331797,
+        "unscheduled_us": 0.0006103701895199438,
+        "migrations_per_iteration": 6.103701895199438e-05,
+        "stops_per_iteration": {
+          "3": 0.0004272591326639607,
+          "1": 0.0004272591326639607
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.6132389294106876,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3428144169438765,
+        "unscheduled_us": 0.2704245124668111,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.4420606097598193,
+          "1": 0.000640888698995941
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.6024353770561846,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.315683462019715,
+        "unscheduled_us": 0.28675191503646963,
+        "migrations_per_iteration": 3.051850947599719e-05,
+        "stops_per_iteration": {
+          "3": 0.3059175389873959,
+          "1": 0.0003662221137119663
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 38.19946897793512,
+          "p50": 39.0,
+          "p95": 48.0
+        },
+        "scheduled_us": 26.117831965086825,
+        "unscheduled_us": 12.081637012848292,
+        "migrations_per_iteration": 3.051850947599719e-05,
+        "stops_per_iteration": {
+          "12": 1.000122074037904,
+          "3": 0.7679067354350414,
+          "1": 0.04867702261421552
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.28943754387035736,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.28943754387035736,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 3.051850947599719e-05,
+          "1": 0.00012207403790398877
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.17963194677571948,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.17963194677571948,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00012207403790398877,
+          "3": 3.051850947599719e-05
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 40.65614795373394,
+          "p50": 41.0,
+          "p95": 51.0
+        },
+        "scheduled_us": 28.016602069154942,
+        "unscheduled_us": 12.639545884578997,
+        "migrations_per_iteration": 0.00012207403790398877,
+        "stops_per_iteration": {
+          "2": 3.051850947599719e-05,
+          "3": 1.5163731803338725,
+          "12": 1.000122074037904,
+          "1": 0.050813318277535324
+        }
+      }
+    },
+    "source": {
+      "count": 32767,
+      "elapsed_us": {
+        "mean": 15.632648701437422,
+        "p50": 16.0,
+        "p95": 22.0
+      },
+      "scheduled_us": 15.623645741142003,
+      "fork_delay_us": {
+        "mean": 3.9176915799432357,
+        "p50": 4.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.8099002044740135
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 32763,
+        "elapsed_us": {
+          "mean": 40.569361780056774,
+          "p50": 41.0,
+          "p95": 51.0
+        }
+      },
+      "child_migrated": {
+        "count": 26538,
+        "elapsed_us": {
+          "mean": 43.65694475845957,
+          "p50": 42.0,
+          "p95": 51.0
+        }
+      },
+      "parent_migrated": {
+        "count": 4,
+        "elapsed_us": {
+          "mean": 751.5,
+          "p50": 83.0,
+          "p95": 103.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 6229,
+        "elapsed_us": {
+          "mean": 27.8715684700594,
+          "p50": 26.0,
+          "p95": 32.0
+        }
+      }
+    }
+  },
+  "candidate-phase-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-4.eventlog",
+    "bytes": 34979394,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.3247863247863248,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3247863247863248,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0002442002442002442,
+          "2": 0.0002442002442002442
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.4341880341880342,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4283272283272283,
+        "unscheduled_us": 0.005860805860805861,
+        "migrations_per_iteration": 0.0004884004884004884,
+        "stops_per_iteration": {
+          "3": 0.002442002442002442,
+          "1": 0.001221001221001221
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.23931623931623933,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.23663003663003662,
+        "unscheduled_us": 0.002686202686202686,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.003663003663003663
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.9162393162393162,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.37826617826617825,
+        "unscheduled_us": 0.537973137973138,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.5846153846153846,
+          "1": 0.0007326007326007326
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 262.3894993894994,
+          "p50": 274.0,
+          "p95": 295.0
+        },
+        "scheduled_us": 227.15702075702075,
+        "unscheduled_us": 35.23247863247863,
+        "migrations_per_iteration": 0.001221001221001221,
+        "stops_per_iteration": {
+          "12": 1.0007326007326007,
+          "3": 0.6007326007326007,
+          "1": 0.49108669108669106
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2874236874236874,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2874236874236874,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.1663003663003663,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1663003663003663,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 264.75775335775336,
+          "p50": 276.0,
+          "p95": 298.0
+        },
+        "scheduled_us": 228.97875457875458,
+        "unscheduled_us": 35.778998778998776,
+        "migrations_per_iteration": 0.0017094017094017094,
+        "stops_per_iteration": {
+          "3": 1.1916971916971917,
+          "2": 0.0002442002442002442,
+          "12": 1.0007326007326007,
+          "1": 0.4932844932844933
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 106.1970695970696,
+        "p50": 129.0,
+        "p95": 154.0
+      },
+      "scheduled_us": 105.76971916971917,
+      "fork_delay_us": {
+        "mean": 5.5245421245421245,
+        "p50": 6.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.6141636141636142
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 4088,
+        "elapsed_us": {
+          "mean": 264.1824853228963,
+          "p50": 276.0,
+          "p95": 298.0
+        }
+      },
+      "child_migrated": {
+        "count": 2515,
+        "elapsed_us": {
+          "mean": 284.34393638170974,
+          "p50": 284.0,
+          "p95": 300.0
+        }
+      },
+      "parent_migrated": {
+        "count": 7,
+        "elapsed_us": {
+          "mean": 600.7142857142857,
+          "p50": 302.0,
+          "p95": 1377.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 1580,
+        "elapsed_us": {
+          "mean": 233.58101265822785,
+          "p50": 228.0,
+          "p95": 236.0
+        }
+      }
+    }
+  },
+  "candidate-phase-5.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-5.eventlog",
+    "bytes": 6028573,
+    "iterations": 1023,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.4496578690127077,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.44379276637341153,
+        "unscheduled_us": 0.005865102639296188,
+        "migrations_per_iteration": 0.0009775171065493646,
+        "stops_per_iteration": {
+          "3": 0.0009775171065493646,
+          "2": 0.0009775171065493646
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.5650048875855328,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5640273704789834,
+        "unscheduled_us": 0.0009775171065493646,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.008797653958944282
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.9696969696969697,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3704789833822092,
+        "unscheduled_us": 0.5992179863147605,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.4858260019550342
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.5073313782991202,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.30303030303030304,
+        "unscheduled_us": 0.20430107526881722,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.05083088954056696
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2616.0400782013685,
+          "p50": 2695.0,
+          "p95": 2870.0
+        },
+        "scheduled_us": 2553.179863147605,
+        "unscheduled_us": 62.86021505376344,
+        "migrations_per_iteration": 0.013685239491691105,
+        "stops_per_iteration": {
+          "12": 0.9960899315738025,
+          "3": 1.5043988269794721,
+          "1": 4.927663734115347
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.44574780058651026,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4447702834799609,
+        "unscheduled_us": 0.0009775171065493646,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.002932551319648094
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.26588465298142716,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.26588465298142716,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2619.2434017595306,
+          "p50": 2701.0,
+          "p95": 2874.0
+        },
+        "scheduled_us": 2555.5718475073313,
+        "unscheduled_us": 63.671554252199414,
+        "migrations_per_iteration": 0.01466275659824047,
+        "stops_per_iteration": {
+          "3": 2.050830889540567,
+          "2": 0.0009775171065493646,
+          "12": 0.9960899315738025,
+          "1": 4.930596285434995
+        }
+      }
+    },
+    "source": {
+      "count": 1023,
+      "elapsed_us": {
+        "mean": 1134.514173998045,
+        "p50": 1249.0,
+        "p95": 1461.0
+      },
+      "scheduled_us": 1131.7262952101662,
+      "fork_delay_us": {
+        "mean": 9.355816226783968,
+        "p50": 9.0,
+        "p95": 12.0
+      },
+      "migrations_per_iteration": 0.9990224828934506
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 15,
+        "elapsed_us": {
+          "mean": 3895.266666666667,
+          "p50": 3781.0,
+          "p95": 4996.0
+        }
+      },
+      "child_migrated": {
+        "count": 1021,
+        "elapsed_us": {
+          "mean": 2619.881488736533,
+          "p50": 2702.0,
+          "p95": 2875.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 1008,
+        "elapsed_us": {
+          "mean": 2600.2549603174602,
+          "p50": 2692.0,
+          "p95": 2864.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 2,
+        "elapsed_us": {
+          "mean": 2293.5,
+          "p50": 2293.5,
+          "p95": 2250.0
+        }
+      }
+    }
+  },
+  "candidate-phase-6.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-6.eventlog",
+    "bytes": 56945142,
+    "iterations": 8191,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 1.7463069222317178,
+          "p50": 2.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 1.7416676840434624,
+        "unscheduled_us": 0.004639238188255402,
+        "migrations_per_iteration": 0.00024417043096081065,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 0.001465022585764864,
+          "1": 0.012696862409962154
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.4585520693444024,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4585520693444024,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0006104260774020266
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.6277621780002441,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3335368086924673,
+        "unscheduled_us": 0.2942253693077768,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.33842021731168354,
+          "1": 0.0008545965083628373
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.625320473690636,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3191307532657795,
+        "unscheduled_us": 0.30618972042485654,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.34366988157734096,
+          "1": 0.0004883408619216213
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 275.1880112318398,
+          "p50": 267.0,
+          "p95": 303.0
+        },
+        "scheduled_us": 244.20473690636064,
+        "unscheduled_us": 30.983274325479183,
+        "migrations_per_iteration": 0.0010987669393236479,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.6974728360395556,
+          "1": 0.6610914418263948
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.3049688682700525,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3049688682700525,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.18202905628128432,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.18202905628128432,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.000366255646441216,
+          "3": 0.00012208521548040532
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 279.13295079965815,
+          "p50": 271.0,
+          "p95": 307.0
+        },
+        "scheduled_us": 247.5446221462581,
+        "unscheduled_us": 31.588328653400072,
+        "migrations_per_iteration": 0.0013429373702844585,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 1.3811500427298253,
+          "12": 1.0,
+          "1": 0.6761079233304846
+        }
+      }
+    },
+    "source": {
+      "count": 8191,
+      "elapsed_us": {
+        "mean": 75.21902087657185,
+        "p50": 71.0,
+        "p95": 101.0
+      },
+      "scheduled_us": 74.66756195824685,
+      "fork_delay_us": {
+        "mean": 3.565987058967159,
+        "p50": 4.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.6918569161274569
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 8180,
+        "elapsed_us": {
+          "mean": 278.03581907090467,
+          "p50": 271.0,
+          "p95": 307.0
+        }
+      },
+      "child_migrated": {
+        "count": 5667,
+        "elapsed_us": {
+          "mean": 280.1805187930122,
+          "p50": 278.0,
+          "p95": 312.0
+        }
+      },
+      "parent_migrated": {
+        "count": 11,
+        "elapsed_us": {
+          "mean": 1095.0,
+          "p50": 1211.0,
+          "p95": 1494.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 2524,
+        "elapsed_us": {
+          "mean": 276.7809033280507,
+          "p50": 266.0,
+          "p95": 280.0
+        }
+      }
+    }
+  },
+  "candidate-phase-7.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-phase-7.eventlog",
+    "bytes": 12526751,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 32.55381604696673,
+          "p50": 32.0,
+          "p95": 42.0
+        },
+        "scheduled_us": 28.31898238747554,
+        "unscheduled_us": 4.234833659491194,
+        "migrations_per_iteration": 0.003913894324853229,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "1": 0.11154598825831702,
+          "3": 0.003913894324853229
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.6692759295499021,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.6692759295499021,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.7142857142857143,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.350293542074364,
+        "unscheduled_us": 0.3639921722113503,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.2583170254403131,
+          "1": 0.0019569471624266144
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.8747553816046967,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.37377690802348335,
+        "unscheduled_us": 0.5009784735812133,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3561643835616438
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2665.101761252446,
+          "p50": 2612.0,
+          "p95": 2970.0
+        },
+        "scheduled_us": 2563.283757338552,
+        "unscheduled_us": 101.81800391389433,
+        "migrations_per_iteration": 0.023483365949119372,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 1.1761252446183954,
+          "1": 6.649706457925636
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.45792563600782776,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.45792563600782776,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.33072407045009783,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.33072407045009783,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2700.702544031311,
+          "p50": 2646.0,
+          "p95": 3007.0
+        },
+        "scheduled_us": 2593.784735812133,
+        "unscheduled_us": 106.91780821917808,
+        "migrations_per_iteration": 0.0273972602739726,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "3": 1.7945205479452055,
+          "12": 1.0,
+          "1": 6.763209393346379
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 891.4931506849315,
+        "p50": 845.0,
+        "p95": 1249.0
+      },
+      "scheduled_us": 889.3522504892368,
+      "fork_delay_us": {
+        "mean": 6.048923679060666,
+        "p50": 6.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.8806262230919765
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 497,
+        "elapsed_us": {
+          "mean": 2683.271629778672,
+          "p50": 2639.0,
+          "p95": 2998.0
+        }
+      },
+      "child_migrated": {
+        "count": 450,
+        "elapsed_us": {
+          "mean": 2705.3333333333335,
+          "p50": 2743.0,
+          "p95": 3007.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 61,
+        "elapsed_us": {
+          "mean": 2666.5409836065573,
+          "p50": 2635.0,
+          "p95": 2829.0
+        }
+      },
+      "parent_migrated": {
+        "count": 14,
+        "elapsed_us": {
+          "mean": 3319.5,
+          "p50": 3419.5,
+          "p95": 3835.0
+        }
+      }
+    }
+  },
+  "candidate-static-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-0.eventlog",
+    "bytes": 77291549,
+    "iterations": 32767,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.2542802209540086,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2541581469161046,
+        "unscheduled_us": 0.00012207403790398877,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00018311105685598315
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.3063753166295358,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.30622272408215584,
+        "unscheduled_us": 0.00015259254737998596,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0004272591326639607,
+          "1": 0.0004272591326639607
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.13315225684377574,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.12369151890621662,
+        "unscheduled_us": 0.00946073793755913,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.011139255958738976,
+          "1": 0.00018311105685598315
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.3076570940275277,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.13193151646473586,
+        "unscheduled_us": 0.17572557756279183,
+        "migrations_per_iteration": 3.051850947599719e-05,
+        "stops_per_iteration": {
+          "2": 3.051850947599719e-05,
+          "3": 0.14920499282815028,
+          "1": 0.0003051850947599719
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 41.20923490096744,
+          "p50": 41.0,
+          "p95": 57.0
+        },
+        "scheduled_us": 28.785637989440595,
+        "unscheduled_us": 12.423596911526841,
+        "migrations_per_iteration": 0.36497085482345043,
+        "stops_per_iteration": {
+          "12": 1.0696127201147496,
+          "3": 0.6292916653950621,
+          "1": 0.06067079683828242
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.13528855250709557,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.13528855250709557,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05444502090517899,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.05444502090517899,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 42.40043336283456,
+          "p50": 42.0,
+          "p95": 58.0
+        },
+        "scheduled_us": 29.791375469222082,
+        "unscheduled_us": 12.609057893612476,
+        "migrations_per_iteration": 0.3650013733329264,
+        "stops_per_iteration": {
+          "3": 0.7900631733146153,
+          "2": 3.051850947599719e-05,
+          "12": 1.0696127201147496,
+          "1": 0.06176946317941832
+        }
+      }
+    },
+    "source": {
+      "count": 32767,
+      "elapsed_us": {
+        "mean": 13.373088778344066,
+        "p50": 14.0,
+        "p95": 22.0
+      },
+      "scheduled_us": 12.942716757713553,
+      "fork_delay_us": {
+        "mean": 1.7964110232856227,
+        "p50": 1.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.31168553727835935
+    },
+    "groups": {
+      "topology_parent": {
+        "count": 11956,
+        "elapsed_us": {
+          "mean": 44.04675476748076,
+          "p50": 42.0,
+          "p95": 53.0
+        }
+      },
+      "parent_migrated": {
+        "count": 11959,
+        "elapsed_us": {
+          "mean": 44.65256292332135,
+          "p50": 42.0,
+          "p95": 53.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 22554,
+        "elapsed_us": {
+          "mean": 37.32561851556265,
+          "p50": 39.0,
+          "p95": 50.0
+        }
+      },
+      "topology_child": {
+        "count": 10210,
+        "elapsed_us": {
+          "mean": 52.900685602350634,
+          "p50": 53.0,
+          "p95": 63.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 20808,
+        "elapsed_us": {
+          "mean": 41.10606497500961,
+          "p50": 39.0,
+          "p95": 60.0
+        }
+      },
+      "child_migrated": {
+        "count": 10213,
+        "elapsed_us": {
+          "mean": 53.607461079016936,
+          "p50": 53.0,
+          "p95": 63.0
+        }
+      },
+      "topology_none": {
+        "count": 10598,
+        "elapsed_us": {
+          "mean": 29.743253444046047,
+          "p50": 28.0,
+          "p95": 36.0
+        }
+      },
+      "topology_parentchild": {
+        "count": 3,
+        "elapsed_us": {
+          "mean": 2459.0,
+          "p50": 2462.0,
+          "p95": 2462.0
+        }
+      }
+    }
+  },
+  "candidate-static-1.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-1.eventlog",
+    "bytes": 64417236,
+    "iterations": 8191,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.29971920400439506,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.29971920400439506,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.32267122451471125,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.321694542790868,
+        "unscheduled_us": 0.0009766817238432426,
+        "migrations_per_iteration": 0.00012208521548040532,
+        "stops_per_iteration": {
+          "3": 0.0015871078012452693,
+          "1": 0.0008545965083628373
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.26455866194603833,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.12879990233182761,
+        "unscheduled_us": 0.13575875961421072,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.09266267854962763
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.37919667928213896,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.1419851056037114,
+        "unscheduled_us": 0.23721157367842755,
+        "migrations_per_iteration": 0.00012208521548040532,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 0.19130753265779515,
+          "1": 0.00024417043096081065
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 285.53168111341716,
+          "p50": 276.0,
+          "p95": 319.0
+        },
+        "scheduled_us": 252.87693810279575,
+        "unscheduled_us": 32.65474301062142,
+        "migrations_per_iteration": 0.2362348919545843,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.7315346111585886,
+          "1": 0.6576730557929434
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.14149676474178977,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.14149676474178977,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00012208521548040532
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.050299108777926996,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.050299108777926996,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 286.9896227566842,
+          "p50": 277.0,
+          "p95": 321.0
+        },
+        "scheduled_us": 253.96093273104626,
+        "unscheduled_us": 33.02869002563789,
+        "migrations_per_iteration": 0.2364790623855451,
+        "stops_per_iteration": {
+          "3": 1.0170919301672567,
+          "2": 0.00012208521548040532,
+          "12": 1.0,
+          "1": 0.6588939079477475
+        }
+      }
+    },
+    "source": {
+      "count": 8191,
+      "elapsed_us": {
+        "mean": 82.4784519594677,
+        "p50": 82.0,
+        "p95": 123.0
+      },
+      "scheduled_us": 81.47185935783176,
+      "fork_delay_us": {
+        "mean": 2.306555976071298,
+        "p50": 1.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.4058112562568673
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 1936,
+        "elapsed_us": {
+          "mean": 289.323347107438,
+          "p50": 288.0,
+          "p95": 318.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 4867,
+        "elapsed_us": {
+          "mean": 279.8393260735566,
+          "p50": 272.0,
+          "p95": 311.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 6255,
+        "elapsed_us": {
+          "mean": 286.2673061550759,
+          "p50": 277.0,
+          "p95": 322.0
+        }
+      },
+      "child_migrated": {
+        "count": 3324,
+        "elapsed_us": {
+          "mean": 297.45908543922985,
+          "p50": 295.0,
+          "p95": 328.0
+        }
+      }
+    }
+  },
+  "candidate-static-2.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-2.eventlog",
+    "bytes": 16160585,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.5812133072407045,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5812133072407045,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.5499021526418787,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5440313111545988,
+        "unscheduled_us": 0.005870841487279843,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.01761252446183953
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.22113502935420742,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.15459882583170254,
+        "unscheduled_us": 0.06653620352250489,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0410958904109589
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.7808219178082192,
+          "p50": 0.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 0.2172211350293542,
+        "unscheduled_us": 0.5636007827788649,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "2": 0.0019569471624266144,
+          "3": 0.30724070450097846,
+          "1": 0.0019569471624266144
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2776.3972602739727,
+          "p50": 2727.0,
+          "p95": 3096.0
+        },
+        "scheduled_us": 2637.7338551859098,
+        "unscheduled_us": 138.66340508806263,
+        "migrations_per_iteration": 0.37181996086105673,
+        "stops_per_iteration": {
+          "1": 7.048923679060666,
+          "12": 0.9980430528375733,
+          "3": 0.9412915851272016
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2465753424657534,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2465753424657534,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.07827788649706457,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.07827788649706457,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2778.8551859099803,
+          "p50": 2730.0,
+          "p95": 3099.0
+        },
+        "scheduled_us": 2639.5557729941293,
+        "unscheduled_us": 139.29941291585126,
+        "migrations_per_iteration": 0.37377690802348335,
+        "stops_per_iteration": {
+          "3": 1.3072407045009784,
+          "2": 0.0019569471624266144,
+          "1": 7.050880626223092,
+          "12": 0.9980430528375733
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 825.2407045009785,
+        "p50": 805.0,
+        "p95": 1146.0
+      },
+      "scheduled_us": 821.4990215264188,
+      "fork_delay_us": {
+        "mean": 3.5772994129158513,
+        "p50": 1.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.5107632093933464
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 188,
+        "elapsed_us": {
+          "mean": 2820.973404255319,
+          "p50": 2788.0,
+          "p95": 3394.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 250,
+        "elapsed_us": {
+          "mean": 2775.5,
+          "p50": 2729.5,
+          "p95": 3127.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 323,
+        "elapsed_us": {
+          "mean": 2754.340557275542,
+          "p50": 2720.0,
+          "p95": 3020.0
+        }
+      },
+      "child_migrated": {
+        "count": 261,
+        "elapsed_us": {
+          "mean": 2782.0689655172414,
+          "p50": 2730.0,
+          "p95": 3039.0
+        }
+      }
+    }
+  },
+  "candidate-static-3.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-3.eventlog",
+    "bytes": 132822454,
+    "iterations": 65535,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.23076218814374,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.23067063401235982,
+        "unscheduled_us": 9.155413138017853e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00038147554741741054,
+          "3": 1.5259021896696422e-05
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.3334401464866102,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.29280537117570765,
+        "unscheduled_us": 0.04063477531090257,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.00024414435034714275,
+          "1": 0.0005951018539711605
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.11436636911573968,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.10742351415274282,
+        "unscheduled_us": 0.0069428549629968715,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.008789196612497139,
+          "1": 1.5259021896696422e-05
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.18194857709620813,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.10969710841535057,
+        "unscheduled_us": 0.07225146868085755,
+        "migrations_per_iteration": 1.5259021896696422e-05,
+        "stops_per_iteration": {
+          "2": 1.5259021896696422e-05,
+          "3": 0.0907911802853437,
+          "1": 0.00038147554741741054
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 33.373342488746474,
+          "p50": 30.0,
+          "p95": 50.0
+        },
+        "scheduled_us": 23.0757457846952,
+        "unscheduled_us": 10.297596704051271,
+        "migrations_per_iteration": 0.06666666666666667,
+        "stops_per_iteration": {
+          "12": 1.0070191500724803,
+          "3": 0.6905470359349966,
+          "1": 0.04597543297474632
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.11593804837109942,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.11593804837109942,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 1.5259021896696422e-05
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.04666208896009766,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.04666208896009766,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 34.396459906919965,
+          "p50": 30.0,
+          "p95": 51.0
+        },
+        "scheduled_us": 23.97894254978256,
+        "unscheduled_us": 10.417517357137408,
+        "migrations_per_iteration": 0.06668192568856336,
+        "stops_per_iteration": {
+          "3": 0.7903868162050812,
+          "2": 1.5259021896696422e-05,
+          "12": 1.0070191500724803,
+          "1": 0.04736400396734569
+        }
+      }
+    },
+    "source": {
+      "count": 65535,
+      "elapsed_us": {
+        "mean": 11.590646219577325,
+        "p50": 7.0,
+        "p95": 22.0
+      },
+      "scheduled_us": 11.416830701152056,
+      "fork_delay_us": {
+        "mean": 2.215991454947738,
+        "p50": 1.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.3913939116502632
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 4370,
+        "elapsed_us": {
+          "mean": 42.50526315789474,
+          "p50": 39.0,
+          "p95": 49.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 39885,
+        "elapsed_us": {
+          "mean": 27.90778488153441,
+          "p50": 25.0,
+          "p95": 40.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 61165,
+        "elapsed_us": {
+          "mean": 33.81711763263304,
+          "p50": 27.0,
+          "p95": 51.0
+        }
+      },
+      "child_migrated": {
+        "count": 25650,
+        "elapsed_us": {
+          "mean": 44.48615984405458,
+          "p50": 44.0,
+          "p95": 53.0
+        }
+      }
+    }
+  },
+  "candidate-static-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-4.eventlog",
+    "bytes": 12907264,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.34114774114774116,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.34114774114774116,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.3367521367521368,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.326984126984127,
+        "unscheduled_us": 0.009768009768009768,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "3": 0.0029304029304029304,
+          "1": 0.0004884004884004884
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.11037851037851037,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.11037851037851037,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.675946275946276,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.18095238095238095,
+        "unscheduled_us": 0.494993894993895,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "2": 0.0002442002442002442,
+          "3": 0.4244200244200244
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 249.14285714285714,
+          "p50": 245.0,
+          "p95": 278.0
+        },
+        "scheduled_us": 231.25494505494507,
+        "unscheduled_us": 17.88791208791209,
+        "migrations_per_iteration": 0.5106227106227106,
+        "stops_per_iteration": {
+          "12": 0.9997557997557998,
+          "3": 1.0717948717948718,
+          "1": 0.45396825396825397
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.13894993894993896,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.13894993894993896,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05225885225885226,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.05225885225885226,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 250.7982905982906,
+          "p50": 246.0,
+          "p95": 280.0
+        },
+        "scheduled_us": 232.40561660561661,
+        "unscheduled_us": 18.39267399267399,
+        "migrations_per_iteration": 0.5111111111111111,
+        "stops_per_iteration": {
+          "3": 1.4991452991452991,
+          "2": 0.0002442002442002442,
+          "12": 0.9997557997557998,
+          "1": 0.4547008547008547
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 96.67008547008547,
+        "p50": 93.0,
+        "p95": 128.0
+      },
+      "scheduled_us": 95.55457875457876,
+      "fork_delay_us": {
+        "mean": 5.156288156288157,
+        "p50": 4.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.4896214896214896
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 2090,
+        "elapsed_us": {
+          "mean": 245.72535885167463,
+          "p50": 240.0,
+          "p95": 275.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 2090,
+        "elapsed_us": {
+          "mean": 245.72535885167463,
+          "p50": 240.0,
+          "p95": 275.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 2005,
+        "elapsed_us": {
+          "mean": 256.0862842892768,
+          "p50": 253.0,
+          "p95": 284.0
+        }
+      },
+      "child_migrated": {
+        "count": 2005,
+        "elapsed_us": {
+          "mean": 256.0862842892768,
+          "p50": 253.0,
+          "p95": 284.0
+        }
+      }
+    }
+  },
+  "candidate-static-5.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-5.eventlog",
+    "bytes": 9074503,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.44422700587084146,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.44422700587084146,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.5244618395303327,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.512720156555773,
+        "unscheduled_us": 0.011741682974559686,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "3": 0.01761252446183953
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.17416829745596868,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.16634050880626222,
+        "unscheduled_us": 0.007827788649706457,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.005870841487279843
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.974559686888454,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.2700587084148728,
+        "unscheduled_us": 0.7045009784735812,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "2": 0.0019569471624266144,
+          "3": 0.5733855185909981
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2572.6262230919765,
+          "p50": 2685.0,
+          "p95": 2847.0
+        },
+        "scheduled_us": 2480.1448140900197,
+        "unscheduled_us": 92.48140900195695,
+        "migrations_per_iteration": 0.033268101761252444,
+        "stops_per_iteration": {
+          "1": 4.592954990215264,
+          "12": 0.9863013698630136,
+          "3": 0.6888454011741683
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2309197651663405,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2309197651663405,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.09393346379647749,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.09393346379647749,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2575.068493150685,
+          "p50": 2689.0,
+          "p95": 2849.0
+        },
+        "scheduled_us": 2481.8630136986303,
+        "unscheduled_us": 93.20547945205479,
+        "migrations_per_iteration": 0.03718199608610567,
+        "stops_per_iteration": {
+          "3": 1.2857142857142858,
+          "2": 0.0019569471624266144,
+          "1": 4.592954990215264,
+          "12": 0.9863013698630136
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 1160.7005870841488,
+        "p50": 1269.0,
+        "p95": 1439.0
+      },
+      "scheduled_us": 1153.3855185909981,
+      "fork_delay_us": {
+        "mean": 16.31115459882583,
+        "p50": 9.0,
+        "p95": 30.0
+      },
+      "migrations_per_iteration": 0.9706457925636007
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 18,
+        "elapsed_us": {
+          "mean": 2976.8333333333335,
+          "p50": 2366.5,
+          "p95": 5047.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 16,
+        "elapsed_us": {
+          "mean": 2478.1875,
+          "p50": 2330.5,
+          "p95": 2753.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 493,
+        "elapsed_us": {
+          "mean": 2560.399594320487,
+          "p50": 2695.0,
+          "p95": 2840.0
+        }
+      },
+      "child_migrated": {
+        "count": 495,
+        "elapsed_us": {
+          "mean": 2578.2,
+          "p50": 2696.0,
+          "p95": 2849.0
+        }
+      }
+    }
+  },
+  "candidate-static-6.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-6.eventlog",
+    "bytes": 55878845,
+    "iterations": 8191,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 1.6314247344646564,
+          "p50": 2.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 1.6276400927847638,
+        "unscheduled_us": 0.003784641679892565,
+        "migrations_per_iteration": 0.00012208521548040532,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 0.001465022585764864,
+          "1": 0.011720180686118912
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.4426809913319497,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4425589061164693,
+        "unscheduled_us": 0.00012208521548040532,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.000732511292882432
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.1145159321206202,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1145159321206202,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.7148089366377731,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.18727872054694175,
+        "unscheduled_us": 0.5275302160908314,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.37931876449761937,
+          "1": 0.00012208521548040532
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 279.06751312416066,
+          "p50": 273.0,
+          "p95": 310.0
+        },
+        "scheduled_us": 250.35600048834087,
+        "unscheduled_us": 28.7115126358198,
+        "migrations_per_iteration": 0.33390306433890854,
+        "stops_per_iteration": {
+          "12": 0.9998779147845196,
+          "3": 0.720791112196313,
+          "1": 0.6116469295568306
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.1471126846538884,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.146990599438408,
+        "unscheduled_us": 0.00012208521548040532,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.000366255646441216
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.060920522524722256,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.060920522524722256,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 282.1789769258943,
+          "p50": 276.0,
+          "p95": 313.0
+        },
+        "scheduled_us": 252.9359052618728,
+        "unscheduled_us": 29.243071664021485,
+        "migrations_per_iteration": 0.33402514955438894,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "12": 0.9998779147845196,
+          "3": 1.1015748992796972,
+          "1": 0.6245879623977536
+        }
+      }
+    },
+    "source": {
+      "count": 8191,
+      "elapsed_us": {
+        "mean": 81.51178122329387,
+        "p50": 87.0,
+        "p95": 106.0
+      },
+      "scheduled_us": 80.38298132096203,
+      "fork_delay_us": {
+        "mean": 2.369551947259187,
+        "p50": 1.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.38786472958124774
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 2734,
+        "elapsed_us": {
+          "mean": 295.1470373079737,
+          "p50": 287.0,
+          "p95": 330.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 5014,
+        "elapsed_us": {
+          "mean": 283.4790586358197,
+          "p50": 277.0,
+          "p95": 322.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 5457,
+        "elapsed_us": {
+          "mean": 275.6818764889133,
+          "p50": 272.0,
+          "p95": 293.0
+        }
+      },
+      "child_migrated": {
+        "count": 3177,
+        "elapsed_us": {
+          "mean": 280.12716399118665,
+          "p50": 276.0,
+          "p95": 297.0
+        }
+      }
+    }
+  },
+  "candidate-static-7.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/candidate-static-7.eventlog",
+    "bytes": 19360071,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 31.56751467710372,
+          "p50": 30.0,
+          "p95": 40.0
+        },
+        "scheduled_us": 27.475538160469668,
+        "unscheduled_us": 4.091976516634051,
+        "migrations_per_iteration": 0.005870841487279843,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "1": 0.11545988258317025,
+          "3": 0.005870841487279843
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.6575342465753424,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.6575342465753424,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.350293542074364,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.14285714285714285,
+        "unscheduled_us": 0.20743639921722112,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.12720156555772993
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.4892367906066536,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.162426614481409,
+        "unscheduled_us": 0.3268101761252446,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.1780821917808219
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2707.426614481409,
+          "p50": 2622.0,
+          "p95": 2956.0
+        },
+        "scheduled_us": 2566.504892367906,
+        "unscheduled_us": 140.92172211350294,
+        "migrations_per_iteration": 0.33268101761252444,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.974559686888454,
+          "1": 6.5440313111545985
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.26614481409001955,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.26614481409001955,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05675146771037182,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.05675146771037182,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2740.8140900195694,
+          "p50": 2657.0,
+          "p95": 2994.0
+        },
+        "scheduled_us": 2595.2661448140902,
+        "unscheduled_us": 145.54794520547946,
+        "migrations_per_iteration": 0.3385518590998043,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "3": 1.2857142857142858,
+          "12": 1.0,
+          "1": 6.659491193737769
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 864.8297455968689,
+        "p50": 795.0,
+        "p95": 1203.0
+      },
+      "scheduled_us": 859.8003913894324,
+      "fork_delay_us": {
+        "mean": 3.6614481409001955,
+        "p50": 1.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.5303326810176126
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 343,
+        "elapsed_us": {
+          "mean": 2707.553935860058,
+          "p50": 2646.0,
+          "p95": 2961.0
+        }
+      },
+      "child_migrated": {
+        "count": 271,
+        "elapsed_us": {
+          "mean": 2742.1291512915127,
+          "p50": 2670.0,
+          "p95": 2979.0
+        }
+      },
+      "parent_migrated": {
+        "count": 168,
+        "elapsed_us": {
+          "mean": 2808.720238095238,
+          "p50": 2853.0,
+          "p95": 3289.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 240,
+        "elapsed_us": {
+          "mean": 2739.329166666667,
+          "p50": 2646.0,
+          "p95": 2999.0
+        }
+      }
+    }
+  },
+  "release-events-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-events-0.eventlog",
+    "bytes": 241377804,
+    "dominant_parent": 43,
+    "parents": [
+      [
+        43,
+        131071
+      ],
+      [
+        null,
+        55
+      ],
+      [
+        1,
+        37
+      ],
+      [
+        39,
+        5
+      ],
+      [
+        40,
+        1
+      ],
+      [
+        41,
+        1
+      ]
+    ],
+    "parent": {
+      "count": 1,
+      "running_us": 3344898.0,
+      "run_segments": 178452,
+      "stop_status": {
+        "6": 103,
+        "3": 36434,
+        "2": 1,
+        "12": 133092,
+        "1": 8821,
+        "5": 1
+      },
+      "migrations": 14267,
+      "blackholes": []
+    },
+    "children": {
+      "count": 131071,
+      "running_us": 1082719.0,
+      "run_segments": 250523,
+      "stop_status": {
+        "3": 118775,
+        "8": 1,
+        "5": 131071,
+        "1": 676
+      },
+      "migrations": 14544,
+      "blackholes": [
+        [
+          43,
+          1
+        ]
+      ]
+    },
+    "after_fork_stop": {
+      "2": 1,
+      "12": 119107,
+      "3": 11909,
+      "1": 54
+    },
+    "per_iteration": {
+      "child_running_us": 8.260553440501713,
+      "parent_running_us": 25.519741208963083,
+      "child_elapsed_us": 9.346270342028367,
+      "child_migrations": 0.11096276064117921,
+      "parent_stops": {
+        "6": 0.0007858336321535656,
+        "3": 0.2779714811056603,
+        "2": 7.629452739355006e-06,
+        "12": 1.0154191239862365,
+        "1": 0.0672994026138505,
+        "5": 7.629452739355006e-06
+      },
+      "child_stops": {
+        "3": 0.9061882491168909,
+        "8": 7.629452739355006e-06,
+        "5": 1.0,
+        "1": 0.005157510051803984
+      }
+    }
+  },
+  "release-events-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-events-4.eventlog",
+    "bytes": 69158185,
+    "dominant_parent": 43,
+    "parents": [
+      [
+        43,
+        8191
+      ],
+      [
+        1,
+        37
+      ],
+      [
+        null,
+        32
+      ],
+      [
+        39,
+        5
+      ],
+      [
+        40,
+        1
+      ],
+      [
+        41,
+        1
+      ]
+    ],
+    "parent": {
+      "count": 1,
+      "running_us": 1676534.0,
+      "run_segments": 21784,
+      "stop_status": {
+        "6": 79,
+        "3": 9342,
+        "2": 1,
+        "12": 8192,
+        "1": 4169,
+        "5": 1
+      },
+      "migrations": 134,
+      "blackholes": []
+    },
+    "children": {
+      "count": 8191,
+      "running_us": 724164.0,
+      "run_segments": 12311,
+      "stop_status": {
+        "3": 3814,
+        "8": 1,
+        "5": 8191,
+        "1": 305
+      },
+      "migrations": 4654,
+      "blackholes": [
+        [
+          43,
+          1
+        ]
+      ]
+    },
+    "after_fork_stop": {
+      "2": 1,
+      "12": 3624,
+      "3": 4566
+    },
+    "per_iteration": {
+      "child_running_us": 88.40971798315223,
+      "parent_running_us": 204.68001465022587,
+      "child_elapsed_us": 93.44023928702234,
+      "child_migrations": 0.5681845928458064,
+      "parent_stops": {
+        "6": 0.00964473202295202,
+        "3": 1.1405200830179465,
+        "2": 0.00012208521548040532,
+        "12": 1.0001220852154804,
+        "1": 0.5089732633378098,
+        "5": 0.00012208521548040532
+      },
+      "child_stops": {
+        "3": 0.4656330118422659,
+        "8": 0.00012208521548040532,
+        "5": 1.0,
+        "1": 0.03723599072152362
+      }
+    }
+  },
+  "release-phase-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-0.eventlog",
+    "bytes": 137178699,
+    "iterations": 65535,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.4413824673838407,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4412451361867704,
+        "unscheduled_us": 0.0001373311970702678,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "2": 1.5259021896696422e-05,
+          "1": 0.0008239871824216068,
+          "3": 1.5259021896696422e-05
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.44194705119401845,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4416113527122911,
+        "unscheduled_us": 0.0003356984817273213,
+        "migrations_per_iteration": 1.5259021896696422e-05,
+        "stops_per_iteration": {
+          "3": 0.00024414435034714275,
+          "1": 0.0006103608758678569
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.6261692225528344,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.34694438086518653,
+        "unscheduled_us": 0.27922484168764783,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.39510185397116043,
+          "1": 0.0006408789196612497
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.5660791943236438,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.31403067063401235,
+        "unscheduled_us": 0.2520485236896315,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.34702067597467,
+          "1": 0.0004119935912108034
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 45.65729762722209,
+          "p50": 46.0,
+          "p95": 59.0
+        },
+        "scheduled_us": 32.38359655146105,
+        "unscheduled_us": 13.273701075761045,
+        "migrations_per_iteration": 0.00019836728465705348,
+        "stops_per_iteration": {
+          "12": 1.0001831082627604,
+          "3": 0.7082932784008545,
+          "1": 0.06746013580529488
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.27826352330815596,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2782024872205692,
+        "unscheduled_us": 6.103608758678569e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0003356984817273213
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.18503089951934082,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.18500038147554743,
+        "unscheduled_us": 3.0518043793392844e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00018310826276035706
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 48.19616998550393,
+          "p50": 49.0,
+          "p95": 61.0
+        },
+        "scheduled_us": 34.39063096055543,
+        "unscheduled_us": 13.805539024948501,
+        "migrations_per_iteration": 0.0002136263065537499,
+        "stops_per_iteration": {
+          "2": 1.5259021896696422e-05,
+          "3": 1.4506752117189288,
+          "12": 1.0001831082627604,
+          "1": 0.07046616311894408
+        }
+      }
+    },
+    "source": {
+      "count": 65535,
+      "elapsed_us": {
+        "mean": 15.656733043411917,
+        "p50": 17.0,
+        "p95": 23.0
+      },
+      "scheduled_us": 15.646448462653543,
+      "fork_delay_us": {
+        "mean": 3.284931715877012,
+        "p50": 4.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.7851834897383078
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 65521,
+        "elapsed_us": {
+          "mean": 47.916194807771554,
+          "p50": 49.0,
+          "p95": 61.0
+        }
+      },
+      "child_migrated": {
+        "count": 51457,
+        "elapsed_us": {
+          "mean": 52.56670618186058,
+          "p50": 51.0,
+          "p95": 63.0
+        }
+      },
+      "parent_migrated": {
+        "count": 14,
+        "elapsed_us": {
+          "mean": 1358.5,
+          "p50": 2258.0,
+          "p95": 2432.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 14078,
+        "elapsed_us": {
+          "mean": 32.22126722545816,
+          "p50": 30.0,
+          "p95": 41.0
+        }
+      }
+    }
+  },
+  "release-phase-1.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-1.eventlog",
+    "bytes": 29294322,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.40244200244200246,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4021978021978022,
+        "unscheduled_us": 0.0002442002442002442,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0002442002442002442,
+          "2": 0.0002442002442002442,
+          "1": 0.0007326007326007326
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 1.38998778998779,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 1.3748473748473748,
+        "unscheduled_us": 0.01514041514041514,
+        "migrations_per_iteration": 0.0004884004884004884,
+        "stops_per_iteration": {
+          "3": 0.002686202686202686
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.3960927960927961,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2605616605616606,
+        "unscheduled_us": 0.13553113553113552,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.1619047619047619,
+          "1": 0.0002442002442002442
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.6744810744810745,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3145299145299145,
+        "unscheduled_us": 0.35995115995115995,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.4017094017094017,
+          "1": 0.0007326007326007326
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 292.7995115995116,
+          "p50": 293.0,
+          "p95": 321.0
+        },
+        "scheduled_us": 261.7118437118437,
+        "unscheduled_us": 31.087667887667887,
+        "migrations_per_iteration": 0.0009768009768009768,
+        "stops_per_iteration": {
+          "12": 1.000976800976801,
+          "3": 0.7333333333333333,
+          "1": 0.6884004884004884
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.31355311355311355,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.31355311355311355,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.1741147741147741,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1741147741147741,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 296.1501831501831,
+          "p50": 295.0,
+          "p95": 323.0
+        },
+        "scheduled_us": 264.55164835164834,
+        "unscheduled_us": 31.5985347985348,
+        "migrations_per_iteration": 0.0014652014652014652,
+        "stops_per_iteration": {
+          "3": 1.2998778998779,
+          "2": 0.0002442002442002442,
+          "12": 1.000976800976801,
+          "1": 0.6901098901098901
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 90.62002442002442,
+        "p50": 94.0,
+        "p95": 129.0
+      },
+      "scheduled_us": 90.25079365079365,
+      "fork_delay_us": {
+        "mean": 3.3694749694749695,
+        "p50": 4.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.6644688644688644
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 4089,
+        "elapsed_us": {
+          "mean": 295.57593543653707,
+          "p50": 295.0,
+          "p95": 323.0
+        }
+      },
+      "child_migrated": {
+        "count": 2721,
+        "elapsed_us": {
+          "mean": 307.2477030503491,
+          "p50": 305.0,
+          "p95": 326.0
+        }
+      },
+      "parent_migrated": {
+        "count": 6,
+        "elapsed_us": {
+          "mean": 687.5,
+          "p50": 364.5,
+          "p95": 1281.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 1374,
+        "elapsed_us": {
+          "mean": 274.17321688500726,
+          "p50": 270.0,
+          "p95": 279.0
+        }
+      }
+    }
+  },
+  "release-phase-2.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-2.eventlog",
+    "bytes": 20851039,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.5694716242661448,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5655577299412916,
+        "unscheduled_us": 0.003913894324853229,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0019569471624266144,
+          "2": 0.0019569471624266144
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.7221135029354208,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.6966731898238747,
+        "unscheduled_us": 0.025440313111545987,
+        "migrations_per_iteration": 0.003913894324853229,
+        "stops_per_iteration": {
+          "3": 0.015655577299412915
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.7710371819960861,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.34637964774951074,
+        "unscheduled_us": 0.4246575342465753,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.2700587084148728
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 1.0724070450097847,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.30332681017612523,
+        "unscheduled_us": 0.7690802348336595,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3131115459882583,
+          "1": 0.0019569471624266144
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2830.839530332681,
+          "p50": 2736.0,
+          "p95": 3124.0
+        },
+        "scheduled_us": 2663.0763209393344,
+        "unscheduled_us": 167.7632093933464,
+        "migrations_per_iteration": 0.021526418786692758,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.8610567514677103,
+          "1": 7.078277886497065
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.46771037181996084,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.46771037181996084,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.299412915851272,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.299412915851272,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2834.74168297456,
+          "p50": 2738.0,
+          "p95": 3129.0
+        },
+        "scheduled_us": 2665.7553816046966,
+        "unscheduled_us": 168.986301369863,
+        "migrations_per_iteration": 0.025440313111545987,
+        "stops_per_iteration": {
+          "3": 1.461839530332681,
+          "2": 0.0019569471624266144,
+          "12": 1.0,
+          "1": 7.080234833659492
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 882.917808219178,
+        "p50": 839.0,
+        "p95": 1235.0
+      },
+      "scheduled_us": 877.972602739726,
+      "fork_delay_us": {
+        "mean": 5.667318982387475,
+        "p50": 6.0,
+        "p95": 11.0
+      },
+      "migrations_per_iteration": 0.7984344422700587
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 498,
+        "elapsed_us": {
+          "mean": 2812.0481927710844,
+          "p50": 2735.0,
+          "p95": 3103.0
+        }
+      },
+      "child_migrated": {
+        "count": 408,
+        "elapsed_us": {
+          "mean": 2857.3799019607845,
+          "p50": 2896.0,
+          "p95": 3134.0
+        }
+      },
+      "parent_migrated": {
+        "count": 13,
+        "elapsed_us": {
+          "mean": 3704.076923076923,
+          "p50": 3595.0,
+          "p95": 4223.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 103,
+        "elapsed_us": {
+          "mean": 2745.0679611650485,
+          "p50": 2715.0,
+          "p95": 2762.0
+        }
+      }
+    }
+  },
+  "release-phase-3.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-3.eventlog",
+    "bytes": 131973765,
+    "iterations": 65535,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.4034485389486534,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.40325017166399635,
+        "unscheduled_us": 0.00019836728465705348,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 1.5259021896696422e-05,
+          "2": 1.5259021896696422e-05,
+          "1": 0.0010376134889753567
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.43863584344243534,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.43849851224536507,
+        "unscheduled_us": 0.0001373311970702678,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.00025940337224383917,
+          "1": 0.0002746623941405356
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.6610818646524758,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.35016403448538946,
+        "unscheduled_us": 0.3109178301670863,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.474891279468986,
+          "1": 0.0008545052262149996
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.3321583886472877,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2523842221713588,
+        "unscheduled_us": 0.07977416647592889,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.11030746929121843,
+          "1": 0.0002746623941405356
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 35.192614633402,
+          "p50": 36.0,
+          "p95": 47.0
+        },
+        "scheduled_us": 23.73058670939193,
+        "unscheduled_us": 11.462027924010071,
+        "migrations_per_iteration": 0.00016784924086366064,
+        "stops_per_iteration": {
+          "12": 1.0009155413138018,
+          "3": 0.5768520637827115,
+          "1": 0.04783703364614328
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2681162737468528,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2681010147249561,
+        "unscheduled_us": 1.5259021896696422e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 1.5259021896696422e-05,
+          "1": 0.00012207217517357137
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.17444113832303348,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1744258793011368,
+        "unscheduled_us": 1.5259021896696422e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 1.5259021896696422e-05,
+          "1": 6.103608758678569e-05
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 37.470496681162736,
+          "p50": 39.0,
+          "p95": 50.0
+        },
+        "scheduled_us": 25.617410543984132,
+        "unscheduled_us": 11.853086137178607,
+        "migrations_per_iteration": 0.00016784924086366064,
+        "stops_per_iteration": {
+          "3": 1.16235599298085,
+          "2": 1.5259021896696422e-05,
+          "12": 1.0009155413138018,
+          "1": 0.05046158541237507
+        }
+      }
+    },
+    "source": {
+      "count": 65535,
+      "elapsed_us": {
+        "mean": 13.205188067444876,
+        "p50": 15.0,
+        "p95": 21.0
+      },
+      "scheduled_us": 13.186846723125047,
+      "fork_delay_us": {
+        "mean": 3.2535439078355077,
+        "p50": 4.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.6124818799114977
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 65524,
+        "elapsed_us": {
+          "mean": 37.27939380990171,
+          "p50": 39.0,
+          "p95": 50.0
+        }
+      },
+      "child_migrated": {
+        "count": 40139,
+        "elapsed_us": {
+          "mean": 43.624529759087174,
+          "p50": 42.0,
+          "p95": 51.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 25396,
+        "elapsed_us": {
+          "mean": 27.74389667664199,
+          "p50": 26.0,
+          "p95": 33.0
+        }
+      },
+      "parent_migrated": {
+        "count": 11,
+        "elapsed_us": {
+          "mean": 1175.8181818181818,
+          "p50": 46.0,
+          "p95": 2976.0
+        }
+      }
+    }
+  },
+  "release-phase-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-4.eventlog",
+    "bytes": 13806150,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.43394383394383396,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4332112332112332,
+        "unscheduled_us": 0.0007326007326007326,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0002442002442002442,
+          "2": 0.0002442002442002442,
+          "1": 0.0009768009768009768
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.48205128205128206,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.47863247863247865,
+        "unscheduled_us": 0.003418803418803419,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "3": 0.002686202686202686,
+          "1": 0.0002442002442002442
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.7445665445665446,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3562881562881563,
+        "unscheduled_us": 0.3882783882783883,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.495970695970696,
+          "1": 0.0002442002442002442
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.25177045177045176,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2205128205128205,
+        "unscheduled_us": 0.03125763125763126,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.030525030525030524,
+          "1": 0.0002442002442002442
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 256.96630036630035,
+          "p50": 261.0,
+          "p95": 295.0
+        },
+        "scheduled_us": 237.23760683760685,
+        "unscheduled_us": 19.72869352869353,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "12": 0.9995115995115995,
+          "3": 1.363858363858364,
+          "1": 0.4869352869352869
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.3103785103785104,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3103785103785104,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0004884004884004884
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.18534798534798536,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.18534798534798536,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 259.374358974359,
+          "p50": 265.0,
+          "p95": 298.0
+        },
+        "scheduled_us": 239.22197802197803,
+        "unscheduled_us": 20.152380952380952,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "3": 1.8932844932844932,
+          "2": 0.0002442002442002442,
+          "12": 0.9995115995115995,
+          "1": 0.48937728937728936
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 110.55384615384615,
+        "p50": 116.0,
+        "p95": 153.0
+      },
+      "scheduled_us": 109.78778998778999,
+      "fork_delay_us": {
+        "mean": 6.6290598290598295,
+        "p50": 7.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.9494505494505494
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 4094,
+        "elapsed_us": {
+          "mean": 259.36052760136783,
+          "p50": 264.5,
+          "p95": 298.0
+        }
+      },
+      "child_migrated": {
+        "count": 3887,
+        "elapsed_us": {
+          "mean": 260.9099562644713,
+          "p50": 272.0,
+          "p95": 299.0
+        }
+      },
+      "parent_migrated": {
+        "count": 1,
+        "elapsed_us": {
+          "mean": 316.0,
+          "p50": 316.0,
+          "p95": 316.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 208,
+        "elapsed_us": {
+          "mean": 230.6778846153846,
+          "p50": 229.0,
+          "p95": 237.0
+        }
+      }
+    }
+  },
+  "release-phase-5.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-5.eventlog",
+    "bytes": 5133667,
+    "iterations": 1023,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.5767350928641252,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5767350928641252,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "2": 0.0009775171065493646
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.6304985337243402,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.6236559139784946,
+        "unscheduled_us": 0.006842619745845552,
+        "migrations_per_iteration": 0.0009775171065493646,
+        "stops_per_iteration": {
+          "3": 0.008797653958944282
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 1.043010752688172,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3831867057673509,
+        "unscheduled_us": 0.6598240469208211,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.501466275659824,
+          "1": 0.0009775171065493646
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 1.5591397849462365,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.38514173998044965,
+        "unscheduled_us": 1.173998044965787,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.47116324535679377
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2608.1290322580644,
+          "p50": 2420.0,
+          "p95": 2945.0
+        },
+        "scheduled_us": 2547.5415444770283,
+        "unscheduled_us": 60.58748778103617,
+        "migrations_per_iteration": 0.01466275659824047,
+        "stops_per_iteration": {
+          "12": 0.9951124144672532,
+          "3": 1.0742913000977516,
+          "1": 4.9315738025415445
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.45356793743890517,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.45356793743890517,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0009775171065493646
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.26881720430107525,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.26881720430107525,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2612.660801564027,
+          "p50": 2424.0,
+          "p95": 2949.0
+        },
+        "scheduled_us": 2550.2326490713585,
+        "unscheduled_us": 62.42815249266862,
+        "migrations_per_iteration": 0.015640273704789834,
+        "stops_per_iteration": {
+          "2": 0.0009775171065493646,
+          "3": 2.0557184750733137,
+          "12": 0.9951124144672532,
+          "1": 4.933528836754643
+        }
+      }
+    },
+    "source": {
+      "count": 1023,
+      "elapsed_us": {
+        "mean": 1147.0977517106548,
+        "p50": 953.0,
+        "p95": 1551.0
+      },
+      "scheduled_us": 1142.9315738025416,
+      "fork_delay_us": {
+        "mean": 9.271749755620723,
+        "p50": 9.0,
+        "p95": 12.0
+      },
+      "migrations_per_iteration": 0.9980449657869013
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 1007,
+        "elapsed_us": {
+          "mean": 2597.8093346573983,
+          "p50": 2415.0,
+          "p95": 2936.0
+        }
+      },
+      "child_migrated": {
+        "count": 1020,
+        "elapsed_us": {
+          "mean": 2613.8823529411766,
+          "p50": 2426.5,
+          "p95": 2951.0
+        }
+      },
+      "parent_migrated": {
+        "count": 16,
+        "elapsed_us": {
+          "mean": 3547.375,
+          "p50": 3513.5,
+          "p95": 4350.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 3,
+        "elapsed_us": {
+          "mean": 2197.3333333333335,
+          "p50": 2270.0,
+          "p95": 2270.0
+        }
+      }
+    }
+  },
+  "release-phase-6.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-6.eventlog",
+    "bytes": 21211450,
+    "iterations": 8191,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 1.8268831644487853,
+          "p50": 2.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 1.8224880966914907,
+        "unscheduled_us": 0.0043950677572945915,
+        "migrations_per_iteration": 0.00012208521548040532,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 0.001465022585764864,
+          "1": 0.011231839824197289
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.5209376144548895,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5208155292394091,
+        "unscheduled_us": 0.00012208521548040532,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0013429373702844585
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.6094493956781833,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.33133927481382003,
+        "unscheduled_us": 0.2781101208643633,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3380539616652423,
+          "1": 0.0006104260774020266
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.5748992796972286,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.30411427176168965,
+        "unscheduled_us": 0.270785007935539,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.3259675253326822,
+          "1": 0.00012208521548040532
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 295.5302160908314,
+          "p50": 297.0,
+          "p95": 323.0
+        },
+        "scheduled_us": 277.63252350140397,
+        "unscheduled_us": 17.89769258942742,
+        "migrations_per_iteration": 0.000366255646441216,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 1.337687706018801,
+          "1": 0.6568184592845806
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.3122939811988768,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3122939811988768,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.1875228909779026,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.18740080576242216,
+        "unscheduled_us": 0.00012208521548040532,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00012208521548040532
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 299.56220241728727,
+          "p50": 301.0,
+          "p95": 326.0
+        },
+        "scheduled_us": 281.1109754608717,
+        "unscheduled_us": 18.451226956415578,
+        "migrations_per_iteration": 0.0004883408619216213,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 2.0031742156024905,
+          "12": 1.0,
+          "1": 0.6702478329874252
+        }
+      }
+    },
+    "source": {
+      "count": 8191,
+      "elapsed_us": {
+        "mean": 111.81333170553046,
+        "p50": 114.0,
+        "p95": 135.0
+      },
+      "scheduled_us": 111.35184959101453,
+      "fork_delay_us": {
+        "mean": 4.4312049810767915,
+        "p50": 4.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.9963374435355878
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 8187,
+        "elapsed_us": {
+          "mean": 299.1540246732625,
+          "p50": 301.0,
+          "p95": 326.0
+        }
+      },
+      "child_migrated": {
+        "count": 8161,
+        "elapsed_us": {
+          "mean": 299.68226932973903,
+          "p50": 301.0,
+          "p95": 326.0
+        }
+      },
+      "parent_migrated": {
+        "count": 4,
+        "elapsed_us": {
+          "mean": 1135.0,
+          "p50": 1333.0,
+          "p95": 1372.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 30,
+        "elapsed_us": {
+          "mean": 266.9,
+          "p50": 265.5,
+          "p95": 275.0
+        }
+      }
+    }
+  },
+  "release-phase-7.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-phase-7.eventlog",
+    "bytes": 30480299,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 32.962818003913895,
+          "p50": 32.0,
+          "p95": 42.0
+        },
+        "scheduled_us": 29.041095890410958,
+        "unscheduled_us": 3.9217221135029354,
+        "migrations_per_iteration": 0.005870841487279843,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "1": 0.08610567514677103,
+          "3": 0.003913894324853229
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.735812133072407,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.735812133072407,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0019569471624266144
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.5792563600782779,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3287671232876712,
+        "unscheduled_us": 0.25048923679060664,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.16829745596868884
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.7318982387475538,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.3013698630136986,
+        "unscheduled_us": 0.43052837573385516,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.2700587084148728
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2671.166340508806,
+          "p50": 2588.0,
+          "p95": 2970.0
+        },
+        "scheduled_us": 2449.262230919765,
+        "unscheduled_us": 221.9041095890411,
+        "migrations_per_iteration": 0.023483365949119372,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.8434442270058709,
+          "1": 6.671232876712328
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.4500978473581213,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4500978473581213,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.2700587084148728,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2700587084148728,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2706.8962818003915,
+          "p50": 2622.0,
+          "p95": 3005.0
+        },
+        "scheduled_us": 2480.3894324853227,
+        "unscheduled_us": 226.5068493150685,
+        "migrations_per_iteration": 0.029354207436399216,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "3": 1.2876712328767124,
+          "12": 1.0,
+          "1": 6.7573385518591
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 812.1389432485323,
+        "p50": 760.0,
+        "p95": 1252.0
+      },
+      "scheduled_us": 809.1135029354208,
+      "fork_delay_us": {
+        "mean": 4.749510763209393,
+        "p50": 6.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.7084148727984344
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 496,
+        "elapsed_us": {
+          "mean": 2682.7600806451615,
+          "p50": 2621.0,
+          "p95": 2987.0
+        }
+      },
+      "child_migrated": {
+        "count": 362,
+        "elapsed_us": {
+          "mean": 2720.243093922652,
+          "p50": 2638.0,
+          "p95": 3011.0
+        }
+      },
+      "parent_migrated": {
+        "count": 15,
+        "elapsed_us": {
+          "mean": 3505.0,
+          "p50": 3413.0,
+          "p95": 3966.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 149,
+        "elapsed_us": {
+          "mean": 2674.469798657718,
+          "p50": 2620.0,
+          "p95": 2776.0
+        }
+      }
+    }
+  },
+  "release-static-0.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-0.eventlog",
+    "bytes": 75730491,
+    "iterations": 32767,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.29276406140324107,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2927030243842891,
+        "unscheduled_us": 6.103701895199438e-05,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00015259254737998596
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.30350657673879206,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3030793176061281,
+        "unscheduled_us": 0.0004272591326639607,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0004577776421399579,
+          "1": 0.000640888698995941
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.1382488479262673,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.11755729850154119,
+        "unscheduled_us": 0.020691549424726098,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.017548142948698386,
+          "1": 0.00015259254737998596
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.18131046479689933,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.09271523178807947,
+        "unscheduled_us": 0.08859523300881984,
+        "migrations_per_iteration": 3.051850947599719e-05,
+        "stops_per_iteration": {
+          "2": 3.051850947599719e-05,
+          "3": 0.08133182775353252,
+          "1": 0.0003051850947599719
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 37.88406018250069,
+          "p50": 38.0,
+          "p95": 55.0
+        },
+        "scheduled_us": 26.717642750328075,
+        "unscheduled_us": 11.166417432172613,
+        "migrations_per_iteration": 0.3296304208502457,
+        "stops_per_iteration": {
+          "12": 1.0596026490066226,
+          "3": 0.4793237098300119,
+          "1": 0.060731833857234414
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.13568529313028352,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.13568529313028352,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 6.103701895199438e-05
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.0500198370311594,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.0500198370311594,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 3.051850947599719e-05
+        }
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 38.98559526352733,
+          "p50": 39.0,
+          "p95": 57.0
+        },
+        "scheduled_us": 27.709402752769556,
+        "unscheduled_us": 11.276192510757774,
+        "migrations_per_iteration": 0.3296609393597217,
+        "stops_per_iteration": {
+          "3": 0.5786919766838587,
+          "2": 3.051850947599719e-05,
+          "12": 1.0596026490066226,
+          "1": 0.06204412976470229
+        }
+      }
+    },
+    "source": {
+      "count": 32767,
+      "elapsed_us": {
+        "mean": 11.475539414654989,
+        "p50": 11.0,
+        "p95": 21.0
+      },
+      "scheduled_us": 11.139103366191595,
+      "fork_delay_us": {
+        "mean": 1.3733634449293497,
+        "p50": 1.0,
+        "p95": 5.0
+      },
+      "migrations_per_iteration": 0.20410779137546922
+    },
+    "groups": {
+      "topology_parent": {
+        "count": 10800,
+        "elapsed_us": {
+          "mean": 43.738055555555555,
+          "p50": 42.0,
+          "p95": 53.0
+        }
+      },
+      "parent_migrated": {
+        "count": 10801,
+        "elapsed_us": {
+          "mean": 43.948060364781036,
+          "p50": 42.0,
+          "p95": 53.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 26079,
+        "elapsed_us": {
+          "mean": 35.35611028030216,
+          "p50": 30.0,
+          "p95": 48.0
+        }
+      },
+      "topology_child": {
+        "count": 6687,
+        "elapsed_us": {
+          "mean": 52.80050844922985,
+          "p50": 53.0,
+          "p95": 62.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 21966,
+        "elapsed_us": {
+          "mean": 36.54547937721934,
+          "p50": 29.0,
+          "p95": 58.0
+        }
+      },
+      "child_migrated": {
+        "count": 6688,
+        "elapsed_us": {
+          "mean": 53.13830741626794,
+          "p50": 53.0,
+          "p95": 62.0
+        }
+      },
+      "topology_none": {
+        "count": 15279,
+        "elapsed_us": {
+          "mean": 29.43131094966948,
+          "p50": 28.0,
+          "p95": 33.0
+        }
+      },
+      "topology_parentchild": {
+        "count": 1,
+        "elapsed_us": {
+          "mean": 2312.0,
+          "p50": 2312.0,
+          "p95": 2312.0
+        }
+      }
+    }
+  },
+  "release-static-1.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-1.eventlog",
+    "bytes": 28016838,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.38217338217338215,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.38217338217338215,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.335042735042735,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3338217338217338,
+        "unscheduled_us": 0.001221001221001221,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0029304029304029304,
+          "1": 0.0002442002442002442
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.1851037851037851,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.11672771672771673,
+        "unscheduled_us": 0.06837606837606838,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.055921855921855924
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.3213675213675214,
+          "p50": 0.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.11916971916971918,
+        "unscheduled_us": 0.2021978021978022,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "2": 0.0002442002442002442,
+          "3": 0.16605616605616605,
+          "1": 0.0007326007326007326
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 292.83223443223443,
+          "p50": 290.0,
+          "p95": 324.0
+        },
+        "scheduled_us": 263.0879120879121,
+        "unscheduled_us": 29.744322344322345,
+        "migrations_per_iteration": 0.3492063492063492,
+        "stops_per_iteration": {
+          "12": 0.9997557997557998,
+          "3": 0.8302808302808303,
+          "1": 0.6612942612942613
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.15018315018315018,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.15018315018315018,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05030525030525031,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.05030525030525031,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 294.2564102564103,
+          "p50": 292.0,
+          "p95": 325.0
+        },
+        "scheduled_us": 264.24029304029307,
+        "unscheduled_us": 30.016117216117216,
+        "migrations_per_iteration": 0.34945054945054943,
+        "stops_per_iteration": {
+          "3": 1.0551892551892552,
+          "2": 0.0002442002442002442,
+          "12": 0.9997557997557998,
+          "1": 0.6625152625152625
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 90.82710622710623,
+        "p50": 91.0,
+        "p95": 130.0
+      },
+      "scheduled_us": 89.98217338217339,
+      "fork_delay_us": {
+        "mean": 2.047130647130647,
+        "p50": 1.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.35946275946275946
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 1430,
+        "elapsed_us": {
+          "mean": 297.23566433566435,
+          "p50": 300.0,
+          "p95": 321.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 2623,
+        "elapsed_us": {
+          "mean": 286.71673656118946,
+          "p50": 278.0,
+          "p95": 316.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 2665,
+        "elapsed_us": {
+          "mean": 292.6577861163227,
+          "p50": 283.0,
+          "p95": 327.0
+        }
+      },
+      "child_migrated": {
+        "count": 1472,
+        "elapsed_us": {
+          "mean": 307.6915760869565,
+          "p50": 308.0,
+          "p95": 331.0
+        }
+      }
+    }
+  },
+  "release-static-2.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-2.eventlog",
+    "bytes": 19140325,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.7123287671232876,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.7123287671232876,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.5068493150684932,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4892367906066536,
+        "unscheduled_us": 0.01761252446183953,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "3": 0.01761252446183953
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.1898238747553816,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.12915851272015655,
+        "unscheduled_us": 0.060665362035225046,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.033268101761252444
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.6477495107632094,
+          "p50": 0.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 0.15264187866927592,
+        "unscheduled_us": 0.49510763209393344,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "2": 0.0019569471624266144,
+          "3": 0.25440313111545987
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2868.037181996086,
+          "p50": 2841.0,
+          "p95": 3169.0
+        },
+        "scheduled_us": 2707.6575342465753,
+        "unscheduled_us": 160.37964774951075,
+        "migrations_per_iteration": 0.3542074363992172,
+        "stops_per_iteration": {
+          "1": 7.050880626223092,
+          "12": 0.9980430528375733,
+          "3": 0.8904109589041096
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2172211350293542,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2172211350293542,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.06653620352250489,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.06653620352250489,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2870.3776908023483,
+          "p50": 2843.0,
+          "p95": 3171.0
+        },
+        "scheduled_us": 2709.4246575342468,
+        "unscheduled_us": 160.95303326810176,
+        "migrations_per_iteration": 0.35812133072407043,
+        "stops_per_iteration": {
+          "3": 1.1956947162426614,
+          "2": 0.0019569471624266144,
+          "1": 7.050880626223092,
+          "12": 0.9980430528375733
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 887.9060665362035,
+        "p50": 809.0,
+        "p95": 1257.0
+      },
+      "scheduled_us": 882.2133072407045,
+      "fork_delay_us": {
+        "mean": 3.1291585127201564,
+        "p50": 1.0,
+        "p95": 8.0
+      },
+      "migrations_per_iteration": 0.49706457925636005
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 180,
+        "elapsed_us": {
+          "mean": 2944.438888888889,
+          "p50": 2950.5,
+          "p95": 3193.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 257,
+        "elapsed_us": {
+          "mean": 2872.077821011673,
+          "p50": 2875.0,
+          "p95": 3105.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 331,
+        "elapsed_us": {
+          "mean": 2830.1027190332325,
+          "p50": 2747.0,
+          "p95": 3164.0
+        }
+      },
+      "child_migrated": {
+        "count": 254,
+        "elapsed_us": {
+          "mean": 2868.6574803149606,
+          "p50": 2784.0,
+          "p95": 3189.0
+        }
+      }
+    }
+  },
+  "release-static-3.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-3.eventlog",
+    "bytes": 134964512,
+    "iterations": 65535,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.3355916685740444,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.3353933012893873,
+        "unscheduled_us": 0.00019836728465705348,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.000686655985351339,
+          "3": 1.5259021896696422e-05
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.31955443656061644,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.27740901808194096,
+        "unscheduled_us": 0.04214541847867552,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.00024414435034714275,
+          "1": 0.00045777065690089265
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.13461509117265583,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.11654840924696727,
+        "unscheduled_us": 0.018066681925688565,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.021728847180895704,
+          "1": 3.0518043793392844e-05
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.3267872129396506,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.12437628747997254,
+        "unscheduled_us": 0.20241092545967804,
+        "migrations_per_iteration": 1.5259021896696422e-05,
+        "stops_per_iteration": {
+          "2": 1.5259021896696422e-05,
+          "3": 0.2593270771343557,
+          "1": 0.000289921416037232
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 37.06216525520714,
+          "p50": 38.0,
+          "p95": 52.0
+        },
+        "scheduled_us": 25.581475547417412,
+        "unscheduled_us": 11.48068970778973,
+        "migrations_per_iteration": 0.049439230945296404,
+        "stops_per_iteration": {
+          "12": 1.0069275959411002,
+          "3": 0.7440909437705043,
+          "1": 0.045349813076981764
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.12416266117341879,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.12416266117341879,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05024795910582132,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.05024795910582132,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 38.35312428473335,
+          "p50": 40.0,
+          "p95": 53.0
+        },
+        "scheduled_us": 26.60961318379492,
+        "unscheduled_us": 11.743511100938429,
+        "migrations_per_iteration": 0.0494544899671931,
+        "stops_per_iteration": {
+          "3": 1.0254062714579995,
+          "2": 1.5259021896696422e-05,
+          "12": 1.0069275959411002,
+          "1": 0.04681467917906462
+        }
+      }
+    },
+    "source": {
+      "count": 65535,
+      "elapsed_us": {
+        "mean": 13.800213626306554,
+        "p50": 15.0,
+        "p95": 24.0
+      },
+      "scheduled_us": 13.684977492942702,
+      "fork_delay_us": {
+        "mean": 2.698970016021973,
+        "p50": 3.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.5301289387350271
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 3241,
+        "elapsed_us": {
+          "mean": 44.01758716445541,
+          "p50": 40.0,
+          "p95": 50.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 30793,
+        "elapsed_us": {
+          "mean": 28.782093332900335,
+          "p50": 26.0,
+          "p95": 40.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 62294,
+        "elapsed_us": {
+          "mean": 38.05841654091887,
+          "p50": 40.0,
+          "p95": 53.0
+        }
+      },
+      "child_migrated": {
+        "count": 34742,
+        "elapsed_us": {
+          "mean": 46.836250071959014,
+          "p50": 46.0,
+          "p95": 55.0
+        }
+      }
+    }
+  },
+  "release-static-4.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-4.eventlog",
+    "bytes": 35187184,
+    "iterations": 4095,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.31575091575091574,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.31575091575091574,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0002442002442002442
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.31233211233211233,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.31184371184371185,
+        "unscheduled_us": 0.0004884004884004884,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.0029304029304029304
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.10158730158730159,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.10158730158730159,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.7687423687423688,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.21196581196581196,
+        "unscheduled_us": 0.5567765567765568,
+        "migrations_per_iteration": 0.0002442002442002442,
+        "stops_per_iteration": {
+          "2": 0.0002442002442002442,
+          "3": 0.5755799755799755
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 261.96874236874237,
+          "p50": 275.0,
+          "p95": 302.0
+        },
+        "scheduled_us": 226.67106227106228,
+        "unscheduled_us": 35.2976800976801,
+        "migrations_per_iteration": 0.020757020757020756,
+        "stops_per_iteration": {
+          "12": 0.9997557997557998,
+          "3": 0.6031746031746031,
+          "1": 0.505982905982906
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.1426129426129426,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1426129426129426,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.04371184371184371,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.04371184371184371,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 263.65347985347984,
+          "p50": 277.0,
+          "p95": 304.0
+        },
+        "scheduled_us": 227.7985347985348,
+        "unscheduled_us": 35.854945054945055,
+        "migrations_per_iteration": 0.021001221001221003,
+        "stops_per_iteration": {
+          "3": 1.1816849816849817,
+          "2": 0.0002442002442002442,
+          "12": 0.9997557997557998,
+          "1": 0.5062271062271062
+        }
+      }
+    },
+    "source": {
+      "count": 4095,
+      "elapsed_us": {
+        "mean": 106.92503052503052,
+        "p50": 130.0,
+        "p95": 159.0
+      },
+      "scheduled_us": 106.22075702075702,
+      "fork_delay_us": {
+        "mean": 5.222222222222222,
+        "p50": 6.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.5870573870573871
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 86,
+        "elapsed_us": {
+          "mean": 249.8953488372093,
+          "p50": 238.0,
+          "p95": 308.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 1691,
+        "elapsed_us": {
+          "mean": 226.2903607332939,
+          "p50": 224.0,
+          "p95": 236.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 4009,
+        "elapsed_us": {
+          "mean": 263.9486156148665,
+          "p50": 278.0,
+          "p95": 304.0
+        }
+      },
+      "child_migrated": {
+        "count": 2404,
+        "elapsed_us": {
+          "mean": 289.9351081530782,
+          "p50": 289.0,
+          "p95": 308.0
+        }
+      }
+    }
+  },
+  "release-static-5.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-5.eventlog",
+    "bytes": 10560591,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 0.6281800391389433,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.5655577299412916,
+        "unscheduled_us": 0.06262230919765166,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "3": 0.0019569471624266144
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.46966731898238745,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4657534246575342,
+        "unscheduled_us": 0.003913894324853229,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.015655577299412915
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.7534246575342466,
+          "p50": 1.0,
+          "p95": 2.0
+        },
+        "scheduled_us": 0.20156555772994128,
+        "unscheduled_us": 0.5518590998043053,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.4500978473581213
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.1487279843444227,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.08610567514677103,
+        "unscheduled_us": 0.06262230919765166,
+        "migrations_per_iteration": 0.0019569471624266144,
+        "stops_per_iteration": {
+          "2": 0.0019569471624266144,
+          "3": 0.0410958904109589
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2492.5068493150684,
+          "p50": 2390.0,
+          "p95": 2811.0
+        },
+        "scheduled_us": 2394.9197651663403,
+        "unscheduled_us": 97.58708414872798,
+        "migrations_per_iteration": 0.07045009784735812,
+        "stops_per_iteration": {
+          "1": 4.559686888454012,
+          "12": 0.9941291585127201,
+          "3": 0.6575342465753424
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.21330724070450097,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.21330724070450097,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.0273972602739726,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.0273972602739726,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2494.747553816047,
+          "p50": 2393.0,
+          "p95": 2812.0
+        },
+        "scheduled_us": 2396.4794520547944,
+        "unscheduled_us": 98.26810176125245,
+        "migrations_per_iteration": 0.07436399217221135,
+        "stops_per_iteration": {
+          "3": 1.1663405088062622,
+          "2": 0.0019569471624266144,
+          "1": 4.559686888454012,
+          "12": 0.9941291585127201
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 1128.3972602739725,
+        "p50": 1113.0,
+        "p95": 1415.0
+      },
+      "scheduled_us": 1116.2681017612524,
+      "fork_delay_us": {
+        "mean": 17.322896281800393,
+        "p50": 13.0,
+        "p95": 30.0
+      },
+      "migrations_per_iteration": 0.9178082191780822
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 37,
+        "elapsed_us": {
+          "mean": 2676.2972972972975,
+          "p50": 2742.0,
+          "p95": 3179.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 42,
+        "elapsed_us": {
+          "mean": 2544.1428571428573,
+          "p50": 2444.5,
+          "p95": 2908.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 474,
+        "elapsed_us": {
+          "mean": 2480.5759493670885,
+          "p50": 2385.0,
+          "p95": 2800.0
+        }
+      },
+      "child_migrated": {
+        "count": 469,
+        "elapsed_us": {
+          "mean": 2490.324093816631,
+          "p50": 2392.0,
+          "p95": 2801.0
+        }
+      }
+    }
+  },
+  "release-static-6.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-6.eventlog",
+    "bytes": 56208291,
+    "iterations": 8191,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 1.7453302405078746,
+          "p50": 2.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 1.7359296789158833,
+        "unscheduled_us": 0.00940056159199121,
+        "migrations_per_iteration": 0.00012208521548040532,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "3": 0.001465022585764864,
+          "1": 0.008057624221706751
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.4243682090098889,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.4243682090098889,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.0006104260774020266
+        }
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.1075570748382371,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.1075570748382371,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00012208521548040532
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.11390550604321817,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.07691368575265535,
+        "unscheduled_us": 0.03699182029056281,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.001465022585764864,
+          "1": 0.00012208521548040532
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 280.13734586741543,
+          "p50": 274.0,
+          "p95": 310.0
+        },
+        "scheduled_us": 250.44573312171897,
+        "unscheduled_us": 29.691612745696496,
+        "migrations_per_iteration": 0.330728848736418,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 1.1041386888047857,
+          "1": 0.6153094860212428
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.16640214869979245,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.16640214869979245,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "1": 0.00024417043096081065
+        }
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.05017702356244659,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "scheduled_us": 0.05017702356244659,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 282.7450860700769,
+          "p50": 276.0,
+          "p95": 312.0
+        },
+        "scheduled_us": 253.00708094249785,
+        "unscheduled_us": 29.73800512757905,
+        "migrations_per_iteration": 0.3308509339518984,
+        "stops_per_iteration": {
+          "2": 0.00012208521548040532,
+          "12": 1.0,
+          "3": 1.1070687339763154,
+          "1": 0.6244658771822732
+        }
+      }
+    },
+    "source": {
+      "count": 8191,
+      "elapsed_us": {
+        "mean": 80.30069588572823,
+        "p50": 85.0,
+        "p95": 104.0
+      },
+      "scheduled_us": 79.46380173361005,
+      "fork_delay_us": {
+        "mean": 2.328897570504212,
+        "p50": 1.0,
+        "p95": 6.0
+      },
+      "migrations_per_iteration": 0.3918935416921011
+    },
+    "groups": {
+      "parent_migrated": {
+        "count": 2710,
+        "elapsed_us": {
+          "mean": 294.340221402214,
+          "p50": 285.0,
+          "p95": 328.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 4981,
+        "elapsed_us": {
+          "mean": 283.5735796024895,
+          "p50": 277.0,
+          "p95": 319.0
+        }
+      },
+      "parent_not_migrated": {
+        "count": 5481,
+        "elapsed_us": {
+          "mean": 277.0120415982485,
+          "p50": 272.0,
+          "p95": 298.0
+        }
+      },
+      "child_migrated": {
+        "count": 3210,
+        "elapsed_us": {
+          "mean": 281.4595015576324,
+          "p50": 276.0,
+          "p95": 301.0
+        }
+      }
+    }
+  },
+  "release-static-7.eventlog.json": {
+    "file": "/tmp/shibuya-phase-investigation/release-static-7.eventlog",
+    "bytes": 20513099,
+    "iterations": 511,
+    "incomplete": 0,
+    "anomalies": {},
+    "phases": {
+      "entry_setup": {
+        "elapsed_us": {
+          "mean": 32.10371819960861,
+          "p50": 32.0,
+          "p95": 41.0
+        },
+        "scheduled_us": 28.303326810176124,
+        "unscheduled_us": 3.8003913894324852,
+        "migrations_per_iteration": 0.003913894324853229,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "1": 0.10763209393346379,
+          "3": 0.005870841487279843
+        }
+      },
+      "runtime_setup": {
+        "elapsed_us": {
+          "mean": 0.7045009784735812,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.7045009784735812,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "fork": {
+        "elapsed_us": {
+          "mean": 0.22309197651663404,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.15851272015655576,
+        "unscheduled_us": 0.06457925636007827,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.03718199608610567
+        }
+      },
+      "processor_setup": {
+        "elapsed_us": {
+          "mean": 0.6007827788649707,
+          "p50": 0.0,
+          "p95": 3.0
+        },
+        "scheduled_us": 0.12133072407045009,
+        "unscheduled_us": 0.4794520547945205,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {
+          "3": 0.13307240704500978
+        }
+      },
+      "drain": {
+        "elapsed_us": {
+          "mean": 2757.780821917808,
+          "p50": 2707.0,
+          "p95": 3012.0
+        },
+        "scheduled_us": 2603.113502935421,
+        "unscheduled_us": 154.66731898238748,
+        "migrations_per_iteration": 0.3953033268101761,
+        "stops_per_iteration": {
+          "12": 1.0,
+          "3": 0.9882583170254403,
+          "1": 6.461839530332681
+        }
+      },
+      "join": {
+        "elapsed_us": {
+          "mean": 0.2563600782778865,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.2563600782778865,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "return": {
+        "elapsed_us": {
+          "mean": 0.06262230919765166,
+          "p50": 0.0,
+          "p95": 1.0
+        },
+        "scheduled_us": 0.06262230919765166,
+        "unscheduled_us": 0.0,
+        "migrations_per_iteration": 0.0,
+        "stops_per_iteration": {}
+      },
+      "total": {
+        "elapsed_us": {
+          "mean": 2791.7318982387474,
+          "p50": 2741.0,
+          "p95": 3047.0
+        },
+        "scheduled_us": 2632.720156555773,
+        "unscheduled_us": 159.01174168297456,
+        "migrations_per_iteration": 0.39921722113502933,
+        "stops_per_iteration": {
+          "2": 5.001956947162427,
+          "3": 1.1643835616438356,
+          "12": 1.0,
+          "1": 6.569471624266145
+        }
+      }
+    },
+    "source": {
+      "count": 511,
+      "elapsed_us": {
+        "mean": 928.7886497064579,
+        "p50": 844.0,
+        "p95": 1268.0
+      },
+      "scheduled_us": 923.454011741683,
+      "fork_delay_us": {
+        "mean": 3.183953033268102,
+        "p50": 1.0,
+        "p95": 9.0
+      },
+      "migrations_per_iteration": 0.48336594911937375
+    },
+    "groups": {
+      "parent_not_migrated": {
+        "count": 313,
+        "elapsed_us": {
+          "mean": 2778.6006389776358,
+          "p50": 2722.0,
+          "p95": 3043.0
+        }
+      },
+      "child_migrated": {
+        "count": 247,
+        "elapsed_us": {
+          "mean": 2831.267206477733,
+          "p50": 2886.0,
+          "p95": 3066.0
+        }
+      },
+      "parent_migrated": {
+        "count": 198,
+        "elapsed_us": {
+          "mean": 2812.489898989899,
+          "p50": 2873.0,
+          "p95": 3397.0
+        }
+      },
+      "child_not_migrated": {
+        "count": 264,
+        "elapsed_us": {
+          "mean": 2754.742424242424,
+          "p50": 2676.0,
+          "p95": 3003.0
+        }
+      }
+    }
+  }
+}

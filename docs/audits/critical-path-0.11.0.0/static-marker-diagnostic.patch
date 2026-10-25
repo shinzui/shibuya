@@ -1,0 +1,186 @@
+diff --git a/shibuya-core-bench/bench/Bench/Concurrency.hs b/shibuya-core-bench/bench/Bench/Concurrency.hs
+index c307190..5b95a93 100644
+--- a/shibuya-core-bench/bench/Bench/Concurrency.hs
++++ b/shibuya-core-bench/bench/Bench/Concurrency.hs
+@@ -1,8 +1,11 @@
++{-# LANGUAGE MagicHash, UnboxedTuples #-}
+ -- | Concurrency mode benchmarks.
+ -- Compares Serial, Ahead, and Async processing modes to measure
+ -- throughput gains from concurrent handler execution.
+ module Bench.Concurrency (benchmarks) where
+ 
++import GHC.Exts (Addr#, traceEvent#)
++import GHC.IO (IO (..))
+ import Control.Concurrent (threadDelay)
+ import Control.Concurrent.NQE.Supervisor (Strategy (..))
+ import Control.DeepSeq (NFData)
+@@ -140,7 +143,7 @@ concurrencyLevelBenchmarks =
+ -- For Serial: uses runWithMetrics (simpler, no async overhead).
+ -- For Ahead/Async: uses runSupervised (designed for I/O-bound handlers).
+ runWithConcurrency :: Concurrency -> (forall es. (IOE :> es) => IORef Int -> Handler es BenchMessage) -> Int -> IO Int
+-runWithConcurrency concurrency mkHandler n = do
++runWithConcurrency concurrency mkHandler n = phaseBench $ do
+   -- Create counter to track processed messages
+   counterRef <- newIORef 0
+ 
+@@ -225,3 +228,12 @@ createIngestedMessages n = mapM createMessage [1 .. n]
+           envelope = (mkEnvelope msgId' (BenchMessage i (Text.pack $ "payload-" <> show i))) {enqueuedAt = Just benchTime}
+           ackHandle = AckHandle $ \_ -> pure () -- No-op ack
+       pure $ mkIngested envelope ackHandle
++
++-- Temporary diagnostic markers; workload and RTS are unchanged.
++phaseBench :: IO a -> IO a
++phaseBench action = (mark "bench.begin"# >> action) <* mark "bench.end"#
++
++-- Diagnostic only: static addresses avoid marker string encoding/allocation.
++mark :: Addr# -> IO ()
++mark addr = IO $ \s -> case traceEvent# addr s of s' -> (# s', () #)
++{-# INLINE mark #-}
+diff --git a/shibuya-core-bench/bench/Bench/Framework.hs b/shibuya-core-bench/bench/Bench/Framework.hs
+index 212e456..9b38544 100644
+--- a/shibuya-core-bench/bench/Bench/Framework.hs
++++ b/shibuya-core-bench/bench/Bench/Framework.hs
+@@ -1,7 +1,10 @@
++{-# LANGUAGE MagicHash, UnboxedTuples #-}
+ -- | Framework overhead benchmarks.
+ -- Measures the overhead of running messages through shibuya vs pure streamly.
+ module Bench.Framework (benchmarks) where
+ 
++import GHC.Exts (Addr#, traceEvent#)
++import GHC.IO (IO (..))
+ import Control.DeepSeq (NFData, deepseq)
+ import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+ import Data.Text (Text)
+@@ -131,7 +134,7 @@ setupMessages n = pure [BenchMessage i (Text.pack $ "payload-" <> show i) | i <-
+ 
+ -- | Run pre-created messages through shibuya
+ runShibuyaWithMessages :: [BenchMessage] -> IO Int
+-runShibuyaWithMessages payloads = do
++runShibuyaWithMessages payloads = phaseBench $ do
+   -- Create counter for processed messages
+   counterRef <- newIORef (0 :: Int)
+ 
+@@ -177,3 +180,12 @@ streamlyBaseline n = do
+     processMsg ref msg = do
+       atomicModifyIORef' ref (\c -> (c + 1, ()))
+       msg `deepseq` pure ()
++
++-- Temporary diagnostic markers; workload and RTS are unchanged.
++phaseBench :: IO a -> IO a
++phaseBench action = (mark "bench.begin"# >> action) <* mark "bench.end"#
++
++-- Diagnostic only: static addresses avoid marker string encoding/allocation.
++mark :: Addr# -> IO ()
++mark addr = IO $ \s -> case traceEvent# addr s of s' -> (# s', () #)
++{-# INLINE mark #-}
+diff --git a/shibuya-core-bench/bench/Bench/Handler.hs b/shibuya-core-bench/bench/Bench/Handler.hs
+index a10ea71..e428bf5 100644
+--- a/shibuya-core-bench/bench/Bench/Handler.hs
++++ b/shibuya-core-bench/bench/Bench/Handler.hs
+@@ -1,7 +1,10 @@
++{-# LANGUAGE MagicHash, UnboxedTuples #-}
+ -- | Handler overhead benchmarks.
+ -- Measures the overhead of different handler patterns.
+ module Bench.Handler (benchmarks) where
+ 
++import GHC.Exts (Addr#, traceEvent#)
++import GHC.IO (IO (..))
+ import Control.DeepSeq (NFData)
+ import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+ import Data.Text (Text)
+@@ -95,7 +98,7 @@ runWithHandler handler n = runEff $ runTracingNoop $ do
+ 
+ -- | Run with counting handler (includes IO overhead)
+ runCountingHandler :: Int -> IO Int
+-runCountingHandler n = do
++runCountingHandler n = phaseBench $ do
+   counterRef <- newIORef (0 :: Int)
+   runEff $ runTracingNoop $ do
+     msgs <- createIngestedMessages n
+@@ -125,3 +128,12 @@ createIngestedMessages n = do
+       let msgId' = MessageId $ Text.pack $ show i
+           envelope = (mkEnvelope msgId' (BenchMessage i (Text.pack $ "payload-" <> show i))) {enqueuedAt = Just now}
+        in mkIngested envelope (trackingAckHandle tracking msgId')
++
++-- Temporary diagnostic markers; workload and RTS are unchanged.
++phaseBench :: IO a -> IO a
++phaseBench action = (mark "bench.begin"# >> action) <* mark "bench.end"#
++
++-- Diagnostic only: static addresses avoid marker string encoding/allocation.
++mark :: Addr# -> IO ()
++mark addr = IO $ \s -> case traceEvent# addr s of s' -> (# s', () #)
++{-# INLINE mark #-}
+diff --git a/shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs b/shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs
+index 693fcfd..96b2e2f 100644
+--- a/shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs
++++ b/shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs
+@@ -1,3 +1,4 @@
++{-# LANGUAGE MagicHash, UnboxedTuples #-}
+ -- | __Internal module.__ Exposed for the test suite and benchmarks only.
+ -- No PVP guarantees: anything here may change or disappear in any release.
+ -- Application authors should import "Shibuya" instead.
+@@ -142,6 +143,8 @@ import Streamly.Data.Stream qualified as Stream
+ import Streamly.Data.Stream.Prelude qualified as StreamP
+ import UnliftIO (Async, SomeException, catchAny, displayException, finally)
+ import UnliftIO qualified as UIO
++import GHC.Exts (Addr#, traceEvent#)
++import GHC.IO (IO (..))
+ 
+ -- | Handle for a supervised processor.
+ -- Provides introspection into the running processor.
+@@ -272,6 +275,7 @@ runWithMetrics ::
+   Handler es msg ->
+   Eff es SupervisedProcessor
+ runWithMetrics inboxSize procId adapter handler = do
++  liftIO $ mark "runtime.begin"#
+   now <- liftIO getCurrentTime
+ 
+   -- Initialize state
+@@ -280,6 +284,7 @@ runWithMetrics inboxSize procId adapter handler = do
+ 
+   runIngesterAndProcessor metricsHandle Nothing procId inboxSize Unordered Serial adapter handler
+     `finally` liftIO (atomically (writeTVar doneVar True))
++  liftIO $ mark "runtime.end"#
+ 
+   pure
+     SupervisedProcessor
+@@ -321,10 +326,12 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
+           Nothing -> runIngesterWithMetricsUnpaused procId metricsHandle adapter.source inbox
+           Just pause -> runIngesterWithMetrics procId metricsHandle pause adapter.source inbox
+         ingesterWithSignal =
+-          unsafeUnmask (runInIO ingest)
+-            `finally` atomically (writeTVar streamDoneVar True)
++          (mark "source.begin"# >> unsafeUnmask (runInIO ingest))
++            `finally` (mark "source.end"# >> atomically (writeTVar streamDoneVar True))
+ 
++    mark "runtime.fork"#
+     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
++      mark "process.begin"#
+       -- Processor: process messages, exit when stream done and inbox empty
+       -- Saturated literal arguments plus INLINE on the loop and worker erase
+       -- the detail ownership action from the basic specialization. Selecting a
+@@ -332,6 +339,7 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
+       case Metrics.metricsDetailLevel metricsHandle of
+         Metrics.MetricsBasic -> runInIO $ processUntilDrained False metricsHandle procId ordering concurrency handler inbox streamDoneVar
+         Metrics.MetricsDetailed _ -> runInIO $ processUntilDrained True metricsHandle procId ordering concurrency handler inbox streamDoneVar
++      mark "process.end"#
+       UIO.waitCatch ingesterAsync >>= \case
+         Left ingesterErr -> do
+           now <- getCurrentTime
+@@ -634,6 +642,7 @@ processUntilDrained detailed metricsHandle procId ordering concurrency handler i
+             processAction
+             inboxStream
+ 
++    mark "process.ready"#
+     case (ordering, concurrency) of
+       (_, Serial) ->
+         -- Unmask the serial region once. Unmasking each message is measurable
+@@ -848,3 +857,8 @@ concurrencyBound :: Concurrency -> Int
+ concurrencyBound Serial = 1
+ concurrencyBound (Ahead n) = n
+ concurrencyBound (Async n) = n
++
++-- Diagnostic only: static addresses avoid marker string encoding/allocation.
++mark :: Addr# -> IO ()
++mark addr = IO $ \s -> case traceEvent# addr s of s' -> (# s', () #)
++{-# INLINE mark #-}
