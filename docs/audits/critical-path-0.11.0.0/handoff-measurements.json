@@ -1,0 +1,3552 @@
+[
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 4.896289110183716,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "37872937",
+        "2*Stdev (ps)": "1961772",
+        "Allocated": "311222",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 3.1450917720794678,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "46815002",
+        "2*Stdev (ps)": "2609200",
+        "Allocated": "307244",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 4.6793341636657715,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "376088281",
+        "2*Stdev (ps)": "22168298",
+        "Allocated": "3109915",
+        "Copied": "460",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 4.424633979797363,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "357204150",
+        "2*Stdev (ps)": "12925738",
+        "Allocated": "3063929",
+        "Copied": "445",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.911874771118164,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3819017968",
+        "2*Stdev (ps)": "143489180",
+        "Allocated": "31765005",
+        "Copied": "23967",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 1.4389781951904297,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3701085937",
+        "2*Stdev (ps)": "212671026",
+        "Allocated": "31347859",
+        "Copied": "15890",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 42.79300093650818,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "51573818",
+        "2*Stdev (ps)": "1219692",
+        "Allocated": "232336",
+        "Copied": "204",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 2.502397060394287,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "46678259",
+        "2*Stdev (ps)": "1901476",
+        "Allocated": "226935",
+        "Copied": "205",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 4.153714895248413,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "335763281",
+        "2*Stdev (ps)": "14872034",
+        "Allocated": "2261262",
+        "Copied": "396",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 3.786223888397217,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "292054687",
+        "2*Stdev (ps)": "9931286",
+        "Allocated": "2219955",
+        "Copied": "370",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 5.185927867889404,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3780007421",
+        "2*Stdev (ps)": "149227838",
+        "Allocated": "22930533",
+        "Copied": "14442",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 2.3407950401306152,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3454904687",
+        "2*Stdev (ps)": "134370216",
+        "Allocated": "22519403",
+        "Copied": "12968",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 4.787467956542969,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "379872314",
+        "2*Stdev (ps)": "21337634",
+        "Allocated": "2898946",
+        "Copied": "297",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.237842082977295,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "362792968",
+        "2*Stdev (ps)": "16239880",
+        "Allocated": "2831927",
+        "Copied": "306",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 2.8571789264678955,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3784864062",
+        "2*Stdev (ps)": "110783192",
+        "Allocated": "29609605",
+        "Copied": "7186",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "single-transaction",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 2.626397132873535,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3076532031",
+        "2*Stdev (ps)": "121453428",
+        "Allocated": "29195834",
+        "Copied": "7218",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 38.553688049316406,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "42380178",
+        "2*Stdev (ps)": "2006326",
+        "Allocated": "311203",
+        "Copied": "206",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 47.32404017448425,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "53533315",
+        "2*Stdev (ps)": "5244182",
+        "Allocated": "307204",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 4.672184944152832,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "372630322",
+        "2*Stdev (ps)": "15583034",
+        "Allocated": "3109209",
+        "Copied": "437",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 2.1970179080963135,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "337745117",
+        "2*Stdev (ps)": "16283552",
+        "Allocated": "3063230",
+        "Copied": "460",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.9531781673431396,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3849476562",
+        "2*Stdev (ps)": "201106362",
+        "Allocated": "31762526",
+        "Copied": "24346",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 10.929898023605347,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3834328906",
+        "2*Stdev (ps)": "94079066",
+        "Allocated": "31349637",
+        "Copied": "19879",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 2.4729011058807373,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "45681567",
+        "2*Stdev (ps)": "2630054",
+        "Allocated": "232164",
+        "Copied": "207",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 2.2960500717163086,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "40048828",
+        "2*Stdev (ps)": "2083210",
+        "Allocated": "226900",
+        "Copied": "204",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 3.977699041366577,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "319949267",
+        "2*Stdev (ps)": "13457460",
+        "Allocated": "2261306",
+        "Copied": "400",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.8747358322143555,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "295074414",
+        "2*Stdev (ps)": "13196294",
+        "Allocated": "2219888",
+        "Copied": "375",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.6585350036621094,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3805732812",
+        "2*Stdev (ps)": "140257362",
+        "Allocated": "22931160",
+        "Copied": "15746",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 2.4069058895111084,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3479893750",
+        "2*Stdev (ps)": "110101890",
+        "Allocated": "22519991",
+        "Copied": "16201",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 4.822283983230591,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "381271093",
+        "2*Stdev (ps)": "18172638",
+        "Allocated": "2897092",
+        "Copied": "292",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.221745014190674,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "357345898",
+        "2*Stdev (ps)": "20497580",
+        "Allocated": "2831672",
+        "Copied": "271",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 2.8999040126800537,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3842221875",
+        "2*Stdev (ps)": "155902852",
+        "Allocated": "29614035",
+        "Copied": "7337",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "serial-ingester-placement",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 5.108658790588379,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/placement/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/placement/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/placement/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3424546093",
+        "2*Stdev (ps)": "169698342",
+        "Allocated": "29196961",
+        "Copied": "8567",
+        "Peak Memory": "1275068416"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 38.78936576843262,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "42371518",
+        "2*Stdev (ps)": "2430792",
+        "Allocated": "311198",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 3.2214860916137695,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "48000769",
+        "2*Stdev (ps)": "2675474",
+        "Allocated": "308042",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 4.69938588142395,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "377978906",
+        "2*Stdev (ps)": "20186626",
+        "Allocated": "3111780",
+        "Copied": "450",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 2.2536330223083496,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "348438183",
+        "2*Stdev (ps)": "20347780",
+        "Allocated": "3064061",
+        "Copied": "442",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.9155256748199463,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3821189843",
+        "2*Stdev (ps)": "167037770",
+        "Allocated": "31763274",
+        "Copied": "21173",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 2.7469820976257324,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3587995312",
+        "2*Stdev (ps)": "121051636",
+        "Allocated": "31348425",
+        "Copied": "21536",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 2.4885220527648926,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "46086645",
+        "2*Stdev (ps)": "2615150",
+        "Allocated": "232279",
+        "Copied": "206",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 21.62431526184082,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "53663092",
+        "2*Stdev (ps)": "3005820",
+        "Allocated": "227822",
+        "Copied": "204",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 2.020832061767578,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "320520800",
+        "2*Stdev (ps)": "14274148",
+        "Allocated": "2261368",
+        "Copied": "406",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.9085280895233154,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "297954296",
+        "2*Stdev (ps)": "13721682",
+        "Allocated": "2220524",
+        "Copied": "404",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.6700212955474854,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3806637500",
+        "2*Stdev (ps)": "128497042",
+        "Allocated": "22930192",
+        "Copied": "16299",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 4.665039777755737,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3350776562",
+        "2*Stdev (ps)": "61673548",
+        "Allocated": "22518483",
+        "Copied": "11944",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 2.3871190547943115,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "371680371",
+        "2*Stdev (ps)": "21013798",
+        "Allocated": "2895282",
+        "Copied": "321",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.215399980545044,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "355483496",
+        "2*Stdev (ps)": "15978714",
+        "Allocated": "2832553",
+        "Copied": "280",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 2.8636200428009033,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3788696875",
+        "2*Stdev (ps)": "123975992",
+        "Allocated": "29613344",
+        "Copied": "7991",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "provider-rollback-combination",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 2.606292963027954,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/combined/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/combined/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/combined/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3096772656",
+        "2*Stdev (ps)": "119531808",
+        "Allocated": "29194664",
+        "Copied": "6080",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 4.970361948013306,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "38082781",
+        "2*Stdev (ps)": "2181722",
+        "Allocated": "311251",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 48.32832598686218,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "55847909",
+        "2*Stdev (ps)": "3483452",
+        "Allocated": "303168",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 2.369662046432495,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "369652929",
+        "2*Stdev (ps)": "15950326",
+        "Allocated": "3112516",
+        "Copied": "446",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 4.216310024261475,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "330909814",
+        "2*Stdev (ps)": "12550368",
+        "Allocated": "3023428",
+        "Copied": "432",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.9302310943603516,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3811098437",
+        "2*Stdev (ps)": "133248688",
+        "Allocated": "31762493",
+        "Copied": "21968",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 2.6564087867736816,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3535714062",
+        "2*Stdev (ps)": "118518590",
+        "Allocated": "30948088",
+        "Copied": "20388",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 4.943164348602295,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "46867962",
+        "2*Stdev (ps)": "1699460",
+        "Allocated": "232389",
+        "Copied": "205",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 33.294716119766235,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "38367232",
+        "2*Stdev (ps)": "2151764",
+        "Allocated": "222124",
+        "Copied": "204",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 2.032196044921875,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "319648242",
+        "2*Stdev (ps)": "17824780",
+        "Allocated": "2261245",
+        "Copied": "386",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.7963180541992188,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "287043359",
+        "2*Stdev (ps)": "15480840",
+        "Allocated": "2180158",
+        "Copied": "332",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.6327579021453857,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3748614843",
+        "2*Stdev (ps)": "148579728",
+        "Allocated": "22931313",
+        "Copied": "15288",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 4.595430135726929,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3238886328",
+        "2*Stdev (ps)": "89690782",
+        "Allocated": "22121318",
+        "Copied": "16320",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 2.398776054382324,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "371694824",
+        "2*Stdev (ps)": "17207240",
+        "Allocated": "2899489",
+        "Copied": "299",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.0649189949035645,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "320589062",
+        "2*Stdev (ps)": "15958624",
+        "Allocated": "2791235",
+        "Copied": "308",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 2.899089813232422,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3821696875",
+        "2*Stdev (ps)": "104986884",
+        "Allocated": "29612621",
+        "Copied": "7024",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "concrete-queue",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 4.983673095703125,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/concrete/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/concrete/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3247376562",
+        "2*Stdev (ps)": "66895118",
+        "Allocated": "28796272",
+        "Copied": "7413",
+        "Peak Memory": "1275068416"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "release",
+    "seconds": 4.94020676612854,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "37882171",
+        "2*Stdev (ps)": "1754024",
+        "Allocated": "311235",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "variant": "candidate",
+    "seconds": 47.38422203063965,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "54558077",
+        "2*Stdev (ps)": "3437400",
+        "Allocated": "307196",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "release",
+    "seconds": 4.672033071517944,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-1.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "375738818",
+        "2*Stdev (ps)": "17588944",
+        "Allocated": "3109315",
+        "Copied": "452",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-1000",
+    "variant": "candidate",
+    "seconds": 2.242525339126587,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-1.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-1.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "353887011",
+        "2*Stdev (ps)": "20528152",
+        "Allocated": "3063896",
+        "Copied": "433",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "release",
+    "seconds": 2.928438901901245,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-2.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3829692968",
+        "2*Stdev (ps)": "227942672",
+        "Allocated": "31762637",
+        "Copied": "23379",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.handler-overhead.io-handler.counter-10000",
+    "variant": "candidate",
+    "seconds": 2.7934162616729736,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-2.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-2.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "3704317187",
+        "2*Stdev (ps)": "118902914",
+        "Allocated": "31347819",
+        "Copied": "22361",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "release",
+    "seconds": 2.471719980239868,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-3.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "45470312",
+        "2*Stdev (ps)": "2382044",
+        "Allocated": "232199",
+        "Copied": "206",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-100",
+    "variant": "candidate",
+    "seconds": 2.4784557819366455,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-3.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-3.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "46202990",
+        "2*Stdev (ps)": "1783340",
+        "Allocated": "226947",
+        "Copied": "206",
+        "Peak Memory": "1269825536"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "release",
+    "seconds": 2.0085129737854004,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "314309375",
+        "2*Stdev (ps)": "15621466",
+        "Allocated": "2261355",
+        "Copied": "396",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "variant": "candidate",
+    "seconds": 1.8931148052215576,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "287509375",
+        "2*Stdev (ps)": "14961564",
+        "Allocated": "2219927",
+        "Copied": "384",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "release",
+    "seconds": 2.6669321060180664,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-5.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3825479687",
+        "2*Stdev (ps)": "158439390",
+        "Allocated": "22930773",
+        "Copied": "14007",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.framework-overhead.processing.runWithMetrics-10000",
+    "variant": "candidate",
+    "seconds": 2.356384038925171,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-10000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-5.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-5.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3449817187",
+        "2*Stdev (ps)": "141267088",
+        "Allocated": "22519338",
+        "Copied": "15680",
+        "Peak Memory": "1270874112"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "release",
+    "seconds": 2.3951427936553955,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-6.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "370970019",
+        "2*Stdev (ps)": "19846850",
+        "Allocated": "2898208",
+        "Copied": "289",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+    "variant": "candidate",
+    "seconds": 2.252664089202881,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.1000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-6.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-6.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "364187890",
+        "2*Stdev (ps)": "20042942",
+        "Allocated": "2831898",
+        "Copied": "292",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "release",
+    "seconds": 1.4790489673614502,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/release-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-7.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3726367187",
+        "2*Stdev (ps)": "218296136",
+        "Allocated": "29613286",
+        "Copied": "7168",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "unpaused-io-fold",
+    "case": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+    "variant": "candidate",
+    "seconds": 2.624255895614624,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-bench",
+      "-p",
+      "$0==\"All.concurrency-modes.cpu-bound-serial.10000-msgs\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/io-fold/candidate-7.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/io-fold/release-7.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3109118750",
+        "2*Stdev (ps)": "108952412",
+        "Allocated": "29195525",
+        "Copied": "5534",
+        "Peak Memory": "1274019840"
+      }
+    ]
+  },
+  {
+    "experiment": "full-release-comparison",
+    "variant": "release",
+    "seconds": 112.76858305931091,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/release-bench",
+      "--stdev",
+      "5",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/full-release.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.baseline-streamly.stream-creation.100-msgs",
+        "Mean (ps)": "838832",
+        "2*Stdev (ps)": "72430",
+        "Allocated": "5642",
+        "Copied": "0",
+        "Peak Memory": "1268776960"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-creation.1000-msgs",
+        "Mean (ps)": "8396237",
+        "2*Stdev (ps)": "547510",
+        "Allocated": "55993",
+        "Copied": "0",
+        "Peak Memory": "1268776960"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-creation.10000-msgs",
+        "Mean (ps)": "82396875",
+        "2*Stdev (ps)": "7815536",
+        "Allocated": "559508",
+        "Copied": "7",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-100",
+        "Mean (ps)": "880602",
+        "2*Stdev (ps)": "58344",
+        "Allocated": "5642",
+        "Copied": "0",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-1000",
+        "Mean (ps)": "8645239",
+        "2*Stdev (ps)": "515220",
+        "Allocated": "55993",
+        "Copied": "0",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-10000",
+        "Mean (ps)": "83375390",
+        "2*Stdev (ps)": "6664748",
+        "Allocated": "559507",
+        "Copied": "7",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-100",
+        "Mean (ps)": "898129",
+        "2*Stdev (ps)": "51754",
+        "Allocated": "5682",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-1000",
+        "Mean (ps)": "8556803",
+        "2*Stdev (ps)": "584920",
+        "Allocated": "56033",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-10000",
+        "Mean (ps)": "84240380",
+        "2*Stdev (ps)": "8152912",
+        "Allocated": "559547",
+        "Copied": "6",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-100",
+        "Mean (ps)": "6203886",
+        "2*Stdev (ps)": "331724",
+        "Allocated": "94883",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-1000",
+        "Mean (ps)": "63195996",
+        "2*Stdev (ps)": "3344166",
+        "Allocated": "986857",
+        "Copied": "10",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-10000",
+        "Mean (ps)": "663101367",
+        "2*Stdev (ps)": "52427932",
+        "Allocated": "10265885",
+        "Copied": "112",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-100",
+        "Mean (ps)": "8494052",
+        "2*Stdev (ps)": "483174",
+        "Allocated": "135267",
+        "Copied": "3",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-1000",
+        "Mean (ps)": "99542504",
+        "2*Stdev (ps)": "3731656",
+        "Allocated": "1422884",
+        "Copied": "226",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-10000",
+        "Mean (ps)": "1760982031",
+        "2*Stdev (ps)": "138115630",
+        "Allocated": "15017797",
+        "Copied": "14653",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "45669458",
+        "2*Stdev (ps)": "2138294",
+        "Allocated": "232120",
+        "Copied": "205",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "340761816",
+        "2*Stdev (ps)": "15096952",
+        "Allocated": "2261127",
+        "Copied": "394",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3941331250",
+        "2*Stdev (ps)": "336744848",
+        "Allocated": "22929920",
+        "Copied": "15374",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.100-msgs.streamly-baseline",
+        "Mean (ps)": "7394696",
+        "2*Stdev (ps)": "488142",
+        "Allocated": "98800",
+        "Copied": "1",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.100-msgs.shibuya-framework",
+        "Mean (ps)": "65267626",
+        "2*Stdev (ps)": "5281836",
+        "Allocated": "322665",
+        "Copied": "210",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.1000-msgs.streamly-baseline",
+        "Mean (ps)": "81056298",
+        "2*Stdev (ps)": "7554152",
+        "Allocated": "1026742",
+        "Copied": "12",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.1000-msgs.shibuya-framework",
+        "Mean (ps)": "479264453",
+        "2*Stdev (ps)": "29227854",
+        "Allocated": "3196277",
+        "Copied": "524",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.10000-msgs.streamly-baseline",
+        "Mean (ps)": "838204296",
+        "2*Stdev (ps)": "64620616",
+        "Allocated": "10665439",
+        "Copied": "116",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.10000-msgs.shibuya-framework",
+        "Mean (ps)": "4887209375",
+        "2*Stdev (ps)": "386434472",
+        "Allocated": "32631933",
+        "Copied": "25519",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.100-msgs",
+        "Mean (ps)": "55138256",
+        "2*Stdev (ps)": "5085306",
+        "Allocated": "303966",
+        "Copied": "206",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.1000-msgs",
+        "Mean (ps)": "433418652",
+        "2*Stdev (ps)": "25824400",
+        "Allocated": "3014755",
+        "Copied": "452",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.10000-msgs",
+        "Mean (ps)": "4643109375",
+        "2*Stdev (ps)": "245827722",
+        "Allocated": "30804059",
+        "Copied": "23968",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.light-100",
+        "Mean (ps)": "56678320",
+        "2*Stdev (ps)": "3377248",
+        "Allocated": "304007",
+        "Copied": "207",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.light-1000",
+        "Mean (ps)": "428992578",
+        "2*Stdev (ps)": "13102834",
+        "Allocated": "3014803",
+        "Copied": "435",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.medium-100",
+        "Mean (ps)": "57775561",
+        "2*Stdev (ps)": "4519738",
+        "Allocated": "303961",
+        "Copied": "206",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.medium-1000",
+        "Mean (ps)": "435038476",
+        "2*Stdev (ps)": "26877362",
+        "Allocated": "3014463",
+        "Copied": "459",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "41915075",
+        "2*Stdev (ps)": "2544182",
+        "Allocated": "311166",
+        "Copied": "206",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "421056054",
+        "2*Stdev (ps)": "38979206",
+        "Allocated": "3108114",
+        "Copied": "405",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "4465714062",
+        "2*Stdev (ps)": "281367228",
+        "Allocated": "31759562",
+        "Copied": "18415",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "423563476",
+        "2*Stdev (ps)": "34200484",
+        "Allocated": "2888394",
+        "Copied": "301",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "4256212500",
+        "2*Stdev (ps)": "242250014",
+        "Allocated": "29607580",
+        "Copied": "6515",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.serial",
+        "Mean (ps)": "128708099993",
+        "2*Stdev (ps)": "7265208450",
+        "Allocated": "919629",
+        "Copied": "1985",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.ahead-5",
+        "Mean (ps)": "27403500000",
+        "2*Stdev (ps)": "1957118496",
+        "Allocated": "2201630",
+        "Copied": "10781",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.async-5",
+        "Mean (ps)": "27161387499",
+        "2*Stdev (ps)": "1943254868",
+        "Allocated": "1300214",
+        "Copied": "9183",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.async-10",
+        "Mean (ps)": "14478043748",
+        "2*Stdev (ps)": "856441988",
+        "Allocated": "1620802",
+        "Copied": "9286",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.serial",
+        "Mean (ps)": "304556900018",
+        "2*Stdev (ps)": "22026164120",
+        "Allocated": "471030",
+        "Copied": "4878",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.ahead-5",
+        "Mean (ps)": "54821074998",
+        "2*Stdev (ps)": "5200087906",
+        "Allocated": "1437367",
+        "Copied": "8065",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.async-5",
+        "Mean (ps)": "55036750000",
+        "2*Stdev (ps)": "3860571362",
+        "Allocated": "935018",
+        "Copied": "7675",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.async-10",
+        "Mean (ps)": "28416087497",
+        "2*Stdev (ps)": "2381188774",
+        "Allocated": "1117035",
+        "Copied": "7764",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-2",
+        "Mean (ps)": "66603000000",
+        "2*Stdev (ps)": "5387805790",
+        "Allocated": "1835340",
+        "Copied": "9032",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-5",
+        "Mean (ps)": "27334987499",
+        "2*Stdev (ps)": "1844588364",
+        "Allocated": "2222480",
+        "Copied": "10947",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-10",
+        "Mean (ps)": "14647328125",
+        "2*Stdev (ps)": "1261282096",
+        "Allocated": "2498744",
+        "Copied": "12547",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-20",
+        "Mean (ps)": "9085349999",
+        "2*Stdev (ps)": "587121572",
+        "Allocated": "2676013",
+        "Copied": "13890",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-2",
+        "Mean (ps)": "66077725001",
+        "2*Stdev (ps)": "3447793228",
+        "Allocated": "1165320",
+        "Copied": "11776",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-5",
+        "Mean (ps)": "27219812499",
+        "2*Stdev (ps)": "1948453722",
+        "Allocated": "1287530",
+        "Copied": "8973",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-10",
+        "Mean (ps)": "14740731248",
+        "2*Stdev (ps)": "951754384",
+        "Allocated": "1634816",
+        "Copied": "9335",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-20",
+        "Mean (ps)": "8543575000",
+        "2*Stdev (ps)": "851913946",
+        "Allocated": "1962546",
+        "Copied": "11628",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.hot-path.serial-noop-10000",
+        "Mean (ps)": "9065446875",
+        "2*Stdev (ps)": "860131498",
+        "Allocated": "20344120",
+        "Copied": "912",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.hot-path.async8-noop-10000",
+        "Mean (ps)": "35009137500",
+        "2*Stdev (ps)": "3245540864",
+        "Allocated": "38471739",
+        "Copied": "105423",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.lifecycle.serial-small-inbox",
+        "Mean (ps)": "107578300000",
+        "2*Stdev (ps)": "7153628672",
+        "Allocated": "207491880",
+        "Copied": "10929901",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.lifecycle.ahead-uniform-keys",
+        "Mean (ps)": "904721400000",
+        "2*Stdev (ps)": "33957822732",
+        "Allocated": "465504292",
+        "Copied": "18948972",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.lifecycle.async-hot-key",
+        "Mean (ps)": "776269200000",
+        "2*Stdev (ps)": "35112528236",
+        "Allocated": "480838968",
+        "Copied": "18958859",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.lifecycle.batch-size",
+        "Mean (ps)": "169161400000",
+        "2*Stdev (ps)": "13212702072",
+        "Allocated": "229617781",
+        "Copied": "11042718",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.lifecycle.startup-shutdown",
+        "Mean (ps)": "28801900000",
+        "2*Stdev (ps)": "2580646052",
+        "Allocated": "4300876",
+        "Copied": "9014439",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.dead-letter-reason.validate-application-code",
+        "Mean (ps)": "167785",
+        "2*Stdev (ps)": "13762",
+        "Allocated": "615",
+        "Copied": "0",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.dead-letter-reason.render-poison-pill",
+        "Mean (ps)": "25086",
+        "2*Stdev (ps)": "2036",
+        "Allocated": "183",
+        "Copied": "0",
+        "Peak Memory": "1288699904"
+      },
+      {
+        "Name": "All.dead-letter-reason.render-application-failure",
+        "Mean (ps)": "24145",
+        "2*Stdev (ps)": "2030",
+        "Allocated": "215",
+        "Copied": "0",
+        "Peak Memory": "1288699904"
+      }
+    ]
+  },
+  {
+    "experiment": "full-release-comparison",
+    "variant": "candidate",
+    "seconds": 110.80586791038513,
+    "code": 1,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "--stdev",
+      "5",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/full-candidate.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/full-release.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.baseline-streamly.stream-creation.100-msgs",
+        "Mean (ps)": "833772",
+        "2*Stdev (ps)": "68528",
+        "Allocated": "5642",
+        "Copied": "0",
+        "Peak Memory": "1268776960"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-creation.1000-msgs",
+        "Mean (ps)": "8257421",
+        "2*Stdev (ps)": "420230",
+        "Allocated": "55993",
+        "Copied": "0",
+        "Peak Memory": "1268776960"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-creation.10000-msgs",
+        "Mean (ps)": "79845141",
+        "2*Stdev (ps)": "6865864",
+        "Allocated": "559505",
+        "Copied": "6",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-100",
+        "Mean (ps)": "846081",
+        "2*Stdev (ps)": "78778",
+        "Allocated": "5642",
+        "Copied": "0",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-1000",
+        "Mean (ps)": "8381015",
+        "2*Stdev (ps)": "700926",
+        "Allocated": "55993",
+        "Copied": "0",
+        "Peak Memory": "1269825536"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-consumption.fold-10000",
+        "Mean (ps)": "81862719",
+        "2*Stdev (ps)": "3729036",
+        "Allocated": "559505",
+        "Copied": "6",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-100",
+        "Mean (ps)": "856361",
+        "2*Stdev (ps)": "64300",
+        "Allocated": "5682",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-1000",
+        "Mean (ps)": "8411584",
+        "2*Stdev (ps)": "698852",
+        "Allocated": "56033",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.map-10000",
+        "Mean (ps)": "82593457",
+        "2*Stdev (ps)": "6637670",
+        "Allocated": "559547",
+        "Copied": "6",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-100",
+        "Mean (ps)": "6033026",
+        "2*Stdev (ps)": "222848",
+        "Allocated": "94883",
+        "Copied": "0",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-1000",
+        "Mean (ps)": "61941162",
+        "2*Stdev (ps)": "5560144",
+        "Allocated": "986857",
+        "Copied": "10",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.baseline-streamly.stream-transform.filter-map-10000",
+        "Mean (ps)": "650542578",
+        "2*Stdev (ps)": "60649850",
+        "Allocated": "10265902",
+        "Copied": "117",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-100",
+        "Mean (ps)": "8430255",
+        "2*Stdev (ps)": "505066",
+        "Allocated": "135267",
+        "Copied": "3",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-1000",
+        "Mean (ps)": "99589916",
+        "2*Stdev (ps)": "4743892",
+        "Allocated": "1422884",
+        "Copied": "224",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.adapter-creation.mock-adapter-10000",
+        "Mean (ps)": "1758344531",
+        "2*Stdev (ps)": "131082496",
+        "Allocated": "15017810",
+        "Copied": "14650",
+        "Peak Memory": "1271922688"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-100",
+        "Mean (ps)": "46352954",
+        "2*Stdev (ps)": "3741264",
+        "Allocated": "226947",
+        "Copied": "207",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "299897363",
+        "2*Stdev (ps)": "15743316",
+        "Allocated": "2219855",
+        "Copied": "394",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-10000",
+        "Mean (ps)": "3530189062",
+        "2*Stdev (ps)": "305488812",
+        "Allocated": "22519505",
+        "Copied": "16654",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.100-msgs.streamly-baseline",
+        "Mean (ps)": "6830798",
+        "2*Stdev (ps)": "639156",
+        "Allocated": "98800",
+        "Copied": "1",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.100-msgs.shibuya-framework",
+        "Mean (ps)": "61707617",
+        "2*Stdev (ps)": "3914428",
+        "Allocated": "316481",
+        "Copied": "208",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.1000-msgs.streamly-baseline",
+        "Mean (ps)": "75436108",
+        "2*Stdev (ps)": "3775984",
+        "Allocated": "1026739",
+        "Copied": "11",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.1000-msgs.shibuya-framework",
+        "Mean (ps)": "414514843",
+        "2*Stdev (ps)": "32093688",
+        "Allocated": "3151733",
+        "Copied": "544",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.10000-msgs.streamly-baseline",
+        "Mean (ps)": "777839453",
+        "2*Stdev (ps)": "65113250",
+        "Allocated": "10665434",
+        "Copied": "121",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.framework-overhead.comparison.10000-msgs.shibuya-framework",
+        "Mean (ps)": "4200287500",
+        "2*Stdev (ps)": "341992620",
+        "Allocated": "32225583",
+        "Copied": "25616",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.100-msgs",
+        "Mean (ps)": "55368505",
+        "2*Stdev (ps)": "3907332",
+        "Allocated": "298194",
+        "Copied": "206",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.1000-msgs",
+        "Mean (ps)": "376930078",
+        "2*Stdev (ps)": "18778602",
+        "Allocated": "2968215",
+        "Copied": "453",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.noop-handler.10000-msgs",
+        "Mean (ps)": "3956292187",
+        "2*Stdev (ps)": "302679750",
+        "Allocated": "30386168",
+        "Copied": "23008",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.light-100",
+        "Mean (ps)": "56572851",
+        "2*Stdev (ps)": "3630006",
+        "Allocated": "298202",
+        "Copied": "206",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.light-1000",
+        "Mean (ps)": "404433203",
+        "2*Stdev (ps)": "15576920",
+        "Allocated": "2968030",
+        "Copied": "431",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.medium-100",
+        "Mean (ps)": "57039233",
+        "2*Stdev (ps)": "3791270",
+        "Allocated": "298156",
+        "Copied": "207",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.compute-handler.medium-1000",
+        "Mean (ps)": "416393261",
+        "2*Stdev (ps)": "13450908",
+        "Allocated": "2968052",
+        "Copied": "414",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "51505566",
+        "2*Stdev (ps)": "3463720",
+        "Allocated": "307194",
+        "Copied": "207",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-1000",
+        "Mean (ps)": "410340234",
+        "2*Stdev (ps)": "29882078",
+        "Allocated": "3063923",
+        "Copied": "437",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.handler-overhead.io-handler.counter-10000",
+        "Mean (ps)": "4248890625",
+        "2*Stdev (ps)": "199149804",
+        "Allocated": "31348048",
+        "Copied": "21379",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.1000-msgs",
+        "Mean (ps)": "405721484",
+        "2*Stdev (ps)": "17458798",
+        "Allocated": "2832069",
+        "Copied": "296",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.concurrency-modes.cpu-bound-serial.10000-msgs",
+        "Mean (ps)": "3530129687",
+        "2*Stdev (ps)": "328464410",
+        "Allocated": "29194822",
+        "Copied": "4848",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.serial",
+        "Mean (ps)": "128984949990",
+        "2*Stdev (ps)": "6944556332",
+        "Allocated": "914391",
+        "Copied": "2271",
+        "Peak Memory": "1272971264"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.ahead-5",
+        "Mean (ps)": "27419100000",
+        "2*Stdev (ps)": "1920446982",
+        "Allocated": "2141648",
+        "Copied": "10939",
+        "Peak Memory": "1290797056"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.async-5",
+        "Mean (ps)": "27495524998",
+        "2*Stdev (ps)": "1933136664",
+        "Allocated": "1275278",
+        "Copied": "9068",
+        "Peak Memory": "1290797056"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.100-msgs-1ms-delay.async-10",
+        "Mean (ps)": "14557956248",
+        "2*Stdev (ps)": "995581316",
+        "Allocated": "1547392",
+        "Copied": "8914",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.serial",
+        "Mean (ps)": "302478299993",
+        "2*Stdev (ps)": "22352182802",
+        "Allocated": "466305",
+        "Copied": "4888",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.ahead-5",
+        "Mean (ps)": "55202450003",
+        "2*Stdev (ps)": "4584051150",
+        "Allocated": "1414476",
+        "Copied": "8004",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.async-5",
+        "Mean (ps)": "54592475001",
+        "2*Stdev (ps)": "4831248456",
+        "Allocated": "931242",
+        "Copied": "7490",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.io-bound.50-msgs-5ms-delay.async-10",
+        "Mean (ps)": "28519537500",
+        "2*Stdev (ps)": "1720598416",
+        "Allocated": "1071258",
+        "Copied": "7403",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-2",
+        "Mean (ps)": "65895849993",
+        "2*Stdev (ps)": "3598727816",
+        "Allocated": "1512794",
+        "Copied": "8752",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-5",
+        "Mean (ps)": "27289287499",
+        "2*Stdev (ps)": "1832960812",
+        "Allocated": "2160843",
+        "Copied": "10882",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-10",
+        "Mean (ps)": "14986693750",
+        "2*Stdev (ps)": "956841442",
+        "Allocated": "2275478",
+        "Copied": "11545",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.ahead-100msgs-1ms.ahead-20",
+        "Mean (ps)": "8990568749",
+        "2*Stdev (ps)": "533735448",
+        "Allocated": "2659145",
+        "Copied": "14221",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-2",
+        "Mean (ps)": "66045274998",
+        "2*Stdev (ps)": "3766880100",
+        "Allocated": "1159692",
+        "Copied": "11895",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-5",
+        "Mean (ps)": "27320700003",
+        "2*Stdev (ps)": "2033592028",
+        "Allocated": "1278259",
+        "Copied": "9066",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-10",
+        "Mean (ps)": "14544531250",
+        "2*Stdev (ps)": "942642412",
+        "Allocated": "1566516",
+        "Copied": "9090",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.concurrency-modes.concurrency-levels.async-100msgs-1ms.async-20",
+        "Mean (ps)": "8318112499",
+        "2*Stdev (ps)": "583012798",
+        "Allocated": "1908749",
+        "Copied": "11419",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.hot-path.serial-noop-10000",
+        "Mean (ps)": "8179212500",
+        "2*Stdev (ps)": "470818088",
+        "Allocated": "19672373",
+        "Copied": "899",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.hot-path.async8-noop-10000",
+        "Mean (ps)": "33939525000",
+        "2*Stdev (ps)": "1520721880",
+        "Allocated": "37646020",
+        "Copied": "110890",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.lifecycle.serial-small-inbox",
+        "Mean (ps)": "101238775000",
+        "2*Stdev (ps)": "4883796068",
+        "Allocated": "202419847",
+        "Copied": "11382631",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.lifecycle.ahead-uniform-keys",
+        "Mean (ps)": "916152000000",
+        "2*Stdev (ps)": "45830449266",
+        "Allocated": "463364726",
+        "Copied": "19404039",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.lifecycle.async-hot-key",
+        "Mean (ps)": "776699800000",
+        "2*Stdev (ps)": "30385480532",
+        "Allocated": "481918254",
+        "Copied": "19413702",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.lifecycle.batch-size",
+        "Mean (ps)": "170774850000",
+        "2*Stdev (ps)": "8653806678",
+        "Allocated": "225781901",
+        "Copied": "11497713",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.lifecycle.startup-shutdown",
+        "Mean (ps)": "28244643750",
+        "2*Stdev (ps)": "1796708570",
+        "Allocated": "3836778",
+        "Copied": "9477052",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.dead-letter-reason.validate-application-code",
+        "Mean (ps)": "168231",
+        "2*Stdev (ps)": "7514",
+        "Allocated": "615",
+        "Copied": "0",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.dead-letter-reason.render-poison-pill",
+        "Mean (ps)": "25084",
+        "2*Stdev (ps)": "2300",
+        "Allocated": "183",
+        "Copied": "0",
+        "Peak Memory": "1291845632"
+      },
+      {
+        "Name": "All.dead-letter-reason.render-application-failure",
+        "Mean (ps)": "24023",
+        "2*Stdev (ps)": "1642",
+        "Allocated": "215",
+        "Copied": "0",
+        "Peak Memory": "1291845632"
+      }
+    ]
+  },
+  {
+    "experiment": "before-after-control",
+    "variant": "before",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 2.8289008140563965,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/before-0.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "50624304",
+        "2*Stdev (ps)": "3010938",
+        "Allocated": "312992",
+        "Copied": "206",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "before-after-control",
+    "variant": "after",
+    "case": "All.handler-overhead.io-handler.counter-100",
+    "seconds": 2.6318390369415283,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.handler-overhead.io-handler.counter-100\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/after-0.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/before-0.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.handler-overhead.io-handler.counter-100",
+        "Mean (ps)": "46850610",
+        "2*Stdev (ps)": "2672580",
+        "Allocated": "307229",
+        "Copied": "205",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "before-after-control",
+    "variant": "before",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 2.1531529426574707,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-phase-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/before-4.csv"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "357990429",
+        "2*Stdev (ps)": "13277090",
+        "Allocated": "2273244",
+        "Copied": "357",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  },
+  {
+    "experiment": "before-after-control",
+    "variant": "after",
+    "case": "All.framework-overhead.processing.runWithMetrics-1000",
+    "seconds": 1.8717279434204102,
+    "code": 0,
+    "argv": [
+      "/tmp/shibuya-handoff-investigation/candidate-bench",
+      "-p",
+      "$0==\"All.framework-overhead.processing.runWithMetrics-1000\"",
+      "--stdev",
+      "3",
+      "--timeout",
+      "120",
+      "--csv",
+      "/tmp/shibuya-handoff-investigation/after-4.csv",
+      "--baseline",
+      "/tmp/shibuya-handoff-investigation/before-4.csv",
+      "--fail-if-slower",
+      "10"
+    ],
+    "csv": [
+      {
+        "Name": "All.framework-overhead.processing.runWithMetrics-1000",
+        "Mean (ps)": "285943457",
+        "2*Stdev (ps)": "16525066",
+        "Allocated": "2219962",
+        "Copied": "400",
+        "Peak Memory": "1268776960"
+      }
+    ]
+  }
+]

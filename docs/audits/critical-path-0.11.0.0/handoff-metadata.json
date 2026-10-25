@@ -1,0 +1,38 @@
+{
+  "base": "7460b781ca31d2fb9f3c1607bf338b8001974114",
+  "candidate_sha256": "1662202563a5714bdf1181602fa206253d5eec591af2b1696d52dc8678085d6d",
+  "release_sha256": "76d4da1b17fafcba432dee8417620536c9f488ce350ecefa84f1448c79d2e756",
+  "dependency_unit_ids_match": true,
+  "hypothesis": "Replace per-message orElse child transaction with one emptiness/read/completion transaction, preserving single-message admission and backpressure.",
+  "retained_change": "Single-transaction receive only",
+  "source_patch_sha256": "ccb8e3a15e9e10ec51d55261ea684092c232054a89591a2c729cf289d3eb4e29",
+  "source_matches_measured_patch": true,
+  "before_binary_sha256": "d0d865d2a72b1c5ae69e6d7d8475a44eca4653427987cba0e0f5f9b846d06394",
+  "tests": {
+    "core_examples": 287,
+    "metrics_examples": 104,
+    "isolated_gc_suites": 2,
+    "failures": 0
+  },
+  "full_comparison": {
+    "cases": 62,
+    "passed": 61,
+    "failed": [
+      "All.handler-overhead.io-handler.counter-100"
+    ]
+  },
+  "compiler": "GHC 9.12.4",
+  "rts": [
+    "-N",
+    "-T",
+    "-A32m"
+  ],
+  "library_optimization": "-O1",
+  "benchmark_optimization": "-O2",
+  "host": "Apple M5 Ultra, 36 capabilities, shared workstation",
+  "measurement_concurrency": "No builds, tests or event parsers concurrent with measurements",
+  "raw_artifacts": "/tmp/shibuya-handoff-investigation",
+  "normal_benchmark_rebuild": "passed",
+  "normal_rebuild_sha256": "bd38f5b30d9fdfc9099411d9d4365f332205beedca5eac6888edfa829c52fc55",
+  "normal_rebuild_matches_measured_binary": false
+}

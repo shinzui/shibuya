@@ -1,5 +1,10 @@
 # Critical-path regression investigation, 2026-10-25
 
+Follow-up: [the single-transaction intake repair](handoff-follow-up.md) passes all
+correctness suites and 61/62 full benchmark comparisons. It resolves the observed
+processing-1000 regression; the short counter remains open. The evidence below
+records the preceding investigation.
+
 The ingestion cancellation bug is fixed in `848eb31`; the performance gate still
 fails. This investigation identifies scheduler migration and the concurrent
 intake/drain interval as the performance problem. It does not claim a safe

@@ -4,6 +4,8 @@
 
 ### Bug Fixes
 
+- Reduce intake overhead by checking queue emptiness and receiving in one STM
+  transaction, preserving bounded admission and completion/halt wakeups.
 - Preserve ingestion cancellation when tracing callbacks swallow asynchronous
   exceptions. Keep source effects on their owning thread and isolate SDK callbacks
   on an owned worker, preventing source entry after cancellation during span start.

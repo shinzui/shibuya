@@ -37,7 +37,6 @@ import Control.Concurrent.STM
     atomically,
     modifyTVar',
     newTVarIO,
-    orElse,
     readTVar,
     readTVarIO,
     retry,
@@ -576,16 +575,16 @@ inboxToStream inbox streamDoneVar stopSignal = Stream.unfoldrM step ()
         Just _ -> pure Nothing
         Nothing -> do
           result <-
-            atomically $
-              (Just <$> receiveSTM inbox)
-                `orElse` do
-                  -- Source completion and terminal publication share this
-                  -- wake cell. A populated inbox therefore keeps the original
-                  -- receive-only hot branch, while either terminal event wakes
-                  -- an empty intake wait.
+            atomically $ do
+              -- Inspect and receive in the same transaction. Avoid an orElse
+              -- child transaction for every message; only an empty inbox needs
+              -- the source-completion/terminal wake cell in its read set.
+              empty <- mailboxEmptySTM inbox
+              if empty
+                then do
                   done <- readTVar streamDoneVar
-                  empty <- mailboxEmptySTM inbox
-                  if done && empty then pure Nothing else retry
+                  if done then pure Nothing else retry
+                else Just <$> receiveSTM inbox
           pure $ fmap (,()) result
 
 -- | Process messages from inbox until stream is done and inbox is empty.
