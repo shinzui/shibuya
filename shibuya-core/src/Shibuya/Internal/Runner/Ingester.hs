@@ -11,17 +11,25 @@ module Shibuya.Internal.Runner.Ingester
   )
 where
 
+import Control.Concurrent.Async qualified as Async
 import Control.Concurrent.NQE.Process (Inbox, inboxToMailbox, send)
-import Effectful (Eff, IOE, liftIO, (:>))
+import Control.Concurrent.STM (atomically, newEmptyTMVarIO, orElse, putTMVar, readTMVar, retry, throwSTM)
+import Control.Exception qualified as IOException
+import Effectful (Eff, IOE, UnliftStrategy (..), liftIO, withEffToIO, (:>))
 import Effectful.Dispatch.Static (unEff, unsafeEff)
+import Effectful.Exception qualified as Exception
+import OpenTelemetry.Context qualified as TraceContext
+import OpenTelemetry.Context.ThreadLocal qualified as TraceContext
+import OpenTelemetry.Trace.Core qualified as OTel
 import Shibuya.Core.Ingested (Ingested)
 import Shibuya.Core.Metrics (MetricsHandle, ProcessorId (..), incrementReceived)
 import Shibuya.Internal.Runner.Pause (PauseHandle, waitWhilePaused)
-import Shibuya.Telemetry.Effect (Tracing, addAttribute, withSpan')
+import Shibuya.Telemetry.Effect (Tracing, getTracer, isTracingEnabled)
 import Shibuya.Telemetry.Semantic (attrShibuyaProcessorId, ingestSpanName, internalSpanArgs)
 import Streamly.Data.Fold qualified as Fold
 import Streamly.Data.Stream (Stream)
 import Streamly.Data.Stream qualified as Stream
+import UnliftIO qualified as UIO
 
 -- | Run the ingester: reads from stream, sends to inbox.
 -- Sends each element to the inbox with backpressure - if inbox is full, blocks.
@@ -99,7 +107,36 @@ traceIngestion ::
   ProcessorId ->
   Eff es () ->
   Eff es ()
-traceIngestion procId action =
-  withSpan' ingestSpanName internalSpanArgs $ \sp -> do
-    addAttribute sp attrShibuyaProcessorId procId.unProcessorId
-    action
+traceIngestion procId action = do
+  enabled <- isTracingEnabled
+  if not enabled
+    then action
+    else do
+      tracer <- getTracer
+      -- Only the owner unlifts source effects. The SDK worker is entirely IO,
+      -- so a sequential unlift preserves the source's thread and local state.
+      withEffToIO SeqUnlift $ \runInIO -> UIO.mask $ \restore -> do
+        context <- TraceContext.getContext
+        ready <- newEmptyTMVarIO
+        finished <- newEmptyTMVarIO
+        -- SDK callbacks catch cancellation. Isolate them from source ownership:
+        -- after cancellation the worker can only observe the published outcome,
+        -- never enter the source even if onStart consumes its cancellation.
+        let trace = UIO.bracket (TraceContext.attachContext context) TraceContext.detachContext $ \_ ->
+              OTel.inSpan' tracer ingestSpanName internalSpanArgs $ \sp -> do
+                OTel.addAttribute sp attrShibuyaProcessorId procId.unProcessorId
+                atomically $ putTMVar ready sp
+                result <- atomically $ readTMVar finished
+                either IOException.throwIO pure result
+        UIO.withAsync trace $ \worker -> do
+          result <- IOException.try @IOException.SomeException $ restore $ do
+            sp <- atomically $ readTMVar ready `orElse` (Async.waitCatchSTM worker >>= either throwSTM (const retry))
+            UIO.bracket (TraceContext.attachContext $ TraceContext.insertSpan sp context) TraceContext.detachContext $ \_ ->
+              runInIO action
+          atomically $ putTMVar finished result
+          case result of
+            -- withAsync still cancels and joins the worker on this path.
+            Left failure | Exception.isAsyncException failure -> IOException.throwIO failure
+            _ -> do
+              traced <- restore $ UIO.waitCatch worker
+              either IOException.throwIO (const $ either IOException.throwIO pure traced) result

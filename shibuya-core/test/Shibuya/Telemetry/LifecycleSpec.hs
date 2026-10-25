@@ -1,19 +1,23 @@
 module Shibuya.Telemetry.LifecycleSpec (spec) where
 
-import Control.Concurrent (newEmptyMVar, putMVar, takeMVar)
+import Control.Concurrent (myThreadId, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
+import Control.Concurrent.NQE.Process (newBoundedInbox)
 import Control.Concurrent.STM (atomically, retry)
-import Control.Exception (SomeException, bracket, displayException, try)
-import Control.Monad (forM_, void, when)
-import Data.Foldable (toList)
+import Control.Exception (SomeException, bracket, displayException, finally, try)
+import Control.Monad (forM_, unless, void, when)
+import Data.Foldable (toList, traverse_)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Time (getCurrentTime)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.Exception qualified as Exception
 import Effectful.State.Static.Local qualified as State
 import OpenTelemetry.Attributes (emptyAttributes, getAttributeMap, toAttribute)
+import OpenTelemetry.Context qualified as TraceContext
+import OpenTelemetry.Context.ThreadLocal qualified as TraceContext
 import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Processor.Span (SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
@@ -25,8 +29,11 @@ import Shibuya.App
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (mkIngested)
+import Shibuya.Core.Metrics (newMetricsHandle)
 import Shibuya.Core.Types (MessageId (..), mkEnvelope)
+import Shibuya.Internal.Runner.Ingester (runIngesterWithMetrics, runIngesterWithMetricsUnpaused)
 import Shibuya.Internal.Runner.Master (ProcessorLifecycle (..), getLifecycleSnapshot)
+import Shibuya.Internal.Runner.Pause (newPauseHandle, requestPause, requestResume)
 import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop, withSpan')
 import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
@@ -50,6 +57,150 @@ spec = describe "Shibuya.Telemetry.Lifecycle" $ do
       readIORef calls `shouldReturn` 1
       expectSpan "shibuya.ingest" spans >>= expectIdentity
       expectSpan "lifecycle shutdown" spans >>= expectIdentity
+
+  forM_ [False, True] $ \batching ->
+    it ("does not start ingestion after onStart consumes cancellation for " <> if batching then "batch" else "single") $ do
+      (_, _) <- withBlockedIngestion False $ \tracer gates -> do
+        app <- runEff $ runTracing tracer $ do
+          let adapter = (listAdapter []) {source = Stream.repeatM (liftIO gates.sourceWait >> Exception.throwIO (userError "test source released"))}
+              processor =
+                if batching
+                  then mkBatchProcessor adapter (\_ _ -> pure ackAllOk) defaultBatchConfig
+                  else mkProcessor adapter (const $ pure AckOk)
+          start processor
+        finally
+          ( do
+              gates.awaitHook
+              UIO.withAsync
+                (runEff $ runTracing tracer $ stopAppGracefully defaultShutdownConfig {drainTimeout = 0.01, totalShutdownTimeout = 0.1} app)
+                $ \stopper ->
+                  finally
+                    ( do
+                        UIO.timeout 1_000_000 (UIO.wait stopper) `shouldReturn` Just False
+                        gates.sourceEntries `shouldReturn` 0
+                    )
+                    gates.release
+          )
+          (gates.release >> void (try @SomeException $ runEff (runTracing tracer $ stopApp app)))
+      pure ()
+
+  forM_ [False, True] $ \onEnd ->
+    it ("retains direct ingester cancellation during " <> if onEnd then "onEnd" else "onStart") $ do
+      (_, _) <- withBlockedIngestion onEnd $ \tracer gates -> do
+        metrics <- getCurrentTime >>= newMetricsHandle
+        inbox <- newBoundedInbox 1
+        let source = if onEnd then Stream.fromList [] else Stream.repeatM (liftIO gates.sourceWait >> Exception.throwIO (userError "test source released"))
+        UIO.withAsync (runEff $ runTracing tracer $ runIngesterWithMetricsUnpaused (ProcessorId "lifecycle") metrics source inbox) $ \ingester ->
+          finally
+            ( do
+                gates.awaitHook
+                UIO.withAsync (UIO.cancel ingester) $ \canceller ->
+                  finally
+                    ( do
+                        UIO.timeout 1_000_000 (UIO.wait canceller) `shouldReturn` Just ()
+                        UIO.waitCatch ingester >>= \case
+                          Left failure -> Exception.isAsyncException failure `shouldBe` True
+                          Right () -> expectationFailure "ingestion swallowed cancellation"
+                        gates.sourceEntries `shouldReturn` 0
+                    )
+                    gates.release
+            )
+            gates.release
+      pure ()
+
+  forM_ [False, True] $ \pauseAware ->
+    it ("preserves source thread, local state and context with " <> if pauseAware then "pause admission" else "unpaused admission") $ do
+      owner <- myThreadId
+      metrics <- getCurrentTime >>= newMetricsHandle
+      pause <- newPauseHandle
+      inbox <- newBoundedInbox 10
+      seen <- newIORef []
+      ((updates, parentContext), spans) <- withExporter $ \tracer -> do
+        (parentContext, updates) <- runEff $
+          State.runState (0 :: Int) $
+            runTracing tracer $
+              withSpan' "source caller" OTel.defaultSpanArguments $ \parent -> do
+                let source =
+                      Stream.unfoldrM
+                        ( \n -> do
+                            liftIO $ myThreadId >>= (`shouldBe` owner)
+                            State.modify @Int (+ 1)
+                            liftIO $ do
+                              current <- TraceContext.lookupSpan <$> TraceContext.getContext
+                              traverse_ (\sp -> OTel.getSpanContext sp >>= \ctx -> modifyIORef' seen (ctx :)) current
+                            pure $ if n < 2 then Just (mkIngested (mkEnvelope (MessageId "one") ()) (AckHandle (const $ pure ())), n + 1) else Nothing
+                        )
+                        (0 :: Int)
+                if pauseAware
+                  then runIngesterWithMetrics (ProcessorId "lifecycle") metrics pause source inbox
+                  else runIngesterWithMetricsUnpaused (ProcessorId "lifecycle") metrics source inbox
+                parentContext <- liftIO $ OTel.getSpanContext parent
+                liftIO $ do
+                  restored <- TraceContext.lookupSpan <$> TraceContext.getContext
+                  case restored of
+                    Nothing -> expectationFailure "source caller context was not restored"
+                    Just sp -> OTel.getSpanContext sp >>= \ctx -> OTel.spanId ctx `shouldBe` OTel.spanId parentContext
+                pure parentContext
+        pure (updates, parentContext)
+      updates `shouldBe` 3
+      ingestion <- expectSpan "shibuya.ingest" spans
+      expectIdentity ingestion
+      let ingestionContext = OTel.spanContext ingestion
+      observed <- readIORef seen
+      map OTel.spanId observed `shouldBe` replicate 3 (OTel.spanId ingestionContext)
+      case OTel.spanParent ingestion of
+        Nothing -> expectationFailure "ingestion lost its caller parent"
+        Just sp -> OTel.getSpanContext sp >>= \ctx -> OTel.spanId ctx `shouldBe` OTel.spanId parentContext
+
+  forM_ [False, True] $ \paused ->
+    it ("retains cancellation of a " <> if paused then "paused source" else "running source") $ do
+      entered <- newEmptyMVar
+      gate <- newEmptyMVar
+      calls <- newIORef (0 :: Int)
+      pause <- newPauseHandle
+      metrics <- getCurrentTime >>= newMetricsHandle
+      inbox <- newBoundedInbox 1
+      let release = void (tryPutMVar gate ()) >> void (requestResume pause)
+          source = Stream.repeatM $ liftIO $ do
+            modifyIORef' calls (+ 1)
+            when paused $ void (requestPause pause)
+            putMVar entered ()
+            unless paused $ readMVar gate
+            pure (mkIngested (mkEnvelope (MessageId "one") ()) (AckHandle (const $ pure ())))
+      (_, _) <- withExporter $ \tracer ->
+        UIO.withAsync (runEff $ runTracing tracer $ runIngesterWithMetrics (ProcessorId "lifecycle") metrics pause source inbox) $ \ingester ->
+          finally
+            ( do
+                takeMVar entered
+                -- For the paused case, no further source admission is allowed.
+                when paused $ UIO.timeout 20_000 (takeMVar entered) `shouldReturn` Nothing
+                UIO.withAsync (UIO.cancel ingester) $ \canceller ->
+                  finally
+                    ( do
+                        UIO.timeout 1_000_000 (UIO.wait canceller) `shouldReturn` Just ()
+                        UIO.waitCatch ingester >>= \case
+                          Left failure -> Exception.isAsyncException failure `shouldBe` True
+                          Right () -> expectationFailure "source cancellation disappeared"
+                        readIORef calls `shouldReturn` 1
+                    )
+                    release
+            )
+            release
+      pure ()
+
+  it "preserves the direct source exception when onEnd also fails" $ do
+    metrics <- getCurrentTime >>= newMetricsHandle
+    inbox <- newBoundedInbox 1
+    let failEnd processor = processor {spanProcessorOnEnd = \_ -> ioError (userError "export failed")}
+        source = Stream.repeatM (Exception.throwIO (userError "original source failure"))
+    (result, _) <- withExporterUsing failEnd $ \tracer ->
+      try @SomeException $
+        runEff $
+          runTracing tracer $
+            runIngesterWithMetricsUnpaused (ProcessorId "lifecycle") metrics source inbox
+    case result of
+      Left failure -> displayException failure `shouldBe` "user error (original source failure)"
+      Right () -> expectationFailure "source exception disappeared"
 
   it "records source failure and retains the terminal lifecycle" $ do
     (state, spans) <- withExporter $ \tracer -> runEff $ runTracing tracer $ do
@@ -194,6 +345,39 @@ blockingShutdownHook onEnd entered processor =
     block sp = do
       hot <- readIORef (OTel.spanHot sp)
       when (OTel.hotName hot == "lifecycle shutdown") $ entered >> atomically retry
+
+-- Release gates before joining test-owned threads, even on the broken runtime.
+-- Keeping these gates reachable also prevents a collected STM wait from faking
+-- successful cancellation via BlockedIndefinitelyOnSTM.
+data IngestionGates = IngestionGates
+  { awaitHook :: IO (),
+    sourceWait :: IO (),
+    sourceEntries :: IO Int,
+    release :: IO ()
+  }
+
+withBlockedIngestion :: Bool -> (OTel.Tracer -> IngestionGates -> IO a) -> IO (a, [OTel.ImmutableSpan])
+withBlockedIngestion onEnd action = do
+  entered <- newEmptyMVar
+  hookGate <- newEmptyMVar
+  sourceGate <- newEmptyMVar
+  calls <- newIORef (0 :: Int)
+  let release = void (tryPutMVar hookGate ()) >> void (tryPutMVar sourceGate ())
+      gates =
+        IngestionGates
+          { awaitHook = takeMVar entered,
+            sourceWait = modifyIORef' calls (+ 1) >> readMVar sourceGate,
+            sourceEntries = readIORef calls,
+            release = release
+          }
+      block sp = do
+        hot <- readIORef (OTel.spanHot sp)
+        when (OTel.hotName hot == "shibuya.ingest") $ putMVar entered () >> readMVar hookGate
+      configure processor =
+        if onEnd
+          then processor {spanProcessorOnEnd = \sp -> block sp >> spanProcessorOnEnd processor sp}
+          else processor {spanProcessorOnStart = \sp ctx -> block sp >> spanProcessorOnStart processor sp ctx}
+  withExporterUsing configure $ \tracer -> finally (action tracer gates) release
 
 withExporterUsing :: (SpanProcessor -> SpanProcessor) -> (OTel.Tracer -> IO a) -> IO (a, [OTel.ImmutableSpan])
 withExporterUsing configure action = do

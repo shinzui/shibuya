@@ -30,8 +30,16 @@ Enabled non-recording spans with valid IDs may still propagate normally.
 
 The framework emits one Internal `shibuya.ingest` span per source lifetime for
 both single and batch processors, and one Internal `<ProcessorId> shutdown` span
-per adapter shutdown attempt. Both carry `shibuya.processor.id`. SDK brackets
-record exceptions and rethrow, including cancellation and deadline expiration.
+per adapter shutdown attempt. Both carry `shibuya.processor.id`. Enabled lifecycle
+tracing runs SDK callbacks on an owned worker: the SDK catches asynchronous
+exceptions in those callbacks, so its bracket alone cannot preserve cancellation.
+The ingester or shutdown caller owns the operation, publishes its outcome, and
+cancels/joins the tracing worker during cleanup. Only the owner executes source
+or adapter effects, with the lifecycle span attached and prior context restored.
+Ingestion uses a sequential unlift to preserve its thread and local effect state.
+Disabled ingestion runs directly without a tracing worker. This preserves
+cancellation for interruptible callbacks; it does not forcibly terminate arbitrary
+uninterruptible adapter or exporter code.
 The existing once-only shutdown leader and cached outcome remain authoritative.
 Capture the enabled startup tracer in the internal application handle so stopping
 requires no new effect constraint and uses the same provider as application work.
@@ -64,3 +72,7 @@ startup tracer capture, and disabled mode. `EffectSpec.hs` checks shared-provide
 identity, concrete tracer usability, and sentinel inspection/injection.
 `PropagationSpec.hs` compares active headers with exported IDs. The cancellation
 and ownership contract remains [ADR 3](0003-make-processor-termination-and-shutdown-outcomes-explicit.md).
+
+[Plan 53](../plans/53-preserve-ingestion-cancellation-across-telemetry-callbacks.md)
+repairs ingestion cancellation during SDK callbacks and tests owner thread/local
+state, parent context restoration, and running/paused source cancellation.

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Preserve ingestion cancellation when tracing callbacks swallow asynchronous
+  exceptions. Keep source effects on their owning thread and isolate SDK callbacks
+  on an owned worker, preventing source entry after cancellation during span start.
+
 ## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
