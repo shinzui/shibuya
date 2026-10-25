@@ -147,8 +147,7 @@ runShibuyaWithMessages payloads = do
           pure AckOk
 
     -- Run through framework
-    -- NOTE: inbox size must be >= message count for runWithMetrics
-    -- because it runs ingester sequentially before draining
+    -- Keep this benchmark's workload-sized inbox.
     let inboxSize = fromIntegral $ length payloads
     _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
 

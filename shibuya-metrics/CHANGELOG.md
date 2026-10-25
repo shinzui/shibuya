@@ -1,57 +1,45 @@
 # Changelog
 
-## Unreleased
-
-- Add opt-in `enableControl` (False by default), discovery and pause/resume POST routes with structured errors and actual-request Origin enforcement. New `Shibuya.Metrics.Control` module; direct MetricsServerConfig construction must supply the flag.
-
-
-- Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
-
-
-- Add optional acknowledged `progress` to processor JSON and WebSocket metrics, bounded per partition, with lossless tagged Cursor JSON. Basic detail remains the default. Direct `ProcessorMetrics` construction must supply `progress`.
-
+## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
 
-- `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`, and
-  `wsSendTimeoutUs`; direct construction must provide them. `MetricsServer` gains
-  the `serverShutdown` action used before Warp cancellation.
-
-- `ServerMessage` gains `ServerError`; exhaustive matches must handle this constructor.
-
-- `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
-  must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
+- `MetricsServerConfig` gains `enableControl`, `corsAllowedOrigins`,
+  `wsMaxQueuedFrames`, `wsMaxQueuedBytes`, and `wsSendTimeoutUs`; direct construction
+  must supply them. `MetricsServer` gains the required `serverShutdown` action.
+- `ServerMessage` gains `ServerError`; exhaustive matches must handle it.
+  `ProcessorHealth` gains `paused`; direct construction must supply the count.
+- Require `shibuya-core ^>=0.11.0.0`, including its extended processor metrics and
+  paused-state API.
 
 ### New Features
 
-- Opt-in detailed accounting with `MetricsDetail`, `DetailOptions`, `LatencySummary`,
-  `LatencyBucket`, and `OldestInFlight`; the default remains `MetricsBasic`. Monotonic
-  timing includes finalization retries, one observation per message attempt or emitted
-  batch, using bounded synchronized slots. Add `MessageId` JSON instances, detail-aware
-  handle/runner constructors and read-only slot-miss diagnostics.
-- Add optional camelCase `latency` and `oldestInFlight` JSON/WebSocket members and the
-  `shibuya_message_processing_seconds` histogram and optional
-  `shibuya_processor_oldest_in_flight_seconds` gauge. Preserve basic JSON bytes and omit
-  unavailable values. WebSocket clients extrapolate age between state changes.
+- Add opt-in control discovery and pause/resume POST routes with structured errors,
+  draining refusal, and actual-request Origin enforcement. Control is disabled by
+  default. Export `Shibuya.Metrics.Control`.
+- Expose optional latency, oldest in-flight, and bounded acknowledged progress in
+  JSON and WebSocket metrics. Add the processing-duration Prometheus histogram and
+  optional oldest-in-flight gauge; report paused health counts and state value 5.
+- Bound queued WebSocket frames and encoded bytes with independent sampling and a
+  single application writer. Recover dropped deltas with an adjacent
+  `queue_overflow` error and replacement snapshot; bound sends and shutdown flushes.
+- Export the pure `Shibuya.Metrics.Outbound` queue model and optional
+  `WebSocketHooks` instrumentation. Subscription changes establish ordered snapshots.
+- Send in-band WebSocket errors for malformed messages and before subscription-limit
+  policy closes; expose stable `code` members in HTTP error responses.
+- Add configurable HTTP CORS and preflight handling, and validate WebSocket upgrade
+  Origins before acquiring connection slots. Export `Shibuya.Metrics.Cors` and
+  `Shibuya.Metrics.Error` with reusable middleware and error helpers.
 
-- Bound every queued WebSocket frame and encoded byte with independent sampling
-  and one application writer. Drop oldest updates under pressure, followed by an
-  adjacent `queue_overflow` error and replacement snapshot; close on required-frame
-  saturation or oversized snapshots. Bound individual sends and shutdown flushes.
-- Export the pure `Shibuya.Metrics.Outbound` admission model and optional
-  `WebSocketHooks` instrumentation. Subscription changes, including unsubscribe,
-  establish an ordered snapshot boundary.
+### Bug Fixes
 
-- Send additive in-band WebSocket `error` frames for invalid messages and before
-  subscription-limit policy closes (1008). Valid existing frames are unchanged.
+- Suspend deltas after terminal-frame admission evicts updates so the next update
+  establishes a replacement snapshot.
 
-- add configurable cross-origin HTTP access and preflight handling, plus
-  WebSocket upgrade Origin validation before connection-slot acquisition.
-- export `Shibuya.Metrics.Cors` and `Shibuya.Metrics.Error`, with reusable
-  `corsMiddleware`, `isAllowedOrigin`, `isValidOrigin`, `originGuard`, and `errorResponse`
-  helpers, plus top-level re-exports for `combinedApp`, `corsMiddleware`, and `errorResponse`.
-- add stable `code` members to existing error bodies, preserving their
-  `error` text, context, status, and content type (additive wire change).
+### Other Changes
+
+- Avoid waking WebSocket writers for empty terminal batches and make observer
+  captures reproducible with bounded delivery acceptance evidence.
 
 ## 0.10.0.1 — 2026-10-05
 

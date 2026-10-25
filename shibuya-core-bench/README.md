@@ -313,6 +313,27 @@ data BenchMessage = BenchMessage
 
 ### Benchmarks timeout
 
+The `io-bound` and `concurrency-levels` groups deliberately sleep in their
+handlers and use wall-clock time. Other groups retain the default CPU timing.
+[tasty-bench](mori://Bodigrim/tasty-bench/packages/tasty-bench) excludes sleeping
+time from its default CPU clock and also uses that clock to estimate sampling
+time remaining. Delay-heavy workloads can therefore hit the wall-clock timeout
+while the sampler keeps increasing repetitions. Increasing the timeout alone
+does not correct the clock mismatch.
+
+When comparing against a release predating this timing fix, apply the same
+benchmark-only patch to the detached baseline worktree before building either
+benchmark. Both sides must use the same clock for each benchmark; discard CSVs
+captured with the previous clock. Keep the workload, precision target, timeout,
+RTS settings, and regression threshold unchanged.
+
+Use matching lifecycle fixtures as well. In particular, the full-inbox capture
+fix advanced the lifecycle workload version from 3 to 4 and changed its shared
+driver. When the baseline API is compatible, overlay the current
+`bench/Bench/Lifecycle.hs` in the baseline worktree while retaining the old
+Shibuya runtime source. A fixture-version difference must not be attributed to
+the runtime's allocation cost.
+
 The framework benchmarks include full supervisor setup which takes longer. Increase timeout:
 
 ```bash
@@ -339,26 +360,12 @@ Ensure the `-T` RTS flag is enabled (it's in the cabal file by default). If runn
 
 ### runWithMetrics vs runSupervised
 
-The benchmarks use `runWithMetrics` which is a **test helper** designed for simple, finite streams. It has an important constraint:
+The standalone `runWithMetrics` and `runWithMetricsBatch` helpers block until the
+source ends and processing drains. Both run the ingester and consumer concurrently,
+so any positive inbox capacity can provide backpressure; capacity does not have to
+match the message count. The existing benchmark inbox sizes remain unchanged.
 
-**⚠️ Inbox size must be >= message count when using `runWithMetrics`**
-
-This is because `runWithMetrics` runs the ingester and processor **sequentially**:
-
-```haskell
--- Sequential execution in runWithMetrics:
-runIngesterWithMetrics metricsVar adapter.source inbox  -- pushes ALL messages
-drainInboxWithMetrics metricsVar handler inbox          -- then drains
-```
-
-If the inbox capacity is smaller than the message count, the ingester blocks waiting for space that will never be freed (since draining hasn't started yet), causing a **deadlock**.
-
-**Production code uses `runSupervised`** which runs ingester and processor **concurrently**, so backpressure works correctly with any inbox size:
-
-```haskell
--- Concurrent execution in runSupervised:
-UIO.withAsync ingesterWithSignal $ \_ ->
-  processUntilDrained metricsVar handler inbox  -- drains while ingester pushes
-```
-
-This is not a bug in shibuya-core - it's a design constraint of the test helper. The benchmarks account for this by setting inbox size equal to message count.
+These blocking helpers return their processor handle only after completion and
+expose no live pause capability. Their ingesters retain metrics and tracing while
+omitting unreachable pause checks. Supervised processors return a live handle and
+retain pause/resume admission checks before each source step.

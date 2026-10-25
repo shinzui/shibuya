@@ -1,54 +1,56 @@
 # Changelog
 
-## Unreleased
-
-- Add opt-in `enableControl` (False by default), discovery and pause/resume POST routes with structured errors and actual-request Origin enforcement. New `Shibuya.Metrics.Control` module; direct MetricsServerConfig construction must supply the flag.
-
-
-- Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
-
-
-- Add optional acknowledged `progress` to processor JSON and WebSocket metrics, bounded per partition, with lossless tagged Cursor JSON. Basic detail remains the default. Direct `ProcessorMetrics` construction must supply `progress`.
-
+## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
 
-- `AppConfig` gains `metricsDetail`; `ProcessorMetrics` gains optional `latency` and
-  `oldestInFlight` fields. Direct record construction must supply them. `MetricsHandle` also gains detail state. `ConfigError`
-  gains `InvalidMaxTrackedPartitions` for negative detailed partition capacity.
-
-- `shibuya-metrics`: `MetricsServerConfig` gains `wsMaxQueuedFrames`, `wsMaxQueuedBytes`,
-  and `wsSendTimeoutUs`; direct record construction must supply them. `MetricsServer`
-  gains the required `serverShutdown` action, and exhaustive `ServerMessage` matches
-  must handle the new `ServerError` constructor.
-- `shibuya-metrics`: `MetricsServerConfig` gains `corsAllowedOrigins`; direct record construction
-  must supply an explicit origin list. `defaultConfig` keeps it empty (disabled).
+- `shibuya-core`: extend `AppConfig`, `ProcessorMetrics`, and `MetricsHandle` for
+  detailed metrics; add `ProcessorState.Paused` and
+  `ConfigError.InvalidMaxTrackedPartitions`. Extend the exposed
+  `SupervisedProcessor` and `AppHandle` records with pause state and a shutdown
+  tracer. Direct record construction and exhaustive matches need updating.
+- `shibuya-metrics`: extend `MetricsServerConfig` with control, CORS, queue limits,
+  and send deadlines; add `MetricsServer.serverShutdown`, `ServerMessage.ServerError`,
+  and `ProcessorHealth.paused`. Require `shibuya-core ^>=0.11.0.0`.
 
 ### New Features
 
-- Opt-in detailed accounting with `MetricsDetail`, `DetailOptions`, `LatencySummary`,
-  `LatencyBucket`, and `OldestInFlight`; the default remains `MetricsBasic`. Monotonic
-  timing includes finalization retries, one observation per message attempt or emitted
-  batch, using bounded synchronized slots. Add `MessageId` JSON instances, detail-aware
-  handle/runner constructors and read-only slot-miss diagnostics.
-- Add optional camelCase `latency` and `oldestInFlight` JSON/WebSocket members and the
-  `shibuya_message_processing_seconds` histogram and optional
-  `shibuya_processor_oldest_in_flight_seconds` gauge. Preserve basic JSON bytes and omit
-  unavailable values. WebSocket clients extrapolate age between state changes.
+- Add atomic processor intake pause/resume with draining refusal, opt-in HTTP
+  control routes, paused health counts, and Prometheus state value 5.
+- Add opt-in latency histograms, oldest in-flight inspection, bounded acknowledged
+  cursor progress, and lossless tagged cursor JSON. Basic accounting remains the
+  default; JSON and WebSocket metrics omit unavailable detail.
+- Bound WebSocket delivery by frame count and encoded bytes, use one application
+  writer, recover dropped updates with error/snapshot pairs, and enforce send and
+  shutdown deadlines. Export the queue model and instrumentation hooks.
+- Add HTTP CORS and preflight handling, WebSocket Origin validation, stable HTTP
+  error codes, and in-band WebSocket protocol errors with ordered subscription
+  snapshots. Browser access and control remain opt-in.
+- Trace source-stream lifetimes and once-only adapter shutdowns with processor
+  identity, exception, and cancellation outcomes while preserving the stop API.
 
-- `shibuya-metrics`: bound every queued WebSocket frame and encoded byte, separate
-  sampling from the sole application writer, recover dropped deltas with an adjacent
-  error/snapshot pair, and enforce send/shutdown deadlines. Expose the pure
-  `Shibuya.Metrics.Outbound` queue model and optional `WebSocketHooks` instrumentation.
-- `shibuya-metrics`: send additive in-band `error` frames for malformed messages and
-  before subscription-limit closes; subscription mutations establish ordered snapshots.
-- `shibuya-metrics`: add configurable cross-origin HTTP access and preflight handling, plus
-  WebSocket upgrade Origin validation before connection-slot acquisition.
-- `shibuya-metrics`: export `Shibuya.Metrics.Cors` and `Shibuya.Metrics.Error`, with reusable
-  `corsMiddleware`, `isAllowedOrigin`, `isValidOrigin`, `originGuard`, and `errorResponse`
-  helpers, plus top-level re-exports for `combinedApp`, `corsMiddleware`, and `errorResponse`.
-- `shibuya-metrics`: add stable `code` members to existing error bodies, preserving their
-  `error` text, context, status, and content type (additive wire change).
+### Bug Fixes
+
+- Remove per-message zip state from pause admission and avoid unreachable pause
+  checks in blocking standalone helpers, preserving supervised intake control.
+- Preserve shutdown deadlines and caller cancellation across tracing callbacks;
+  prevent cancelled shutdowns from starting more adapter cleanup.
+- Omit invalid tracing contexts from W3C propagation.
+- Suspend WebSocket deltas after terminal-frame admission evicts updates until a
+  replacement snapshot establishes consistent state.
+
+### Other Changes
+
+- Performance note: with package-default RTS settings, the 100-message standalone
+  counter benchmark measured 41.7 to 53.4 microseconds (+28%) in the matched release
+  comparison. The 1,000- and 10,000-message cases stayed within the 10% timing gate.
+- Share the disabled compatibility tracer, specialize basic workers without detail
+  closures, and avoid waking writers for empty terminal batches.
+- Update browser/control and OpenTelemetry documentation, stabilize benchmark
+  captures, and refresh Nix tooling and agent workflows.
+- Use wall-clock timing for benchmark groups with intentional I/O delays so
+  adaptive CPU-time sampling does not exhaust the wall-clock timeout. Apply the
+  same benchmark-only correction to the previous-release comparison harness.
 
 ## 0.10.0.1 — 2026-10-05
 

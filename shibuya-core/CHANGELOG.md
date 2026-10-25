@@ -1,41 +1,48 @@
 # Changelog
 
-## Unreleased
-
-- Preserve shutdown deadlines and caller cancellation when tracing callbacks catch
-  asynchronous exceptions; prevent cancelled shutdowns from starting more adapter
-  cleanup. Bracket app acquisition and cleanup in the OpenTelemetry guide.
-
-- Trace source-stream lifetimes and once-only adapter shutdowns as Internal spans
-  carrying `shibuya.processor.id`, including exception and cancellation outcomes.
-  Keep the existing stop API by capturing the startup tracer.
-- Share the private `runTracingNoop` compatibility tracer across invocations.
-  Document the non-recording, zero-ID callback sentinel; propagation now omits
-  invalid contexts rather than emitting unusable W3C headers.
-
-- Add public processor pause/resume intake control and transactional draining refusal. Paused state is additive on the wire, with health `paused` count and Prometheus state 5; exhaustive ProcessorState matches and direct ProcessorHealth/SupervisedProcessor construction need updating.
-
-
-- Add optional acknowledged `progress` to processor JSON and WebSocket metrics, bounded per partition, with lossless tagged Cursor JSON. Basic detail remains the default. Direct `ProcessorMetrics` construction must supply `progress`.
-
+## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
 
-- `AppConfig` gains `metricsDetail`; `ProcessorMetrics` gains optional `latency` and
-  `oldestInFlight` fields. Direct record construction must supply them. `MetricsHandle` also gains detail state. `ConfigError`
-  gains `InvalidMaxTrackedPartitions` for negative detailed partition capacity.
+- `AppConfig` gains `metricsDetail`; `ProcessorMetrics` gains optional `latency`,
+  `oldestInFlight`, and `progress` fields. `MetricsHandle` gains detail state.
+  Direct record construction must supply the new fields.
+- `ProcessorState` gains `Paused`; `ConfigError` gains
+  `InvalidMaxTrackedPartitions`. Exhaustive matches must handle these constructors.
+- The exposed `SupervisedProcessor` and `AppHandle` records gain `pause` and
+  `shutdownTracer`, respectively; direct construction must supply them.
 
 ### New Features
 
-- Opt-in detailed accounting with `MetricsDetail`, `DetailOptions`, `LatencySummary`,
-  `LatencyBucket`, and `OldestInFlight`; the default remains `MetricsBasic`. Monotonic
-  timing includes finalization retries, one observation per message attempt or emitted
-  batch, using bounded synchronized slots. Add `MessageId` JSON instances, detail-aware
-  handle/runner constructors and read-only slot-miss diagnostics.
-- Add optional camelCase `latency` and `oldestInFlight` JSON/WebSocket members and the
-  `shibuya_message_processing_seconds` histogram and optional
-  `shibuya_processor_oldest_in_flight_seconds` gauge. Preserve basic JSON bytes and omit
-  unavailable values. WebSocket clients extrapolate age between state changes.
+- Add processor intake pause/resume APIs with atomic admission control and refusal
+  during draining. Already admitted polls and inbox work may finish while paused.
+- Add opt-in detailed metrics with bounded synchronized in-flight slots, latency
+  histograms, oldest in-flight inspection, and acknowledged cursor progress bounded
+  per partition. Basic accounting remains the default.
+- Add lossless tagged `Cursor` JSON and `MessageId` JSON instances, detail-aware
+  handle and runner constructors, and read-only slot-miss diagnostics.
+- Trace source-stream lifetimes and once-only adapter shutdowns as Internal spans
+  carrying `shibuya.processor.id`, including exception and cancellation outcomes.
+  Capture the startup tracer to preserve the existing stop API.
+
+### Bug Fixes
+
+- Remove per-message zip state from pause admission and avoid unreachable pause
+  checks in blocking standalone helpers, preserving supervised intake control.
+- Preserve shutdown deadlines and caller cancellation when tracing callbacks catch
+  asynchronous exceptions; prevent cancelled shutdowns from starting more adapter
+  cleanup.
+- Omit invalid contexts from W3C propagation instead of emitting unusable headers.
+
+### Other Changes
+
+- Performance note: with package-default RTS settings, the 100-message standalone
+  counter benchmark measured 41.7 to 53.4 microseconds (+28%) in the matched release
+  comparison. The 1,000- and 10,000-message cases stayed within the 10% timing gate.
+- Share the private disabled compatibility tracer across invocations and document
+  its non-recording, zero-ID callback sentinel.
+- Specialize basic workers without per-message detail closures; document bracketed
+  application acquisition and cleanup in the OpenTelemetry guide.
 
 ## 0.10.0.1 — 2026-10-05
 

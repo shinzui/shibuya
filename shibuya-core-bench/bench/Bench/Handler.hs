@@ -89,7 +89,7 @@ runWithHandler :: (forall es. (IOE :> es) => Handler es BenchMessage) -> Int -> 
 runWithHandler handler n = runEff $ runTracingNoop $ do
   msgs <- createIngestedMessages n
   let adapter = listAdapter msgs
-  -- inbox size must be >= message count for runWithMetrics (sequential ingestion)
+  -- Keep this benchmark's workload-sized inbox.
   _ <- runWithMetrics (fromIntegral n) (ProcessorId "bench") adapter handler
   pure n
 
@@ -106,7 +106,7 @@ runCountingHandler n = do
           pure AckOk
 
     let adapter = listAdapter msgs
-    -- inbox size must be >= message count for runWithMetrics (sequential ingestion)
+    -- Keep this benchmark's workload-sized inbox.
     _ <- runWithMetrics (fromIntegral n) (ProcessorId "bench") adapter handler
 
     liftIO $ readIORef counterRef

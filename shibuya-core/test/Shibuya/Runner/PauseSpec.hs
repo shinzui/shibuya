@@ -1,6 +1,6 @@
 module Shibuya.Runner.PauseSpec (spec) where
 
-import Control.Concurrent (yield)
+import Control.Concurrent (myThreadId, yield)
 import Control.Concurrent.NQE.Process (newBoundedInbox)
 import Control.Concurrent.NQE.Supervisor (Strategy (IgnoreAll))
 import Control.Concurrent.STM
@@ -8,6 +8,7 @@ import Control.Monad (forM_, replicateM_, void)
 import Data.Map.Strict qualified as Map
 import Data.Time.Clock (getCurrentTime)
 import Effectful (liftIO, runEff)
+import Effectful.State.Static.Local qualified as State
 import Shibuya qualified as Public
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Batch (BatchConfig (..), ackAllOk, defaultBatchConfig)
@@ -28,6 +29,30 @@ import UnliftIO qualified as UIO
 
 spec :: Spec
 spec = describe "pause and resume" $ do
+  it "preserves source-local effects and counts only yielded messages across skipped steps" $ do
+    owner <- myThreadId
+    now <- getCurrentTime
+    h <- newMetricsHandle now
+    pause <- newPauseHandle
+    inbox <- newBoundedInbox 10
+    updates <- runEff $ State.execState (0 :: Int) $ runTracingNoop $ do
+      let numbers =
+            Stream.unfoldrM
+              ( \n -> do
+                  liftIO $ myThreadId >>= (`shouldBe` owner)
+                  State.modify @Int (+ 1)
+                  pure $ if n < 6 then Just (n, n + 1) else Nothing
+              )
+              (0 :: Int)
+          source =
+            fmap
+              (\n -> mkIngested (mkEnvelope (MessageId "source-local") n) (AckHandle (\_ -> pure ())))
+              (Stream.filter even numbers)
+      runIngesterWithMetrics (ProcessorId "source-local") h pause source inbox
+    updates `shouldBe` 7
+    snapshot <- sampleMetrics h
+    snapshot.stats.received `shouldBe` 3
+
   it "requests nothing further when paused before source admission" $ do
     now <- getCurrentTime
     h <- newMetricsHandle now

@@ -24,7 +24,8 @@ import Shibuya.Internal.Runner.Supervised (SupervisedProcessor, isDone, runSuper
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
 import Streamly.Data.Stream qualified as Stream
-import Test.Tasty.Bench (Benchmark, bcompare, bench, bgroup, nfIO)
+import Test.Tasty (localOption)
+import Test.Tasty.Bench (Benchmark, TimeMode (WallTime), bcompare, bench, bgroup, nfIO)
 
 -- | Simple message type for benchmarking
 data BenchMessage = BenchMessage
@@ -39,8 +40,10 @@ benchmarks =
   bgroup
     "concurrency-modes"
     [ cpuBoundBenchmarks,
-      ioBoundBenchmarks,
-      concurrencyLevelBenchmarks
+      -- CPU time excludes the intentional handler waits, so adaptive sampling
+      -- can exceed its wall-clock timeout before reaching the precision target.
+      localOption WallTime ioBoundBenchmarks,
+      localOption WallTime concurrencyLevelBenchmarks
     ]
 
 -- | CPU-bound (fast) handlers - Serial mode only.
@@ -159,7 +162,7 @@ runWithConcurrency concurrency mkHandler n = do
     case concurrency of
       Serial -> do
         -- For Serial mode, use runWithMetrics (simpler, no async overhead)
-        -- NOTE: inbox size must be >= message count for runWithMetrics
+        -- Keep this benchmark's workload-sized inbox.
         let inboxSize = fromIntegral n
         _ <- runWithMetrics inboxSize (ProcessorId "bench") adapter handler
         pure ()

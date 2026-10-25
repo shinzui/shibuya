@@ -7,11 +7,13 @@
 module Shibuya.Internal.Runner.Ingester
   ( runIngester,
     runIngesterWithMetrics,
+    runIngesterWithMetricsUnpaused,
   )
 where
 
 import Control.Concurrent.NQE.Process (Inbox, inboxToMailbox, send)
 import Effectful (Eff, IOE, liftIO, (:>))
+import Effectful.Dispatch.Static (unEff, unsafeEff)
 import Shibuya.Core.Ingested (Ingested)
 import Shibuya.Core.Metrics (MetricsHandle, ProcessorId (..), incrementReceived)
 import Shibuya.Internal.Runner.Pause (PauseHandle, waitWhilePaused)
@@ -54,9 +56,32 @@ runIngesterWithMetrics ::
   Inbox (Ingested es msg) ->
   Eff es ()
 runIngesterWithMetrics procId metricsHandle pauseHandle source inbox =
-  withSpan' ingestSpanName internalSpanArgs $ \sp -> do
-    addAttribute sp attrShibuyaProcessorId procId.unProcessorId
-    ingest
+  traceIngestion procId $
+    -- The fold and admission check use IO directly, avoiding an Eff action
+    -- allocation for each step. Safe use of unsafeEff: IOE is required, and
+    -- only this sequential fold calls unEff, on the owning ingester thread.
+    -- The fold neither forks nor exports this environment or callback.
+    unsafeEff $ \environment -> do
+      let mailbox = inboxToMailbox inbox
+      Stream.fold Fold.drain $
+        Stream.mapM
+          ( \msg -> do
+              incrementReceived metricsHandle
+              send msg mailbox
+              pure msg
+          )
+          (Stream.morphInner (\step -> waitWhilePaused pauseHandle >> unEff step environment) source)
+
+-- | Metrics and tracing for an intake that has no live pause capability.
+runIngesterWithMetricsUnpaused ::
+  (IOE :> es, Tracing :> es) =>
+  ProcessorId ->
+  MetricsHandle ->
+  Stream (Eff es) (Ingested es msg) ->
+  Inbox (Ingested es msg) ->
+  Eff es ()
+runIngesterWithMetricsUnpaused procId metricsHandle source inbox =
+  traceIngestion procId ingest
   where
     ingest = do
       let mailbox = inboxToMailbox inbox
@@ -67,4 +92,14 @@ runIngesterWithMetrics procId metricsHandle pauseHandle source inbox =
               liftIO $ send msg mailbox
               pure msg
           )
-          (Stream.zipWith (\() msg -> msg) (Stream.repeatM (liftIO (waitWhilePaused pauseHandle))) source)
+          source
+
+traceIngestion ::
+  (IOE :> es, Tracing :> es) =>
+  ProcessorId ->
+  Eff es () ->
+  Eff es ()
+traceIngestion procId action =
+  withSpan' ingestSpanName internalSpanArgs $ \sp -> do
+    addAttribute sp attrShibuyaProcessorId procId.unProcessorId
+    action
