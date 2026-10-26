@@ -43,7 +43,11 @@ There is no new counter or wire metric. Received counters remain ingestion facts
 Adapters own the decision about freshness, while the framework owns admission.
 This is a source-breaking 0.12.0.0 candidate for direct record construction.
 Performance acceptance remains governed by the existing benchmark and allocation
-limits; this ADR does not waive a failed gate or certify a release.
+limits. For this candidate the owner explicitly accepted the measured increase
+on 2026-10-26: approximately 8 bytes per constructed record and 24 bytes per
+processed message in the existing framework workloads. All 62 timing comparisons
+pass the ten-percent gate. This bounded acceptance does not change the general
+allocation policy or certify a release.
 
 ## Evidence
 
