@@ -65,7 +65,7 @@ import Shibuya.Core.Ack
     renderDeadLetterReason,
   )
 import Shibuya.Core.Error (HandlerError (..), handlerErrorToText)
-import Shibuya.Core.Ingested (Ingested (..), toMessage)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), toMessage)
 import Shibuya.Core.Metrics
   ( AckDecisionMetric (..),
     MetricsHandle (..),
@@ -723,115 +723,124 @@ processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPu
           mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
       addAttributes traceSpan mergedAttrs
 
-      let process currentInflight = do
-            addAttribute traceSpan attrShibuyaInflightCount currentInflight
-            addAttribute traceSpan attrShibuyaInflightMax maxConc
+      status <- ingested.deliveryStatus
+      case status of
+        DeliverySuperseded -> do
+          addEvent traceSpan $
+            mkEvent
+              eventAckDecision
+              [(attrShibuyaAckDecision, OTel.toAttribute ("superseded" :: Text))]
+          setStatus traceSpan OTel.Ok
+        DeliveryCurrent -> do
+          let process currentInflight = do
+                addAttribute traceSpan attrShibuyaInflightCount currentInflight
+                addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-            -- Record handler start event
-            addEvent traceSpan handlerStartedEvent
+                -- Record handler start event
+                addEvent traceSpan handlerStartedEvent
 
-            -- Call handler and finalizer separately. A handler exception is
-            -- substituted with immediate retry so the adapter always observes a
-            -- finalization decision for an ingested message.
-            --
-            -- This is a *separate* per-message 'catchAny' from the one inside
-            -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
-            -- handler+finalize, which skipped finalization when the handler threw;
-            -- splitting them is what makes "always finalize" hold. The extra
-            -- per-message exception frame costs ~126 bytes/message (measured, EP-31
-            -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
-            -- accepted as the price of the always-finalize guarantee — do not merge the
-            -- two catches back together to reclaim it.
-            handlerResult <-
-              catchAny
-                (Right <$> handler (toMessage ingested))
-                ( \ex -> do
-                    recordException traceSpan ex
-                    pure (Left ex)
-                )
-            let (decision, result) = case handlerResult of
-                  Right d -> (d, Right d)
-                  Left ex ->
-                    ( AckRetry (RetryDelay 0),
-                      Left $ HandlerException $ Text.pack $ show ex
+                -- Call handler and finalizer separately. A handler exception is
+                -- substituted with immediate retry so an admitted delivery always receives a
+                -- finalization decision. Superseded deliveries are excluded.
+                --
+                -- This is a *separate* per-message 'catchAny' from the one inside
+                -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
+                -- handler+finalize, which skipped finalization when the handler threw;
+                -- splitting them is what makes "always finalize admitted deliveries" hold. The extra
+                -- per-message exception frame costs ~126 bytes/message (measured, EP-31
+                -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
+                -- accepted as the price of the always-finalize guarantee — do not merge the
+                -- two catches back together to reclaim it.
+                handlerResult <-
+                  catchAny
+                    (Right <$> handler (toMessage ingested))
+                    ( \ex -> do
+                        recordException traceSpan ex
+                        pure (Left ex)
                     )
+                let (decision, result) = case handlerResult of
+                      Right d -> (d, Right d)
+                      Left ex ->
+                        ( AckRetry (RetryDelay 0),
+                          Left $ HandlerException $ Text.pack $ show ex
+                        )
 
-            when (isLeft handlerResult) $
-              addEvent traceSpan $
-                mkEvent
-                  eventAckDecision
-                  [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
-
-            finalizeResult <- finalizeWithRetry traceSpan ingested decision
-
-            -- Record completion event and set status
-            case finalizeResult of
-              Left _ -> do
-                addEvent traceSpan $
-                  mkEvent
-                    eventAckDecision
-                    [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
-                setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
-              Right () -> case result of
-                Right decision' -> do
-                  let decisionText = showAckDecision decision'
-                  addEvent traceSpan $
-                    mkEvent
-                      eventHandlerCompleted
-                      [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
-                  addAttribute traceSpan attrShibuyaAckDecision decisionText
-
-                  -- Set span status based on decision
-                  case decision' of
-                    AckOk -> setStatus traceSpan OTel.Ok
-                    AckRetry _ -> setStatus traceSpan OTel.Ok
-                    AckDeadLetter reason -> do
-                      addAttribute
-                        traceSpan
-                        attrShibuyaDeadLetterReasonCode
-                        (deadLetterCodeText (deadLetterReasonCode reason))
-                      setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
-                    AckHalt reason ->
-                      setStatus traceSpan $ OTel.Error $ showHaltReason reason
-                Left err -> do
+                when (isLeft handlerResult) $
                   addEvent traceSpan $
                     mkEvent
                       eventAckDecision
-                      [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
-                  setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+                      [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
 
-            let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
-            when detailed $ case (finalizeResult, result) of
-              (Right (), Right AckOk) -> recordCursor
-              (Right (), Right (AckDeadLetter _)) -> recordCursor
-              _ -> pure ()
+                finalizeResult <- finalizeWithRetry traceSpan ingested decision
 
-            -- Decrement in-flight and update stats.
-            liftIO $
-              case finalizeResult of
-                Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
-                Right () -> finishProcessing metricsHandle (metricForResult result)
+                -- Record completion event and set status
+                case finalizeResult of
+                  Left _ -> do
+                    addEvent traceSpan $
+                      mkEvent
+                        eventAckDecision
+                        [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
+                    setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
+                  Right () -> case result of
+                    Right decision' -> do
+                      let decisionText = showAckDecision decision'
+                      addEvent traceSpan $
+                        mkEvent
+                          eventHandlerCompleted
+                          [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+                      addAttribute traceSpan attrShibuyaAckDecision decisionText
 
-            -- Handle halt (set flag, don't throw - let stream drain)
-            case finalizeResult of
-              Left _ ->
+                      -- Set span status based on decision
+                      case decision' of
+                        AckOk -> setStatus traceSpan OTel.Ok
+                        AckRetry _ -> setStatus traceSpan OTel.Ok
+                        AckDeadLetter reason -> do
+                          addAttribute
+                            traceSpan
+                            attrShibuyaDeadLetterReasonCode
+                            (deadLetterCodeText (deadLetterReasonCode reason))
+                          setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
+                        AckHalt reason ->
+                          setStatus traceSpan $ OTel.Error $ showHaltReason reason
+                    Left err -> do
+                      addEvent traceSpan $
+                        mkEvent
+                          eventAckDecision
+                          [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+                      setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+
+                let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+                when detailed $ case (finalizeResult, result) of
+                  (Right (), Right AckOk) -> recordCursor
+                  (Right (), Right (AckDeadLetter _)) -> recordCursor
+                  _ -> pure ()
+
+                -- Decrement in-flight and update stats.
                 liftIO $
-                  requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
-              Right () -> case result of
-                Right (AckHalt reason) ->
-                  liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
-                _ -> pure ()
-      if not detailed
-        then do
-          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-          process currentInflight
-        else Exception.mask $ \restore -> do
-          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-          slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
-          restore (process currentInflight)
-            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
-          liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
-            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+                  case finalizeResult of
+                    Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
+                    Right () -> finishProcessing metricsHandle (metricForResult result)
+
+                -- Handle halt (set flag, don't throw - let stream drain)
+                case finalizeResult of
+                  Left _ ->
+                    liftIO $
+                      requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
+                  Right () -> case result of
+                    Right (AckHalt reason) ->
+                      liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
+                    _ -> pure ()
+          if not detailed
+            then do
+              currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+              process currentInflight
+            else Exception.mask $ \restore -> do
+              currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+              slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
+              restore (process currentInflight)
+                `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+              liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
+                `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
   where
     isLeft :: Either a b -> Bool
     isLeft (Left _) = True

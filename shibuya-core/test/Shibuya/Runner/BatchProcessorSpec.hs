@@ -1,13 +1,8 @@
 module Shibuya.Runner.BatchProcessorSpec (spec) where
 
-import Control.Concurrent.STM
-  ( atomically,
-    modifyTVar',
-    newTVarIO,
-    readTVar,
-    readTVarIO,
-    writeTVar,
-  )
+import Control.Concurrent.NQE.Supervisor (Strategy (..))
+import Control.Concurrent.STM (atomically, check, modifyTVar', newTVarIO, readTVar, readTVarIO, writeTVar)
+import Control.Monad (forM_)
 import Data.IORef (IORef, atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty)
@@ -18,6 +13,7 @@ import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya (ProcessorFailure (..), ProcessorHalt (..))
+import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock
   ( TrackingAck (..),
     getTrackedDecisions,
@@ -25,11 +21,14 @@ import Shibuya.Adapter.Mock
     trackingAckHandle,
   )
 import Shibuya.Batch
-  ( BatchInfo (..),
+  ( BatchConfig (..),
+    BatchHandler,
+    BatchInfo (..),
     BatchKey (..),
     BatchTrigger (..),
     ackAllOk,
     ackExcept,
+    defaultBatchConfig,
     defaultBatchKey,
     withFallback,
   )
@@ -42,23 +41,113 @@ import Shibuya.Core.Ack
     mkDeadLetterCode,
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), Message (..), mkIngested)
 import Shibuya.Core.Metrics
   ( BatchStats (..),
     ProcessorId (..),
     ProcessorMetrics (..),
     StreamStats (..),
   )
-import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
+import Shibuya.Core.Metrics qualified as Metrics
+import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.BatchProcessor (runBatchesWithMetrics)
+import Shibuya.Internal.Runner.Master (startMaster, stopMaster)
+import Shibuya.Internal.Runner.Supervised (SupervisedProcessor (..), runSupervisedBatchWith)
 import Shibuya.Policy (Concurrency (..))
-import Shibuya.Telemetry.Effect (runTracingNoop)
+import Shibuya.Telemetry.Effect (Tracing, runTracingNoop)
+import Streamly.Data.Stream qualified as Stream
 import Test.Hspec
 import UnliftIO (throwIO, try)
 import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
 spec = describe "Shibuya.Internal.Runner.BatchProcessor" $ do
+  describe "delivery status" $ do
+    forM_ [Metrics.MetricsBasic, Metrics.MetricsDetailed Metrics.defaultDetailOptions] $ \detail -> do
+      forM_ [[1, 3, 5], [1 .. 5], []] $ \retained ->
+        it ("samples every status once and retains current members " <> show retained <> " / " <> show detail) $ do
+          calls <- newIORef []
+          handled <- newIORef []
+          (tracked, metrics) <- runEff $ runTracingNoop $ do
+            tracking <- newTrackingAck
+            (info, batch) <- buildBatch tracking 5 TriggerSize
+            let members =
+                  NE.zipWith
+                    ( \n item ->
+                        item
+                          { envelope = item.envelope {cursor = Just (CursorInt (fromIntegral n))},
+                            deliveryStatus = liftIO $ do
+                              previous <- atomicModifyIORef' calls (\xs -> (xs <> [n], xs))
+                              -- A superseded status flips on a second sample; two reads
+                              -- would wrongly re-admit it and fail both assertions.
+                              pure $ if n `elem` retained || n `elem` previous then DeliveryCurrent else DeliverySuperseded
+                          }
+                    )
+                    (NE.fromList [1 .. 5 :: Int])
+                    batch
+                handler actual messages = do
+                  liftIO $ modifyIORef' handled (<> [(actual, map (.envelope.messageId) (NE.toList messages))])
+                  pure ackAllOk
+            m <- runStatusBatches detail handler [(info, members)]
+            t <- getTrackedDecisions tracking
+            pure (t, m)
+          readIORef calls `shouldReturn` [1 .. 5]
+          map fst (reverse tracked) `shouldBe` [MessageId ("msg-" <> Text.pack (show n)) | n <- retained]
+          observed <- readIORef handled
+          case retained of
+            [] -> do
+              observed `shouldBe` []
+              metrics.batch.batchesEmitted `shouldBe` 0
+            _ -> case observed of
+              [(actual, ids)] -> do
+                actual.size `shouldBe` length retained
+                actual.batchKey `shouldBe` defaultBatchKey
+                actual.trigger `shouldBe` TriggerSize
+                actual.partition `shouldBe` Nothing
+                ids `shouldBe` map fst (reverse tracked)
+              _ -> expectationFailure (show observed)
+          metrics.stats.processed `shouldBe` length retained
+          metrics.stats.failed `shouldBe` 0
+          metrics.oldestInFlight `shouldBe` Nothing
+          case detail of
+            Metrics.MetricsBasic -> metrics.latency `shouldBe` Nothing
+            _ -> do
+              fmap (.count) metrics.latency `shouldBe` (if null retained then Nothing else Just 1)
+              (metrics.progress >>= (.latest)) `shouldBe` (if null retained then Nothing else Just (CursorInt (fromIntegral (last retained))))
+
+    it "checks a later batch after the previous batch finalizes" $ do
+      current <- newIORef True
+      handled <- newIORef []
+      finalized <- newIORef []
+      metrics <- runEff $ runTracingNoop $ do
+        tracking <- newTrackingAck
+        (info, first) <- buildBatch tracking 1 TriggerSize
+        let a = (NE.head first) {ack = AckHandle (\_ -> liftIO $ atomicModifyIORef' current (const (False, ())))}
+            b =
+              (NE.head first)
+                { deliveryStatus = liftIO $ (\x -> if x then DeliveryCurrent else DeliverySuperseded) <$> readIORef current,
+                  ack = AckHandle (\_ -> liftIO $ modifyIORef' finalized (<> [2 :: Int]))
+                }
+            handler _ _ = liftIO (modifyIORef' handled (<> [1 :: Int])) >> pure ackAllOk
+        runBatchesWithMetrics (ProcessorId "status-later") Serial handler [(info, NE.singleton a), (info, NE.singleton b)]
+      readIORef handled `shouldReturn` [1]
+      readIORef finalized `shouldReturn` []
+      metrics.batch.batchesEmitted `shouldBe` 1
+
+    it "lets throwing status escape as infrastructure failure" $ do
+      handlerCalls <- newIORef (0 :: Int)
+      finalized <- newIORef (0 :: Int)
+      result <- try @IO @IOError $ runEff $ runTracingNoop $ do
+        tracking <- newTrackingAck
+        (info, batch) <- buildBatch tracking 1 TriggerSize
+        let item = (NE.head batch) {deliveryStatus = liftIO $ ioError (userError "batch status infrastructure failure"), ack = AckHandle (\_ -> liftIO $ modifyIORef' finalized (+ 1))}
+        runBatchesWithMetrics (ProcessorId "status-throw") Serial (\_ _ -> liftIO (modifyIORef' handlerCalls (+ 1)) >> pure ackAllOk) [(info, NE.singleton item)]
+      case result of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected infrastructure failure"
+      readIORef handlerCalls `shouldReturn` 0
+      readIORef finalized `shouldReturn` 0
+
   describe "decision resolution and finalization (M1)" $ do
     it "finalizes each of 5 messages successfully with per-message decisions" $ do
       (tracked, metrics) <- runEff $ runTracingNoop $ do
@@ -358,3 +447,17 @@ validDeadLetterCode code =
   case mkDeadLetterCode code of
     Left err -> error $ "invalid test fixture: " <> show err
     Right valid -> valid
+
+-- Exercise the actual supervised batch runner in both metrics modes.
+runStatusBatches :: (IOE :> es, Tracing :> es) => Metrics.MetricsDetail -> BatchHandler es msg -> [(BatchInfo, NonEmpty (Ingested es msg))] -> Eff es ProcessorMetrics
+runStatusBatches detail handler batches = do
+  master <- startMaster IgnoreAll
+  let values = concatMap (NE.toList . snd) batches
+      adapter = Adapter "status-batch" (Stream.fromList values) (pure ())
+      config = defaultBatchConfig {batchSize = length values}
+  proc <- runSupervisedBatchWith detail master 10 (ProcessorId "status-batch") Serial config adapter handler
+  liftIO $ atomically $ readTVar proc.done >>= check
+  metrics <- liftIO $ Metrics.sampleMetrics proc.metrics
+  liftIO $ Metrics.slotMisses proc.metrics `shouldReturn` 0
+  stopMaster master
+  pure metrics

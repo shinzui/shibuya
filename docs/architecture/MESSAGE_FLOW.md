@@ -119,7 +119,7 @@ emitted batch and the returned `BatchAck`, the framework resolves exactly one
 retained message it looks the message's `MessageId` up in `decisions`; if the id
 is absent it uses `fallback`. The handler's return value only supplies decisions
 — it never drives which messages are acked. Each resolved decision is then
-applied through the message's idempotent finalizer with bounded retries. A
+applied through each retained current message's idempotent finalizer with bounded retries. A
 permanently failing finalizer is surfaced as a loud processor failure with the
 affected `MessageId`; it is not swallowed.
 
@@ -215,13 +215,15 @@ Loop:
    - Yes: Exit (all done)
    - No: Continue
 2. `receive inbox` (blocks if empty)
-3. Update state to `Processing`
-4. Project the internal `Ingested` value to handler-facing `Message`
-5. Call `handler message`
-6. Call `ingested.ack.finalize decision`
-7. Update metrics based on decision
-8. Update state to `Idle`
-9. Loop
+3. Ask `ingested.deliveryStatus` once. If superseded, record that on the processing
+   span and return to the loop without handler, finalizer or processing metrics.
+4. Update state to `Processing`
+5. Project the internal `Ingested` value to handler-facing `Message`
+6. Call `handler message`
+7. Call `ingested.ack.finalize decision`
+8. Update metrics based on decision
+9. Update state to `Idle`
+10. Loop
 
 ### 5. Graceful Shutdown
 

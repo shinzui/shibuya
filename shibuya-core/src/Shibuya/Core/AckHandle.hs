@@ -6,7 +6,8 @@
 -- failure. Adapters must therefore make finalization idempotent or
 -- phase-tracked: re-running a partially completed finalization with the same
 -- decision must be safe. The framework never intentionally finalizes one
--- delivery with two different decisions.
+-- delivery with two different decisions. A delivery whose admission status is
+-- DeliverySuperseded receives no finalizer call.
 module Shibuya.Core.AckHandle
   ( AckHandle (..),
   )

@@ -79,6 +79,7 @@ module Shibuya
     AckHandle (..),
     Lease (..),
     Ingested (..),
+    DeliveryStatus (..),
     mkIngested,
     toMessage,
 
@@ -153,7 +154,7 @@ import Shibuya.Core.Ack
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Error (ConfigError (..), HandlerError (..), PolicyError (..), RuntimeError (..))
-import Shibuya.Core.Ingested (Ingested (..), Message (..), mkIngested, toMessage)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), Message (..), mkIngested, toMessage)
 import Shibuya.Core.Lease (Lease (..))
 import Shibuya.Core.Metrics
   ( BatchStats (..),

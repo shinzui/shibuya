@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- Prepare `shibuya-core` and `shibuya-metrics` 0.12.0.0 candidates. `Ingested`
+  gains `deliveryStatus`: direct record constructors must add
+  `deliveryStatus = pure DeliveryCurrent`; positional construction also needs the
+  extra field. `mkIngested` continues to build current deliveries.
+- `shibuya-metrics` requires `shibuya-core ^>=0.12.0.0` in every component.
+  Consumers such as `mori://shinzui/shibuya-pgmq-adapter` and
+  `mori://shinzui/kiroku` construct `Ingested` records directly; their existing
+  core 0.11 bounds keep them on that series until they migrate explicitly.
+
+### New Features
+
+- Let adapters supersede buffered deliveries before handler entry. The runner
+  skips handlers, finalizers and processing outcomes for superseded deliveries;
+  batches retain only current members and report the retained size. Status is
+  sampled once at admission and must be prompt and free of synchronous exceptions.
+
 ## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes

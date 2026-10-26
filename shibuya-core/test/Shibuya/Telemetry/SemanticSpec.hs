@@ -50,7 +50,7 @@ import Shibuya.Core.Ack
     mkDeadLetterCode,
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (mkIngested)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), mkIngested)
 import Shibuya.Core.Metrics (ProcessorId (..))
 import Shibuya.Core.Types (Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Internal.Runner.Supervised (runWithMetrics)
@@ -63,6 +63,31 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
   it "keeps the application dead-letter reason code wire key stable" $ do
     attrShibuyaDeadLetterReasonCode
       `shouldBe` "shibuya.dead_letter.reason.code"
+
+  it "records superseded without starting a handler" $ do
+    (processor, spansRef) <- inMemoryListExporter
+    provider <- createTracerProvider [processor] emptyTracerProviderOptions
+    let tracer = mkTestTracer provider
+    runEff $ runTracing tracer $ do
+      let item =
+            (mkIngested (mkEnvelope (MessageId "superseded") ("hello" :: Text)) (AckHandle (\_ -> error "finalizer must not run")))
+              { deliveryStatus = pure DeliverySuperseded
+              }
+      _ <- runWithMetrics 4 (ProcessorId "skip-proc") (listAdapter [item]) (\_ -> error "handler must not run")
+      pure ()
+    _ <- shutdownTracerProvider provider (Just 5_000_000)
+    spans <- filter ((== Consumer) . spanKind) <$> readIORef spansRef
+    case spans of
+      [processingSpan] -> do
+        hot <- readIORef (spanHot processingSpan)
+        hotName hot `shouldBe` "skip-proc process"
+        let events = toList (appendOnlyBoundedCollectionValues (hotEvents hot))
+        map eventName events `shouldBe` ["shibuya.ack.decision"]
+        hotStatus hot `shouldBe` Ok
+        case events of
+          [event] -> getAttributeMap (eventAttributes event) `shouldHaveTextAttribute` ("shibuya.ack.decision", "superseded")
+          _ -> expectationFailure "expected acknowledgement event"
+      _ -> expectationFailure ("expected processing span, got " <> show (length spans))
 
   it "emits a process span with conventions-aligned attributes and events" $ do
     (processor, spansRef) <- inMemoryListExporter

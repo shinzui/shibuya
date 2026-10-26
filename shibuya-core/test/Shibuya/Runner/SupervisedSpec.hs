@@ -40,7 +40,7 @@ import Shibuya.Core.Ack
     mkDeadLetterCode,
   )
 import Shibuya.Core.AckHandle (AckHandle (..))
-import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), Message (..), mkIngested)
 import Shibuya.Core.Metrics
   ( InFlightInfo (..),
     ProcessorId (..),
@@ -53,8 +53,10 @@ import Shibuya.Core.Metrics qualified as Metrics
 import Shibuya.Core.Types (Cursor (..), Envelope (..), MessageId (..), mkEnvelope)
 import Shibuya.Handler (Handler)
 import Shibuya.Internal.Runner.Master
-  ( getAllMetrics,
+  ( ProcessorLifecycle (..),
+    getAllMetrics,
     getAllMetricsIO,
+    getLifecycleSnapshot,
     getProcessorMetricsIO,
     startMaster,
     stopMaster,
@@ -64,6 +66,7 @@ import Shibuya.Internal.Runner.Supervised
     getMetrics,
     isDone,
     runSupervised,
+    runSupervisedBatchWith,
     runSupervisedWith,
     runWithMetrics,
     runWithMetricsBatch,
@@ -78,6 +81,98 @@ import UnliftIO.Concurrent (threadDelay)
 
 spec :: Spec
 spec = do
+  describe "delivery status" $ do
+    it "treats deliveries built by mkIngested as current" $ do
+      status <- runEff $ (mkIngested (createTestEnvelope 1) (AckHandle (const (pure ())))).deliveryStatus
+      status `shouldBe` DeliveryCurrent
+
+    forM_ [Metrics.MetricsBasic, Metrics.MetricsDetailed Metrics.defaultDetailOptions] $ \detail -> do
+      it ("skips the handler and finalizer for a superseded delivery: " <> show detail) $ do
+        seen <- newIORef []
+        (decisions, metrics) <- runEff $ runTracingNoop $ do
+          tracking <- newTrackingAck
+          let values =
+                [ let item = mkTrackedIngested tracking ((createTestEnvelope n) {cursor = Just (CursorInt (fromIntegral n))})
+                   in item {deliveryStatus = pure (if n == 2 then DeliverySuperseded else DeliveryCurrent)}
+                | n <- [1 .. 3]
+                ]
+              handler message = liftIO (modifyIORef' seen (<> [message.envelope.messageId])) >> pure AckOk
+          master <- startMaster IgnoreAll
+          proc <- runSupervisedWith detail master 10 (ProcessorId "status") Unordered Serial (testAdapter values) handler
+          liftIO $ atomically $ readTVar proc.done >>= check
+          metrics <- liftIO $ sampleMetrics proc.metrics
+          liftIO $ Metrics.slotMisses proc.metrics `shouldReturn` 0
+          decisions <- getTrackedDecisions tracking
+          stopMaster master
+          pure (decisions, metrics)
+        readIORef seen `shouldReturn` [MessageId "msg-1", MessageId "msg-3"]
+        map fst (reverse decisions) `shouldBe` [MessageId "msg-1", MessageId "msg-3"]
+        metrics.stats.received `shouldBe` 3
+        metrics.stats.processed `shouldBe` 2
+        metrics.stats.failed `shouldBe` 0
+        metrics.oldestInFlight `shouldBe` Nothing
+        case detail of
+          Metrics.MetricsBasic -> metrics.latency `shouldBe` Nothing
+          _ -> do
+            fmap (.count) metrics.latency `shouldBe` Just 2
+            (metrics.progress >>= (.latest)) `shouldBe` Just (CursorInt 3)
+
+    it "asks for status at handler time, not at ingestion" $ do
+      queued <- UIO.newEmptyMVar
+      current <- newIORef True
+      seen <- newIORef []
+      result <- UIO.timeout 5000000 $ runEff $ runTracingNoop $ do
+        tracking <- newTrackingAck
+        let values =
+              [ let item = mkTrackedIngested tracking (createTestEnvelope n)
+                 in if n == 2 then item {deliveryStatus = liftIO $ (\x -> if x then DeliveryCurrent else DeliverySuperseded) <$> readIORef current} else item
+              | n <- [1 .. 3]
+              ]
+            source =
+              Stream.unfoldrM
+                ( \case
+                    [] -> liftIO (UIO.putMVar queued ()) >> pure Nothing
+                    x : xs -> pure (Just (x, xs))
+                )
+                values
+            adapter = (testAdapter values) {source}
+            handler message = do
+              liftIO $ modifyIORef' seen (<> [message.envelope.messageId])
+              when (message.envelope.messageId == MessageId "msg-1") $ liftIO $ do
+                UIO.takeMVar queued
+                atomicWriteIORef current False
+              pure AckOk
+        _ <- runWithMetrics 10 (ProcessorId "status-time") adapter handler
+        getTrackedDecisions tracking
+      fmap (map fst . reverse) result `shouldBe` Just [MessageId "msg-1", MessageId "msg-3"]
+      readIORef seen `shouldReturn` [MessageId "msg-1", MessageId "msg-3"]
+
+    forM_ [False, True] $ \batching ->
+      it ("reports throwing status as infrastructure failure without handler or finalizer: batch=" <> show batching) $ do
+        seen <- newIORef (0 :: Int)
+        finalized <- newIORef (0 :: Int)
+        result <- UIO.timeout 5000000 $ runEff $ runTracingNoop $ do
+          master <- startMaster IgnoreAll
+          let pid = ProcessorId "throwing-status"
+              item =
+                (mkIngested (createTestEnvelope 1) (AckHandle (\_ -> liftIO $ modifyIORef' finalized (+ 1))))
+                  { deliveryStatus = liftIO $ UIO.throwIO (userError "status infrastructure failure")
+                  }
+              adapter = testAdapter [item]
+          proc <-
+            if batching
+              then runSupervisedBatchWith Metrics.MetricsBasic master 10 pid Serial defaultBatchConfig {batchSize = 1} adapter (\_ _ -> liftIO (modifyIORef' seen (+ 1)) >> pure ackAllOk)
+              else runSupervised master 10 pid Unordered Serial adapter (\_ -> liftIO (modifyIORef' seen (+ 1)) >> pure AckOk)
+          liftIO $ atomically $ readTVar proc.done >>= check
+          lifecycle <- getLifecycleSnapshot master
+          stopMaster master
+          pure (Map.lookup pid lifecycle)
+        case result of
+          Just (Just (LifecycleFailed message Nothing)) -> message `shouldSatisfy` Text.isInfixOf "status infrastructure failure"
+          other -> expectationFailure (show other)
+        readIORef seen `shouldReturn` 0
+        readIORef finalized `shouldReturn` 0
+
   describe "Shibuya.Internal.Runner.Master" $ do
     it "starts and stops cleanly" $ do
       result <- runEff $ runTracingNoop $ do

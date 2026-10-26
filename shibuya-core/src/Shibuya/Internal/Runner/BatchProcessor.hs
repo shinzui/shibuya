@@ -59,7 +59,7 @@ import Shibuya.Core.Ack
     HaltReason (..),
     RetryDelay (..),
   )
-import Shibuya.Core.Ingested (Ingested (..), toMessage)
+import Shibuya.Core.Ingested (DeliveryStatus (..), Ingested (..), toMessage)
 import Shibuya.Core.Metrics
   ( AckDecisionMetric (..),
     BatchTriggerMetric (..),
@@ -148,7 +148,42 @@ processOneBatchWithDetail ::
   BatchHandler es msg ->
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
-processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
+processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler original@(info, batch) =
+  scan 0 (NE.toList batch)
+  where
+    -- All-current batches retain the original pair without constructing a list.
+    scan _ [] = run original
+    scan count (member : rest) = do
+      status <- member.deliveryStatus
+      case status of
+        DeliveryCurrent -> scan (count + 1) rest
+        DeliverySuperseded -> do
+          suffix <- retain rest
+          case NE.nonEmpty (take count (NE.toList batch) <> suffix) of
+            Nothing -> pure ()
+            Just current -> run (info {size = NE.length current}, current)
+    retain [] = pure []
+    retain (member : rest) = do
+      status <- member.deliveryStatus
+      suffix <- retain rest
+      pure $ case status of
+        DeliveryCurrent -> member : suffix
+        DeliverySuperseded -> suffix
+    run = processCurrentBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler
+{-# INLINE processOneBatchWithDetail #-}
+
+processCurrentBatchWithDetail ::
+  (IOE :> es, Tracing :> es) =>
+  Bool ->
+  MetricsHandle ->
+  ProcessorId ->
+  Int ->
+  ProcessorSignal ->
+  ProcessorExitPublisher ->
+  BatchHandler es msg ->
+  (BatchInfo, NonEmpty (Ingested es msg)) ->
+  Eff es ()
+processCurrentBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
   -- Use the first message's trace context as the batch span's parent. A batch
   -- may span several traces; picking the first is a pragmatic single parent
   -- (full fan-in links are a later refinement).
@@ -286,7 +321,7 @@ processOneBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitP
     isFailing (AckDeadLetter _) = True
     isFailing (AckRetry _) = True
     isFailing _ = False
-{-# INLINE processOneBatchWithDetail #-}
+{-# INLINE processCurrentBatchWithDetail #-}
 
 decisionMetric :: AckDecision -> AckDecisionMetric
 decisionMetric AckOk = CountProcessed

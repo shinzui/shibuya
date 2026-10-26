@@ -94,6 +94,7 @@ data Ingested es msg = Ingested
   { envelope :: !(Envelope msg)
   , ack      :: !(AckHandle es)
   , lease    :: !(Maybe (Lease es))
+  , deliveryStatus :: !(Eff es DeliveryStatus)
   }
 ```
 
@@ -105,9 +106,18 @@ handlers receive its read-only `Message` projection and return an `AckDecision`.
 | `envelope` | Message metadata + payload |
 | `ack` | Adapter finalizer, managed by the framework |
 | `lease` | Optional visibility timeout extension |
+| `deliveryStatus` | Prompt adapter admission read: current or superseded |
 
 Application handlers do not receive `Ingested` directly. The runner projects it
-to the read-only `Message` type before invoking user code.
+to the read-only `Message` type before invoking user code. It first reads
+`deliveryStatus` once at processing admission. `DeliverySuperseded` skips the
+handler and finalizer, contributes no processing outcome, and advances no cursor.
+`DeliveryCurrent` follows normal processing. `mkIngested` defaults to current;
+direct record constructors must provide the new field. The action must return
+promptly without side effects or synchronous exceptions. A current answer does
+not reserve the attempt against subsequent revocation or concurrent retry.
+For batches, each member is sampled once before handler entry, superseded
+members are excluded in order, and the retained batch size is reported.
 
 ## What Handlers Receive
 
@@ -133,7 +143,8 @@ newtype AckHandle es = AckHandle
 ```
 
 Adapter-provided callback. The framework resolves one `AckDecision` per delivery
-after the handler returns. A transient exception from `finalize` can cause the
+after an admitted handler returns. Superseded deliveries receive no finalizer
+call. A transient exception from `finalize` can cause the
 framework to invoke it again with that same decision, so adapters must make
 finalization idempotent or track its phases durably.
 
