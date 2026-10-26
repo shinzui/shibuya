@@ -1,0 +1,94 @@
+--- fresh
++++ shared
+@@ -1,6 +1,6 @@
+
+ Result size of Tidy Core
+-  = {terms: 1,920, types: 2,755, coercions: 1,202, joins: 1/6}
++  = {terms: 1,922, types: 2,743, coercions: 1,212, joins: 1/6}
+
+ -- RHS size: {terms: 11, types: 5, coercions: 0, joins: 0/0}
+ $WBenchMessage [InlPrag=INLINE[final] CONLIKE]
+@@ -1208,7 +1208,7 @@
+       ($f:>e:0_$creifyIndex
+        `cast` <Co:17> :: Int ~R# (Tracing :> [Tracing, IOE]))
+
+--- RHS size: {terms: 103, types: 344, coercions: 191, joins: 0/1}
++-- RHS size: {terms: 104, types: 338, coercions: 196, joins: 0/1}
+ benchmarks57
+   :: (forall (es :: [Effect]).
+       (IOE :> es) =>
+@@ -1219,7 +1219,7 @@
+  Str=<MC(1,L)><L><L>,
+  Unf=Unf{Src=<vanilla>, TopLvl=True,
+          Value=True, ConLike=True, WorkFree=True, Expandable=True,
+-         Guidance=IF_ARGS [60 20 0] 380 0}]
++         Guidance=IF_ARGS [60 20 0] 410 60}]
+ benchmarks57
+   = \ (handler
+          :: forall (es :: [Effect]). (IOE :> es) => Handler es BenchMessage)
+@@ -1269,7 +1269,11 @@
+       { __DEFAULT ->
+       case writeIntArray# ipv1 1# ww6 s1 of s'#1 { __DEFAULT ->
+       case unsafeFreezeByteArray# ipv1 s'#1 of { (# s'#2, arr'# #) ->
+-      $wrunTracingNoop
++      $wevalStaticRep
++        (runTracingNoop4
++         `cast` <Co:4> :: CallStack ~R# (?callStack::CallStack))
++        @~<Co:1> :: DispatchOf Tracing ~# Static WithSideEffects
++        runTracingNoop2
+         ((\ (v [OS=OneShot] :: Env [Tracing, IOE])
+             (s [OS=OneShot] :: State# RealWorld) ->
+             case $wcreateIngestedMessages n s of { (# ipv2, ipv3 #) ->
+@@ -1302,7 +1306,9 @@
+          `cast` <Co:44> :: (Env [Tracing, IOE]
+                             -> State# RealWorld -> (# State# RealWorld, Int #))
+                            ~R# Eff [Tracing, IOE] Int)
+-        (Env 0# arr'# ww3)
++        0#
++        arr'#
++        ww3
+         (s'#2 `cast` <Co:2> :: State# (PrimState IO) ~R# State# RealWorld)
+       }
+       }
+@@ -1400,7 +1406,7 @@
+          Guidance=IF_ARGS [] 10 10}]
+ benchmarks32 = PushCallStack runEff11 runEff8 benchmarks21
+
+--- RHS size: {terms: 123, types: 406, coercions: 239, joins: 0/1}
++-- RHS size: {terms: 124, types: 400, coercions: 244, joins: 0/1}
+ benchmarks12
+   :: Int -> State# RealWorld -> (# State# RealWorld, Int #)
+ [GblId,
+@@ -1408,7 +1414,7 @@
+  Str=<L><L>,
+  Unf=Unf{Src=<vanilla>, TopLvl=True,
+          Value=True, ConLike=True, WorkFree=True, Expandable=True,
+-         Guidance=IF_ARGS [20 0] 428 0}]
++         Guidance=IF_ARGS [20 0] 458 60}]
+ benchmarks12
+   = \ (n :: Int) (s [OS=OneShot] :: State# RealWorld) ->
+       case newMutVar# $fShowBenchMessage5 s of { (# ipv, ipv1 #) ->
+@@ -1456,7 +1462,11 @@
+       { __DEFAULT ->
+       case writeIntArray# ipv3 1# ww6 s1 of s'#1 { __DEFAULT ->
+       case unsafeFreezeByteArray# ipv3 s'#1 of { (# s'#2, arr'# #) ->
+-      $wrunTracingNoop
++      $wevalStaticRep
++        (runTracingNoop4
++         `cast` <Co:4> :: CallStack ~R# (?callStack::CallStack))
++        @~<Co:1> :: DispatchOf Tracing ~# Static WithSideEffects
++        runTracingNoop2
+         ((\ (v [OS=OneShot] :: Env [Tracing, IOE])
+             (s2 [OS=OneShot] :: State# RealWorld) ->
+             case $wcreateIngestedMessages n s2 of { (# ipv4, ipv5 #) ->
+@@ -1502,7 +1512,9 @@
+          `cast` <Co:44> :: (Env [Tracing, IOE]
+                             -> State# RealWorld -> (# State# RealWorld, Int #))
+                            ~R# Eff [Tracing, IOE] Int)
+-        (Env 0# arr'# ww3)
++        0#
++        arr'#
++        ww3
+         (s'#2 `cast` <Co:2> :: State# (PrimState IO) ~R# State# RealWorld)
+       }
+       }

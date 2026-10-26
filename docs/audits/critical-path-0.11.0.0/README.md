@@ -1,14 +1,17 @@
 # Critical-path regression investigation, 2026-10-25
 
-Follow-up: [the single-transaction intake repair](handoff-follow-up.md) passes all
-correctness suites and 61/62 full benchmark comparisons. It resolves the observed
-processing-1000 regression; the short counter remains open. The evidence below
-records the preceding investigation.
+Latest result: [the ordinary-Haskell startup handoff](source-trigger-follow-up.md)
+passes all 62 existing release comparisons, 289 core examples, 104 metrics
+examples and both GC suites. It recovers the remaining counter without a custom
+GHC primitive: counter-100 measures 41.32 µs at release and 38.16 µs with the fix.
+The GHC-specific workaround is saved separately at `721436c` on
+`perf/serial-intake-fork-workaround` and is not merged into `master`.
 
-The ingestion cancellation bug is fixed in `848eb31`; the performance gate still
-fails. This investigation identifies scheduler migration and the concurrent
-intake/drain interval as the performance problem. It does not claim a safe
-production performance fix or a passing full release gate.
+The evidence below records the earlier investigation at `848eb31`, when the
+ingestion cancellation bug was fixed but the performance gate still failed.
+The subsequent [single-transaction intake repair](handoff-follow-up.md) passed
+61/62 cases before the startup handoff recovered the remaining counter. Keep
+those historical results distinct from the final passing comparison.
 
 ## Correctness repair
 
@@ -159,7 +162,7 @@ The [pinned runtime sources](https://github.com/ghc/ghc/tree/ghc-9.12.4-release/
 and [trace implementation](https://github.com/ghc/ghc/blob/ghc-9.12.4-release/libraries/ghc-internal/src/GHC/Internal/Debug/Trace.hs)
 support those implementation details.
 
-## Implementation decision
+## Implementation decision at the earlier revision
 
 Keep the verified cancellation repair. No speculative performance patch is
 retained. The previous provider rollback, tracing specializations, preparation

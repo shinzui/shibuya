@@ -4,6 +4,9 @@
 
 ### Bug Fixes
 
+- Reduce serial intake startup migration by waiting for input before processor
+  setup and yielding the producer before it publishes messages. Preserve bounded
+  admission, source ownership and cancellation using ordinary Haskell operations.
 - Reduce intake overhead by checking queue emptiness and receiving in one STM
   transaction, preserving bounded admission and completion/halt wakeups.
 - Preserve ingestion cancellation when tracing callbacks swallow asynchronous

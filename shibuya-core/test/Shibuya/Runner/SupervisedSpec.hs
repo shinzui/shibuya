@@ -2,6 +2,7 @@
 
 module Shibuya.Runner.SupervisedSpec (spec) where
 
+import Control.Concurrent (myThreadId)
 import Control.Concurrent.NQE.Supervisor (Strategy (..))
 import Control.Concurrent.STM (atomically, check, newEmptyTMVarIO, readTVar, readTVarIO, takeTMVar, tryPutTMVar)
 import Control.Exception (MaskingState (..), getMaskingState)
@@ -11,6 +12,7 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
+import Effectful.State.Static.Local qualified as State
 import Shibuya (ProcessorHalt (..))
 import Shibuya.Adapter (Adapter (..))
 import Shibuya.Adapter.Mock
@@ -27,6 +29,7 @@ import Shibuya.App
     runApp,
     stopAppGracefully,
   )
+import Shibuya.Batch (BatchConfig (..), ackAllOk, defaultBatchConfig)
 import Shibuya.Batch.TestHarness (finalizedExactlyOnce)
 import Shibuya.Core.Ack
   ( AckDecision (..),
@@ -63,6 +66,7 @@ import Shibuya.Internal.Runner.Supervised
     runSupervised,
     runSupervisedWith,
     runWithMetrics,
+    runWithMetricsBatch,
   )
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Telemetry.Effect (runTracingNoop)
@@ -101,6 +105,36 @@ spec = do
       processorMetrics `shouldBe` Just Nothing
 
   describe "Shibuya.Internal.Runner.Supervised" $ do
+    forM_ [False, True] $ \batching ->
+      it ("isolates intake state while preserving serial handler state for " <> if batching then "batches" else "messages") $ do
+        owner <- myThreadId
+        observed <- newIORef []
+        finalState <- runEff $ State.execState (100 :: Int) $ runTracingNoop $ do
+          let source =
+                Stream.unfoldrM
+                  ( \n ->
+                      if n == (3 :: Int)
+                        then pure Nothing
+                        else do
+                          liftIO $ myThreadId >>= (`shouldNotBe` owner)
+                          value <- State.get @Int
+                          State.modify @Int (+ 1)
+                          pure $ Just (mkIngested (mkEnvelope (MessageId (Text.pack (show n))) value) (AckHandle (const $ pure ())), n + 1)
+                  )
+                  0
+              adapter = Adapter {adapterName = "test:state", source = source, shutdown = pure ()}
+              observe message = do
+                value <- State.get @Int
+                State.modify @Int (+ 10)
+                liftIO $ do
+                  myThreadId >>= (`shouldBe` owner)
+                  modifyIORef' observed (<> [(message.envelope.payload, value)])
+          if batching
+            then runWithMetricsBatch 1 (ProcessorId "state") Serial defaultBatchConfig {batchSize = 1} adapter (\_ messages -> mapM_ observe messages >> pure ackAllOk)
+            else runWithMetrics 1 (ProcessorId "state") adapter (\message -> observe message >> pure AckOk)
+        finalState `shouldBe` 130
+        readIORef observed `shouldReturn` [(100, 100), (101, 110), (102, 120)]
+
     it "records only successful acknowledgement and dead-letter cursors" $ do
       forM_ [AckOk, AckDeadLetter MaxRetriesExceeded, AckRetry (RetryDelay 0), AckHalt (HaltFatal "stop")] $ \decision -> do
         final <- cursorOutcome decision False

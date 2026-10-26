@@ -30,6 +30,7 @@ module Shibuya.Internal.Runner.Supervised
   )
 where
 
+import Control.Concurrent (yield)
 import Control.Concurrent.NQE.Process (Inbox, mailboxEmptySTM, newBoundedInbox, receiveSTM)
 import Control.Concurrent.NQE.Supervisor (addChild)
 import Control.Concurrent.STM
@@ -320,10 +321,28 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
           Nothing -> runIngesterWithMetricsUnpaused procId metricsHandle adapter.source inbox
           Just pause -> runIngesterWithMetrics procId metricsHandle pause adapter.source inbox
         ingesterWithSignal =
-          unsafeUnmask (runInIO ingest)
+          ( do
+              -- Honor the startup scheduling hint before publishing messages.
+              -- A later yield can move the newly awakened serial consumer to
+              -- another capability while intake is still running.
+              case concurrency of
+                Serial -> yield
+                _ -> pure ()
+              unsafeUnmask (runInIO ingest)
+          )
             `finally` atomically (writeTVar streamDoneVar True)
 
     UIO.withAsync ingesterWithSignal $ \ingesterAsync -> do
+      -- Block before allocating processor state. Paired with the producer's
+      -- startup yield, this avoids leaving both threads runnable at handoff.
+      -- Observe readiness without removing a message or changing admission.
+      case concurrency of
+        Serial -> unsafeUnmask $ atomically $ do
+          empty <- mailboxEmptySTM inbox
+          when empty $ do
+            done <- readTVar streamDoneVar
+            when (not done) retry
+        _ -> pure ()
       -- Processor: process messages, exit when stream done and inbox empty
       -- Saturated literal arguments plus INLINE on the loop and worker erase
       -- the detail ownership action from the basic specialization. Selecting a

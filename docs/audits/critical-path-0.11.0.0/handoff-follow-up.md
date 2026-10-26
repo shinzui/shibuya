@@ -1,5 +1,9 @@
 # Intake handoff follow-up, 2026-10-25
 
+Subsequent result: [the ordinary-Haskell startup handoff](source-trigger-follow-up.md)
+recovers the remaining counter and passes the full 62-case gate. This document
+records the earlier partial STM repair at `20c0821`.
+
 The retained change removes the per-message nested STM transaction in
 `inboxToStream`. All correctness suites pass. The full release comparison passes
 61 of 62 benchmarks: the previously regressing 1,000-message processing case is
