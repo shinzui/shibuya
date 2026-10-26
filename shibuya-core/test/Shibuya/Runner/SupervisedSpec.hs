@@ -8,6 +8,8 @@ import Control.Concurrent.STM (atomically, check, newEmptyTMVarIO, readTVar, rea
 import Control.Exception (MaskingState (..), getMaskingState)
 import Control.Monad (forM, forM_, replicateM, replicateM_, when)
 import Data.IORef (IORef, atomicModifyIORef', atomicWriteIORef, modifyIORef', newIORef, readIORef)
+import Data.List (sort)
+import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
@@ -29,7 +31,7 @@ import Shibuya.App
     runApp,
     stopAppGracefully,
   )
-import Shibuya.Batch (BatchConfig (..), ackAllOk, defaultBatchConfig)
+import Shibuya.Batch (BatchConfig (..), BatchKey (..), ackAll, ackAllOk, defaultBatchConfig)
 import Shibuya.Batch.TestHarness (finalizedExactlyOnce)
 import Shibuya.Core.Ack
   ( AckDecision (..),
@@ -146,6 +148,74 @@ spec = do
         getTrackedDecisions tracking
       fmap (map fst . reverse) result `shouldBe` Just [MessageId "msg-1", MessageId "msg-3"]
       readIORef seen `shouldReturn` [MessageId "msg-1", MessageId "msg-3"]
+
+    forM_ [Ahead 2, Async 2] $ \concurrency ->
+      forM_ [False, True] $ \batching ->
+        forM_ [Metrics.MetricsBasic, Metrics.MetricsDetailed Metrics.defaultDetailOptions] $ \detail ->
+          it ("checks queued delivery status after finalization with concurrent keys: " <> show (concurrency, batching, detail)) $ do
+            otherStarted <- UIO.newEmptyMVar
+            firstFinalized <- UIO.newEmptyMVar
+            current <- newIORef True
+            sampled <- newIORef []
+            handled <- newIORef []
+            finalized <- newIORef []
+            result <- UIO.timeout 5_000_000 $
+              runEff $
+                runTracingNoop $
+                  UIO.bracket (startMaster IgnoreAll) stopMaster $ \master -> do
+                    let values =
+                          [ ( mkIngested ((createTestEnvelope n) {partition = Just (if n == 3 then "b" else "a")}) $
+                                AckHandle $ \decision -> liftIO $ do
+                                  atomicModifyIORef' finalized (\xs -> ((n, decision) : xs, ()))
+                                  when (n == 1) $ do
+                                    atomicWriteIORef current False
+                                    UIO.putMVar firstFinalized ()
+                            )
+                              { deliveryStatus = liftIO $ do
+                                  atomicModifyIORef' sampled (\xs -> (n : xs, ()))
+                                  fresh <- readIORef current
+                                  pure $ if n == 2 && not fresh then DeliverySuperseded else DeliveryCurrent
+                              }
+                          | n <- [1 .. 3]
+                          ]
+                        handler message = do
+                          let mid = message.envelope.messageId
+                          liftIO $ atomicModifyIORef' handled (\xs -> (mid : xs, ()))
+                          -- The second key cannot start until the scheduler has read
+                          -- the queued successor on key a. Both handlers must overlap:
+                          -- a waits for b to start, and b waits for a to finalize.
+                          if mid == MessageId "msg-1"
+                            then liftIO (UIO.takeMVar otherStarted) >> pure (AckRetry (RetryDelay 0))
+                            else do
+                              when (mid == MessageId "msg-3") $ liftIO $ do
+                                UIO.putMVar otherStarted ()
+                                UIO.takeMVar firstFinalized
+                              pure AckOk
+                        config = defaultBatchConfig {batchSize = 1, batchKey = \env -> BatchKey (maybe "" id env.partition)}
+                    proc <-
+                      if batching
+                        then runSupervisedBatchWith detail master 10 (ProcessorId "concurrent-status") concurrency config (testAdapter values) (\_ messages -> ackAll <$> handler (NE.head messages))
+                        else runSupervisedWith detail master 10 (ProcessorId "concurrent-status") PartitionedInOrder concurrency (testAdapter values) handler
+                    liftIO $ atomically $ readTVar proc.done >>= check
+                    liftIO $ Metrics.slotMisses proc.metrics `shouldReturn` 0
+                    liftIO $ sampleMetrics proc.metrics
+            case result of
+              Nothing -> expectationFailure "concurrent delivery admission did not finish"
+              Just metrics -> do
+                metrics.stats.received `shouldBe` 3
+                metrics.stats.processed `shouldBe` 2
+                metrics.stats.failed `shouldBe` 0
+                metrics.oldestInFlight `shouldBe` Nothing
+                metrics.state `shouldBe` Idle
+                case detail of
+                  Metrics.MetricsBasic -> metrics.latency `shouldBe` Nothing
+                  _ -> fmap (.count) metrics.latency `shouldBe` Just 2
+            sort <$> readIORef sampled `shouldReturn` [1, 2, 3]
+            sort <$> readIORef handled `shouldReturn` [MessageId "msg-1", MessageId "msg-3"]
+            decisions <- readIORef finalized
+            sort (map fst decisions) `shouldBe` [1, 3]
+            lookup 1 decisions `shouldBe` Just (AckRetry (RetryDelay 0))
+            lookup 3 decisions `shouldBe` Just AckOk
 
     forM_ [False, True] $ \batching ->
       it ("reports throwing status as infrastructure failure without handler or finalizer: batch=" <> show batching) $ do
