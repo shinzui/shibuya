@@ -190,7 +190,7 @@ executable metrics-observer-load
     shibuya-core,
     shibuya-metrics,
     stm,
-    streamly-core,
+    streamly-core ^>=0.3,
     text,
     warp,
     websockets,

@@ -38,6 +38,8 @@
 
 ### Other Changes
 
+- Bound the observer-load executable's `streamly-core` dependency to `^>=0.3`,
+  matching the range already required by `shibuya-core`.
 - Avoid waking WebSocket writers for empty terminal batches and make observer
   captures reproducible with bounded delivery acceptance evidence.
 

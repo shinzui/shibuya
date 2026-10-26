@@ -1,18 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Bug Fixes
-
-- Reduce serial intake startup migration by waiting for input before processor
-  setup and yielding the producer before it publishes messages. Preserve bounded
-  admission, source ownership and cancellation using ordinary Haskell operations.
-- Reduce intake overhead by checking queue emptiness and receiving in one STM
-  transaction, preserving bounded admission and completion/halt wakeups.
-- Preserve ingestion cancellation when tracing callbacks swallow asynchronous
-  exceptions. Keep source effects on their owning thread and isolate SDK callbacks
-  on an owned worker, preventing source entry after cancellation during span start.
-
 ## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
@@ -40,6 +27,14 @@
 
 ### Bug Fixes
 
+- Reduce serial intake startup migration by waiting for input before processor
+  setup and yielding the producer before it publishes messages. Preserve bounded
+  admission, source ownership and cancellation using ordinary Haskell operations.
+- Reduce intake overhead by checking queue emptiness and receiving in one STM
+  transaction, preserving bounded admission and completion/halt wakeups.
+- Preserve ingestion cancellation when tracing callbacks swallow asynchronous
+  exceptions. Keep source effects on their owning thread and isolate SDK callbacks
+  on an owned worker, preventing source entry after cancellation during span start.
 - Remove per-message zip state from pause admission and avoid unreachable pause
   checks in blocking standalone helpers, preserving supervised intake control.
 - Preserve shutdown deadlines and caller cancellation when tracing callbacks catch
@@ -49,9 +44,14 @@
 
 ### Other Changes
 
-- Performance note: with package-default RTS settings, the 100-message standalone
-  counter benchmark measured 41.7 to 53.4 microseconds (+28%) in the matched release
-  comparison. The 1,000- and 10,000-message cases stayed within the 10% timing gate.
+- The final matched comparison against 0.10.0.1 passed all 62 existing benchmarks
+  at the 10% timing threshold with package-default RTS settings. The 100-message
+  standalone counter measured 41.32 to 38.16 microseconds (-7.7%) after the startup
+  handoff repair. These measurements were taken on a shared workstation.
+- The same comparison observed higher allocation for serial delayed I/O
+  (471,316 to 570,252 bytes per invocation, +21.0%) and ahead-5
+  (2,132,353 to 2,171,847 bytes, +1.85%). Their timing changes were +2.9% and
+  -2.7%, respectively; the allocation increases remain unexplained.
 - Share the private disabled compatibility tracer across invocations and document
   its non-recording, zero-ID callback sentinel.
 - Specialize basic workers without per-message detail closures; document bracketed
