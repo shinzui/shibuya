@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0.0 — 2026-10-26
+
+### Breaking Changes
+
+- Require `shibuya-core ^>=0.12.0.0` in the library, test suite and load
+  executables, matching the shared release and the new `Ingested.deliveryStatus`
+  field. Direct `Ingested` construction must supply the field when migrating.
+
 ## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes

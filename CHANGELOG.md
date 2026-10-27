@@ -1,11 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.12.0.0 — 2026-10-26
 
 ### Breaking Changes
 
-- Prepare `shibuya-core` and `shibuya-metrics` 0.12.0.0 candidates. `Ingested`
-  gains `deliveryStatus`: direct record constructors must add
+- `shibuya-core`: `Ingested` gains `deliveryStatus`: direct record constructors must add
   `deliveryStatus = pure DeliveryCurrent`; positional construction also needs the
   extra field. `mkIngested` continues to build current deliveries.
 - `shibuya-metrics` requires `shibuya-core ^>=0.12.0.0` in every component.
@@ -19,6 +18,21 @@
   skips handlers, finalizers and processing outcomes for superseded deliveries;
   batches retain only current members and report the retained size. Status is
   sampled once at admission and must be prompt and free of synchronous exceptions.
+
+### Other Changes
+
+- Add concurrent-key regression coverage for Ahead and Async runners, single and
+  batch handlers, and basic and detailed metrics. Verify queued successors are
+  checked after finalization and superseded deliveries skip handlers and finalizers.
+- Accept this candidate's measured allocation increase of approximately 8 bytes
+  per constructed record and 24 bytes per processed message in the existing
+  framework workloads. All 62 timing comparisons passed the 10% gate; this
+  candidate-specific acceptance leaves the general allocation policy unchanged.
+- The release comparison against 0.11.0.0 measured 10,000-message processing at
+  3.519 to 3.741 ms (+6.31%), with allocation increasing from 22,517,226 to
+  22,756,034 bytes. Construction allocation increased from 15,017,773 to
+  15,097,727 bytes for 10,000 records. Measurements used package-default RTS
+  settings on a shared workstation.
 
 ## 0.11.0.0 — 2026-10-25
 

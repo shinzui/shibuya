@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.12.0.0 — 2026-10-26
+
+### Breaking Changes
+
+- `Ingested` gains `deliveryStatus`. Direct record constructors must add
+  `deliveryStatus = pure DeliveryCurrent`; positional construction requires the
+  extra field. `mkIngested` continues to build current deliveries.
+
+### New Features
+
+- Export `DeliveryStatus` so adapters can supersede buffered deliveries before
+  handler admission. Sample status once; skip handlers, finalizers and processing
+  outcomes for superseded deliveries. Filter batches in order, update their
+  retained size, and skip processing when no current members remain.
+- Require delivery-status actions to return promptly without side effects or
+  synchronous exceptions. Unexpected exceptions propagate as infrastructure
+  failures; cancellation preserves existing ownership behavior.
+
+### Other Changes
+
+- Add concurrent-key regression coverage for Ahead and Async runners, single and
+  batch handlers, and basic and detailed metrics. Verify queued successors are
+  checked after finalization and superseded deliveries skip handlers and finalizers.
+- Accept this candidate's measured allocation increase of approximately 8 bytes
+  per constructed record and 24 bytes per processed message in the existing
+  framework workloads. All 62 timing comparisons passed the 10% gate; this
+  candidate-specific acceptance leaves the general allocation policy unchanged.
+- The release comparison against 0.11.0.0 measured 10,000-message processing at
+  3.519 to 3.741 ms (+6.31%), with allocation increasing from 22,517,226 to
+  22,756,034 bytes. Construction allocation increased from 15,017,773 to
+  15,097,727 bytes for 10,000 records. Measurements used package-default RTS
+  settings on a shared workstation.
+
 ## 0.11.0.0 — 2026-10-25
 
 ### Breaking Changes
