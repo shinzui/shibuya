@@ -41,6 +41,11 @@ provenance:
       at: 2026-11-12T18:51:06Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-12T23:12:57Z
+      mode: "implement"
+      note: "Coordinate EP-1 onward; registry and progress updates"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -208,7 +213,7 @@ with their measured results. Proposed status does not claim implemented behavior
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Not Started |
+| 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | In Progress |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Not Started |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Not Started |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |

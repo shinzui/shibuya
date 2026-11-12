@@ -33,6 +33,11 @@ provenance:
       at: 2026-11-12T18:51:06Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-12T23:12:57Z
+      mode: "implement"
+      note: "Implement tracing benchmark group, retention suite and baseline"
 ---
 
 # Establish tracing-enabled performance and retention baselines
@@ -61,12 +66,15 @@ behaviour. Its output is the "before" measurement that later plans compare again
 
 ## Progress
 
-- [ ] M1: Benchmark group `tracing` exists in `shibuya-core-bench` and
+- [x] M1 (2026-11-12): Benchmark group `tracing` exists in `shibuya-core-bench` and
   `cabal bench shibuya-core-bench --benchmark-options="-p tracing"` reports every cell of the
   matrix described in Plan of Work, with the enabled cells verified to record spans.
-- [ ] M2: Test suite `shibuya-core-trace-retention-test` exists, runs under
+  Evidence: all 12 cells `OK`, each asserting 10,000 processed; `newBenchTracer` fails the run
+  unless `isRecording` holds.
+- [x] M2 (2026-11-12): Test suite `shibuya-core-trace-retention-test` exists, runs under
   `cabal test shibuya-core`, and passes on unchanged library code; a deliberately introduced
-  retention bug makes it fail (demonstrated once, then reverted).
+  retention bug makes it fail (demonstrated once, then reverted). Evidence: all four
+  `shibuya-core` suites `PASS`; failing output recorded in Surprises & Discoveries.
 - [ ] M3: Baseline numbers and the procedure to reproduce them are recorded in
   `shibuya-core-bench/README.md`, and `CLAUDE.md` names the new suite.
 
@@ -77,6 +85,35 @@ Review correction (2026-11-12): Check A now distinguishes processing spans from 
 exports and keeps the exporter observably alive across collection. This corrects the existing
 retention check; it adds no benchmark cells or calibration.
 
+- A provider with no span processors does *not* produce recording spans. hs-opentelemetry-api
+  1.0 sets `tracerProviderHasProcessor = not (V.null processors)` in `createTracerProvider` and
+  creates non-recording spans when it is false. `newBenchTracer` caught this on its first run
+  ("spans from the processor-less provider are not recording"). Both the benchmark tracer and
+  retention Check B therefore use one processor whose callbacks discard every span. See the
+  Decision Log.
+- The master's live metrics registry drops a processor when it finishes, so `getAppMetrics`
+  after `waitApp` returned no processors and the first run counted 0 processed. The benchmark
+  reads each `SupervisedProcessor`'s own metrics (`getMetrics`) from the `AppHandle` instead.
+- The first Check A run reported "0 of 8 payloads collected" because of the harness, not the
+  library: the returned `map fst built` was a lazy thunk over the message list. Forcing each
+  weak pointer before running fixed it. A weak pointer keyed on an `IORef` token inside the
+  payload is used instead of one keyed on the `ByteString` box, which the optimiser may copy.
+- Failure demonstration (2026-11-12). Injected into `processOne` a global
+  `IORef` list prepended with each `ingested.envelope`, then reverted with
+  `git checkout -- shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs`:
+
+  ```text
+  FAIL: single-serial: finished spans do not retain payloads (8 Consumer spans (expected 8), 10 exported in total, 0 of 8 payloads collected)
+  PASS: batch: finished spans do not retain payloads (1 Consumer spans (expected 1), 3 exported in total, 8 of 8 payloads collected)
+  FAIL: single-serial: live bytes flat (N=20000 -> 200000, live bytes 11688032 -> 43693088 (limit 13905411))
+  FAIL: single-async8: live bytes flat (N=20000 -> 200000, live bytes 46950648 -> 79000272 (limit 52694288))
+  PASS: batch: live bytes flat (N=20000 -> 200000, live bytes 78900440 -> 101360 (limit 87839060))
+  ```
+
+  The batch cases pass because batches do not run through `processOne`. On unchanged code the
+  readings are about 100–170 KB before and after, so the starting margin (1 MiB plus 10
+  percent) was kept.
+
 
 
 ## Decision Log
@@ -86,6 +123,14 @@ retention check; it adds no benchmark cells or calibration.
   A provider without processors still creates recording spans under the default sampler and
   adds no I/O or background thread, so results are stable.
   Date: 2026-11-11
+
+- Decision: Replace "a provider with no processors" with a provider holding one span processor
+  whose callbacks do nothing, for the enabled benchmark cells and retention Check B.
+  Rationale: hs-opentelemetry makes spans non-recording when a provider has no processors, so
+  the plan's first choice measured nothing. The plan's fallback, the in-memory exporter, would
+  keep every span from every benchmark iteration and grow the heap during measurement. A
+  discarding processor keeps the SDK's full recording path and adds two no-op calls per span.
+  Date: 2026-11-12
 
 - Decision: Retention is tested in a new process-isolated test suite, not inside
   `shibuya-core-test`.

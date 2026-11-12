@@ -36,6 +36,7 @@ benchmark shibuya-core-bench
     Bench.Handler
     Bench.HotPath
     Bench.Lifecycle
+    Bench.Tracing
 
   default-extensions:
     DeriveAnyClass
@@ -54,6 +55,7 @@ benchmark shibuya-core-bench
     bytestring,
     deepseq,
     effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
+    hs-opentelemetry-api ^>=1.0,
     nqe,
     shibuya-core,
     streamly ^>=0.11,

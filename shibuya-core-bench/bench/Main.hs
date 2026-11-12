@@ -7,10 +7,13 @@ import Bench.Framework qualified as Framework
 import Bench.Handler qualified as Handler
 import Bench.HotPath qualified as HotPath
 import Bench.Lifecycle qualified as Lifecycle
+import Bench.Tracing qualified as Tracing
 import Test.Tasty.Bench (defaultMain)
 
 main :: IO ()
-main =
+main = do
+  -- Built once, outside every measured cell; see "Bench.Tracing".
+  tracer <- Tracing.newBenchTracer
   defaultMain
     [ Baseline.benchmarks,
       Framework.benchmarks,
@@ -18,5 +21,6 @@ main =
       Concurrency.benchmarks,
       HotPath.benchmarks,
       Lifecycle.benchmarks,
-      DeadLetterReason.benchmarks
+      DeadLetterReason.benchmarks,
+      Tracing.benchmarks tracer
     ]

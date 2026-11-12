@@ -195,3 +195,27 @@ test-suite shibuya-core-gc-finished-test
     shibuya-core,
     streamly-core,
     unliftio,
+
+-- Trace retention probes for the trace correlation work. Process-isolated for
+-- the same reason as the GC suites: weak-pointer and live-bytes assertions
+-- need nothing else in the process holding references (ADR 0001).
+test-suite shibuya-core-trace-retention-test
+  import: warnings
+  default-language: GHC2024
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test-retention
+  main-is: Main.hs
+  ghc-options:
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N2 -T"
+
+  build-depends:
+    base ^>=4.21.0.0,
+    bytestring,
+    effectful-core (>=2.6.1 && <2.7) || (>=2.7.1.1 && <2.8),
+    hs-opentelemetry-api,
+    hs-opentelemetry-exporter-in-memory ^>=1.0,
+    shibuya-core,
+    streamly-core,
+    text,
