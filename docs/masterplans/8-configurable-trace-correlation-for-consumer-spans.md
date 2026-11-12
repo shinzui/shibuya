@@ -26,6 +26,11 @@ provenance:
       at: 2026-11-12T03:38:50Z
       mode: "update"
       note: "Carry the policy in an extensible AdapterTelemetry record"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T04:52:36Z
+      mode: "update"
+      note: "Export the processing-span function for Keiro"
 ---
 
 # Configurable trace correlation for consumer spans
@@ -292,6 +297,15 @@ section first and the adapter plans follow.
 caller-supplied link attributes. EP-3 must use these rather than decoding headers a second way;
 it passes each member's `messaging.message.id` as the link attribute.
 
+**The shared processing-span function.** Defined by EP-2 in the new public module
+`Shibuya.Telemetry.Process`: `withProcessSpan` (in the `Tracing` effect) and `withProcessSpanIO`
+(for a plain `Tracer`). Shibuya's own `processOne` is built on it. Its consumers are outside
+this MasterPlan: Keiro's `keiro-pgmq` bounded drain, which copies the span by hand today, and
+Keiro's subscription workers, which have none, both planned under
+`mori://shinzui/keiro/masterplans/47-trace-context-propagation-and-span-correlation-across-keiro-durable-boundaries`.
+That MasterPlan is blocked on this one's release gate. EP-3 does not use the function, since
+batch spans have their own link collection.
+
 **`processSpanName`, `consumerSpanArgs` and the Consumer span.** `consumerSpanArgs` in
 `shibuya-core/src/Shibuya/Telemetry/Semantic.hs` is a shared constant with `links = []`. It
 stays exported and unchanged; EP-2 adds a function that builds arguments carrying links. Both
@@ -397,6 +411,13 @@ Cross-plan gates not owned by a child plan:
   breaking release of the core and three adapters. One extensible record costs one extra type
   now; the runner still reads it once per processor. The record solves extensibility only; it
   does not itself provide those options.
+  Date: 2026-11-11
+
+- Decision: EP-2 exports the processing-span construction as a public function.
+  Rationale: Keiro needs the same span in two places that do not run under Shibuya's runner, and
+  already carries a hand-written copy that its own decision record flags as able to drift. A
+  shared function is cheaper than a second and third copy and lets a later change to the rule
+  reach every user.
   Date: 2026-11-11
 
 - Decision: Two policies, `ParentAndLink` and `LinkOnly`; the link is always emitted.

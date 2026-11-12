@@ -27,6 +27,11 @@ provenance:
       at: 2026-11-12T03:38:50Z
       mode: "update"
       note: "Carry the policy in an extensible AdapterTelemetry record"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T04:52:36Z
+      mode: "update"
+      note: "Export the processing-span function for Keiro"
 ---
 
 # Add an adapter-declared trace correlation policy to single-message processing
@@ -121,6 +126,19 @@ tests that already exist from the preceding plan.
   Rationale: The conventions put per-message attributes on links only where one span accounts
   for several messages. A single-message span already carries `messaging.message.id` itself.
   The shared empty attribute map also keeps the link's cost minimal.
+  Date: 2026-11-11
+
+- Decision: The construction of the processing span (decode once, link, parent or root by
+  policy, Consumer kind) is exported as `Shibuya.Telemetry.Process.withProcessSpan`, with an
+  `IO` form `withProcessSpanIO`, and `processOne` itself is built on it.
+  Rationale: Two downstream users open this span outside Shibuya's runner. `keiro-pgmq`'s
+  bounded drain copies it by hand today, and Keiro's own decision record notes that the copy
+  can drift silently; Keiro's process managers and routers drain an adapter stream directly and
+  have no processing span at all. Both are planned to call this function
+  (`mori://shinzui/keiro/masterplans/47-trace-context-propagation-and-span-correlation-across-keiro-durable-boundaries`).
+  With one implementation, a later change to the link or parent rule reaches every user. The
+  function sets no attributes; those remain the caller's. It must add no cost to `processOne`,
+  which the Milestone 3 gate checks.
   Date: 2026-11-11
 
 - Decision: A message without `traceContext` behaves exactly as today under either policy.
@@ -305,6 +323,16 @@ as today. With a context, build the linked arguments, then by policy either atta
 context as parent (`ParentAndLink`, today's `withExtractedContext`) or attach an *empty* context
 (`LinkOnly`) before opening the span, restoring the previous context afterwards.
 
+Put that sequence in a new public module, `shibuya-core/src/Shibuya/Telemetry/Process.hs`
+(add it to `exposed-modules`), as `withProcessSpan`, and make `processOne` call it; the
+signature is in Interfaces and Dependencies. It takes the policy, the full span name and the
+message's trace headers, and passes the span to its body; it sets no attributes and records no
+outcome. Mark it `INLINE` or otherwise confirm in Milestone 3 that `processOne` compiles to the
+same code as an inlined version. Provide `withProcessSpanIO` in the same module for callers that
+hold a plain `Tracer` and are not in an effect stack with `Tracing`: it performs the same steps
+directly against the OpenTelemetry API and always behaves as enabled. Implement the shared
+decision logic once and have both functions use it.
+
 Add the empty-context operation to `Shibuya.Telemetry.Effect` as `withRootContext`, implemented
 like `withExtractedContext`'s `Just` branch but attaching `Ctx.empty`. It must use the same
 bracket so the previous context is restored on normal exit, exception, and asynchronous
@@ -329,6 +357,9 @@ module list, using the in-memory exporter in the same way as the neighbouring sp
 - A superseded delivery (ADR 0013) under `LinkOnly`: the span is created, carries the link, and
   ends successfully with the `superseded` event.
 - Disabled tracing with headers under both policies: the handler runs and nothing is exported.
+- `withProcessSpan` and `withProcessSpanIO` called directly, outside the runner, each produce
+  the same span shape as `processOne` for both policies (same kind, name, link, parent), and
+  `withProcessSpan` under `runTracingNoop` passes the sentinel span and exports nothing.
 - `creationLink` unit tests: valid header, valid with `tracestate`, missing, malformed; and
   `creationLinkWith` returns the supplied attributes on the link.
 
@@ -562,11 +593,35 @@ New function in `Shibuya.Telemetry.Effect`:
 withRootContext :: (Tracing :> es, IOE :> es) => Eff es a -> Eff es a
 ```
 
+New public module `Shibuya.Telemetry.Process`:
+
+```haskell
+-- | Open the Consumer-kind processing span for one message. Linked to the
+-- creation context in the headers when one decodes; a child of it under
+-- 'ParentAndLink'; a root under 'LinkOnly'. Without usable headers the span
+-- is opened in the ambient context, as before. With tracing disabled the
+-- body receives the sentinel span and no header is decoded.
+withProcessSpan ::
+  (Tracing :> es, IOE :> es) =>
+  TraceCorrelation ->
+  -- | full span name, e.g. @processSpanName destination@
+  Text ->
+  Maybe TraceHeaders ->
+  (Span -> Eff es a) ->
+  Eff es a
+
+-- | The same span for callers holding a 'Tracer' outside the 'Tracing' effect.
+withProcessSpanIO ::
+  Tracer -> TraceCorrelation -> Text -> Maybe TraceHeaders -> (Span -> IO a) -> IO a
+```
+
 `Shibuya.Telemetry.Semantic.consumerSpanArgs` remains exported and unchanged.
 
 Consumers of these interfaces: the batch plan
 (`docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md`) uses
 `creationLinkWith` and `consumerSpanArgsLinkedTo` and needs only Milestone 1 accepted. The three
 adapter plans (57, 58, 59 under `docs/plans/`) use `TraceCorrelation`, `AdapterTelemetry`,
-`defaultAdapterTelemetry` and the `Adapter.telemetry` field
+`defaultAdapterTelemetry` and the `Adapter.telemetry` field. Outside this MasterPlan, Keiro
+consumes `Shibuya.Telemetry.Process` (see the Decision Log); do not change those two signatures
+after release without checking that consumer
 and need this plan Complete and `shibuya-core` 0.13.0.0 published.
