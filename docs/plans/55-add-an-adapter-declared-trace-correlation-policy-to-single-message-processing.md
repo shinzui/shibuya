@@ -22,6 +22,11 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:38:50Z
+      mode: "update"
+      note: "Carry the policy in an extensible AdapterTelemetry record"
 ---
 
 # Add an adapter-declared trace correlation policy to single-message processing
@@ -57,8 +62,8 @@ tests that already exist from the preceding plan.
 
 ## Progress
 
-- [ ] M1: `Shibuya.Telemetry.Correlation` exists; `Adapter` has a `traceCorrelation` field set
-  to `ParentAndLink` at every construction site in this repository; per-message spans with a
+- [ ] M1: `Shibuya.Telemetry.Correlation` exists; `Adapter` has a `telemetry` field set to
+  `defaultAdapterTelemetry` at every construction site in this repository; per-message spans with a
   creation context carry exactly one link; `cabal build all` and `cabal test shibuya-core` pass.
 - [ ] M2: `LinkOnly` yields a root span in a new trace with the link, even when an ambient span
   is active; with tracing disabled no header is decoded; new tests in
@@ -77,10 +82,21 @@ tests that already exist from the preceding plan.
 
 ## Decision Log
 
-- Decision: The policy is a strict field on `Shibuya.Adapter.Adapter`, read once per processor.
+- Decision: The policy is declared by the adapter and read once per processor.
   Rationale: The right default is a property of the message source. A per-processor constant
-  costs nothing per message. Adding a record field is a breaking change, accepted before 1.0;
-  the version becomes 0.13.0.0.
+  costs nothing per message. Adding a record field to `Adapter` is a breaking change, accepted
+  before 1.0; the version becomes 0.13.0.0.
+  Date: 2026-11-11
+
+- Decision: `Adapter` gains one field, `telemetry :: !AdapterTelemetry`, and the policy is a
+  field of that record. `AdapterTelemetry` is exported with its field but without its
+  constructor and is built from `defaultAdapterTelemetry` by record update.
+  Rationale: `Adapter` is constructed by record literal in three adapter repositories, so each
+  field added to it costs a coordinated breaking release. Later telemetry options (for example
+  a per-message rule that links only old or redelivered messages, or a switch for settle spans)
+  can then be added as fields with defaults without touching `Adapter` or any adapter. Hiding
+  the constructor is what makes such an addition non-breaking. The record adds no per-message
+  cost because the runner projects the policy out of it once per processor.
   Date: 2026-11-11
 
 - Decision: The link is passed in the span's creation arguments, not added afterwards.
@@ -203,8 +219,9 @@ creation context as its parent"; "It is NOT RECOMMENDED to use the message creat
 the parent of "Process" spans (by default)"; "Instrumentations SHOULD document whether they use
 the message creation context as a parent for "Process" spans" and "MAY provide configuration
 options allowing users to control this behavior." This plan implements the link and the
-configuration. Which policy is the default is chosen per adapter in the adapter plans; the
-framework itself has no default, since every adapter must set the field.
+configuration. Which policy is the default is chosen per adapter in the adapter plans.
+`defaultAdapterTelemetry` uses `ParentAndLink`, so an adapter that states nothing keeps the
+trace shape it has today plus the link.
 
 Relevant ADRs.
 [ADR 0012](../adr/0012-keep-telemetry-ownership-and-disabled-context-contracts-explicit.md):
@@ -248,13 +265,27 @@ itself to weak head normal form before returning it inside `Just`, for instance 
 pattern). `creationLink`'s attributes are `HashMap.empty`, a shared constant, so it allocates no
 map. Neither may capture the header list in its result.
 
-Add `traceCorrelation :: !TraceCorrelation` to `Adapter`. Update every construction site in the
-repository to set `ParentAndLink`. The mock adapter constructors in
-`Shibuya/Adapter/Mock.hs` keep their signatures and set `ParentAndLink`; do not add a parameter
-there. A test that needs `LinkOnly` overrides the field with record update.
+Define `AdapterTelemetry` and `defaultAdapterTelemetry` in the same module as given in
+Interfaces and Dependencies. Export the type as `AdapterTelemetry (traceCorrelation)`, that is,
+with its field and without its constructor, so that record update and field access work from
+other modules but construction goes through the default. The repository enables
+`NoFieldSelectors` and `OverloadedRecordDot`; confirm in a small test module outside the
+defining module that `defaultAdapterTelemetry {traceCorrelation = LinkOnly}` and
+`t.traceCorrelation` compile and that `AdapterTelemetry LinkOnly` does not. If GHC's record
+update rules prevent update without the constructor in scope, provide
+`withTraceCorrelation :: TraceCorrelation -> AdapterTelemetry -> AdapterTelemetry` instead,
+keep the constructor hidden, and record the change here and in the parent MasterPlan's
+Integration Points. Re-export the type, its field and the default from `Shibuya.Adapter` and
+`Shibuya.Telemetry`.
+
+Add `telemetry :: !AdapterTelemetry` to `Adapter`. Update every construction site in the
+repository to set `defaultAdapterTelemetry`. The mock adapter constructors in
+`Shibuya/Adapter/Mock.hs` keep their signatures and set the default; do not add a parameter
+there. A test that needs `LinkOnly` overrides the adapter's `telemetry` field with record
+update.
 
 Thread the policy to the hot loop as a per-processor constant: `runIngesterAndProcessor` reads
-`adapter.traceCorrelation` and passes it to `processUntilDrained`, which passes it to
+`adapter.telemetry.traceCorrelation` and passes it to `processUntilDrained`, which passes it to
 `processOne` alongside `spanName`. Do not read it from the adapter per message.
 
 In `processOne`, when tracing is enabled and the message has a decodable creation context, pass
@@ -429,7 +460,7 @@ link. Before this plan the first case fails on the link assertion and the second
 expressed.
 
 Compatibility. Every other existing test in `shibuya-core` and `shibuya-metrics` passes
-unchanged apart from added `traceCorrelation = ParentAndLink` fields and any assertion that
+unchanged apart from added `telemetry = defaultAdapterTelemetry` fields and any assertion that
 previously required an empty link list.
 
 Performance. The benchmark comparison exits 0. The disabled and no-header cells and all
@@ -468,6 +499,8 @@ New public module `Shibuya.Telemetry.Correlation` in `shibuya-core`:
 ```haskell
 module Shibuya.Telemetry.Correlation
   ( TraceCorrelation (..),
+    AdapterTelemetry (traceCorrelation),
+    defaultAdapterTelemetry,
     creationLink,
     creationLinkWith,
     consumerSpanArgsLinkedTo,
@@ -482,6 +515,18 @@ data TraceCorrelation
     LinkOnly
   deriving stock (Eq, Show, Generic, Enum, Bounded)
   deriving anyclass (NFData)
+
+-- | Telemetry options an adapter declares. Build it from
+-- 'defaultAdapterTelemetry' with record update; the constructor is not
+-- exported, so options can be added later without breaking adapters.
+data AdapterTelemetry = AdapterTelemetry
+  { traceCorrelation :: !TraceCorrelation
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | @traceCorrelation = ParentAndLink@.
+defaultAdapterTelemetry :: AdapterTelemetry
 
 -- | Decode trace headers into a link to the message's creation context.
 -- 'Nothing' when the headers are absent or malformed. The result holds an
@@ -504,7 +549,7 @@ data Adapter es msg = Adapter
   { adapterName :: !Text,
     source :: Stream (Eff es) (Ingested es msg),
     shutdown :: Eff es (),
-    traceCorrelation :: !TraceCorrelation
+    telemetry :: !AdapterTelemetry
   }
 ```
 
@@ -522,5 +567,6 @@ withRootContext :: (Tracing :> es, IOE :> es) => Eff es a -> Eff es a
 Consumers of these interfaces: the batch plan
 (`docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md`) uses
 `creationLinkWith` and `consumerSpanArgsLinkedTo` and needs only Milestone 1 accepted. The three
-adapter plans (57, 58, 59 under `docs/plans/`) use `TraceCorrelation` and the `Adapter` field
+adapter plans (57, 58, 59 under `docs/plans/`) use `TraceCorrelation`, `AdapterTelemetry`,
+`defaultAdapterTelemetry` and the `Adapter.telemetry` field
 and need this plan Complete and `shibuya-core` 0.13.0.0 published.

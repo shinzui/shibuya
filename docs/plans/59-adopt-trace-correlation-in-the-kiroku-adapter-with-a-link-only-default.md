@@ -22,6 +22,16 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:38:50Z
+      mode: "update"
+      note: "Carry the policy in an extensible AdapterTelemetry record"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:50:42Z
+      mode: "update"
+      note: "Record that kiroku-otel subscription spans are independent roots"
 ---
 
 # Adopt trace correlation in the Kiroku adapter with a link-only default
@@ -59,9 +69,9 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
 
 ## Progress
 
-- [ ] M1: The interaction with `kiroku-otel`'s own subscription spans is understood and the
-  default is confirmed or revised, with the finding recorded in the Decision Log.
-- [ ] M2: The adapter builds against `shibuya-core` 0.13 with `traceCorrelation` on
+- [ ] M1: The finding that `kiroku-otel`'s subscription spans are independent roots (see the
+  Decision Log) is re-confirmed against the current code, so the `LinkOnly` default stands.
+- [ ] M2: The adapter builds against `shibuya-core` 0.13 with `telemetry` on
   `KirokuAdapterConfig` (default `LinkOnly`), honoured by single adapters and by every
   consumer-group member; tests cover the default, the override, and the span shape.
 - [ ] M3: Performance checks show no regression; documentation, changelog, decision record and
@@ -83,6 +93,30 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
   as parent is "NOT RECOMMENDED ... (by default)". The Kafka and PGMQ adapters deliberately keep
   the parent by default; Kiroku does not, so the documentation must explain why the adapters
   differ.
+  Date: 2026-11-11
+
+- Decision: `kiroku-otel`'s native subscription spans are left as they are; there is no
+  conflict to fix.
+  Rationale: Read on 2026-11-11 in `kiroku-otel/src/Kiroku/Otel/Subscription.hs`: every native
+  span (`kiroku.subscription.catchup`, `.deliver`, `.paused`, `.reconnecting`, `.retrying`,
+  `.dead_letter`, `.db_error`, `.stopped`) is created with
+  `createSpan tracer Context.empty …`, so each is a root in its own trace. They describe the
+  subscription worker's lifecycle, are driven from the store's event callback, and are neither
+  children of nor linked to the span that appended an event, nor parents of Shibuya's
+  processing span. The two instrumentations are complementary: native spans answer "what is the
+  worker doing", Shibuya's answer "what happened to this event". They are correlated by shared
+  `kiroku.*` attribute values, which is what the adapter changelog's "a single trace is
+  followable" refers to; that wording overstates it, since they have never shared a trace.
+  `LinkOnly` therefore breaks no existing nesting. Milestone 1 re-confirms this against the
+  code at implementation time.
+  Date: 2026-11-11
+
+- Decision: A per-event policy (parent when live, link when catching up) is not part of this
+  plan.
+  Rationale: The adapter receives no signal saying which phase delivered an event. That signal
+  is requested from Kiroku in
+  `mori://shinzui/kiroku/okf/improvement-requests/concepts/IR-21`; until it exists the policy
+  stays one value per adapter.
   Date: 2026-11-11
 
 - Decision: The setting applies uniformly to a consumer group; members do not differ.
@@ -127,14 +161,29 @@ data Adapter es msg = Adapter
   { adapterName :: !Text,
     source :: Stream (Eff es) (Ingested es msg),
     shutdown :: Eff es (),
-    traceCorrelation :: !TraceCorrelation
+    telemetry :: !AdapterTelemetry
   }
 
 -- Shibuya.Telemetry.Correlation, re-exported from Shibuya.Adapter
 data TraceCorrelation = ParentAndLink | LinkOnly
+
+data AdapterTelemetry = AdapterTelemetry { traceCorrelation :: !TraceCorrelation }
+
+defaultAdapterTelemetry :: AdapterTelemetry  -- traceCorrelation = ParentAndLink
 ```
 
-The framework creates the processing span. It reads `traceCorrelation` once per processor; for
+`AdapterTelemetry` is exported without its constructor: obtain a value from
+`defaultAdapterTelemetry` and change it with record update, for example
+`defaultAdapterTelemetry {traceCorrelation = LinkOnly}`. It exists so that `shibuya-core` can
+add telemetry options later without another breaking change to `Adapter`. For the same reason
+this adapter's configuration carries the whole `AdapterTelemetry` value in a field named
+`telemetry` and copies it into `Adapter` unchanged, rather than exposing only the policy.
+Wherever this plan speaks of the adapter's default or of setting the policy, it means the
+`traceCorrelation` field of that `telemetry` value. Re-export `AdapterTelemetry`, its field and
+`defaultAdapterTelemetry` from the adapter's top-level module along with `TraceCorrelation (..)`.
+If the published 0.13 offers a setter function instead of record update, use that.
+
+The framework creates the processing span. It reads `telemetry.traceCorrelation` once per processor; for
 each message whose `Envelope.traceContext` holds W3C `traceparent`/`tracestate` header pairs it
 always adds a link to that context, and makes it the parent only under `ParentAndLink`. Under
 `LinkOnly` the span is a root in a new trace. Batch spans always link all members and take no
@@ -218,9 +267,10 @@ Raise the `shibuya-core` bound to `>=0.13 && <0.14` in the four stanzas of
 after verifying the published version. Fix any `Adapter { … }` literal the compiler reports
 anywhere in the repository (search with `grep -rn "Adapter$\|Adapter {" --include='*.hs' .`).
 
-Add `traceCorrelation :: !TraceCorrelation` to `KirokuAdapterConfig` with a Haddock comment that
+Add `telemetry :: !AdapterTelemetry` to `KirokuAdapterConfig` with a Haddock comment that
 states the default, why it differs from queue adapters, and how to restore the single-trace
-shape; set `LinkOnly` in `defaultKirokuAdapterConfig`. Set the `Adapter`'s field from the
+shape; set it to `defaultAdapterTelemetry {traceCorrelation = LinkOnly}` in
+`defaultKirokuAdapterConfig`. Set the `Adapter`'s field from the
 config where the adapter is constructed. Make sure every path that builds a member adapter for
 a consumer group uses the same value: trace how `kirokuConsumerGroupProcessorsWith` and its
 callers obtain `mkMemberAdapter`, and add the field to `KirokuConsumerGroupConfig` only if the
@@ -258,8 +308,9 @@ MasterPlan), or in the measurement.
 
 Update `shibuya-kiroku-adapter/CHANGELOG.md` with a clearly marked behaviour change: the
 default trace shape is now one linked trace per processed event; give the one-line way to
-restore the previous shape; and correct or qualify the earlier "a single trace is followable"
-statement. Adding a record field and changing default behaviour is a breaking change; bump the
+restore the previous shape; and correct the earlier "a single trace is followable"
+statement to say that native subscription spans and Shibuya's processing spans are separate
+traces correlated by matching `kiroku.*` attributes. Adding a record field and changing default behaviour is a breaking change; bump the
 major version following that repository's release process. Update the adapter's Haddock module
 header and the capability documents `docs/capabilities/opentelemetry-trace-context.md` and
 `docs/capabilities/opentelemetry-subscription-tracing.md` where they describe how consumer
@@ -353,7 +404,8 @@ affecting documentation only. The PGMQ plan (Shibuya plan 58) runs the first ada
 read that before starting.
 
 Consumes from `shibuya-core` `>=0.13 && <0.14`: `Shibuya.Adapter.Adapter` with
-`traceCorrelation`, and `Shibuya.Adapter.TraceCorrelation (..)`.
+`telemetry`, `Shibuya.Adapter.AdapterTelemetry` with `defaultAdapterTelemetry`, and
+`Shibuya.Adapter.TraceCorrelation (..)`.
 
 Provides:
 
@@ -361,7 +413,7 @@ Provides:
 -- Shibuya.Adapter.Kiroku
 data KirokuAdapterConfig = KirokuAdapterConfig
   { ...,
-    traceCorrelation :: !TraceCorrelation  -- default LinkOnly
+    telemetry :: !AdapterTelemetry  -- default: traceCorrelation = LinkOnly
   }
 ```
 

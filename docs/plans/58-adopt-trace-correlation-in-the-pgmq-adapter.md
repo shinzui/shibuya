@@ -22,6 +22,11 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:38:50Z
+      mode: "update"
+      note: "Carry the policy in an extensible AdapterTelemetry record"
 ---
 
 # Adopt trace correlation in the PGMQ adapter
@@ -56,7 +61,7 @@ on trace headers.
 ## Progress
 
 - [ ] M1: The adapter builds against `shibuya-core` 0.13 from Hackage with
-  `PgmqAdapterConfig.traceCorrelation` defaulting to `ParentAndLink` and copied into the
+  `PgmqAdapterConfig.telemetry` defaulting to `traceCorrelation = ParentAndLink` and copied into the
   `Adapter`; configuration tests cover the default and the override; the full suite passes.
 - [ ] M2: Tests show the span shape for both settings, the shape across redeliveries, and the
   dead-letter headers under `LinkOnly`; adapter benchmarks show no regression.
@@ -124,14 +129,29 @@ data Adapter es msg = Adapter
   { adapterName :: !Text,
     source :: Stream (Eff es) (Ingested es msg),
     shutdown :: Eff es (),
-    traceCorrelation :: !TraceCorrelation
+    telemetry :: !AdapterTelemetry
   }
 
 -- Shibuya.Telemetry.Correlation, re-exported from Shibuya.Adapter
 data TraceCorrelation = ParentAndLink | LinkOnly
+
+data AdapterTelemetry = AdapterTelemetry { traceCorrelation :: !TraceCorrelation }
+
+defaultAdapterTelemetry :: AdapterTelemetry  -- traceCorrelation = ParentAndLink
 ```
 
-The framework creates the processing span. It reads `traceCorrelation` once per processor; for
+`AdapterTelemetry` is exported without its constructor: obtain a value from
+`defaultAdapterTelemetry` and change it with record update, for example
+`defaultAdapterTelemetry {traceCorrelation = LinkOnly}`. It exists so that `shibuya-core` can
+add telemetry options later without another breaking change to `Adapter`. For the same reason
+this adapter's configuration carries the whole `AdapterTelemetry` value in a field named
+`telemetry` and copies it into `Adapter` unchanged, rather than exposing only the policy.
+Wherever this plan speaks of the adapter's default or of setting the policy, it means the
+`traceCorrelation` field of that `telemetry` value. Re-export `AdapterTelemetry`, its field and
+`defaultAdapterTelemetry` from the adapter's top-level module along with `TraceCorrelation (..)`.
+If the published 0.13 offers a setter function instead of record update, use that.
+
+The framework creates the processing span. It reads `telemetry.traceCorrelation` once per processor; for
 each message with `Envelope.traceContext` it always adds a link to that context and makes it
 the parent only under `ParentAndLink`. Under `LinkOnly` the span is a root in a new trace.
 `Shibuya.Telemetry.Propagation.currentTraceHeaders`, called inside a handler or an
@@ -191,10 +211,10 @@ Raise the `shibuya-core` bound to `^>=0.13.0.0` in every stanza that names it (t
 `shibuya-pgmq-adapter.cabal`, five in `shibuya-pgmq-adapter-bench.cabal`, one in
 `shibuya-pgmq-example.cabal`), after verifying the published version.
 
-Add `traceCorrelation :: !TraceCorrelation` to `PgmqAdapterConfig` with a Haddock comment giving
-the default and the cases for `LinkOnly`; set `ParentAndLink` in `defaultConfig`. The field
+Add `telemetry :: !AdapterTelemetry` to `PgmqAdapterConfig` with a Haddock comment giving
+the default and the cases for `LinkOnly`; set it to `defaultAdapterTelemetry` in `defaultConfig`. The field
 needs no validation. Re-export `TraceCorrelation (..)` from `Shibuya.Adapter.Pgmq`. Set the
-`Adapter`'s `traceCorrelation` from the validated config in `Pgmq.hs`. Fix every other record
+`Adapter`'s `telemetry` from the validated config in `Pgmq.hs`. Fix every other record
 literal the compiler reports.
 
 Extend `ConfigSpec.hs`: the default is `ParentAndLink`; a config with `LinkOnly` validates and
@@ -304,7 +324,7 @@ Intention: intention_01m76tvgq9epqr5p2vdekeetxe
 The adapter builds and its whole test suite passes against `shibuya-core` 0.13 from Hackage,
 with no Shibuya source override left in `cabal.project`.
 
-`defaultConfig q` has `traceCorrelation == ParentAndLink`. The five behaviours in Milestone 2
+`(defaultConfig q).telemetry.traceCorrelation == ParentAndLink`. The five behaviours in Milestone 2
 are each demonstrated by a passing test; the dead-letter test under `LinkOnly` would fail if the
 upstream header were lost or if the active header still named the producer.
 
@@ -328,7 +348,8 @@ Prerequisite from the parent MasterPlan: Shibuya plan 55 Complete and the releas
 (`shibuya-core` 0.13.0.0 on Hackage). Shibuya plan 56 (batch links) is a soft dependency
 affecting documentation only.
 
-Consumes from `shibuya-core` `^>=0.13.0.0`: `Shibuya.Adapter.Adapter` with `traceCorrelation`,
+Consumes from `shibuya-core` `^>=0.13.0.0`: `Shibuya.Adapter.Adapter` with `telemetry`, `Shibuya.Adapter.AdapterTelemetry` with
+`defaultAdapterTelemetry`,
 `Shibuya.Adapter.TraceCorrelation (..)`, and the unchanged
 `Shibuya.Telemetry.Propagation.currentTraceHeaders`.
 
@@ -338,7 +359,7 @@ Provides:
 -- Shibuya.Adapter.Pgmq.Config
 data PgmqAdapterConfig = PgmqAdapterConfig
   { ...,
-    traceCorrelation :: !TraceCorrelation  -- default ParentAndLink
+    telemetry :: !AdapterTelemetry  -- default: traceCorrelation = ParentAndLink
   }
 ```
 

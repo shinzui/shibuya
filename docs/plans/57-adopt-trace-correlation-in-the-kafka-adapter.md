@@ -22,6 +22,11 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:38:50Z
+      mode: "update"
+      note: "Carry the policy in an extensible AdapterTelemetry record"
 ---
 
 # Adopt trace correlation in the Kafka adapter
@@ -54,7 +59,7 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
 ## Progress
 
 - [ ] M1: The adapter builds against `shibuya-core` 0.13 from Hackage with
-  `KafkaAdapterConfig.traceCorrelation` defaulting to `ParentAndLink` and copied into the
+  `KafkaAdapterConfig.telemetry` defaulting to `traceCorrelation = ParentAndLink` and copied into the
   `Adapter`; unit tests cover the default and the override; the full test suite passes.
 - [ ] M2: An integration or in-memory-exporter test shows the span shape for both settings; the
   adapter benchmark shows no regression against the previous release.
@@ -78,7 +83,7 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
   choice to be documented; the README must say so.
   Date: 2026-11-11
 
-- Decision: The setting is one field on `KafkaAdapterConfig`, not per topic.
+- Decision: The setting is one `telemetry` field on `KafkaAdapterConfig`, not per topic.
   Rationale: The policy is a per-adapter constant in `shibuya-core` and is read once per
   processor. Per-topic policy would need a per-message decision on the hot path.
   Date: 2026-11-11
@@ -123,15 +128,30 @@ data Adapter es msg = Adapter
   { adapterName :: !Text,
     source :: Stream (Eff es) (Ingested es msg),
     shutdown :: Eff es (),
-    traceCorrelation :: !TraceCorrelation
+    telemetry :: !AdapterTelemetry
   }
 
 -- Shibuya.Telemetry.Correlation, re-exported from Shibuya.Adapter
 data TraceCorrelation = ParentAndLink | LinkOnly
+
+data AdapterTelemetry = AdapterTelemetry { traceCorrelation :: !TraceCorrelation }
+
+defaultAdapterTelemetry :: AdapterTelemetry  -- traceCorrelation = ParentAndLink
 ```
 
+`AdapterTelemetry` is exported without its constructor: obtain a value from
+`defaultAdapterTelemetry` and change it with record update, for example
+`defaultAdapterTelemetry {traceCorrelation = LinkOnly}`. It exists so that `shibuya-core` can
+add telemetry options later without another breaking change to `Adapter`. For the same reason
+this adapter's configuration carries the whole `AdapterTelemetry` value in a field named
+`telemetry` and copies it into `Adapter` unchanged, rather than exposing only the policy.
+Wherever this plan speaks of the adapter's default or of setting the policy, it means the
+`traceCorrelation` field of that `telemetry` value. Re-export `AdapterTelemetry`, its field and
+`defaultAdapterTelemetry` from the adapter's top-level module along with `TraceCorrelation (..)`.
+If the published 0.13 offers a setter function instead of record update, use that.
+
 The framework, not the adapter, creates the processing span. It reads the adapter's
-`traceCorrelation` once, and for each message that carries `Envelope.traceContext` (the W3C
+`telemetry.traceCorrelation` once, and for each message that carries `Envelope.traceContext` (the W3C
 `traceparent`/`tracestate` header pairs) it always adds a link to that context, and makes the
 context the span's parent only under `ParentAndLink`. Under `LinkOnly` the span is a root in a
 new trace. Batch spans (when the user wraps the adapter in a batching processor) always link
@@ -178,10 +198,12 @@ Raise the `shibuya-core` bound to `^>=0.13.0.0` in all four cabal stanzas that n
 both stanzas in `shibuya-kafka-adapter-bench.cabal`). Verify the published version on Hackage
 before choosing the bound.
 
-Add `traceCorrelation :: !TraceCorrelation` to `KafkaAdapterConfig` with a Haddock comment
-stating the default and when to choose `LinkOnly`; set it to `ParentAndLink` in `defaultConfig`.
-Re-export `TraceCorrelation (..)` from `Shibuya.Adapter.Kafka` so users need no extra import.
-Set `traceCorrelation = config.traceCorrelation` in the `Adapter` construction in `Kafka.hs`.
+Add `telemetry :: !AdapterTelemetry` to `KafkaAdapterConfig` with a Haddock comment stating the
+default policy and when to choose `LinkOnly`; set it to `defaultAdapterTelemetry` in
+`defaultConfig` (its policy is already `ParentAndLink`). Re-export `TraceCorrelation (..)`,
+`AdapterTelemetry`, its field and `defaultAdapterTelemetry` from `Shibuya.Adapter.Kafka` so
+users need no extra import. Set `telemetry = config.telemetry` in the `Adapter` construction in
+`Kafka.hs`.
 Fix any other `Adapter { … }` or `KafkaAdapterConfig { … }` literal the compiler reports in
 tests, examples, or benchmarks.
 
@@ -295,7 +317,7 @@ Intention: intention_01m76tvgq9epqr5p2vdekeetxe
 The adapter builds and its whole test suite passes against `shibuya-core` 0.13 resolved from
 Hackage, with no `source-repository-package` override for Shibuya left in `cabal.project`.
 
-`defaultConfig ts` has `traceCorrelation == ParentAndLink`. The span-shape test passes for both
+`(defaultConfig ts).telemetry.traceCorrelation == ParentAndLink`. The span-shape test passes for both
 settings as described in Milestone 2.
 
 The benchmark comparison exits 0 with no unexplained allocation increase.
@@ -318,7 +340,8 @@ and the release gate passed (`shibuya-core` 0.13.0.0 on Hackage). Shibuya plan 5
 is a soft dependency: it only affects what the documentation says about batches.
 
 Consumes from `shibuya-core` `^>=0.13.0.0`: `Shibuya.Adapter.Adapter` with the
-`traceCorrelation` field, and `Shibuya.Adapter.TraceCorrelation (..)`.
+`telemetry` field, `Shibuya.Adapter.AdapterTelemetry` with `defaultAdapterTelemetry`, and
+`Shibuya.Adapter.TraceCorrelation (..)`.
 
 Provides:
 
@@ -328,7 +351,7 @@ data KafkaAdapterConfig = KafkaAdapterConfig
   { topics :: ![TopicName],
     pollTimeout :: !Timeout,
     batchSize :: !BatchSize,
-    traceCorrelation :: !TraceCorrelation  -- default ParentAndLink
+    telemetry :: !AdapterTelemetry  -- default: traceCorrelation = ParentAndLink
   }
 ```
 

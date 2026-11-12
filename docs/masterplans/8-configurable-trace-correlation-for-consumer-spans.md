@@ -21,6 +21,11 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:38:50Z
+      mode: "update"
+      note: "Carry the policy in an extensible AdapterTelemetry record"
 ---
 
 # Configurable trace correlation for consumer spans
@@ -235,7 +240,8 @@ gate is passed.
 
 ## Integration Points
 
-**The `TraceCorrelation` type and the `Adapter.traceCorrelation` field.** Defined by EP-2,
+**The `TraceCorrelation` type, the `AdapterTelemetry` record and the `Adapter.telemetry`
+field.** Defined by EP-2,
 consumed by EP-4, EP-5, EP-6.
 
 ```haskell
@@ -246,18 +252,37 @@ data TraceCorrelation
   deriving stock (Eq, Show, Generic, Enum, Bounded)
   deriving anyclass (NFData)
 
+-- | Telemetry options an adapter declares. Build it from
+-- 'defaultAdapterTelemetry' with record update; the constructor is not
+-- exported, so options can be added later without breaking adapters.
+data AdapterTelemetry = AdapterTelemetry
+  { traceCorrelation :: !TraceCorrelation
+  }
+
+-- | @traceCorrelation = ParentAndLink@.
+defaultAdapterTelemetry :: AdapterTelemetry
+
 -- module Shibuya.Adapter
 data Adapter es msg = Adapter
   { adapterName :: !Text,
     source :: Stream (Eff es) (Ingested es msg),
     shutdown :: Eff es (),
-    traceCorrelation :: !TraceCorrelation
+    telemetry :: !AdapterTelemetry
   }
 ```
 
-Each adapter plan adds a field of this type to its own configuration record, gives it the
-default in the Vision above, and copies it into `Adapter`. Adapters do not interpret the value.
-If EP-2 changes the constructor set (for example by adding `ParentOnly`), it updates this
+`AdapterTelemetry` is exported with its field but without its constructor. A value is obtained
+only from `defaultAdapterTelemetry` and changed with record update
+(`defaultAdapterTelemetry {traceCorrelation = LinkOnly}`), so a later option becomes a new field
+with a default and no adapter has to change. This is the reason the policy is not a bare field
+on `Adapter`: `Adapter` is constructed by record literal in three adapter repositories, and
+every field added to it is a coordinated breaking release.
+
+Each adapter plan adds a `telemetry :: !AdapterTelemetry` field to its own configuration record,
+defaults it to `defaultAdapterTelemetry` with the `traceCorrelation` given in the Vision above,
+and copies it into `Adapter` unchanged. Adapters do not interpret the value, and carrying the
+whole record means future options reach users without an adapter code change. If EP-2 changes
+the constructor set of `TraceCorrelation` (for example by adding `ParentOnly`), it updates this
 section first and the adapter plans follow.
 
 **The link helper.** Defined by EP-2 M1 in `Shibuya.Telemetry.Correlation`, consumed by EP-3.
@@ -358,11 +383,20 @@ Cross-plan gates not owned by a child plan:
 
 ## Decision Log
 
-- Decision: The policy is declared by the adapter (a strict field on `Adapter`) and exposed
+- Decision: The policy is declared by the adapter (inside the strict `Adapter.telemetry` field) and exposed
   through each adapter's configuration, not set on `QueueProcessor` or `AppConfig`.
   Rationale: The correct default depends on the source's semantics, which the adapter knows;
   the adapter configuration is already supplied by the user, so no second override is needed.
   This keeps ADR 0012's split, where adapters supply context and the framework owns the span.
+  Date: 2026-11-11
+
+- Decision: The policy sits inside an `AdapterTelemetry` record with a default value and an
+  unexported constructor, held in a single `Adapter.telemetry` field.
+  Rationale: Likely later options (a per-message rule such as linking only old or redelivered
+  messages, a switch for settle spans) would each otherwise add a field to `Adapter` and force a
+  breaking release of the core and three adapters. One extensible record costs one extra type
+  now; the runner still reads it once per processor. The record solves extensibility only; it
+  does not itself provide those options.
   Date: 2026-11-11
 
 - Decision: Two policies, `ParentAndLink` and `LinkOnly`; the link is always emitted.
