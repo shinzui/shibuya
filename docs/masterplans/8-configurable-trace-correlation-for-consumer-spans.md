@@ -213,7 +213,7 @@ with their measured results. Proposed status does not claim implemented behavior
 
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
-| 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | In Progress |
+| 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Not Started |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Not Started |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
@@ -387,11 +387,11 @@ EP-4 and EP-6 documentation.
 
 ## Progress
 
-No child plan has started. EP-1 is first in the execution order. The review findings below
-have been resolved in the documents; dependency-source and cross-repository validation remains
-pending because Mori registry access failed during review. No runtime validation is claimed.
-This update authorizes no benchmark execution or expansion: apply repository benchmark-scope
-instructions before adding tooling, measurements, calibration or substantial setup.
+EP-1 is Complete (2026-11-12): the `tracing` benchmark group and the trace retention suite
+exist, and the baseline is recorded in `shibuya-core-bench/README.md`. EP-2 is next. On
+2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
+(EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
+nothing beyond it.
 
 Cross-plan gates not owned by a child plan:
 
@@ -430,6 +430,11 @@ Local sources and relevant ADRs were inspected. Mori registry access failed beca
 PostgreSQL socket refused connections; adapter checkouts, dependency internals and published
 versions/tags remain unverified. No builds, benchmarks or services were run for this review.
 
+- EP-1 (2026-11-12): hs-opentelemetry creates non-recording spans when a provider has no span
+  processors (`tracerProviderHasProcessor`). Any enabled-path measurement or retention check in
+  EP-2, EP-3 or EP-7 must use a provider with at least one processor; `Bench.Tracing` and the
+  retention suite use one that discards every span. EP-1 also confirmed the disabled-path
+  decode cost below: about 346–360 bytes per message.
 - The disabled path may already decode headers. `processOne` binds
   `parentCtx = ingested.envelope.traceContext >>= extractTraceContext` and passes it to
   `withExtractedContext`, which pattern-matches on the `Maybe` before it checks whether tracing

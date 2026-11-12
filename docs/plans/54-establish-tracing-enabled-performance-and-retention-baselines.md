@@ -75,8 +75,10 @@ behaviour. Its output is the "before" measurement that later plans compare again
   `cabal test shibuya-core`, and passes on unchanged library code; a deliberately introduced
   retention bug makes it fail (demonstrated once, then reverted). Evidence: all four
   `shibuya-core` suites `PASS`; failing output recorded in Surprises & Discoveries.
-- [ ] M3: Baseline numbers and the procedure to reproduce them are recorded in
-  `shibuya-core-bench/README.md`, and `CLAUDE.md` names the new suite.
+- [x] M3 (2026-11-12): Baseline numbers and the procedure to reproduce them are recorded in
+  `shibuya-core-bench/README.md`, and `CLAUDE.md` names the new suite. Evidence: precise run
+  (`--stdev 5 --timeout 120`) of commit `35e0e79`, all 12 cells `OK`, table in the README's
+  "Tracing benchmarks" section.
 
 
 ## Surprises & Discoveries
@@ -142,7 +144,31 @@ retention check; it adds no benchmark cells or calibration.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Completed 2026-11-12. The `tracing` benchmark group (12 cells) and the process-isolated
+`shibuya-core-trace-retention-test` suite (five checks) exist. Both pass on unchanged library
+code, and the suite was shown to fail on an injected retention bug. The baseline is the
+commit that records this plan's completion; find it with
+`git log --oneline -- docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md`.
+The measured tree was `35e0e79`; the completion commit changes only documentation.
+
+Measurement confirmed the suspected decode-when-disabled cost: with tracing disabled, a
+`traceparent` on every message adds about 346 bytes per message (`single-serial`) and 360
+bytes per message (`single-async8`). Plan 55 removes it. Enabling tracing adds roughly 6.6 KB
+per message for `single-serial` without headers, and headers add another about 1.4 KB. These
+are the reference numbers for plans 55, 56 and 60.
+
+Two of this plan's assumptions were wrong and were corrected during the work (Surprises &
+Discoveries). A processor-less provider does not record spans, so a discarding processor is
+used instead. A lazy list of weak pointers kept the payloads alive until it was forced.
+
+Friction: FRIC-1 (`docs/friction-log/1-getappmetrics-returns-no-processors-after-waitapp.md`,
+detour) is still `logged`. It is a candidate improvement request for `getAppMetrics` to report
+processors that have finished; filing that request is outside this initiative.
+
+ADR distillation: nothing project-level beyond ADR 0001 (isolated GC suites) and ADR 0006 (the
+allocation reading rule), both already recorded. One fact is durable but belongs with the
+correlation contract: hs-opentelemetry makes spans non-recording when a provider has no
+processors. Plan 55 adds it to ADR 0014's evidence.
 
 
 ## Context and Orientation

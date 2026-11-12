@@ -161,6 +161,13 @@ in  Schema.Project::{ project =
         , description = Some
             "Proposed improvements to Shibuya APIs and behavior, with stable IR-N handles"
         }
+      , Schema.OkfBundle::{ name = "friction-log"
+        , path = "docs/friction-log"
+        , profile = Some "docs/friction-log/profile.dhall"
+        , okfVersion = "0.2"
+        , description = Some
+            "Friction met while implementing plans, before triage into bug reports and requests"
+        }
       , Schema.OkfBundle::{ name = "reviews"
         , path = "docs/reviews"
         , profile = Some "docs/reviews/profile.dhall"

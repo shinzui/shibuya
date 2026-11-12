@@ -7,7 +7,7 @@ unified queue abstraction, NQE-based supervision, backpressure, explicit ack sem
 
 ```bash
 cabal build all
-cabal test shibuya-core            # all three suites: shibuya-core-test, shibuya-core-gc-test, shibuya-core-gc-finished-test
+cabal test shibuya-core            # all four suites: shibuya-core-test, shibuya-core-gc-test, shibuya-core-gc-finished-test, shibuya-core-trace-retention-test
 cabal test shibuya-metrics         # HTTP, health, JSON/Prometheus golden, and WebSocket contract suite
 cabal run shibuya-example
 nix fmt                            # treefmt (fourmolu); run before committing

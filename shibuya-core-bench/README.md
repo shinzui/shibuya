@@ -259,6 +259,91 @@ Shibuya allocates approximately 2.5x more memory than pure streamly due to:
 - Metrics TVar updates
 - Bounded inbox overhead
 
+## Tracing benchmarks
+
+Every other group runs under `runTracingNoop`. The `tracing` group (`bench/Bench/Tracing.hs`)
+measures the per-message tracing path. It was added as the baseline for
+`docs/masterplans/8-configurable-trace-correlation-for-consumer-spans.md`. Each cell runs
+10,000 messages with a no-op handler through `runApp` and fails unless all 10,000 are
+processed. The cells are:
+
+```text
+tracing/<shape>/<mode>
+  shape: single-serial | single-async8 | batch100
+  mode:  disabled-noheaders | disabled-headers | enabled-noheaders | enabled-headers
+```
+
+- `disabled` runs `runTracingNoop`. `enabled` runs `runTracing` with a tracer whose provider
+  has one span processor that discards every span. hs-opentelemetry creates non-recording
+  spans when a provider has no processors, so a processor is required for the SDK to do its
+  full span construction. `newBenchTracer` aborts the run if its spans are not recording.
+- `headers` gives every message the same valid `traceparent`. `noheaders` sets
+  `traceContext = Nothing`.
+- `batch100` is a batching processor with `batchSize = 100`.
+
+Later plans may add cells but must not rename or remove these, because comparisons match
+cells by name.
+
+### Baseline (2026-11-12)
+
+The run used commit `35e0e79` on an Apple M5 Ultra (36 cores, 256 GiB) with GHC 9.12.4 and
+`--stdev 5 --timeout 120`. Allocation is bytes per cell, that is, per 10,000 messages.
+
+| Cell | Time | Allocated |
+|---|---:|---:|
+| single-serial/disabled-noheaders | 8.56 ms | 19,890,400 |
+| single-serial/disabled-headers | 9.76 ms | 23,347,428 |
+| single-serial/enabled-noheaders | 28.8 ms | 86,450,191 |
+| single-serial/enabled-headers | 34.4 ms | 100,058,185 |
+| single-async8/disabled-noheaders | 46.2 ms | 37,953,439 |
+| single-async8/disabled-headers | 58.8 ms | 41,551,267 |
+| single-async8/enabled-noheaders | 226 ms | 186,560,682 |
+| single-async8/enabled-headers | 255 ms | 212,232,901 |
+| batch100/disabled-noheaders | 17.1 ms | 23,615,871 |
+| batch100/disabled-headers | 16.2 ms | 23,668,159 |
+| batch100/enabled-noheaders | 16.1 ms | 24,297,411 |
+| batch100/enabled-headers | 16.0 ms | 24,426,154 |
+
+Even with tracing disabled, `disabled-headers` allocates more than `disabled-noheaders`:
+about 346 bytes per message for `single-serial` (3,457,028 bytes over 10,000 messages) and
+360 bytes per message for `single-async8`. `withExtractedContext` matches on the decoded
+`Maybe SpanContext` before it checks whether tracing is enabled, so the W3C header is decoded
+even under `runTracingNoop`. The batch difference is small (52,288 bytes per run, about 520
+bytes per batch) because only the first member of each batch is decoded.
+
+Absolute numbers depend on the machine. Compare runs only when both sides were measured on the
+same machine in the same session.
+
+### Comparing a change against the baseline
+
+Build the baseline from a git worktree of the baseline commit, then compare the working tree
+against its CSV:
+
+```bash
+git worktree add /tmp/shibuya-tracing-baseline <baseline-commit>
+( cd /tmp/shibuya-tracing-baseline && \
+  cabal bench shibuya-core-bench \
+    --benchmark-options="-p tracing --stdev 5 --timeout 120 --csv /tmp/shibuya-tracing-baseline.csv" )
+cabal bench shibuya-core-bench \
+  --benchmark-options="-p tracing --stdev 5 --timeout 120 --baseline /tmp/shibuya-tracing-baseline.csv --fail-if-slower 10 --csv /tmp/shibuya-tracing-after.csv"
+git worktree remove /tmp/shibuya-tracing-baseline
+```
+
+Remove `-p tracing` to compare every group. Cells that have no baseline row are reported
+without a comparison.
+
+Reading rule ([ADR 0006](../docs/adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md)):
+`--fail-if-slower 10` covers time only. Compare the `Allocated` column of the two CSVs cell by
+cell, and explain any increase, even when time is within noise. An unexplained allocation
+increase is a regression.
+
+The retention side of the same contract is the process-isolated test suite
+`shibuya-core-trace-retention-test`:
+
+```bash
+cabal test shibuya-core:test:shibuya-core-trace-retention-test --enable-tests --test-show-details=direct
+```
+
 ## Configuration
 
 The benchmarks use these default RTS settings (configured in cabal file):
