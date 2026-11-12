@@ -11,6 +11,17 @@ provenance:
     model: "claude-fable-5-2"
     harness: "claude-code"
     at: 2026-11-12T02:55:43Z
+  revisions:
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:14:10Z
+      mode: "update"
+      note: "Align with full reading of OTel messaging spans spec; record deviations"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:25:31Z
+      mode: "update"
+      note: "Add EP-7 span rename and messaging.operation.name"
 ---
 
 # Adopt trace correlation in the Kiroku adapter with a link-only default
@@ -67,8 +78,11 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
 - Decision: Kiroku defaults to `LinkOnly`, subject to confirmation in Milestone 1.
   Rationale: Replay from a checkpoint, bulk catch-up, and fan-out to several subscribers are the
   normal operating mode of an event-store subscription, and each makes joining the writer's
-  trace harmful. The OpenTelemetry messaging conventions make the link the baseline and
-  parenthood the exception.
+  trace harmful. This is also the default the OpenTelemetry messaging conventions recommend:
+  every processing span "SHOULD link to the message's creation context", and using that context
+  as parent is "NOT RECOMMENDED ... (by default)". The Kafka and PGMQ adapters deliberately keep
+  the parent by default; Kiroku does not, so the documentation must explain why the adapters
+  differ.
   Date: 2026-11-11
 
 - Decision: The setting applies uniformly to a consumer group; members do not differ.
@@ -126,6 +140,11 @@ always adds a link to that context, and makes it the parent only under `ParentAn
 `LinkOnly` the span is a root in a new trace. Batch spans always link all members and take no
 parent, whatever the setting. If the published API differs, follow it and record the
 difference.
+
+The same `shibuya-core` release renames the processing span from `<destination> process` to
+`process <destination>` and adds the attribute `messaging.operation.name = "process"`. Search
+this repository for the old form (`grep -rn ' process"\|process`' --include='*.hs' --include='*.md' .`)
+and update every test, example and document that matches it; note the rename in the changelog.
 
 Where the adapter stands today. `shibuya-kiroku-adapter/src/Shibuya/Adapter/Kiroku.hs` defines
 `KirokuAdapterConfig` (fields include `subscriptionName`, `subscriptionTarget`, `batchSize`),

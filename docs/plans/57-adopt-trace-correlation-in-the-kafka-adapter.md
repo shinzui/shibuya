@@ -11,6 +11,17 @@ provenance:
     model: "claude-fable-5-2"
     harness: "claude-code"
     at: 2026-11-12T02:55:43Z
+  revisions:
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:14:10Z
+      mode: "update"
+      note: "Align with full reading of OTel messaging spans spec; record deviations"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:25:31Z
+      mode: "update"
+      note: "Add EP-7 span rename and messaging.operation.name"
 ---
 
 # Adopt trace correlation in the Kafka adapter
@@ -61,7 +72,10 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
 - Decision: Kafka defaults to `ParentAndLink`.
   Rationale: Kafka is normally consumed close to real time, users expect producer and consumer
   in one trace, and trace backends display parent/child more prominently than links. Replay,
-  heavy lag, and wide fan-out are the cases for opting into `LinkOnly`.
+  heavy lag, and wide fan-out are the cases for opting into `LinkOnly`. This is a deliberate
+  departure from the OpenTelemetry messaging conventions, which permit the creation context as
+  parent for single messages but say it is "NOT RECOMMENDED ... (by default)" and require the
+  choice to be documented; the README must say so.
   Date: 2026-11-11
 
 - Decision: The setting is one field on `KafkaAdapterConfig`, not per topic.
@@ -123,6 +137,11 @@ context the span's parent only under `ParentAndLink`. Under `LinkOnly` the span 
 new trace. Batch spans (when the user wraps the adapter in a batching processor) always link
 every member and never take a parent, regardless of this setting. If the constructor names
 differ in the published 0.13, follow the published API and note it in Surprises & Discoveries.
+
+The same `shibuya-core` release renames the processing span from `<destination> process` to
+`process <destination>` and adds the attribute `messaging.operation.name = "process"`. Search
+this repository for the old form (`grep -rn ' process"\|process`' --include='*.hs' --include='*.md' .`)
+and update every test, example and document that matches it; note the rename in the changelog.
 
 Where the adapter stands today. `shibuya-kafka-adapter/src/Shibuya/Adapter/Kafka/Config.hs`
 defines `KafkaAdapterConfig` with fields `topics`, `pollTimeout`, `batchSize` and
@@ -191,10 +210,12 @@ other increase must be explained before continuing.
 ### Milestone 3: documentation and version
 
 Update `README.md` and `shibuya-kafka-adapter/README.md` with a short "Trace correlation"
-section: the default, how to set `LinkOnly`, the three Kafka situations that call for it
+section: the default, that the OpenTelemetry messaging conventions recommend link-only as the
+default and this adapter deliberately keeps the parent for continuity, how to set `LinkOnly`,
+the three Kafka situations that call for it
 (replay from an old offset, sustained lag, many consumer groups on one topic), the effect on
 sampling (a link-only trace is sampled independently of the producer's), and the fixed batch
-behaviour. Update `docs/capabilities/envelope-conversion.md` where it says end-to-end span shape
+behaviour (a root span with one link per record carrying `messaging.message.id`). Update `docs/capabilities/envelope-conversion.md` where it says end-to-end span shape
 is determined by the framework, pointing at the new setting; keep that bundle's frontmatter
 valid and run its validation as that repository's instructions describe. Update the `otel-demo`
 example to read the policy from an environment variable or flag so both shapes can be shown.
@@ -256,7 +277,7 @@ cabal run otel-demo            # default: ParentAndLink
 # then again with the LinkOnly setting added in Milestone 3
 ```
 
-Expected: with the default, the producer's trace contains the `<topic> process` span as a child;
+Expected: with the default, the producer's trace contains the `process <destination>` span as a child;
 with `LinkOnly`, the process span appears as its own trace whose span detail lists one link
 (Jaeger shows it under "References") to the producer's span.
 

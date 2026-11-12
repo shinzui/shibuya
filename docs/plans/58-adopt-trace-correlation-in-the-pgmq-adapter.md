@@ -11,6 +11,17 @@ provenance:
     model: "claude-fable-5-2"
     harness: "claude-code"
     at: 2026-11-12T02:55:43Z
+  revisions:
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:14:10Z
+      mode: "update"
+      note: "Align with full reading of OTel messaging spans spec; record deviations"
+    - model: "claude-fable-5-2"
+      harness: "claude-code"
+      at: 2026-11-12T03:25:31Z
+      mode: "update"
+      note: "Add EP-7 span rename and messaging.operation.name"
 ---
 
 # Adopt trace correlation in the PGMQ adapter
@@ -62,7 +73,10 @@ on trace headers.
 - Decision: PGMQ defaults to `ParentAndLink`.
   Rationale: PGMQ is a job queue: a message is consumed once, usually soon after it is sent, and
   users expect the job in the request's trace. Delayed sends and long retry cycles are the cases
-  for opting into `LinkOnly`.
+  for opting into `LinkOnly`. This is a deliberate departure from the OpenTelemetry messaging
+  conventions, which permit the creation context as parent for single messages but say it is
+  "NOT RECOMMENDED ... (by default)" and require the choice to be documented; the capability
+  document and README must say so.
   Date: 2026-11-11
 
 - Decision: The dead-letter header merge is not changed.
@@ -125,6 +139,13 @@ acknowledgement, returns the headers of the *currently active span*, which is th
 span; under `LinkOnly` those headers therefore name the new trace. Batch spans always link all
 members and take no parent, whatever the setting. If the published API differs, follow it and
 record the difference.
+
+The same `shibuya-core` release renames the processing span from `<destination> process` to
+`process <destination>` and adds the attribute `messaging.operation.name = "process"`. Search
+this repository for the old form (`grep -rn ' process"\|process`' --include='*.hs' --include='*.md' .`)
+and update every test, example and document that matches it; note the rename in the changelog.
+One occurrence is known: `shibuya-pgmq-adapter/test/Shibuya/Adapter/Pgmq/ChaosSpec.hs` selects
+spans named `"dlq-identity process"`, which becomes `"process dlq-identity"`.
 
 Where the adapter stands today.
 `shibuya-pgmq-adapter/src/Shibuya/Adapter/Pgmq/Config.hs` defines `PgmqAdapterConfig` (with
@@ -214,7 +235,9 @@ runs recorded under `docs/performance/`; treat growth as a blocker.
 ### Milestone 3: documentation, example and version
 
 Rewrite the "On ingest" bullet in `docs/capabilities/otel-trace-propagation.md`: the handler
-runs in the producer's trace by default and in its own linked trace under `LinkOnly`; add a
+runs in the producer's trace by default and in its own linked trace under `LinkOnly`, noting
+that the OpenTelemetry messaging conventions recommend link-only as the default and this adapter
+deliberately keeps the parent for continuity; add a
 bullet describing the dead-letter headers under each setting and the redelivery shape; keep the
 frontmatter valid, add the new tests as evidence entries, and run the bundle's validation as the
 repository's instructions describe. Update `README.md`, the user documentation under
