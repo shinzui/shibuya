@@ -9,7 +9,7 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (replicateM_)
 import Effectful (liftIO, runEff)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( AppConfig (..),
     ProcessorId (..),
@@ -56,7 +56,8 @@ worker started = runEff $ runTracingNoop $ do
             source = Stream.fromEffect $ liftIO $ do
               threadDelay 60_000_000
               fail "the idle adapter unexpectedly woke during the GC probe",
-            shutdown = pure ()
+            shutdown = pure (),
+            telemetry = defaultAdapterTelemetry
           }
   result <-
     runApp

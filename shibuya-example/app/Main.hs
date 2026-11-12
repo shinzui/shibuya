@@ -42,7 +42,8 @@ counterAdapter tracking name start step =
       source =
         Stream.unfold Unfold.fromList [start, start + step ..]
           & Stream.mapM (mkCounterIngested tracking name),
-      shutdown = liftIO $ Text.putStrLn $ "Shutting down " <> name <> " adapter"
+      shutdown = liftIO $ Text.putStrLn $ "Shutting down " <> name <> " adapter",
+      telemetry = defaultAdapterTelemetry
     }
 
 -- | Create an Ingested message from a value.

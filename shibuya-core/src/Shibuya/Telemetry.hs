@@ -31,9 +31,17 @@ module Shibuya.Telemetry
 
     -- * Semantic Conventions
     module Shibuya.Telemetry.Semantic,
+
+    -- * Trace Correlation
+    module Shibuya.Telemetry.Correlation,
+
+    -- * Processing Span
+    module Shibuya.Telemetry.Process,
   )
 where
 
+import Shibuya.Telemetry.Correlation
 import Shibuya.Telemetry.Effect
+import Shibuya.Telemetry.Process
 import Shibuya.Telemetry.Propagation
 import Shibuya.Telemetry.Semantic

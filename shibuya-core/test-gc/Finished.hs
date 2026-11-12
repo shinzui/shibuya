@@ -12,7 +12,7 @@ import Control.Exception (displayException, throwIO)
 import Control.Monad (forM, replicateM_, unless, void)
 import Data.List (isInfixOf)
 import Effectful (IOE, liftIO, runEff)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( AppConfig (..),
     ProcessorId (..),
@@ -113,7 +113,8 @@ finite count =
   Adapter
     { adapterName = "gc-regression:finite",
       source = Stream.fromList (map message [1 .. count]),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 failedSource :: Adapter '[Tracing, IOE] String
@@ -121,7 +122,8 @@ failedSource =
   Adapter
     { adapterName = "gc-regression:failed",
       source = Stream.fromEffect (liftIO (throwIO (userError "the source failed on purpose"))),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 -- | One message, then a quiet queue: the source stays alive but produces nothing.
@@ -130,7 +132,8 @@ oneThenIdle =
   Adapter
     { adapterName = "gc-regression:one-then-idle",
       source = Stream.unfoldrM step (0 :: Int),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
   where
     step 0 = pure (Just (message 0, 1))

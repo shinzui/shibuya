@@ -19,7 +19,7 @@ import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Stats (GCDetails (..), RTSStats (..), getRTSStats)
 import Network.Wai.Handler.Warp qualified as Warp
 import Network.WebSockets qualified as WS
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Ack (AckDecision (AckOk))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (mkIngested)
@@ -59,7 +59,7 @@ main = do
                 pure $ mkIngested envelope ack
             )
             $ Stream.fromList [1 .. count]
-        adapter = Adapter "observer-load" source (pure ())
+        adapter = Adapter "observer-load" source (pure ()) defaultAdapterTelemetry
     processor <-
       runEff $
         runTracingNoop $

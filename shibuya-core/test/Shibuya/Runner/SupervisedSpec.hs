@@ -16,7 +16,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.State.Static.Local qualified as State
 import Shibuya (ProcessorHalt (..))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock
   ( getTrackedDecisions,
     mkTrackedIngested,
@@ -287,7 +287,7 @@ spec = do
                           pure $ Just (mkIngested (mkEnvelope (MessageId (Text.pack (show n))) value) (AckHandle (const $ pure ())), n + 1)
                   )
                   0
-              adapter = Adapter {adapterName = "test:state", source = source, shutdown = pure ()}
+              adapter = Adapter {adapterName = "test:state", source = source, shutdown = pure (), telemetry = defaultAdapterTelemetry}
               observe message = do
                 value <- State.get @Int
                 State.modify @Int (+ 10)
@@ -405,7 +405,7 @@ spec = do
               mkIngested
                 (mkEnvelope (MessageId "failed-detail") ())
                 (AckHandle (\_ -> liftIO $ ioError (userError "failed finalizer")))
-            adapter = Adapter "failed-detail" (Stream.fromList [message]) (pure ())
+            adapter = Adapter "failed-detail" (Stream.fromList [message]) (pure ()) defaultAdapterTelemetry
         sp <-
           runSupervisedWith
             (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
@@ -432,7 +432,7 @@ spec = do
           master <- startMaster IgnoreAll
           let waitHere = liftIO (UIO.putMVar entered () >> UIO.takeMVar blocker)
               message = mkIngested (mkEnvelope (MessageId "cancel") ()) (AckHandle (\_ -> when inFinalizer waitHere))
-              adapter = Adapter "cancel-detail" (Stream.fromList [message]) (pure ())
+              adapter = Adapter "cancel-detail" (Stream.fromList [message]) (pure ()) defaultAdapterTelemetry
           sp <-
             runSupervisedWith
               (Metrics.MetricsDetailed Metrics.defaultDetailOptions)
@@ -1068,7 +1068,8 @@ spec = do
                         Adapter
                           { adapterName = "test:failing-source",
                             source = failingSource,
-                            shutdown = pure ()
+                            shutdown = pure (),
+                            telemetry = defaultAdapterTelemetry
                           }
 
                   let handler _ = do
@@ -1126,7 +1127,8 @@ spec = do
                         Adapter
                           { adapterName = "test:failing-source",
                             source = failingSource,
-                            shutdown = pure ()
+                            shutdown = pure (),
+                            telemetry = defaultAdapterTelemetry
                           }
 
                   let handler _ = do
@@ -1170,7 +1172,8 @@ spec = do
                     Adapter
                       { adapterName = "test:failing-immediate",
                         source = failingSource,
-                        shutdown = pure ()
+                        shutdown = pure (),
+                        telemetry = defaultAdapterTelemetry
                       }
                   handler _ = pure AckOk
 
@@ -1263,7 +1266,8 @@ spec = do
                         Adapter
                           { adapterName = "test:failing-A",
                             source = failingSourceA,
-                            shutdown = pure ()
+                            shutdown = pure (),
+                            telemetry = defaultAdapterTelemetry
                           }
 
                   -- Handler A counts messages
@@ -1522,7 +1526,8 @@ testAdapter messages =
   Adapter
     { adapterName = "test:supervised",
       source = Stream.fromList messages,
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 validDeadLetterCode :: Text.Text -> DeadLetterCode
@@ -1549,7 +1554,7 @@ cursorOutcome decision failFinalizer = runEff $ runTracingNoop $ do
         mkIngested
           ((mkEnvelope (MessageId "cursor") ()) {cursor = Just (CursorInt 5), partition = Just "p"})
           (AckHandle (\_ -> when failFinalizer (liftIO $ UIO.throwIO (userError "finalization failed"))))
-      adapter = Adapter "cursor" (Stream.fromList [message]) (pure ())
+      adapter = Adapter "cursor" (Stream.fromList [message]) (pure ()) defaultAdapterTelemetry
   proc <- runSupervisedWith (Metrics.MetricsDetailed Metrics.defaultDetailOptions) master 10 (ProcessorId "cursor") Unordered Serial adapter (\_ -> pure decision)
   liftIO $ atomically $ readTVar proc.done >>= check
   m <- getMetrics proc

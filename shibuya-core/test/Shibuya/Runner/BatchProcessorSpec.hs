@@ -13,7 +13,7 @@ import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Shibuya (ProcessorFailure (..), ProcessorHalt (..))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock
   ( TrackingAck (..),
     getTrackedDecisions,
@@ -453,7 +453,7 @@ runStatusBatches :: (IOE :> es, Tracing :> es) => Metrics.MetricsDetail -> Batch
 runStatusBatches detail handler batches = do
   master <- startMaster IgnoreAll
   let values = concatMap (NE.toList . snd) batches
-      adapter = Adapter "status-batch" (Stream.fromList values) (pure ())
+      adapter = Adapter "status-batch" (Stream.fromList values) (pure ()) defaultAdapterTelemetry
       config = defaultBatchConfig {batchSize = length values}
   proc <- runSupervisedBatchWith detail master 10 (ProcessorId "status-batch") Serial config adapter handler
   liftIO $ atomically $ readTVar proc.done >>= check

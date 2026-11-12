@@ -16,7 +16,7 @@ where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Effectful (Eff, IOE, liftIO, (:>))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Ack (AckDecision)
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, mkIngested)
@@ -30,7 +30,8 @@ listAdapter msgs =
   Adapter
     { adapterName = "mock:list",
       source = Stream.fromList msgs,
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 -- | Tracking state for ack decisions.

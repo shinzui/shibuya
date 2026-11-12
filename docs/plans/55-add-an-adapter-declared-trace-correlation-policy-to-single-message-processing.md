@@ -42,6 +42,11 @@ provenance:
       at: 2026-11-12T18:51:06Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-12T23:23:05Z
+      mode: "implement"
+      note: "Implement correlation policy, process span helpers, gate and docs"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -88,12 +93,15 @@ tests that already exist from the preceding plan.
 
 ## Progress
 
-- [ ] M1: `Shibuya.Telemetry.Correlation` exists; `Adapter` has a `telemetry` field set to
+- [x] M1 (2026-11-12): `Shibuya.Telemetry.Correlation` exists; `Adapter` has a `telemetry` field set to
   `defaultAdapterTelemetry` at every construction site in this repository; per-message spans with a
   creation context carry exactly one link; `cabal build all` and `cabal test shibuya-core` pass.
-- [ ] M2: `LinkOnly` yields a root span in a new trace with the link, even when an ambient span
+  Evidence: `cabal build all --enable-tests --enable-benchmarks` clean; all four `shibuya-core`
+  suites and `shibuya-metrics-test` pass (340 and 104 examples).
+- [x] M2 (2026-11-12): `LinkOnly` yields a root span in a new trace with the link, even when an ambient span
   is active; with tracing disabled no header is decoded; new tests in
-  `shibuya-core/test/Shibuya/Telemetry/CorrelationSpec.hs` pass.
+  `shibuya-core/test/Shibuya/Telemetry/CorrelationSpec.hs` pass. Evidence: 28 examples, 0
+  failures. Disabled-path decode removal is measured in M3.
 - [ ] M3: Performance and retention gate passed against the baseline commit, with the measured
   per-message cost of the link recorded in this plan; retention suite extended to both policies
   and passing.
@@ -106,6 +114,18 @@ tests that already exist from the preceding plan.
 Review resolved (2026-11-12): the MasterPlan now matches this plan's no-header ambient
 parentage exception. The public helper explicitly documents suppression of meaningful ambient
 context with valid headers. Batch decoding remains plan 56 work.
+
+- Record update without the constructor works under `NoFieldSelectors`: the spec uses
+  `defaultAdapterTelemetry {traceCorrelation = LinkOnly}` and `t.traceCorrelation` from another
+  module. A scratch module outside the package that writes `AdapterTelemetry LinkOnly` fails
+  with "Illegal term-level use of the type constructor `AdapterTelemetry`". The
+  `withTraceCorrelation` fallback was therefore not needed.
+- Ten construction sites build `Adapter` positionally (`Adapter "name" source shutdown`), not
+  with a record literal. Five are in `shibuya-core` tests and two in `shibuya-metrics`. The
+  plan's grep for record syntax does not find them; the compiler does.
+- `withProcessSpan` uses one `withEffToIO` for the context attachment and the span together. The
+  old `ParentAndLink` path used two, one in `withExtractedContext` and one in `withSpan'`. The
+  plan allowed at most the old two.
 
 
 ## Decision Log

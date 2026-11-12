@@ -8,7 +8,7 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
 import Shibuya.App
   ( AppConfig (..),
@@ -179,7 +179,7 @@ createTrackedMessages tracking n = mapM mk [1 .. n]
 -- Finite adapter: ends as soon as its list is exhausted.
 listAdapter' :: [Ingested es String] -> Adapter es String
 listAdapter' messages =
-  Adapter {adapterName = "test:batch", source = Stream.fromList messages, shutdown = pure ()}
+  Adapter {adapterName = "test:batch", source = Stream.fromList messages, shutdown = pure (), telemetry = defaultAdapterTelemetry}
 
 -- Gated adapter: emits the messages, then blocks until 'shutdown' opens the gate,
 -- so a partial batch stays pending until stopApp triggers the flush. Implemented
@@ -190,7 +190,8 @@ gatedAdapter gate messages =
   Adapter
     { adapterName = "test:gated",
       source = Stream.unfoldrM step messages,
-      shutdown = liftIO $ atomically $ writeTVar gate True
+      shutdown = liftIO $ atomically $ writeTVar gate True,
+      telemetry = defaultAdapterTelemetry
     }
   where
     step [] = do

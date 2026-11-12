@@ -6,7 +6,7 @@ import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock (TrackingAck (..), newTrackingAck, trackingAckHandle)
 import Shibuya.App (AppConfig (..), AppError (..), QueueProcessor (..), defaultAppConfig, mkBatchProcessor, mkProcessor, runApp, stopApp, waitApp)
 import Shibuya.Batch (ackAll, defaultBatchConfig)
@@ -296,7 +296,8 @@ testAdapter messages =
   Adapter
     { adapterName = "test:mock",
       source = Stream.fromList messages,
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 -- | Handler that records processed messages

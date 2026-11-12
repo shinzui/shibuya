@@ -10,7 +10,7 @@ import Data.Time.Clock (getCurrentTime)
 import Effectful (liftIO, runEff)
 import Effectful.State.Static.Local qualified as State
 import Shibuya qualified as Public
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Batch (BatchConfig (..), ackAllOk, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), HaltReason (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
@@ -95,13 +95,13 @@ spec = describe "pause and resume" $ do
                     pure $ fmap (\() -> (mkIngested (mkEnvelope (MessageId "live") ()) (AckHandle (\_ -> liftIO $ atomically $ modifyTVar' finishes (+ 1))), n + 1)) next
                 )
                 (1 :: Int)
-            adapter = Adapter "live" source (liftIO $ atomically $ writeTVar stop True)
+            adapter = Adapter "live" source (liftIO $ atomically $ writeTVar stop True) defaultAdapterTelemetry
             work = liftIO ((atomically (writeTQueue starts ()) >> atomically (takeTMVar handlerGate))) >> pure AckOk
             processor =
               if batching
                 then Public.mkBatchProcessor adapter (\_ _ -> work >> pure ackAllOk) defaultBatchConfig {batchSize = 1}
                 else Public.mkProcessor adapter (\_ -> work)
-            siblingAdapter = Adapter "sibling" (Stream.fromList [mkIngested (mkEnvelope (MessageId "sibling") ()) (AckHandle (\_ -> pure ()))]) (pure ())
+            siblingAdapter = Adapter "sibling" (Stream.fromList [mkIngested (mkEnvelope (MessageId "sibling") ()) (AckHandle (\_ -> pure ()))]) (pure ()) defaultAdapterTelemetry
         result <- Public.runApp Public.defaultAppConfig [(ProcessorId "live", processor), (ProcessorId "sibling", Public.mkProcessor siblingAdapter (\_ -> liftIO (atomically $ putTMVar sibling ()) >> pure AckOk))]
         app <- either (liftIO . ioError . userError . show) pure result
         liftIO $ atomically (readTQueue polls) `shouldReturn` 1
@@ -168,7 +168,7 @@ spec = describe "pause and resume" $ do
       UIO.finally
         ( runEff $ runTracingNoop $ do
             let message = mkIngested (mkEnvelope (MessageId "terminal") ()) (AckHandle (\_ -> if failure then liftIO (ioError (userError "failure")) else pure ()))
-                adapter = Adapter "terminal" (Stream.fromList [message]) (pure ())
+                adapter = Adapter "terminal" (Stream.fromList [message]) (pure ()) defaultAdapterTelemetry
             proc <-
               runSupervised
                 master

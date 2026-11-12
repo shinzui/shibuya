@@ -109,6 +109,7 @@ import Shibuya.Internal.Runner.Master
 import Shibuya.Internal.Runner.Pause (PauseHandle, newPauseHandle)
 import Shibuya.Policy (Concurrency (..), OrderingPolicy (..))
 import Shibuya.Prelude
+import Shibuya.Telemetry.Correlation (AdapterTelemetry (traceCorrelation), TraceCorrelation)
 import Shibuya.Telemetry.Effect
   ( Tracing,
     addAttribute,
@@ -116,10 +117,8 @@ import Shibuya.Telemetry.Effect
     addEvent,
     recordException,
     setStatus,
-    withExtractedContext,
-    withSpan',
   )
-import Shibuya.Telemetry.Propagation (extractTraceContext)
+import Shibuya.Telemetry.Process (withProcessSpan)
 import Shibuya.Telemetry.Semantic
   ( attrMessagingDestinationName,
     attrMessagingMessageId,
@@ -130,7 +129,6 @@ import Shibuya.Telemetry.Semantic
     attrShibuyaInflightCount,
     attrShibuyaInflightMax,
     attrShibuyaPartition,
-    consumerSpanArgs,
     eventAckDecision,
     eventHandlerCompleted,
     eventHandlerStarted,
@@ -308,6 +306,9 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
   -- Create bounded inbox (this is where inboxSize is used for backpressure)
   inbox <- liftIO $ newBoundedInbox inboxSize
 
+  -- The adapter's trace correlation policy, read once per processor.
+  let !correlation = adapter.telemetry.traceCorrelation
+
   -- Signal when ingester completes (stream exhausted)
   streamDoneVar <- liftIO $ newTVarIO False
 
@@ -348,8 +349,8 @@ runIngesterAndProcessor metricsHandle pauseHandle procId inboxSize ordering conc
       -- the detail ownership action from the basic specialization. Selecting a
       -- partially applied worker retains a per-message closure.
       case Metrics.metricsDetailLevel metricsHandle of
-        Metrics.MetricsBasic -> runInIO $ processUntilDrained False metricsHandle procId ordering concurrency handler inbox streamDoneVar
-        Metrics.MetricsDetailed _ -> runInIO $ processUntilDrained True metricsHandle procId ordering concurrency handler inbox streamDoneVar
+        Metrics.MetricsBasic -> runInIO $ processUntilDrained False metricsHandle procId correlation ordering concurrency handler inbox streamDoneVar
+        Metrics.MetricsDetailed _ -> runInIO $ processUntilDrained True metricsHandle procId correlation ordering concurrency handler inbox streamDoneVar
       UIO.waitCatch ingesterAsync >>= \case
         Left ingesterErr -> do
           now <- getCurrentTime
@@ -613,13 +614,14 @@ processUntilDrained ::
   Bool ->
   MetricsHandle ->
   ProcessorId ->
+  TraceCorrelation ->
   OrderingPolicy ->
   Concurrency ->
   Handler es msg ->
   Inbox (Ingested es msg) ->
   TVar Bool ->
   Eff es ()
-processUntilDrained detailed metricsHandle procId ordering concurrency handler inbox streamDoneVar = do
+processUntilDrained detailed metricsHandle procId correlation ordering concurrency handler inbox streamDoneVar = do
   stopSignal <- liftIO newProcessorSignal
   let exitPublisher = newProcessorExitPublisherWithWake stopSignal streamDoneVar
 
@@ -639,7 +641,7 @@ processUntilDrained detailed metricsHandle procId ordering concurrency handler i
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
         runProcessAction ingested =
-          runInIO $ processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
+          runInIO $ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
 
         -- Restore normal interruptibility for handlers and finalizers while the
         -- concurrent Streamly scheduler retains its inherited mask.
@@ -694,6 +696,7 @@ processOne ::
   (IOE :> es, Tracing :> es) =>
   Bool ->
   MetricsHandle ->
+  TraceCorrelation ->
   Text ->
   HashMap.HashMap Text Attribute ->
   Int ->
@@ -701,146 +704,144 @@ processOne ::
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne detailed metricsHandle spanName constantFrameworkAttrs maxConc exitPublisher handler ingested = do
-  -- Extract parent context from message headers for distributed tracing
-  let parentCtx = ingested.envelope.traceContext >>= extractTraceContext
+processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc exitPublisher handler ingested =
+  -- Link to (and, by policy, parent on) the producer's span from the
+  -- message's trace headers. With tracing disabled the headers are not read.
+  withProcessSpan correlation spanName ingested.envelope.traceContext $ \traceSpan -> do
+    -- Build the messaging.* attribute set: framework defaults first,
+    -- then the adapter's HashMap layered on top so adapter keys with
+    -- the same name override the framework's default. The explicit
+    -- 'HashMap.union' here is left-biased (left wins), which keeps
+    -- the precedence rule local and obvious instead of relying on
+    -- the order of repeated 'addAttribute' / 'addAttributes' calls
+    -- against the underlying mutable Span.
+    let messageId@(MessageId msgIdText) = ingested.envelope.messageId
+        frameworkAttrs =
+          HashMap.insert attrMessagingMessageId (toAttribute msgIdText) $
+            case ingested.envelope.partition of
+              Just p -> HashMap.insert attrShibuyaPartition (toAttribute p) constantFrameworkAttrs
+              Nothing -> constantFrameworkAttrs
+        mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
+    addAttributes traceSpan mergedAttrs
 
-  withExtractedContext parentCtx $
-    withSpan' spanName consumerSpanArgs $ \traceSpan -> do
-      -- Build the messaging.* attribute set: framework defaults first,
-      -- then the adapter's HashMap layered on top so adapter keys with
-      -- the same name override the framework's default. The explicit
-      -- 'HashMap.union' here is left-biased (left wins), which keeps
-      -- the precedence rule local and obvious instead of relying on
-      -- the order of repeated 'addAttribute' / 'addAttributes' calls
-      -- against the underlying mutable Span.
-      let messageId@(MessageId msgIdText) = ingested.envelope.messageId
-          frameworkAttrs =
-            HashMap.insert attrMessagingMessageId (toAttribute msgIdText) $
-              case ingested.envelope.partition of
-                Just p -> HashMap.insert attrShibuyaPartition (toAttribute p) constantFrameworkAttrs
-                Nothing -> constantFrameworkAttrs
-          mergedAttrs = HashMap.union ingested.envelope.attributes frameworkAttrs
-      addAttributes traceSpan mergedAttrs
+    status <- ingested.deliveryStatus
+    case status of
+      DeliverySuperseded -> do
+        addEvent traceSpan $
+          mkEvent
+            eventAckDecision
+            [(attrShibuyaAckDecision, OTel.toAttribute ("superseded" :: Text))]
+        setStatus traceSpan OTel.Ok
+      DeliveryCurrent -> do
+        let process currentInflight = do
+              addAttribute traceSpan attrShibuyaInflightCount currentInflight
+              addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-      status <- ingested.deliveryStatus
-      case status of
-        DeliverySuperseded -> do
-          addEvent traceSpan $
-            mkEvent
-              eventAckDecision
-              [(attrShibuyaAckDecision, OTel.toAttribute ("superseded" :: Text))]
-          setStatus traceSpan OTel.Ok
-        DeliveryCurrent -> do
-          let process currentInflight = do
-                addAttribute traceSpan attrShibuyaInflightCount currentInflight
-                addAttribute traceSpan attrShibuyaInflightMax maxConc
+              -- Record handler start event
+              addEvent traceSpan handlerStartedEvent
 
-                -- Record handler start event
-                addEvent traceSpan handlerStartedEvent
+              -- Call handler and finalizer separately. A handler exception is
+              -- substituted with immediate retry so an admitted delivery always receives a
+              -- finalization decision. Superseded deliveries are excluded.
+              --
+              -- This is a *separate* per-message 'catchAny' from the one inside
+              -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
+              -- handler+finalize, which skipped finalization when the handler threw;
+              -- splitting them is what makes "always finalize admitted deliveries" hold. The extra
+              -- per-message exception frame costs ~126 bytes/message (measured, EP-31
+              -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
+              -- accepted as the price of the always-finalize guarantee — do not merge the
+              -- two catches back together to reclaim it.
+              handlerResult <-
+                catchAny
+                  (Right <$> handler (toMessage ingested))
+                  ( \ex -> do
+                      recordException traceSpan ex
+                      pure (Left ex)
+                  )
+              let (decision, result) = case handlerResult of
+                    Right d -> (d, Right d)
+                    Left ex ->
+                      ( AckRetry (RetryDelay 0),
+                        Left $ HandlerException $ Text.pack $ show ex
+                      )
 
-                -- Call handler and finalizer separately. A handler exception is
-                -- substituted with immediate retry so an admitted delivery always receives a
-                -- finalization decision. Superseded deliveries are excluded.
-                --
-                -- This is a *separate* per-message 'catchAny' from the one inside
-                -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
-                -- handler+finalize, which skipped finalization when the handler threw;
-                -- splitting them is what makes "always finalize admitted deliveries" hold. The extra
-                -- per-message exception frame costs ~126 bytes/message (measured, EP-31
-                -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
-                -- accepted as the price of the always-finalize guarantee — do not merge the
-                -- two catches back together to reclaim it.
-                handlerResult <-
-                  catchAny
-                    (Right <$> handler (toMessage ingested))
-                    ( \ex -> do
-                        recordException traceSpan ex
-                        pure (Left ex)
-                    )
-                let (decision, result) = case handlerResult of
-                      Right d -> (d, Right d)
-                      Left ex ->
-                        ( AckRetry (RetryDelay 0),
-                          Left $ HandlerException $ Text.pack $ show ex
-                        )
+              when (isLeft handlerResult) $
+                addEvent traceSpan $
+                  mkEvent
+                    eventAckDecision
+                    [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
 
-                when (isLeft handlerResult) $
+              finalizeResult <- finalizeWithRetry traceSpan ingested decision
+
+              -- Record completion event and set status
+              case finalizeResult of
+                Left _ -> do
                   addEvent traceSpan $
                     mkEvent
                       eventAckDecision
-                      [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
+                      [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
+                  setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
+                Right () -> case result of
+                  Right decision' -> do
+                    let decisionText = showAckDecision decision'
+                    addEvent traceSpan $
+                      mkEvent
+                        eventHandlerCompleted
+                        [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+                    addAttribute traceSpan attrShibuyaAckDecision decisionText
 
-                finalizeResult <- finalizeWithRetry traceSpan ingested decision
-
-                -- Record completion event and set status
-                case finalizeResult of
-                  Left _ -> do
+                    -- Set span status based on decision
+                    case decision' of
+                      AckOk -> setStatus traceSpan OTel.Ok
+                      AckRetry _ -> setStatus traceSpan OTel.Ok
+                      AckDeadLetter reason -> do
+                        addAttribute
+                          traceSpan
+                          attrShibuyaDeadLetterReasonCode
+                          (deadLetterCodeText (deadLetterReasonCode reason))
+                        setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
+                      AckHalt reason ->
+                        setStatus traceSpan $ OTel.Error $ showHaltReason reason
+                  Left err -> do
                     addEvent traceSpan $
                       mkEvent
                         eventAckDecision
-                        [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
-                    setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
-                  Right () -> case result of
-                    Right decision' -> do
-                      let decisionText = showAckDecision decision'
-                      addEvent traceSpan $
-                        mkEvent
-                          eventHandlerCompleted
-                          [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
-                      addAttribute traceSpan attrShibuyaAckDecision decisionText
+                        [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+                    setStatus traceSpan $ OTel.Error $ handlerErrorToText err
 
-                      -- Set span status based on decision
-                      case decision' of
-                        AckOk -> setStatus traceSpan OTel.Ok
-                        AckRetry _ -> setStatus traceSpan OTel.Ok
-                        AckDeadLetter reason -> do
-                          addAttribute
-                            traceSpan
-                            attrShibuyaDeadLetterReasonCode
-                            (deadLetterCodeText (deadLetterReasonCode reason))
-                          setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
-                        AckHalt reason ->
-                          setStatus traceSpan $ OTel.Error $ showHaltReason reason
-                    Left err -> do
-                      addEvent traceSpan $
-                        mkEvent
-                          eventAckDecision
-                          [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
-                      setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+              let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+              when detailed $ case (finalizeResult, result) of
+                (Right (), Right AckOk) -> recordCursor
+                (Right (), Right (AckDeadLetter _)) -> recordCursor
+                _ -> pure ()
 
-                let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
-                when detailed $ case (finalizeResult, result) of
-                  (Right (), Right AckOk) -> recordCursor
-                  (Right (), Right (AckDeadLetter _)) -> recordCursor
-                  _ -> pure ()
-
-                -- Decrement in-flight and update stats.
-                liftIO $
-                  case finalizeResult of
-                    Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
-                    Right () -> finishProcessing metricsHandle (metricForResult result)
-
-                -- Handle halt (set flag, don't throw - let stream drain)
+              -- Decrement in-flight and update stats.
+              liftIO $
                 case finalizeResult of
-                  Left _ ->
-                    liftIO $
-                      requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
-                  Right () -> case result of
-                    Right (AckHalt reason) ->
-                      liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
-                    _ -> pure ()
-          if not detailed
-            then do
-              currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-              process currentInflight
-            else Exception.mask $ \restore -> do
-              currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-              slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
-              restore (process currentInflight)
-                `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
-              liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
-                `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+                  Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
+                  Right () -> finishProcessing metricsHandle (metricForResult result)
+
+              -- Handle halt (set flag, don't throw - let stream drain)
+              case finalizeResult of
+                Left _ ->
+                  liftIO $
+                    requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
+                Right () -> case result of
+                  Right (AckHalt reason) ->
+                    liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
+                  _ -> pure ()
+        if not detailed
+          then do
+            currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+            process currentInflight
+          else Exception.mask $ \restore -> do
+            currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+            slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle messageId
+            restore (process currentInflight)
+              `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+            liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
+              `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
   where
     isLeft :: Either a b -> Bool
     isLeft (Left _) = True

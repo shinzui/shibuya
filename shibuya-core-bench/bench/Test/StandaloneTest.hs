@@ -10,7 +10,7 @@ import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Generics (Generic)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, Message (..), mkIngested)
@@ -66,7 +66,8 @@ runWithConcurrency concurrency mkHandler n = do
           Adapter
             { adapterName = "test:list",
               source = Stream.fromList msgs,
-              shutdown = pure ()
+              shutdown = pure (),
+              telemetry = defaultAdapterTelemetry
             }
     master <- startMaster IgnoreAll
     _ <- runSupervised master 100 (ProcessorId "test") Unordered concurrency adapter handler

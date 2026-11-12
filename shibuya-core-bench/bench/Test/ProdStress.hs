@@ -22,7 +22,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Conc.Sync (setUncaughtExceptionHandler)
 import GHC.Generics (Generic)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, mkIngested)
@@ -104,7 +104,8 @@ runRound mode procs msgs = do
             Adapter
               { adapterName = "stress:" <> Text.pack (show i),
                 source = Stream.fromList ms,
-                shutdown = pure ()
+                shutdown = pure (),
+                telemetry = defaultAdapterTelemetry
               }
           -- Small inbox relative to message count => real backpressure, the
           -- concurrent ingester/processor race this bug lives in.

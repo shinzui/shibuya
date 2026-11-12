@@ -32,7 +32,7 @@ import OpenTelemetry.Attributes (emptyAttributes)
 import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Processor.Span (FlushResult (..), ShutdownResult (..), SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( QueueProcessor (..),
     ackAllOk,
@@ -144,7 +144,8 @@ runPayloadCase tracer shape batches = do
         Adapter
           { adapterName = "trace-retention:payload",
             source = Stream.fromList (map snd built),
-            shutdown = pure ()
+            shutdown = pure (),
+            telemetry = defaultAdapterTelemetry
           }
   -- Force the weak pointers out of their tuples now; returning the lazy
   -- @map fst built@ would keep the whole message list reachable.
@@ -202,7 +203,8 @@ runSmallMessages tracer shape n = do
           { adapterName = "trace-retention:flat",
             -- A generator, not a list, so the source itself retains nothing.
             source = fmap (\i -> message i (Text.pack (show i))) (Stream.enumerateFromTo 1 n),
-            shutdown = pure ()
+            shutdown = pure (),
+            telemetry = defaultAdapterTelemetry
           }
   runEff $ runTracing tracer $ runToCompletion shape batches adapter
 {-# NOINLINE runSmallMessages #-}

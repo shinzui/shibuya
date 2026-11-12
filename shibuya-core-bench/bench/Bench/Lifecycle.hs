@@ -34,7 +34,7 @@ import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc (getNumCapabilities)
 import GHC.Stats (RTSStats (..), getRTSStats, getRTSStatsEnabled)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.App qualified as App
 import Shibuya.Batch (BatchConfig (..), BatchHandler, BatchKey (..), ackAll, ackAllOk, defaultBatchConfig)
 import Shibuya.Core.Ack (AckDecision (..), DeadLetterReason (..), RetryDelay (..))
@@ -260,7 +260,8 @@ runMessageFlow scenario counters runStarted =
           Adapter
             { adapterName = "bench:lifecycle:" <> scenario.name,
               source = pacedSource,
-              shutdown = pure ()
+              shutdown = pure (),
+              telemetry = defaultAdapterTelemetry
             }
     processor <-
       case scenario.batching of
@@ -311,7 +312,8 @@ runGracefulDrainFlow scenario counters runStarted stopAfter =
           Adapter
             { adapterName = "bench:lifecycle:" <> scenario.name,
               source = pacedSource,
-              shutdown = pure ()
+              shutdown = pure (),
+              telemetry = defaultAdapterTelemetry
             }
         processor =
           App.QueueProcessor

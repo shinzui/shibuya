@@ -10,7 +10,7 @@ import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import GHC.Generics (Generic)
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Ack (AckDecision (..))
 import Shibuya.Core.AckHandle (AckHandle (..))
 import Shibuya.Core.Ingested (Ingested, mkIngested)
@@ -53,7 +53,8 @@ runHotPath concurrency payloads =
           Adapter
             { adapterName = "bench:hot-path",
               source = Stream.fromList msgs,
-              shutdown = pure ()
+              shutdown = pure (),
+              telemetry = defaultAdapterTelemetry
             }
     master <- startMaster IgnoreAll
     sp <- runSupervised master 100 (ProcessorId "hot-path") Unordered concurrency adapter noopHandler

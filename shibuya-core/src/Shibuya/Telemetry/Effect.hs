@@ -25,6 +25,7 @@ module Shibuya.Telemetry.Effect
     getTracer,
     isTracingEnabled,
     withExtractedContext,
+    withRootContext,
 
     -- * Re-exports
     OTel.Span,
@@ -294,6 +295,24 @@ withExtractedContext (Just parentCtx) action = do
           (Ctx.attachContext newContext)
           Ctx.detachContext
           (\_token -> runInIO action)
+
+-- | Run an action with an empty OpenTelemetry context attached, so a span
+-- opened inside it is a root in a new trace. The previous context is restored
+-- afterwards, on normal exit, exception and asynchronous cancellation.
+-- A no-op when tracing is disabled.
+withRootContext ::
+  (Tracing :> es, IOE :> es) =>
+  Eff es a ->
+  Eff es a
+withRootContext action = do
+  TracingRep {tracingEnabled} <- getStaticRep
+  if not tracingEnabled
+    then action
+    else withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO ->
+      bracket
+        (Ctx.attachContext Ctx.empty)
+        Ctx.detachContext
+        (\_token -> runInIO action)
 
 --------------------------------------------------------------------------------
 -- Internal Helpers

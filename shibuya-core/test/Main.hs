@@ -18,6 +18,7 @@ import Shibuya.Runner.PartitionOrderingSpec qualified
 import Shibuya.Runner.PauseSpec qualified as Pause
 import Shibuya.Runner.SupervisedSpec qualified
 import Shibuya.RunnerSpec qualified
+import Shibuya.Telemetry.CorrelationSpec qualified
 import Shibuya.Telemetry.EffectSpec qualified
 import Shibuya.Telemetry.LifecycleSpec qualified
 import Shibuya.Telemetry.PropagationSpec qualified
@@ -44,5 +45,6 @@ main = hspec $ do
   Shibuya.Runner.SupervisedSpec.spec
   Shibuya.Telemetry.LifecycleSpec.spec
   Shibuya.Telemetry.EffectSpec.spec
+  Shibuya.Telemetry.CorrelationSpec.spec
   Shibuya.Telemetry.PropagationSpec.spec
   Shibuya.Telemetry.SemanticSpec.spec

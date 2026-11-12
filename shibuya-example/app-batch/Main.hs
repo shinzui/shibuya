@@ -62,7 +62,8 @@ ordersAdapter tracking stopVar orders =
       source = Stream.unfoldrM step orders,
       shutdown = do
         liftIO $ Text.putStrLn "Shutting down orders adapter"
-        liftIO $ void (tryPutMVar stopVar ())
+        liftIO $ void (tryPutMVar stopVar ()),
+      telemetry = defaultAdapterTelemetry
     }
   where
     step [] = do

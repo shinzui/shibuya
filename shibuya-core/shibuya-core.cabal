@@ -47,7 +47,9 @@ library
     Shibuya.Policy
     Shibuya.Stream
     Shibuya.Telemetry
+    Shibuya.Telemetry.Correlation
     Shibuya.Telemetry.Effect
+    Shibuya.Telemetry.Process
     Shibuya.Telemetry.Propagation
     Shibuya.Telemetry.Semantic
 
@@ -132,6 +134,7 @@ test-suite shibuya-core-test
     Shibuya.Runner.PauseSpec
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec
+    Shibuya.Telemetry.CorrelationSpec
     Shibuya.Telemetry.EffectSpec
     Shibuya.Telemetry.LifecycleSpec
     Shibuya.Telemetry.PropagationSpec

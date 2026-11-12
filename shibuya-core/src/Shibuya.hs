@@ -76,6 +76,9 @@ module Shibuya
 
     -- * Adapter authoring
     Adapter (..),
+    AdapterTelemetry (traceCorrelation),
+    defaultAdapterTelemetry,
+    TraceCorrelation (..),
     AckHandle (..),
     Lease (..),
     Ingested (..),
@@ -114,7 +117,7 @@ module Shibuya
   )
 where
 
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), AdapterTelemetry (traceCorrelation), TraceCorrelation (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( AppConfig (..),
     AppError (..),

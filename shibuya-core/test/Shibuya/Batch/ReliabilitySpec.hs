@@ -21,7 +21,7 @@ import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock
   ( TrackingAck,
     getTrackedDecisions,
@@ -155,7 +155,8 @@ gatedTrackedAdapter gate tracking envs =
   Adapter
     { adapterName = "test:gated-tracked",
       source = Stream.unfoldrM step (map (mkTrackedIngested tracking) envs),
-      shutdown = liftIO $ atomically $ writeTVar gate True
+      shutdown = liftIO $ atomically $ writeTVar gate True,
+      telemetry = defaultAdapterTelemetry
     }
   where
     step [] = do
@@ -556,7 +557,8 @@ spec = describe "Shibuya.Batch reliability" $ do
               Adapter
                 { adapterName = "test:counting-source",
                   source = source,
-                  shutdown = pure ()
+                  shutdown = pure (),
+                  telemetry = defaultAdapterTelemetry
                 }
             cfg = (defaultBatchConfig @_ @Int) {batchSize = 1, batchTimeout = 30, batchKey = scenarioBatchKey}
             handler _ _ = do

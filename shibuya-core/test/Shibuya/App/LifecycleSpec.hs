@@ -15,7 +15,7 @@ import Effectful (Eff, IOE, Limit (..), Persistence (..), UnliftStrategy (..), l
 import Effectful.Exception qualified as Exception
 import OpenTelemetry.Attributes qualified as OTelAttributes
 import OpenTelemetry.Trace.Core qualified as OTel
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( AppConfig (..),
     QueueProcessor (..),
@@ -581,7 +581,8 @@ testAdapter messages =
   Adapter
     { adapterName = "test:list",
       source = Stream.fromList messages,
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
 
 failingAfterAdapter :: (IOE :> es) => Int -> Text.Text -> Adapter es String
@@ -589,7 +590,8 @@ failingAfterAdapter goodCount failureText =
   Adapter
     { adapterName = "test:failing",
       source = Stream.unfoldrM step (0 :: Int),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
   where
     step n
@@ -603,7 +605,8 @@ infiniteAdapter =
   Adapter
     { adapterName = "test:infinite",
       source = Stream.unfoldrM step (1 :: Int),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
   where
     step n = do
@@ -616,7 +619,8 @@ oneThenIdleAdapter =
   Adapter
     { adapterName = "test:one-then-idle",
       source = Stream.unfoldrM step False,
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
   where
     step False = do
@@ -629,7 +633,8 @@ permanentFinalizerFailureAdapter =
   Adapter
     { adapterName = "test:permanent-finalizer-failure",
       source = Stream.fromEffect (pure ingested),
-      shutdown = pure ()
+      shutdown = pure (),
+      telemetry = defaultAdapterTelemetry
     }
   where
     envelope = mkEnvelope (MessageId "finalizer-failure") "message"

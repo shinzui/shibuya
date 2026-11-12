@@ -17,7 +17,7 @@ import Network.Wai.Handler.Warp qualified as Warp
 import Network.Wai.Test
 import Network.WebSockets qualified as WS
 import Shibuya qualified as Public
-import Shibuya.Adapter (Adapter (..))
+import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
 import Shibuya.Core.Metrics
 import Shibuya.Internal.Runner.Master
 import Shibuya.Internal.Runner.Pause
@@ -134,7 +134,7 @@ spec = do
                         pure $ fmap (\() -> (Public.mkIngested (Public.mkEnvelope (Public.MessageId "live") ()) (Public.AckHandle (\_ -> liftIO $ atomically $ modifyTVar' finalized (+ 1))), n + 1)) next
                     )
                     (1 :: Int)
-                adapter = Adapter "live" source (liftIO $ atomically $ writeTVar stopped True)
+                adapter = Adapter "live" source (liftIO $ atomically $ writeTVar stopped True) defaultAdapterTelemetry
                 handler _ = do
                   liftIO $ atomically $ writeTQueue started ()
                   liftIO $ atomically $ takeTMVar handlerGate

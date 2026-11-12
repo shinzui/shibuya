@@ -214,7 +214,7 @@ with their measured results. Proposed status does not claim implemented behavior
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
-| 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Not Started |
+| 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | In Progress |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Not Started |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
