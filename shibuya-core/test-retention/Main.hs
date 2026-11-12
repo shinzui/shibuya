@@ -32,7 +32,7 @@ import OpenTelemetry.Attributes (emptyAttributes)
 import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Processor.Span (FlushResult (..), ShutdownResult (..), SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
-import Shibuya.Adapter (Adapter (..), defaultAdapterTelemetry)
+import Shibuya.Adapter (Adapter (..), AdapterTelemetry (traceCorrelation), TraceCorrelation (..), defaultAdapterTelemetry)
 import Shibuya.App
   ( QueueProcessor (..),
     ackAllOk,
@@ -59,6 +59,11 @@ import System.Timeout (timeout)
 data Shape = SingleSerial | SingleAsync8 | Batch
   deriving stock (Eq, Show)
 
+-- | Batch cases are labelled by shape alone: batch spans take no policy.
+caseName :: Shape -> TraceCorrelation -> String
+caseName Batch _ = shapeName Batch
+caseName shape policy = shapeName shape <> "/" <> show policy
+
 shapeName :: Shape -> String
 shapeName = \case
   SingleSerial -> "single-serial"
@@ -79,11 +84,13 @@ main :: IO ()
 main = do
   results <-
     sequence
-      [ checkPayloadsCollected SingleSerial,
-        checkPayloadsCollected Batch,
-        checkLiveBytesFlat SingleSerial,
-        checkLiveBytesFlat SingleAsync8,
-        checkLiveBytesFlat Batch
+      [ checkPayloadsCollected SingleSerial ParentAndLink,
+        checkPayloadsCollected SingleSerial LinkOnly,
+        checkPayloadsCollected Batch ParentAndLink,
+        checkLiveBytesFlat SingleSerial ParentAndLink,
+        checkLiveBytesFlat SingleSerial LinkOnly,
+        checkLiveBytesFlat SingleAsync8 ParentAndLink,
+        checkLiveBytesFlat Batch ParentAndLink
       ]
   unless (and results) exitFailure
 
@@ -94,13 +101,13 @@ main = do
 payloadCount :: Int
 payloadCount = 8
 
-checkPayloadsCollected :: Shape -> IO Bool
-checkPayloadsCollected shape = bounded label $ do
+checkPayloadsCollected :: Shape -> TraceCorrelation -> IO Bool
+checkPayloadsCollected shape policy = bounded label $ do
   (processor, exported) <- inMemoryListExporter
   provider <- OTel.createTracerProvider [processor] OTel.emptyTracerProviderOptions
   let tracer = OTel.makeTracer provider (OTel.InstrumentationLibrary "trace-retention-test" "" "" emptyAttributes) OTel.tracerOptions
   batches <- newIORef (0 :: Int)
-  weaks <- runPayloadCase tracer shape batches
+  weaks <- runPayloadCase tracer shape policy batches
   performMajorGC
   performMajorGC
   alive <- length . filter isJust <$> traverse deRefWeak weaks
@@ -126,14 +133,14 @@ checkPayloadsCollected shape = bounded label $ do
         <> " payloads collected"
     )
   where
-    label = shapeName shape <> ": finished spans do not retain payloads"
+    label = caseName shape policy <> ": finished spans do not retain payloads"
 
 -- | Build the messages, process them to completion, and return only the weak
 -- pointers. Everything else this case allocated, including the application
 -- handle (whose adapter still references the message list), is unreachable
 -- once it returns.
-runPayloadCase :: OTel.Tracer -> Shape -> IORef Int -> IO [Weak (IORef ())]
-runPayloadCase tracer shape batches = do
+runPayloadCase :: OTel.Tracer -> Shape -> TraceCorrelation -> IORef Int -> IO [Weak (IORef ())]
+runPayloadCase tracer shape policy batches = do
   built <- forM [1 .. payloadCount] $ \i -> do
     token <- newIORef ()
     weak <- mkWeakToken token
@@ -150,7 +157,7 @@ runPayloadCase tracer shape batches = do
   -- Force the weak pointers out of their tuples now; returning the lazy
   -- @map fst built@ would keep the whole message list reachable.
   mapM_ evaluate weaks
-  runEff $ runTracing tracer $ runToCompletion shape batches adapter
+  runEff $ runTracing tracer $ runToCompletion shape policy batches adapter
   pure weaks
 {-# NOINLINE runPayloadCase #-}
 
@@ -164,16 +171,16 @@ mkWeakToken ref = mkWeakIORef ref (pure ())
 smallRun :: Int
 smallRun = 20_000
 
-checkLiveBytesFlat :: Shape -> IO Bool
-checkLiveBytesFlat shape = bounded label $ do
+checkLiveBytesFlat :: Shape -> TraceCorrelation -> IO Bool
+checkLiveBytesFlat shape policy = bounded label $ do
   -- No exporter retains finished spans; a single discarding processor is
   -- needed only because hs-opentelemetry makes spans non-recording when a
   -- provider has no processors at all.
   provider <- OTel.createTracerProvider [discardProcessor] OTel.emptyTracerProviderOptions
   let tracer = OTel.makeTracer provider (OTel.InstrumentationLibrary "trace-retention-test" "" "" emptyAttributes) OTel.tracerOptions
-  runSmallMessages tracer shape smallRun
+  runSmallMessages tracer shape policy smallRun
   before <- liveBytesAfterGC
-  runSmallMessages tracer shape (10 * smallRun)
+  runSmallMessages tracer shape policy (10 * smallRun)
   after <- liveBytesAfterGC
   void $ OTel.shutdownTracerProvider provider (Just 1_000_000)
   let allowed = before + 1024 * 1024 + before `div` 10
@@ -193,10 +200,10 @@ checkLiveBytesFlat shape = bounded label $ do
         <> ")"
     )
   where
-    label = shapeName shape <> ": live bytes flat"
+    label = caseName shape policy <> ": live bytes flat"
 
-runSmallMessages :: OTel.Tracer -> Shape -> Int -> IO ()
-runSmallMessages tracer shape n = do
+runSmallMessages :: OTel.Tracer -> Shape -> TraceCorrelation -> Int -> IO ()
+runSmallMessages tracer shape policy n = do
   batches <- newIORef (0 :: Int)
   let adapter =
         Adapter
@@ -206,7 +213,7 @@ runSmallMessages tracer shape n = do
             shutdown = pure (),
             telemetry = defaultAdapterTelemetry
           }
-  runEff $ runTracing tracer $ runToCompletion shape batches adapter
+  runEff $ runTracing tracer $ runToCompletion shape policy batches adapter
 {-# NOINLINE runSmallMessages #-}
 
 liveBytesAfterGC :: IO Integer
@@ -234,11 +241,14 @@ discardProcessor =
 runToCompletion ::
   (IOE :> es, Tracing :> es) =>
   Shape ->
+  TraceCorrelation ->
   IORef Int ->
   Adapter es msg ->
   Eff es ()
-runToCompletion shape batches adapter = do
-  let processor = case shape of
+runToCompletion shape policy batches adapter0 = do
+  -- Batch spans take no policy; single-message spans follow the adapter's.
+  let adapter = adapter0 {telemetry = defaultAdapterTelemetry {traceCorrelation = policy}}
+      processor = case shape of
         SingleSerial -> QueueProcessor adapter (\_ -> pure AckOk) Unordered Serial
         SingleAsync8 -> QueueProcessor adapter (\_ -> pure AckOk) Unordered (Async 8)
         Batch -> BatchingProcessor adapter (countBatch batches) defaultBatchConfig {batchSize = 100} Unordered Serial

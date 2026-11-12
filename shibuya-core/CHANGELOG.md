@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.13.0.0 — Unreleased
+
+### Breaking Changes
+
+- `Adapter` gains a strict `telemetry :: AdapterTelemetry` field. Record
+  constructions must add `telemetry = defaultAdapterTelemetry`; positional
+  construction requires the extra argument. Adapters should expose the value in
+  their own configuration so users can override it.
+- Per-message processing spans now carry a link to the producer's span when
+  `Envelope.traceContext` decodes. Under the default `ParentAndLink` policy the span
+  is still the producer span's child, so existing traces keep their shape and gain
+  one link.
+
+### New Features
+
+- New module `Shibuya.Telemetry.Correlation`, re-exported from `Shibuya.Adapter`,
+  `Shibuya.Telemetry` and `Shibuya`. It provides `TraceCorrelation`
+  (`ParentAndLink`, `LinkOnly`), `AdapterTelemetry` (constructor hidden, built from
+  `defaultAdapterTelemetry` by record update), and the link helpers `creationLink`,
+  `creationLinkWith` and `consumerSpanArgsLinkedTo`.
+- `LinkOnly` makes each processing span with a usable creation context the root of
+  a new trace, related to the producer only by the link. Use it for replayed,
+  fanned-out or long-delayed sources and with tail-based sampling. Without usable
+  headers both policies keep the ambient parent and add no link.
+- New module `Shibuya.Telemetry.Process` with `withProcessSpan` (in `Tracing`) and
+  `withProcessSpanIO` (for a plain `Tracer`). They open the same processing span
+  as the runner for code that drains an adapter outside it. With valid headers they
+  neither parent on nor link an ambient span; they are meant for independent
+  message processing.
+- `Shibuya.Telemetry.Effect.withRootContext` runs an action with an empty
+  OpenTelemetry context attached.
+
+### Other Changes
+
+- With tracing disabled, per-message processing no longer decodes the W3C trace
+  headers. Before, each message with a `traceparent` was decoded even under
+  `runTracingNoop`.
+- Per-message processing allocates about 208 bytes less on every single-message
+  path. With tracing enabled and trace headers present it allocates about 210 bytes
+  less, even with the added link, because the context attachment and the span now
+  share one unlift.
+
 ## 0.12.0.0 — 2026-10-26
 
 ### Breaking Changes

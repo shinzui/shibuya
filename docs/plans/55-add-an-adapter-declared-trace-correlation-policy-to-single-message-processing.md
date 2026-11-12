@@ -127,6 +127,35 @@ context with valid headers. Batch decoding remains plan 56 work.
   old `ParentAndLink` path used two, one in `withExtractedContext` and one in `withSpan'`. The
   plan allowed at most the old two.
 
+- M3 gate, 2026-11-12, against baseline `526ddb1` (EP-1's completion commit). Retention: all
+  seven checks pass, covering single-serial Check A and Check B under both `ParentAndLink` and
+  `LinkOnly`. Allocation, which is deterministic, meets the contract and improves it:
+  - Every single-message path allocates about 208 bytes per message *less*. This includes
+    `hot-path`, `handler-overhead`, `framework-overhead` and `concurrency-modes` serial; for
+    example `hot-path/serial-noop-10000` went from 19,917,111 to 17,838,867. The most likely
+    cause is the per-message action closure the old `withExtractedContext parentCtx $ ...`
+    wrapper allocated, which `withProcessSpan` no longer builds.
+  - The disabled-path decode is gone. `tracing/single-serial/disabled-headers` allocates
+    17,815,460, the same as `disabled-noheaders` (17,816,921); the baseline was 23,352,054.
+  - The cost of the link: `single-serial/enabled-headers` minus `enabled-noheaders` was 1,360
+    bytes per message at baseline and is 1,151 now. The new one-element link list, `NewLink` and
+    `SpanArguments` cost less than the second `withEffToIO` they replaced. `LinkOnly`
+    (`enabled-headers-linkonly`, 94,466,964) allocates about 135 bytes per message less than
+    `ParentAndLink`, because it builds no parent context.
+  - Exceptions are all `Async`/`Ahead` cells with 1–5 ms handler delays in
+    `concurrency-modes`: −165 KB to +290 KB per 100-message run, in both directions, across two
+    runs. These cells' allocation depends on worker dispatch (see plan 30); their per-message
+    code is the path that got cheaper everywhere else. `lifecycle/batch-size` (+0.2%) runs
+    through the batch runner, which this plan does not change.
+- M3 time gate: not verified. Three comparisons — full run, `--stdev 3` re-run, and an
+  order-swapped re-run — reported 15–48% slower times in `lifecycle/*`, `hot-path/async8` and
+  `single-async8`. The unchanged batch path (`lifecycle/batch-size`) was among them, at +16% to
+  +48%. Allocation in those cells fell or stayed flat. Load average rose from 4.7 to 23 during
+  the runs while unrelated test suites from another project and a VM ran on the machine. The
+  swapped run put the candidate under heavier load (≈23) than the baseline (≈16), so it could
+  not separate order from load. The time gate is recorded as not met on this machine; M3 stays
+  open pending a run on an idle machine.
+
 
 ## Decision Log
 

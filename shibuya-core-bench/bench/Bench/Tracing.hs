@@ -32,6 +32,7 @@ import GHC.Generics (Generic)
 import OpenTelemetry.Attributes qualified as Attr
 import OpenTelemetry.Processor.Span (FlushResult (..), ShutdownResult (..), SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
+import Shibuya.Adapter (Adapter (..), AdapterTelemetry (traceCorrelation), TraceCorrelation (..), defaultAdapterTelemetry)
 import Shibuya.Adapter.Mock (listAdapter)
 import Shibuya.App
   ( ProcessorMetrics (..),
@@ -67,6 +68,7 @@ data TracingMode = Disabled | Enabled
 data HeaderMode = NoHeaders | WithHeaders
 
 data Shape = SingleSerial | SingleAsync8 | Batch100
+  deriving stock (Eq)
 
 messageCount :: Int
 messageCount = 10_000
@@ -117,36 +119,45 @@ benchmarks tracer =
     ]
   where
     shapeGroup name shape =
-      bgroup
-        name
-        [ cell "disabled-noheaders" Disabled NoHeaders shape,
-          cell "disabled-headers" Disabled WithHeaders shape,
-          cell "enabled-noheaders" Enabled NoHeaders shape,
-          cell "enabled-headers" Enabled WithHeaders shape
+      bgroup name $
+        [ cell "disabled-noheaders" Disabled NoHeaders ParentAndLink shape,
+          cell "disabled-headers" Disabled WithHeaders ParentAndLink shape,
+          cell "enabled-noheaders" Enabled NoHeaders ParentAndLink shape,
+          cell "enabled-headers" Enabled WithHeaders ParentAndLink shape
         ]
+          -- Added by docs/plans/55-…: the same messages under the LinkOnly
+          -- policy, which roots each span instead of parenting it. Batch spans
+          -- take no policy, so the batch shape has no such cell.
+          <> [ cell "enabled-headers-linkonly" Enabled WithHeaders LinkOnly shape
+             | shape /= Batch100
+             ]
 
-    cell name mode headers shape =
+    cell name mode headers correlation shape =
       env (pure $ createBenchMessages messageCount) $ \payloads ->
         bench name $
           nfIO $
             -- Force the env value outside any STM transaction first; see the
             -- EP-29 note in "Bench.Framework".
             payloads `deepseq`
-              runCell tracer mode headers shape payloads
+              runCell tracer mode headers correlation shape payloads
 
-runCell :: OTel.Tracer -> TracingMode -> HeaderMode -> Shape -> [BenchMessage] -> IO Int
-runCell tracer mode headers shape payloads = case mode of
-  Disabled -> runEff $ runTracingNoop $ runShape headers shape payloads
-  Enabled -> runEff $ runTracing tracer $ runShape headers shape payloads
+runCell :: OTel.Tracer -> TracingMode -> HeaderMode -> TraceCorrelation -> Shape -> [BenchMessage] -> IO Int
+runCell tracer mode headers correlation shape payloads = case mode of
+  Disabled -> runEff $ runTracingNoop $ runShape headers correlation shape payloads
+  Enabled -> runEff $ runTracing tracer $ runShape headers correlation shape payloads
 
 runShape ::
   (IOE :> es, Tracing :> es) =>
   HeaderMode ->
+  TraceCorrelation ->
   Shape ->
   [BenchMessage] ->
   Eff es Int
-runShape headers shape payloads = do
-  let adapter = listAdapter (createIngestedMessages headers payloads)
+runShape headers correlation shape payloads = do
+  let adapter =
+        (listAdapter (createIngestedMessages headers payloads))
+          { telemetry = defaultAdapterTelemetry {traceCorrelation = correlation}
+          }
       processor = case shape of
         SingleSerial -> QueueProcessor adapter noopHandler Unordered Serial
         SingleAsync8 -> QueueProcessor adapter noopHandler Unordered (Async 8)

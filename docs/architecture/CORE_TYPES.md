@@ -254,6 +254,7 @@ data Adapter es msg = Adapter
   { adapterName :: !Text
   , source      :: Stream (Eff es) (Ingested es msg)
   , shutdown    :: Eff es ()
+  , telemetry   :: !AdapterTelemetry
   }
 ```
 
@@ -261,6 +262,13 @@ Adapters provide:
 - A name for observability
 - A stream of ingested messages
 - A shutdown action for cleanup
+- Telemetry options, from `Shibuya.Telemetry.Correlation` (re-exported by
+  `Shibuya.Adapter`). Today this is one field, `traceCorrelation`: whether a
+  processing span is a child of the producer's span and linked to it
+  (`ParentAndLink`), or a new root linked to it (`LinkOnly`). Build the value from
+  `defaultAdapterTelemetry` by record update. The constructor is hidden so that
+  options can be added later without breaking adapters. The runner reads the
+  value once per processor.
 
 ## Batch Processing
 

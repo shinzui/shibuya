@@ -111,8 +111,14 @@ Inside `runApp`, the framework's `processOne` opens **exactly one
 Consumer-kind span per message**, named `"<ProcessorId> process"`
 per the OpenTelemetry messaging-spans spec. The span:
 
--   Is parented on the message's W3C `traceparent` if the queue
-    carried one (otherwise it's a root span).
+-   **Links** to the span that produced the message when the message's
+    W3C `traceparent` decodes. The adapter's trace correlation policy
+    decides whether the span is also a *child* of that span
+    (`ParentAndLink`) or the root of a new trace (`LinkOnly`). See
+    [Parent or link](#parent-or-link). Without a usable `traceparent`
+    there is no link, and the span is opened in the surrounding context:
+    usually a root, but a child of an active span when you call the
+    runner on a thread that already has one.
 -   Carries the spec-aligned messaging attributes
     `messaging.system`, `messaging.destination.name`,
     `messaging.operation.type = "process"`, `messaging.message.id`, plus
@@ -286,6 +292,68 @@ headers when constructing envelopes.
 The producer side — including DLQ writes from inside a Shibuya
 handler — needs help.
 
+### Parent or link
+
+A trace can relate the producer's span and the consumer's span in two ways.
+A **parent** makes the consumer's span a child, so both are in one trace. A
+**link** records the producer's span identity on the consumer's span without
+joining the two traces. Shibuya always adds the link when the message carries
+a usable `traceparent`. The OpenTelemetry messaging conventions recommend
+exactly that: a processing span SHOULD link to the creation context of each
+message it handles. Whether the span is also a child is the adapter's
+**trace correlation policy**:
+
+| Policy | Consumer span | In a trace backend |
+|--------|---------------|--------------------|
+| `ParentAndLink` | Child of the producer's span, plus a link to it | One connected trace from producer to consumer |
+| `LinkOnly` | Root of a new trace, linked to the producer's span | Separate traces; the link jumps between them |
+
+Choose `LinkOnly` when joining the producer's trace does harm:
+
+-   **Replay and catch-up.** An event-store subscription replays events
+    written months earlier. Parenting would attach today's work to a trace
+    that ended long ago.
+-   **Fan-out.** Several subscribers read the same message. As children they
+    would all crowd into the producer's trace.
+-   **Long delays and retries.** A delayed or retried job stretches the
+    producer's trace indefinitely.
+-   **Tail-based sampling.** A tail-sampling collector decides per trace,
+    inside a time window, and drops spans that arrive after the decision.
+    A link-only consumer trace gets its own decision. That also means it is
+    sampled independently of the producer's trace: either trace can be
+    kept while the other is dropped.
+
+The default comes from the adapter, because it depends on the source: a job
+queue is consumed soon after production, while an event store replays.
+Adapters expose the policy in their own configuration as a `telemetry ::
+AdapterTelemetry` field, so you change it there, for example
+`config {telemetry = defaultAdapterTelemetry {traceCorrelation = LinkOnly}}`.
+`defaultAdapterTelemetry` itself uses `ParentAndLink`.
+
+Under `LinkOnly`, `currentTraceHeaders` inside the handler returns the
+consumer span's own new trace, not the producer's. Messages your handler
+produces, and DLQ writes, therefore link to the consumer's trace.
+
+Two cases always keep the previous behaviour, under either policy:
+
+-   **No usable `traceparent`.** If the header is absent or malformed there is
+    nothing to link or to parent on. The span is opened in the current
+    context: a root, or a child of an active span on the calling thread.
+-   **Tracing disabled.** Under `runTracingNoop` the trace headers are not
+    even read.
+
+When a valid `traceparent` is present, neither policy preserves an
+operation that is already active on the calling thread: that span is neither
+the parent nor linked. Shibuya's runner processes each message on its own,
+so this rarely matters there. It matters if you call the processing-span
+helpers `Shibuya.Telemetry.Process.withProcessSpan` or `withProcessSpanIO`
+yourself, inside an operation you want recorded. These helpers are for
+*independent* message processing. Open your own span if you need the
+relationship to the enclosing operation. The OpenTelemetry conventions
+discourage creation-context parenting by default only when processing runs
+inside another span. Shibuya documents this choice instead of adding a
+second link to the ambient span.
+
 ### Producing messages from a handler
 
 If your handler produces a follow-on message, attach the current
@@ -387,7 +455,16 @@ Rules of thumb:
 
 -   **`traceContext`** — extract `traceparent` from queue-native
     headers. Return `Nothing` if absent or malformed; the framework
-    will treat the per-message span as a root.
+    then adds no link and opens the per-message span in the current
+    context (normally a root).
+-   **`telemetry`** — every `Adapter` carries an `AdapterTelemetry`
+    value. Add a `telemetry :: AdapterTelemetry` field to your adapter's
+    configuration record, default it to `defaultAdapterTelemetry` (with
+    the `traceCorrelation` that suits your source, see
+    [Parent or link](#parent-or-link)), and copy it into the `Adapter`
+    unchanged. `AdapterTelemetry`'s constructor is not exported: build
+    it from `defaultAdapterTelemetry` by record update, so that options
+    added later do not break your adapter.
 -   **`attributes`** — populate **only** the keys your broker uniquely
     contributes. Don't duplicate `messaging.destination.name`,
     `messaging.operation.type`, or `messaging.message.id` — the framework
@@ -500,8 +577,14 @@ import Shibuya.Telemetry.Effect
   ( Tracing, runTracing, runTracingNoop
   , withSpan, withSpan'
   , addAttribute, addAttributes, addEvent, recordException, setStatus
-  , isTracingEnabled, getTracer, withExtractedContext
+  , isTracingEnabled, getTracer, withExtractedContext, withRootContext
   )
+import Shibuya.Telemetry.Correlation
+  ( TraceCorrelation (..), AdapterTelemetry (traceCorrelation)
+  , defaultAdapterTelemetry, creationLink, creationLinkWith
+  , consumerSpanArgsLinkedTo
+  )
+import Shibuya.Telemetry.Process (withProcessSpan, withProcessSpanIO)
 import Shibuya.Telemetry.Propagation
   ( extractTraceContext, injectTraceContext, currentTraceHeaders
   , TraceHeaders

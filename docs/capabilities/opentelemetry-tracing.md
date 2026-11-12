@@ -1,7 +1,7 @@
 ---
 title: "OpenTelemetry tracing"
 type: Capability
-description: "Per-message consumer spans with messaging semantic conventions and trace-context propagation from message headers, with an allocation-free path when tracing is disabled."
+description: "Per-message consumer spans with messaging semantic conventions, a link to the producer span from message headers with an adapter-declared parent-or-root policy, and an allocation-free path when tracing is disabled."
 generated:
   by: claude-opus-5/1
   at: "2026-08-08T00:00:00Z"
@@ -14,7 +14,9 @@ packages:
   - shibuya-core
 interface:
   - Shibuya.Telemetry
+  - Shibuya.Telemetry.Correlation
   - Shibuya.Telemetry.Effect
+  - Shibuya.Telemetry.Process
   - Shibuya.Telemetry.Propagation
   - Shibuya.Telemetry.Semantic
 requires:
@@ -26,6 +28,12 @@ evidence:
   - kind: test
     resource: shibuya-core/test/Shibuya/Telemetry/PropagationSpec.hs
     proves: Parent context is extracted from message headers and injected for outgoing messages.
+  - kind: test
+    resource: shibuya-core/test/Shibuya/Telemetry/CorrelationSpec.hs
+    proves: Processing spans link to the producer span; ParentAndLink parents on it, LinkOnly roots a new trace, and absent or malformed headers keep the ambient parent without a link.
+  - kind: test
+    resource: shibuya-core/test-retention/Main.hs
+    proves: Finished processing spans under either policy do not retain message payloads, and live heap stays flat under sustained traced processing.
   - kind: test
     resource: shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs
     proves: Span names and messaging.* attributes follow OpenTelemetry semantic conventions.
@@ -39,8 +47,8 @@ evidence:
 **Builds on:** [CAP-1 — backend-agnostic queue processing](backend-agnostic-queue-processing.md).
 
 Every message opens a `Consumer`-kind span named `"<destination> process"`, carrying
-`messaging.*` attributes, in-flight gauges, and the handler's ack decision, with parent context
-propagated from the message's trace headers.
+`messaging.*` attributes, in-flight gauges, and the handler's ack decision. When the message's
+trace headers decode, the span links to the producer's span.
 
 ```haskell
 import Shibuya.Telemetry.Effect (runTracing, runTracingNoop)
@@ -48,8 +56,17 @@ import Shibuya.Telemetry.Effect (runTracing, runTracingNoop)
 runEff $ runTracing tracer $ runApp defaultAppConfig processors
 ```
 
-A distributed trace therefore survives the queue hop: a span started in the producing service
-continues into the consumer rather than starting a disconnected root.
+The adapter declares whether the consumer span is also a child of the producer's span. Under
+`ParentAndLink` (the default of `defaultAdapterTelemetry`) the trace continues across the queue
+hop as one connected trace. Under `LinkOnly`, meant for replayed, fanned-out or long-delayed
+sources, the consumer starts a new trace and the link relates the two. Users change the policy
+in the adapter's configuration. Messages without usable headers have no link and keep whatever
+context the processing thread already had, as before.
+
+The same span is available outside the runner through `Shibuya.Telemetry.Process`
+(`withProcessSpan`, `withProcessSpanIO`). With valid headers these helpers neither parent on
+nor link an ambient span on the calling thread. They are meant for independent message
+processing.
 
 ## Disabled is free
 
@@ -68,6 +85,7 @@ defaults. Adapters with nothing to add pay nothing, which is the common case.
 - Spans follow OpenTelemetry messaging semantic conventions; upgrading conventions is a
   user-visible change and has been one before (see the 0.2.0.0 and 0.3.0.0 entries in
   [`../../CHANGELOG.md`](../../CHANGELOG.md)).
+- Batch spans still take the first member's context as parent; batch linking is planned separately.
 - Propagation requires the backend to carry headers. `Envelope.headers` is `Nothing` when the
   adapter does not surface them, and no parent context is recovered.
 - Requires the OpenTelemetry 1.0 library series as of 0.6.0.0.
