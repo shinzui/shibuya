@@ -32,6 +32,22 @@ provenance:
       at: 2026-11-12T03:50:42Z
       mode: "update"
       note: "Record that kiroku-otel subscription spans are independent roots"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Align release start prerequisite and PGMQ check ordering; adapter source verification unavailable."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Adopt trace correlation in the Kiroku adapter with a link-only default
@@ -88,11 +104,10 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
 - Decision: Kiroku defaults to `LinkOnly`, subject to confirmation in Milestone 1.
   Rationale: Replay from a checkpoint, bulk catch-up, and fan-out to several subscribers are the
   normal operating mode of an event-store subscription, and each makes joining the writer's
-  trace harmful. This is also the default the OpenTelemetry messaging conventions recommend:
-  every processing span "SHOULD link to the message's creation context", and using that context
-  as parent is "NOT RECOMMENDED ... (by default)". The Kafka and PGMQ adapters deliberately keep
-  the parent by default; Kiroku does not, so the documentation must explain why the adapters
-  differ.
+  trace harmful. The conventions recommend creation-context links and qualify their warning against
+  creation-context parenting to processing within another span. Kiroku chooses linked roots
+  for replay semantics; Kafka and PGMQ retain parenthood for compatibility. Document that
+  without usable headers both policies preserve ambient parentage.
   Date: 2026-11-11
 
 - Decision: `kiroku-otel`'s native subscription spans are left as they are; there is no
@@ -136,9 +151,8 @@ This is a child of the Shibuya MasterPlan
 `mori://shinzui/shibuya/masterplans/8-configurable-trace-correlation-for-consumer-spans`
 (file `docs/masterplans/8-configurable-trace-correlation-for-consumer-spans.md` in the Shibuya
 repository). Prerequisite: `shibuya-core` 0.13.0.0 is published on Hackage. Confirm with
-`cabal update && cabal info shibuya-core | head` and against Hackage itself. If it is not
-published, development can use a temporary `source-repository-package` entry for the Shibuya
-repository in `cabal.project`, but this plan is not complete until that entry is removed.
+`cabal update && cabal info shibuya-core | head` and against Hackage itself. Publication is a hard prerequisite to starting this plan. If the release is unavailable,
+leave this plan Not Started; do not substitute a source pin.
 
 Find the Kiroku repository on disk with:
 
@@ -186,8 +200,8 @@ If the published 0.13 offers a setter function instead of record update, use tha
 The framework creates the processing span. It reads `telemetry.traceCorrelation` once per processor; for
 each message whose `Envelope.traceContext` holds W3C `traceparent`/`tracestate` header pairs it
 always adds a link to that context, and makes it the parent only under `ParentAndLink`. Under
-`LinkOnly` the span is a root in a new trace. Batch spans always link all members and take no
-parent, whatever the setting. If the published API differs, follow it and record the
+`LinkOnly` the span is a root in a new trace. Batch spans link the first 128 members with valid contexts and report the exact valid
+remainder count; they take no parent, whatever the setting. If the published API differs, follow it and record the
 difference.
 
 The same `shibuya-core` release renames the processing span from `<destination> process` to
@@ -228,7 +242,7 @@ Decision records in Kiroku live in `docs/adr/` as a *profile-governed* bundle
 `docs/adr/0002-static-hash-partitioned-consumer-groups.md` describes consumer groups and
 `docs/adr/0005-three-tier-performance-regression-gates.md` describes that repository's
 performance gates; read both. The Shibuya-side decision is in the Shibuya repository's
-correlation ADR (created by Shibuya plan 55); cite it by the canonical URI returned by
+correlation ADR (ADR 0014, implemented by Shibuya plan 55); cite it by the canonical URI returned by
 `mori registry concepts --search 'trace correlation' --json`, or, if not listed, as
 `mori://shinzui/shibuya` plus its path under `docs/adr/`, noting the artifact URI is pending.
 
@@ -292,6 +306,10 @@ cabal file), using tracing enabled with the in-memory span exporter
   processing spans in two different traces, both linking to the one writer span;
 - every member of a consumer group reports the configured policy;
 - an event without `traceparent` in its metadata yields a span with no link under either policy.
+
+Before completing documentation or this plan, require M2 of
+`mori://shinzui/shibuya/plans/58-adopt-trace-correlation-in-the-pgmq-adapter` accepted,
+including its link-only dead-letter test. The MasterPlan schedules that check first.
 
 ### Milestone 3: performance, documentation, decision record, version
 
@@ -388,8 +406,8 @@ validation.
 ## Idempotence and Recovery
 
 Source edits are repeatable and reversible with git. Tests manage their own database state; a
-full reset uses the repository's database recipes. If Hackage lacks 0.13, keep the plan In
-Progress on the temporary pin. If `okf id next` was run but the ADR was not committed, run
+full reset uses the repository's database recipes. If Hackage lacks the target release, leave the plan Not Started
+without a source override. If `okf id next` was run but the ADR was not committed, run
 `okf id list` again before allocating so a handle is not skipped or reused. The catch-up
 measurement writes many events to a scratch database; use a dedicated database or schema and
 drop it afterwards.
@@ -419,3 +437,7 @@ data KirokuAdapterConfig = KirokuAdapterConfig
 
 `Shibuya.Adapter.Kiroku.Convert` and `kiroku-otel` are not changed. No other plan depends on
 this one.
+
+Revision note (2026-11-12): publication now blocks implementation, the PGMQ integration
+sequence is explicit, and correlation/conformance documentation includes the no-header
+exception and qualified OTel recommendation. Existing benchmark scope is unchanged.

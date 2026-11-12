@@ -22,6 +22,27 @@ provenance:
       at: 2026-11-12T03:25:31Z
       mode: "update"
       note: "Add EP-7 span rename and messaging.operation.name"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      mode: "update"
+      note: "Apply review corrections and record unresolved contracts without changing benchmark scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Resolve overflow count versus decode cap and root helper prerequisite; corrected release sequence."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Link every batch member's creation context from the batch span
@@ -65,7 +86,9 @@ size, built strictly, and holds no reference to the messages beyond their identi
 
 ## Surprises & Discoveries
 
-(None yet.)
+Review resolved (2026-11-12): overflow accounting scans and decodes the full batch, counting
+only valid omitted contexts. Retained links are bounded at 128; scan and decode work are not
+constant. Plan 55 Complete supplies the root-context helper under a single owner.
 
 
 ## Decision Log
@@ -78,8 +101,8 @@ size, built strictly, and holds no reference to the messages beyond their identi
 - Decision: At most 128 links per batch span; members beyond that are counted in a span
   attribute rather than linked.
   Rationale: 128 is the OpenTelemetry SDK's default link limit per span. Bounding the list
-  ourselves keeps memory per span constant for any batch size and avoids relying on the SDK's
-  dropped-item handling.
+  ourselves keeps memory per span constant for any batch size and avoids relying on the SDK for this bound. A lower configured SDK limit may
+  independently drop links; Shibuya's counter measures only its own omitted valid members.
   Date: 2026-11-11
 
 - Decision: One link per member that has a creation context, each carrying that member's
@@ -114,17 +137,16 @@ must be in the working tree:
   provides the benchmark group `tracing` (cells `tracing/batch100/…`) in
   `shibuya-core-bench/bench/Bench/Tracing.hs` and the test suite
   `shibuya-core-trace-retention-test` in `shibuya-core/test-retention/`.
-- Milestone 1 of
+- All of
   `docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md`
-  accepted: it provides the module `Shibuya.Telemetry.Correlation` with
+  Complete: it provides `withRootContext` from M2 and the module `Shibuya.Telemetry.Correlation` with
   `creationLinkWith :: AttributeMap -> TraceHeaders -> Maybe NewLink` (decodes W3C trace headers
   into a link holding a fully evaluated span identity and the supplied link attributes) and
   `consumerSpanArgsLinkedTo :: [NewLink] -> SpanArguments` (Consumer-kind span arguments
   carrying links).
 
-If `shibuya-core/src/Shibuya/Telemetry/Correlation.hs` is missing, stop. Preferably plan 55 is
-fully Complete before this one starts, so this plan's benchmark baseline is plan 55's last
-commit and measures only the batch change.
+If plan 55 is not Complete or its required helpers are missing, stop. Its final commit is
+this plan's benchmark baseline, isolating the batch change.
 
 Shibuya is a Haskell queue-processing framework; the library package is `shibuya-core`. A
 *batching processor* (`BatchingProcessor`, built with `mkBatchProcessor`, configured by
@@ -150,10 +172,8 @@ withExtractedContext parentCtx $
 
 `withExtractedContext` and `withSpan'` are in `shibuya-core/src/Shibuya/Telemetry/Effect.hs`;
 `withSpan'` does nothing but pass a sentinel span when tracing is disabled, and
-`isTracingEnabled` reports the mode. If plan 55 is Complete, that module also has
-`withRootContext`, which runs an action with an empty OpenTelemetry context so a span opened
-inside is a root; if it is not there yet, add it as plan 55 specifies (same bracket as
-`withExtractedContext`'s `Just` branch, attaching `OpenTelemetry.Context.empty`).
+`isTracingEnabled` reports the mode. Plan 55 owns `withRootContext`, which temporarily attaches
+an empty context. Consume it unchanged; do not define a second implementation here.
 
 Batch span attributes such as `shibuya.batch.size` are named in
 `shibuya-core/src/Shibuya/Telemetry/Semantic.hs`, which takes the spec-defined attribute names
@@ -180,15 +200,17 @@ members only, which is what `processCurrentBatchWithDetail` receives.
 the framework owns the processing span; disabled tracing does no per-message work.
 [ADR 0006](../adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md):
 an allocation increase is a regression even when time is within noise.
-Plan 55 creates a correlation ADR (the next number after 0013 in `docs/adr/`); this plan adds
-the batch rule to it rather than creating another.
+Update [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) with this plan's
+implementation and validation evidence; keep its status honest about remaining work.
 
 The performance and retention contract from the parent MasterPlan, as it applies here:
 
 1. With tracing disabled, no header is decoded and no list is built; the batch path is as it
    was.
-2. With tracing enabled, the cost added per batch is bounded by a constant (at most 128 links),
-   whatever the batch size.
+2. With tracing enabled, retained links are capped at 128. Exact valid overflow counts
+   require scanning all members and decoding their headers, so work and transient decode
+   allocation scale with batch size and header length. Root attachment and batch-count
+   attributes are additional explained costs even without headers.
 3. The link list is fully evaluated before the span is created and holds only evaluated span
    identities and evaluated message-identifier text, never an `Ingested`, `Envelope`, payload,
    or the batch `NonEmpty`.
@@ -207,10 +229,11 @@ the constant `consumerSpanArgs` and do not traverse the batch for headers.
 When enabled, make one strict left-to-right pass over the batch that accumulates, with strict
 accumulators: the links collected so far (in reverse, reversed once at the end), their count,
 and a count of members not linked because the bound was reached. For each member that has a
-decodable `traceContext`: if the count has reached 128, increment the overflow counter and do
-nothing else (do not decode); otherwise build the link with `creationLinkWith`, passing a
+decodable `traceContext`: before the cap, build the link with `creationLinkWith`, passing a
 one-entry attribute map of `messaging.message.id` to the member's message identifier text, and
-cons it. Skip members without a decodable context. Evaluate each link and its attribute map
+cons it. After 128 links, use `extractTraceContext` to validate each remaining context and
+increment the dropped count only on successful decoding; construct no further links or
+attribute maps. Skip absent and malformed contexts everywhere. Evaluate each link and its attribute map
 before it enters the list; the map must hold the identifier `Text` itself, not a thunk that
 projects it out of the envelope. Members that share a creation context each get their own link,
 since the links differ in message identifier. Put this in a small pure, top-level function in
@@ -239,6 +262,8 @@ suite), using the in-memory exporter as the neighbouring telemetry specs do:
 - no member has headers: no links, no parent;
 - a mix with and without headers: links only for those with;
 - 200 members with distinct contexts: 128 links and `shibuya.batch.links.dropped = 72`;
+- after 128 valid members, append absent, malformed and valid contexts: only the valid
+  remainder increments the dropped count; sparse valid contexts before the cap are retained;
 - a batch where one member is superseded (ADR 0013): no link for the superseded member;
 - an ambient span active around the run: the batch span is still a root and the ambient span
   is restored afterwards;
@@ -260,11 +285,11 @@ Compare against a baseline worktree as in Concrete Steps. Reading rule:
 
 - `batch100/disabled-*`: no slower beyond noise, no allocation increase.
 - `batch100/enabled-noheaders`: no slower beyond noise; allocation unchanged apart from the
-  root-context attachment, which should be explained if visible.
+  root-context attachment and batch-count attribute, which must be explained if visible.
 - `batch100/enabled-headers`: record the allocation change per batch. Compared with the
   baseline (one decode for the first member), the new code builds one link with a one-entry
-  attribute map per member; this cost is linear in batch size up to 128 and expected. Report
-  bytes per member.
+  attribute map per member up to 128. Header validation continues beyond that cap; report
+  its cost in the already planned large-batch cell. Report bytes per member.
 - All single-message cells and all pre-existing groups: no allocation change.
 
 If a `batch100` enabled cell fails `--fail-if-slower 10` after a confirming re-run with
@@ -289,10 +314,11 @@ attributes to the attribute table in that guide. Mention that the SDK's own link
 (`OTEL_SPAN_LINK_COUNT_LIMIT`) still applies if set lower. Update
 `docs/capabilities/opentelemetry-tracing.md` and the `0.13.0.0` entry in
 `shibuya-core/CHANGELOG.md` (a behaviour change: batch spans no longer join the first member's
-trace). Add the batch rule and its bound to the correlation ADR created by plan 55.
+trace). Add the batch rule and its bound to ADR 0014.
 
 In the parent MasterPlan, mark this plan Complete and update Progress; the release gate
-described there becomes actionable once this plan and plan 55 are both Complete.
+described there becomes actionable only once this plan, plan 55 and
+`docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md` are Complete.
 
 
 ## Concrete Steps
@@ -306,8 +332,7 @@ cabal test shibuya-core
 cabal test shibuya-core:test:shibuya-core-test --test-options='--match "BatchCorrelation"'
 ```
 
-Performance gate. `<baseline-commit>` is the last commit of plan 55 if it is Complete,
-otherwise the commit that accepted its Milestone 1.
+Performance gate. `<baseline-commit>` is the final accepted commit of plan 55.
 
 ```bash
 git worktree add /tmp/shibuya-tracing-baseline <baseline-commit>
@@ -339,10 +364,10 @@ Behaviour. The `BatchCorrelationSpec` cases pass. Before this plan, the three-pr
 shows a batch span parented to the first producer with zero links; after, a root span with
 three links.
 
-Bound. The 200-member case shows exactly 128 links and a dropped count of 72, and the
-`batch1000` benchmark cell's link-related allocation per batch is close to that of a 128-member
-batch rather than a 1,000-member one, demonstrating that neither the list nor the decoding grows
-past the bound.
+Bound. The 200-member case shows exactly 128 links and a dropped count of 72. Mixed-header
+unit tests prove that absent/malformed overflow entries are excluded. The existing large-batch
+cell reports total cost, which includes decoding all members; do not infer a storage bound from
+aggregate allocation or require a new 128-member benchmark. Unit tests establish the link cap.
 
 Performance. The benchmark comparison exits 0; disabled cells, single-message cells and
 pre-existing groups show no allocation increase; the enabled batch cost per member is recorded
@@ -362,7 +387,7 @@ for investigation; nothing is published by this plan.
 
 ## Interfaces and Dependencies
 
-Prerequisites: plan 54 Complete; plan 55 Milestone 1 accepted (plan 55 Complete preferred).
+Prerequisites: plan 54 Complete; plan 55 Complete, including its M2 root-context helper.
 
 No new package dependency. Uses `OpenTelemetry.Trace.Core` (`NewLink`, `SpanContext` with
 `traceId` and `spanId`) from `hs-opentelemetry-api` `^>=1.0`.
@@ -381,7 +406,8 @@ data BatchLinks = BatchLinks
   }
 
 -- | Collect one link per member that has a decodable creation context, in
--- order, each carrying @messaging.message.id@, stopping at 'maxBatchLinks'.
+-- order, each carrying @messaging.message.id@. Store at most 'maxBatchLinks';
+-- continue decoding to count valid omitted contexts exactly.
 collectBatchLinks :: [(MessageId, Maybe TraceHeaders)] -> BatchLinks
 ```
 
@@ -406,3 +432,7 @@ does not define it, use the literal `"messaging.batch.message_count"` and note t
 
 No other child plan consumes these. The adapter plans (57, 58, 59 under `docs/plans/`) only
 describe the resulting batch behaviour in their documentation.
+
+Revision note (2026-11-12): exact overflow counts require full header validation; retained
+links remain bounded at 128. Plan 55 Complete supplies all shared helpers. No new benchmark
+cell or calibration was added by this revision.

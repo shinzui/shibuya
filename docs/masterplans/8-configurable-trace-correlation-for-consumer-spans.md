@@ -31,6 +31,27 @@ provenance:
       at: 2026-11-12T04:52:36Z
       mode: "update"
       note: "Export the processing-span function for Keiro"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      mode: "update"
+      note: "Apply review corrections and record unresolved contracts without changing benchmark scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Resolve ambient context, release prerequisites, helper ownership and batch accounting; external verification limited by Mori outage."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Configurable trace correlation for consumer spans
@@ -52,8 +73,8 @@ and discards the others.
 A span "link" is a second kind of relationship in OpenTelemetry: a span records the identity of
 another causally related span without joining its trace. The OpenTelemetry messaging semantic
 conventions say a "Process" span SHOULD link to the creation context of every message it
-accounts for, that using the creation context as parent is NOT RECOMMENDED by default and MAY
-be done only for single messages, and that instrumentations MAY make this configurable and
+accounts for, that creation-context parenting is discouraged by default when processing inside another
+span and is allowed only for single messages, and that instrumentations MAY make this configurable and
 SHOULD document what they do. Shibuya currently does the opposite of the default.
 
 Parenthood across a queue is wrong for some sources. An event-store subscription replays events
@@ -64,18 +85,18 @@ span has one parent.
 
 After this initiative:
 
-- Every Consumer span Shibuya creates carries a link to the creation context of each message it
-  accounts for, supplied at span creation so samplers can see it.
+- Consumer spans link usable creation contexts at creation so samplers can see them; batches
+  retain the first 128 valid member links and report the exact valid remainder count.
 - Each adapter declares a trace correlation policy, `ParentAndLink` or `LinkOnly`, exposed in
   that adapter's configuration. `ParentAndLink` keeps today's single connected trace and adds
-  the link. `LinkOnly` starts a new root trace for the processing span and relates it to the
-  producer only by link.
+  the link. `LinkOnly` starts a new root trace when a valid creation context exists and relates it to
+  the producer only by link. Without usable headers both policies preserve ambient parentage.
 - Batch spans never use a member's context as parent. They link every member, bounded.
 - Kafka and PGMQ default to `ParentAndLink`; Kiroku defaults to `LinkOnly`.
 - Processing spans are named `process <destination>` and carry the Required attribute
   `messaging.operation.name`, as the conventions specify, replacing `<destination> process`.
-- None of this costs anything when tracing is disabled, costs a bounded and measured constant
-  when it is enabled, and retains no message data beyond what a span retains today.
+- None of this costs anything when tracing is disabled, has measured enabled-path costs with bounded link storage
+  and a full batch scan for exact overflow accounting, and retains no message data beyond what a span retains today.
 
 Performance and space safety are first-class scope, not a closing check. The initiative begins
 by adding the tracing-enabled benchmarks and heap-retention tests that do not exist today (every
@@ -97,20 +118,14 @@ Development) was read on 2026-11-11. What it requires, and where this initiative
 
 - "For each message it accounts for, the "Process" or "Receive" span SHOULD link to the
   message's creation context." Met for single messages (EP-2) and batches (EP-3).
-- "Exclusively for single messages scenarios, the "Process" span MAY use the message's creation
-  context as its parent", it is "NOT RECOMMENDED ... (by default)", and instrumentations "SHOULD
-  document" what they do and "MAY provide configuration options". Parenthood is configurable and
-  documented. **Deliberate deviation:** Kafka and PGMQ default to `ParentAndLink`, not to the
-  recommended link-only default. Kiroku's default follows the recommendation.
-- When an ambient context exists, the document's default is a "Process" span that is a child of
-  the ambient context and links to the creation context; and if the creation context is used as
-  parent instead, the instrumentation "SHOULD add the ambient context as a link". **Treated as
-  not applicable:** the document's ambient context is an operation the application is in the
-  middle of when it handles a message, such as an HTTP request. Shibuya dispatches messages
-  itself on its own processing threads; whatever context is current there is the incidental
-  context of the thread that started the application, not a cause of the message. Shibuya
-  therefore never parents a processing span to the ambient context and never links to it:
-  `ParentAndLink` replaces it with the creation context, `LinkOnly` and batches clear it.
+- Single-message processing may use the creation context as parent. The recommendation
+  against doing so by default is qualified to processing inside another span; Kafka and PGMQ's
+  defaults alone are not a deviation. Instrumentation must document its chosen behavior.
+- With a meaningful ambient operation, the conventions recommend preserving that relationship
+  through parentage or a link. Shibuya deliberately does not preserve it when valid creation
+  headers are supplied, including through its public helpers. This is a documented limitation.
+  Without usable headers, single-message processing retains ambient parentage under both
+  policies; batches always clear it. See ADR 0014 for the complete contract.
 - For batches, attributes whose values vary per message "SHOULD" be set "on links describing
   individual messages", and the document's batch example sets `messaging.message.id` on each
   link and `messaging.batch.message_count` on the span. Met by EP-3.
@@ -184,8 +199,9 @@ Relevant local ADRs, read for this plan:
 No cross-repository ADR on trace correlation was found (`mori registry concepts --search` for
 "trace context" and "span link" returned capability records only).
 
-EP-2 is expected to produce a new ADR in `docs/adr/` recording the policy, its ownership by the
-adapter, and the links-at-creation and retention rules.
+Proposed [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) records the correlation
+contract and batch accounting. EP-2 adds implementation evidence; EP-3 and EP-7 extend it
+with their measured results. Proposed status does not claim implemented behavior.
 
 
 ## Exec-Plan Registry
@@ -194,7 +210,7 @@ adapter, and the links-at-creation and retention rules.
 |---|-------|------|-----------|-----------|--------|
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Not Started |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Not Started |
-| 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 M1 | EP-2 | Not Started |
+| 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Not Started |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
@@ -212,12 +228,9 @@ EP-1 blocks EP-2 and EP-3 as a whole. Both need the benchmark group `tracing` an
 test suite to exist in a commit that predates their changes, because their performance gate
 compares the working tree against a worktree of that commit.
 
-EP-3 needs only EP-2's first milestone (M1), whose accepted output is the module
-`Shibuya.Telemetry.Correlation` exporting `creationLink` and the linked span-arguments helper,
-with `cabal test shibuya-core` passing. EP-3 does not need the `LinkOnly` behaviour. Because
-EP-2 and EP-3 both edit the tracing-enabled path and both run the same benchmark gate, run them
-one after the other rather than concurrently so each gate measures one change: EP-2 to
-completion, then EP-3, with EP-3's baseline taken at EP-2's final commit.
+EP-3 requires EP-2 Complete, including its link helpers, `withRootContext` from M2,
+accepted single-message behavior and ADR evidence. EP-2 owns those helpers; EP-3 consumes
+them. Run EP-2 to completion, then EP-3, using EP-2's final commit as the baseline.
 
 EP-7 needs only EP-1 for its benchmark baseline and uses nothing EP-2 or EP-3 define, but it
 edits the same runner code, tests and documents. Run it third among the core plans, after EP-3,
@@ -230,17 +243,19 @@ new core until `shibuya-core` 0.13.0.0 is published. Publish once, after EP-2, E
 all Complete, so the record change, the batch behaviour change and the span rename ship in a
 single breaking release.
 Use the repository's release skill (`agents/skills/release/SKILL.md`), which runs the benchmark
-regression gate against the previous tag. An adapter plan may be drafted and developed earlier
-against a temporary `source-repository-package` pin in its `cabal.project`, but it is not
-Complete until it builds against the published version with the pin removed.
+regression gate against the previous tag. Publication is a hard prerequisite to starting
+adapter implementation. Do not bypass it with a source pin. Verify Hackage and upstream tags
+at release time before choosing final versions and bounds; version numbers here are targets.
 
 EP-3 and EP-7 are soft dependencies of the adapter plans in the sense that no adapter library
 code depends on them, but both are in the release the adapters build against: each adapter's
 documentation describes the batch behaviour, and each adapter plan must update any test, example
 or document that matches the old span name `<destination> process`.
 
-EP-4, EP-5 and EP-6 are independent of one another and can proceed in parallel once the release
-gate is passed.
+After the release gate, execute EP-5 through M2, accepting its link-only dead-letter check,
+then finish EP-5, EP-4 and EP-6 in that order. EP-4 and EP-6 implementation has no code-level
+dependency on EP-5, but their documentation/completion must follow its accepted M2 check.
+This explicit milestone sequence takes precedence over registry row order.
 
 
 ## Integration Points
@@ -290,7 +305,8 @@ whole record means future options reach users without an adapter code change. If
 the constructor set of `TraceCorrelation` (for example by adding `ParentOnly`), it updates this
 section first and the adapter plans follow.
 
-**The link helper.** Defined by EP-2 M1 in `Shibuya.Telemetry.Correlation`, consumed by EP-3.
+**The link helper and root-context operation.** EP-2 owns `withRootContext` in
+`Shibuya.Telemetry.Effect` (M2), consumed by EP-3. Link helpers are defined by EP-2 M1 in `Shibuya.Telemetry.Correlation`, consumed by EP-3.
 `creationLink :: TraceHeaders -> Maybe NewLink` decodes trace headers into a link whose
 `SpanContext` is fully evaluated and whose attribute map is the shared empty map, and
 `creationLinkWith :: AttributeMap -> TraceHeaders -> Maybe NewLink` does the same with
@@ -317,15 +333,20 @@ Every plan in this initiative is bound by these rules:
 
 1. Disabled tracing (`runTracingNoop`) allocates nothing new per message and decodes no header.
    The policy is read once per processor, never per message.
-2. With tracing enabled and no `traceContext` on the message, behaviour and cost are unchanged.
-3. With tracing enabled and a `traceContext`, the added cost is one link: a bounded constant per
+2. In EP-2, enabled single-message processing without usable headers retains its behavior and
+   cost. EP-3 may add root-context attachment and batch-count attributes; EP-7 may add the
+   operation-name map entry. These existing allowances must be measured and explained, not
+   treated as blanket performance waivers.
+3. For single messages with tracing enabled and usable `traceContext`, the added cost is one link: a bounded constant per
    message, measured and recorded in the plan. A time regression beyond the benchmark gate, or
    an allocation increase that the one link does not explain, stops the plan for a decision.
 4. Nothing reachable from a span, live or ended, may reference the `Ingested`, the `Envelope`,
    the payload, or a lazy thunk over them. A link holds only an evaluated `SpanContext` and, on
    batch spans, the member's evaluated message identifier. Link lists and link attributes are
    fully evaluated before the span is created.
-5. A batch span's link list is bounded by a constant regardless of batch size.
+5. A batch span stores at most 128 links. Exact overflow accounting requires a full scan
+   and decoding of remaining headers; total work and transient decode allocation may scale
+   with batch size and header length. Only retained link storage is bounded by the link cap.
 6. Heap residency under sustained processing is flat: live bytes after ten times as many
    messages are not materially larger.
 
@@ -335,7 +356,7 @@ increase is a regression.
 
 **`docs/user/opentelemetry.md`, `docs/capabilities/opentelemetry-tracing.md`,
 `shibuya-core/CHANGELOG.md` and the correlation ADR.** EP-2, EP-3 and EP-7 all edit them. EP-2
-writes the correlation section and creates the ADR; EP-3 adds the batch paragraph; EP-7 rewrites
+writes the correlation section and adds implementation evidence to ADR 0014; EP-3 adds the batch paragraph; EP-7 rewrites
 the span-name subsection and moves naming from the ADR's known gaps to its conformance
 statement. Run sequentially as described above to avoid conflicts.
 
@@ -348,8 +369,8 @@ tests and documentation. Known occurrence: the PGMQ adapter's `ChaosSpec.hs` sel
 others. Commits made in an adapter repository cite the plan and this MasterPlan by canonical URI,
 for example `mori://shinzui/shibuya/plans/57-adopt-trace-correlation-in-the-kafka-adapter` and
 `mori://shinzui/shibuya/masterplans/8-configurable-trace-correlation-for-consumer-spans`, in the
-`ExecPlan:` and `MasterPlan:` trailers. The current mori CLI does not yet resolve plan URIs; use
-them anyway.
+`ExecPlan:` and `MasterPlan:` trailers. Verify URI resolution when registry access is available; retain canonical URIs even
+when resolution is unavailable.
 
 **Representative producer/consumer check.** The uncertain shared behaviour is whether a
 `LinkOnly` span is truly a new root and still carries a usable link when driven by a real
@@ -361,7 +382,11 @@ EP-4 and EP-6 documentation.
 
 ## Progress
 
-No child plan has started. EP-1 is the only plan that can begin now.
+No child plan has started. EP-1 is first in the execution order. The review findings below
+have been resolved in the documents; dependency-source and cross-repository validation remains
+pending because Mori registry access failed during review. No runtime validation is claimed.
+This update authorizes no benchmark execution or expansion: apply repository benchmark-scope
+instructions before adding tooling, measurements, calibration or substantial setup.
 
 Cross-plan gates not owned by a child plan:
 
@@ -377,6 +402,29 @@ Cross-plan gates not owned by a child plan:
 
 ## Surprises & Discoveries
 
+### Review resolution — 2026-11-12
+
+The initial review requested changes; this update resolves its planning findings. All seven
+child paths exist and the dependency graph is acyclic. The MasterPlan and all children were
+authored by `claude-fable-5-2`, with no recorded reviews before this session.
+
+The no-header exception is now explicit; the shared public helper documents its ambient-context
+limitation. EP-3 requires EP-2 Complete, leaving root-context ownership solely with EP-2.
+Publication blocks adapter implementation, and the explicit sequence accepts EP-5 M2 before
+EP-4/EP-6 documentation. Batch overflow counts remain exact through a full decode scan, with
+bounded retained links rather than a constant-work promise. Performance allowances match the
+existing child criteria. Retention counts distinguish Consumer and lifecycle spans. All release
+instructions include EP-7. [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) records the proposed durable contract.
+
+The [messaging conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/)
+qualify their recommendation against creation-context parenting to processing within another
+span. Conformance prose now preserves that qualification and explicitly documents the helper's
+ambient-context limitation. Adapter defaults remain unchanged.
+
+Local sources and relevant ADRs were inspected. Mori registry access failed because its
+PostgreSQL socket refused connections; adapter checkouts, dependency internals and published
+versions/tags remain unverified. No builds, benchmarks or services were run for this review.
+
 - The disabled path may already decode headers. `processOne` binds
   `parentCtx = ingested.envelope.traceContext >>= extractTraceContext` and passes it to
   `withExtractedContext`, which pattern-matches on the `Maybe` before it checks whether tracing
@@ -391,8 +439,8 @@ Cross-plan gates not owned by a child plan:
   the caller's thread. A `LinkOnly` span must therefore clear the context explicitly to be a
   root; it cannot rely on there being no ambient span.
 - The SDK caps links per span (`tracerLinkCountLimit`, default 128) and counts the rest as
-  dropped. EP-3 bounds its own list so a large batch neither builds a long list nor trips the
-  SDK's dropped-items path.
+  dropped. EP-3 bounds its own list at 128; a lower configured SDK limit can still drop
+  supplied links independently of Shibuya's exact pre-SDK overflow count.
 
 
 ## Decision Log
@@ -437,21 +485,17 @@ Cross-plan gates not owned by a child plan:
   and catch up long after the writing trace ended and fan out to several subscribers.
   Date: 2026-11-11
 
-- Decision: Kafka and PGMQ keep `ParentAndLink` as their default although the messaging
-  conventions say parenthood is not recommended by default.
-  Rationale: The conventions permit it for single messages provided it is documented and
-  configurable, which it is. One connected trace is what users of these two sources have today
-  and what trace backends display best; switching them to separate linked traces by default
-  would be a larger behaviour change than the conventions, still in Development status, justify.
-  Recorded as a deliberate deviation in the Vision's conformance section.
-  Date: 2026-11-11
+- Decision: Keep Kafka/PGMQ defaults for compatibility and document the qualified OTel rule.
+  Rationale: Creation-context parenting is allowed for single messages; its default is discouraged
+  in the scope of another span, not universally. Supersedes the earlier blanket deviation claim.
+  Date: 2026-11-12
 
-- Decision: Processing spans never use or link the thread's ambient context.
-  Rationale: The conventions' ambient-context rules describe an application that handles a
-  message in the middle of another operation. Shibuya's processing threads have no such
-  operation; the current context there is incidental. Parenting or linking every message to it
-  would attach all processing to an application-lifetime span.
-  Date: 2026-11-11
+- Decision: Preserve ambient parentage without usable headers; suppress it when valid headers
+  select the producer parent or a linked root. Batches remain roots; no ambient links are added.
+  Rationale: Preserve EP-2's existing no-header compatibility and explicitly limit the public
+  helpers to independent processing. Direct callers can have meaningful ambient operations,
+  so the limitation is documented rather than dismissed as inapplicable.
+  Date: 2026-11-12
 
 - Decision: Each batch link carries the member's `messaging.message.id`, one link per member
   with a creation context, and the batch span carries `messaging.batch.message_count`.
@@ -477,7 +521,7 @@ Cross-plan gates not owned by a child plan:
   shown without a tracing-enabled baseline, and none exists.
   Date: 2026-11-11
 
-- Decision: One breaking core release (0.13.0.0) after EP-2 and EP-3, before any adapter plan
+- Decision: One breaking core release (0.13.0.0) after EP-2, EP-3 and EP-7, before any adapter plan
   completes.
   Rationale: Adapters consume `shibuya-core` from Hackage; shipping the record change and the
   batch behaviour change together avoids two breaking releases.
@@ -487,3 +531,7 @@ Cross-plan gates not owned by a child plan:
 ## Outcomes & Retrospective
 
 (To be filled during and after implementation.)
+
+Revision note (2026-11-12): resolved the review findings across the MasterPlan and children,
+recorded the proposed correlation contract in ADR 0014, and retained explicit external
+verification limits. Benchmark scope is unchanged.

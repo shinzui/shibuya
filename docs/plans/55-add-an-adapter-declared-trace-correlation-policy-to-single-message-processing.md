@@ -32,6 +32,27 @@ provenance:
       at: 2026-11-12T04:52:36Z
       mode: "update"
       note: "Export the processing-span function for Keiro"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      mode: "update"
+      note: "Apply review corrections and record unresolved contracts without changing benchmark scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Resolve absent-header parentage and public helper ambient contract; corrected batch gate scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Add an adapter-declared trace correlation policy to single-message processing
@@ -48,8 +69,8 @@ Shibuya wraps the processing of each message in an OpenTelemetry span. Today tha
 always a child of the span that produced the message, and it never records a *link*. A link is
 OpenTelemetry's way for one span to point at another causally related span without joining its
 trace. The OpenTelemetry messaging conventions say a processing span SHOULD link to the
-message's creation context, and that making it a child is optional and not recommended as the
-default.
+message's creation context. Creation-context parenting is optional for single messages; the
+recommendation against that default applies when processing within another span.
 
 After this change, every per-message processing span carries a link to the producer's span,
 and each adapter states a policy: `ParentAndLink` (child of the producer, plus the link; one
@@ -76,13 +97,15 @@ tests that already exist from the preceding plan.
 - [ ] M3: Performance and retention gate passed against the baseline commit, with the measured
   per-message cost of the link recorded in this plan; retention suite extended to both policies
   and passing.
-- [ ] M4: User guide, capability document, changelog and a new ADR describe the policy; the
+- [ ] M4: User guide, capability document, changelog and ADR 0014 describe the policy; the
   parent MasterPlan's registry and Integration Points are updated.
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+Review resolved (2026-11-12): the MasterPlan now matches this plan's no-header ambient
+parentage exception. The public helper explicitly documents suppression of meaningful ambient
+context with valid headers. Batch decoding remains plan 56 work.
 
 
 ## Decision Log
@@ -109,18 +132,17 @@ tests that already exist from the preceding plan.
   OpenTelemetry specification asks for links at creation for that reason.
   Date: 2026-11-11
 
-- Decision: A processing span never takes the thread's ambient context as parent and never
-  links to it. `ParentAndLink` replaces the ambient context with the creation context (as the
-  code already does today); `LinkOnly` replaces it with an empty context.
-  Rationale: The OpenTelemetry messaging conventions say that when an ambient context exists the
-  processing span is by default its child with a link to the creation context, and that if the
-  creation context is the parent the ambient context "SHOULD" be added as a link. Those rules
-  describe an application handling a message in the middle of another operation, such as an
-  HTTP request. Shibuya dispatches messages on its own processing threads, where the current
-  context is only whatever the thread that started the application happened to have. Parenting
-  or linking every message to that would hang all processing off an application-lifetime span.
-  This is recorded as "not applicable" rather than conformance; state it in the ADR.
-  Date: 2026-11-11
+- Decision: Preserve the no-header ambient-parent exception and explicitly document the
+  independent-processing contract of both public helpers.
+  Rationale: With valid creation headers, `ParentAndLink` replaces ambient parentage with the producer
+  and adds its link; `LinkOnly` clears ambient context and adds the producer link. Without usable
+  headers, both policies preserve ambient parentage and emit no link, retaining existing behavior.
+  Batches always clear ambient context. No path adds an ambient-context link. Direct callers of
+  `withProcessSpan` and `withProcessSpanIO` accept this same contract: these helpers are for
+  independent message processing and do not preserve a meaningful enclosing operation when
+  valid creation headers exist. That deliberate limitation must be documented, not described
+  as universally inapplicable to consumers.
+  Date: 2026-11-12
 
 - Decision: Single-message links carry no attributes.
   Rationale: The conventions put per-message attributes on links only where one span accounts
@@ -228,18 +250,12 @@ thread-local context API is `OpenTelemetry.Context.ThreadLocal` (`attachContext`
 library source with `mori registry show iand675/hs-opentelemetry --full` and read it there
 rather than guessing.
 
-What the OpenTelemetry messaging conventions say (the document
-`docs/messaging/messaging-spans.md` in `open-telemetry/semantic-conventions`, status
-Development, read in full on 2026-11-11), in the sentences that govern this plan: "For each
-message it accounts for, the "Process" or "Receive" span SHOULD link to the message's creation
-context."; "Exclusively for single messages scenarios, the "Process" span MAY use the message's
-creation context as its parent"; "It is NOT RECOMMENDED to use the message creation context as
-the parent of "Process" spans (by default)"; "Instrumentations SHOULD document whether they use
-the message creation context as a parent for "Process" spans" and "MAY provide configuration
-options allowing users to control this behavior." This plan implements the link and the
-configuration. Which policy is the default is chosen per adapter in the adapter plans.
-`defaultAdapterTelemetry` uses `ParentAndLink`, so an adapter that states nothing keeps the
-trace shape it has today plus the link.
+The [messaging conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/)
+recommend creation-context links. Single-message processing may also use creation-context
+parentage; the recommendation against that default applies within another span. Instrumentation
+should document its choice and may offer configuration. This plan implements links and that
+configuration. Adapter plans select defaults; `defaultAdapterTelemetry` uses `ParentAndLink`
+for continuity. The public helpers deliberately omit ambient-context links as documented here.
 
 Relevant ADRs.
 [ADR 0012](../adr/0012-keep-telemetry-ownership-and-disabled-context-contracts-explicit.md):
@@ -350,8 +366,9 @@ module list, using the in-memory exporter in the same way as the neighbouring sp
 - `LinkOnly` with an ambient span active on the calling thread (use the unsupervised runner
   path, or wrap the run in an outer span): the Consumer span is still a root, and after
   processing the ambient span is still the thread's current span.
-- Either policy, message without headers: no links; parentage as before this plan.
-- Either policy, malformed `traceparent`: treated as no context.
+- Either policy, message without headers: no links; parentage as before this plan. Exercise
+  both an active ambient span and an empty context, including direct effect and IO helper calls.
+- Either policy, malformed `traceparent`: same ambient-parent exception as absent headers.
 - `LinkOnly` followed by `currentTraceHeaders` inside the handler: the returned `traceparent`
   names the new trace and the Consumer span, not the producer.
 - A superseded delivery (ADR 0013) under `LinkOnly`: the span is created, carries the link, and
@@ -373,9 +390,10 @@ Capture the baseline from a worktree at the last commit of plan 54 and compare, 
 Concrete Steps. Read the results against the contract:
 
 - `disabled-noheaders` cells: no slower beyond noise, identical allocation.
-- `disabled-headers` cells: allocation must not increase, and should decrease to match
+- Single-message `disabled-headers` cells: allocation must not increase, and should decrease to match
   `disabled-noheaders` because headers are no longer decoded. If it does not, the short-circuit
-  is not working.
+  is not working. Batch header decoding is changed by plan 56, so batch cells must remain
+  unchanged in this plan rather than satisfy the single-message decode-elimination criterion.
 - `enabled-noheaders` cells: no slower beyond noise, identical allocation.
 - `enabled-headers` cells: an allocation increase is expected. Compute bytes per message
   (difference in `allocated` divided by 10,000) and record it in Surprises & Discoveries with
@@ -402,10 +420,10 @@ subsection "Parent or link" explaining the two policies, what each looks like in
 backend, when to choose `LinkOnly`, that the default comes from the adapter and is changed in
 the adapter's configuration, that a link-only consumer trace is sampled independently of the
 producer's, that `currentTraceHeaders` inside a handler propagates the processing span's
-own trace under `LinkOnly`, and that the processing span never joins or links whatever span was
-current on the thread that started the application. Say plainly which behaviour the messaging
-conventions recommend by default (link only), so that the conventions' requirement to document
-the choice is met. Correct the capability document
+own trace under `LinkOnly` when headers decode. Document the no-header ambient-parent
+exception and the public helper limitation: with valid headers neither policy preserves a
+meaningful enclosing operation. Explain the qualified OTel parenting recommendation and the
+deliberate omission of an ambient-context link. Correct the capability document
 `docs/capabilities/opentelemetry-tracing.md`, which currently states that the producer's trace
 always continues into the consumer. Add a `0.13.0.0` entry to `shibuya-core/CHANGELOG.md`
 naming the breaking `Adapter` field, the new module, the added link, and the disabled-path
@@ -413,18 +431,10 @@ fix, and bump `version` in `shibuya-core/shibuya-core.cabal` only if the reposit
 process expects the bump before release (read `agents/skills/release/SKILL.md`; otherwise leave
 the bump to the release). Update `docs/architecture/CORE_TYPES.md` where it lists `Adapter`.
 
-Create a new ADR in `docs/adr/` following the existing plain convention (numbered filename,
-`Status`, `Date`, `Context`, `Decision`, `Consequences`, `Evidence`; next number after 0013).
-Record: the link is always emitted at span creation; parenthood is an adapter-declared policy;
-the policy lives on `Adapter` and why not on the processor; the retention rule for links; the
-measured cost; and the standing of the design against the messaging conventions, quoting the
-sentences above: the link and the configurability conform, a `ParentAndLink` adapter default is
-a deliberate departure from the recommended default, the ambient-context rules are treated as
-not applicable (with the reasoning from this plan's Decision Log), and the known gaps: span
-name order and the Required `messaging.operation.name` (closed later in the same release by
-`docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md`, which
-updates the ADR), and "Settle" spans and extraction through the configured propagator (left
-alone). Link this plan and plan 54 as evidence.
+Update [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) with the implemented API,
+measured cost and acceptance evidence, preserving its explicit no-header exception and public
+helper limitation. EP-3 and EP-7 add batch and naming evidence later. Keep its status Proposed
+until all planned behavior is implemented and accepted. Link this plan and plan 54 as evidence.
 
 In the parent MasterPlan, mark this plan Complete in the registry, update Progress, and if the
 constructor set or helper signatures differ from its Integration Points section, correct that
@@ -512,9 +522,9 @@ Milestone 1 is a mechanical, compiler-guided change: after adding the field, `ca
 lists every construction site that needs it; repeat until clean. All edits are ordinary source
 changes recoverable with git. The benchmark worktree can be removed and recreated freely. If
 the gate fails, the working tree is left as is for investigation; nothing has been published.
-This plan does not release the package; the release happens once, after the batch plan
-(`docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md`), as the
-parent MasterPlan describes.
+This plan does not release the package. Release requires this plan,
+`docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md` and
+`docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md` all Complete.
 
 
 ## Interfaces and Dependencies
@@ -600,7 +610,9 @@ New public module `Shibuya.Telemetry.Process`:
 -- creation context in the headers when one decodes; a child of it under
 -- 'ParentAndLink'; a root under 'LinkOnly'. Without usable headers the span
 -- is opened in the ambient context, as before. With tracing disabled the
--- body receives the sentinel span and no header is decoded.
+-- body receives the sentinel span and no header is decoded. With valid headers
+-- a meaningful ambient operation is neither parented nor linked: callers opt
+-- into independent message processing by using this helper.
 withProcessSpan ::
   (Tracing :> es, IOE :> es) =>
   TraceCorrelation ->
@@ -619,9 +631,13 @@ withProcessSpanIO ::
 
 Consumers of these interfaces: the batch plan
 (`docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md`) uses
-`creationLinkWith` and `consumerSpanArgsLinkedTo` and needs only Milestone 1 accepted. The three
+`creationLinkWith` and `consumerSpanArgsLinkedTo` and requires this plan Complete, including `withRootContext` from M2. The three
 adapter plans (57, 58, 59 under `docs/plans/`) use `TraceCorrelation`, `AdapterTelemetry`,
 `defaultAdapterTelemetry` and the `Adapter.telemetry` field. Outside this MasterPlan, Keiro
 consumes `Shibuya.Telemetry.Process` (see the Decision Log); do not change those two signatures
-after release without checking that consumer
-and need this plan Complete and `shibuya-core` 0.13.0.0 published.
+after release without checking that consumer. Adapter implementation requires this plan
+Complete and the core release published.
+
+Revision note (2026-11-12): resolved the ambient-context contradiction by preserving the
+no-header exception; documented the public helper limitation and sole ownership of the
+root-context helper. ADR 0014 now holds the proposed contract.

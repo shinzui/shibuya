@@ -27,6 +27,22 @@ provenance:
       at: 2026-11-12T03:38:50Z
       mode: "update"
       note: "Carry the policy in an extensible AdapterTelemetry record"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Align release start prerequisite and PGMQ check ordering; adapter source verification unavailable."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Adopt trace correlation in the Kafka adapter
@@ -77,10 +93,9 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
 - Decision: Kafka defaults to `ParentAndLink`.
   Rationale: Kafka is normally consumed close to real time, users expect producer and consumer
   in one trace, and trace backends display parent/child more prominently than links. Replay,
-  heavy lag, and wide fan-out are the cases for opting into `LinkOnly`. This is a deliberate
-  departure from the OpenTelemetry messaging conventions, which permit the creation context as
-  parent for single messages but say it is "NOT RECOMMENDED ... (by default)" and require the
-  choice to be documented; the README must say so.
+  heavy lag, and wide fan-out are the cases for opting into `LinkOnly`. The conventions permit creation-context parenting for single messages and discourage that
+  default when processing within another span. Document the choice and the framework's
+  deliberate omission of ambient-context links; do not claim the default alone is a deviation.
   Date: 2026-11-11
 
 - Decision: The setting is one `telemetry` field on `KafkaAdapterConfig`, not per topic.
@@ -101,9 +116,8 @@ This is a child of the Shibuya MasterPlan
 (file `docs/masterplans/8-configurable-trace-correlation-for-consumer-spans.md` in the Shibuya
 repository). Prerequisite: `shibuya-core` 0.13.0.0 is published on Hackage. Confirm with
 `cabal update && cabal info shibuya-core | head` and check Hackage itself, not only the local
-package index. If 0.13 is not published, development can proceed against a temporary
-`source-repository-package` entry for the Shibuya repository in `cabal.project`, but this plan
-is not complete until that entry is removed and the build uses Hackage.
+package index. Publication is a hard prerequisite to starting this plan. If the release is unavailable,
+leave this plan Not Started; do not substitute a source pin.
 
 Find the adapter repository's location on disk with:
 
@@ -153,9 +167,10 @@ If the published 0.13 offers a setter function instead of record update, use tha
 The framework, not the adapter, creates the processing span. It reads the adapter's
 `telemetry.traceCorrelation` once, and for each message that carries `Envelope.traceContext` (the W3C
 `traceparent`/`tracestate` header pairs) it always adds a link to that context, and makes the
-context the span's parent only under `ParentAndLink`. Under `LinkOnly` the span is a root in a
-new trace. Batch spans (when the user wraps the adapter in a batching processor) always link
-every member and never take a parent, regardless of this setting. If the constructor names
+context the span's parent only under `ParentAndLink`. Under `LinkOnly` a usable creation context yields a root in a
+new trace. Without usable headers, both policies preserve ambient parentage and emit no link. Batch spans (when the user wraps the adapter in a batching processor) always link
+the first 128 members with valid contexts, count the exact valid remainder, and never
+take a parent, regardless of this setting. If the constructor names
 differ in the published 0.13, follow the published API and note it in Surprises & Discoveries.
 
 The same `shibuya-core` release renames the processing span from `<destination> process` to
@@ -177,7 +192,7 @@ no frontmatter); the existing three concern acknowledgement fencing and retry ba
 not affected. Capability documents under `docs/capabilities/` are a profile-governed bundle
 (see `mori.dhall` there); `docs/capabilities/envelope-conversion.md` describes trace-context
 extraction. The Shibuya-side decision that this plan follows is recorded in the Shibuya
-repository's correlation ADR (created by Shibuya plan 55; cite it by the canonical URI that
+repository's correlation ADR (ADR 0014, implemented by Shibuya plan 55; cite it by the canonical URI that
 `mori registry concepts --search 'trace correlation' --json` returns, or, if the registry does
 not list it, as `mori://shinzui/shibuya` plus its path under `docs/adr/`, stating that the
 artifact-level URI is pending).
@@ -229,11 +244,15 @@ disabled. If the benchmark runs any cell with tracing enabled and headers presen
 increase equal to one link per message is expected there and must be recorded with its size; any
 other increase must be explained before continuing.
 
+Before completing documentation or this plan, require M2 of
+`mori://shinzui/shibuya/plans/58-adopt-trace-correlation-in-the-pgmq-adapter` accepted,
+including its link-only dead-letter test. The MasterPlan schedules that check first.
+
 ### Milestone 3: documentation and version
 
 Update `README.md` and `shibuya-kafka-adapter/README.md` with a short "Trace correlation"
-section: the default, that the OpenTelemetry messaging conventions recommend link-only as the
-default and this adapter deliberately keeps the parent for continuity, how to set `LinkOnly`,
+section: the default, the qualified OTel recommendation for processing within another span,
+the no-header ambient-parent exception, how to set `LinkOnly`,
 the three Kafka situations that call for it
 (replay from an old offset, sustained lag, many consumer groups on one topic), the effect on
 sampling (a link-only trace is sampled independently of the producer's), and the fixed batch
@@ -328,8 +347,8 @@ A reader of the README can find the setting, its default, and when to change it.
 ## Idempotence and Recovery
 
 All steps are ordinary edits and can be repeated. The bound change is reversible. If Hackage
-does not yet have 0.13, do not weaken the bound to make the build pass; use the temporary
-source pin and leave the plan In Progress. Remove worktrees after use. Stopping the local
+does not yet have the target release, leave the plan Not Started; do not weaken bounds or
+substitute a source pin. Remove worktrees after use. Stopping the local
 services is `just process-down`.
 
 
@@ -356,3 +375,7 @@ data KafkaAdapterConfig = KafkaAdapterConfig
 ```
 
 No other plan depends on this one.
+
+Revision note (2026-11-12): publication now blocks implementation, the PGMQ integration
+sequence is explicit, and correlation/conformance documentation includes the no-header
+exception and qualified OTel recommendation. Existing benchmark scope is unchanged.

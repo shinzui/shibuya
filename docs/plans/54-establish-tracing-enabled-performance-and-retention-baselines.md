@@ -11,6 +11,28 @@ provenance:
     model: "claude-fable-5-2"
     harness: "claude-code"
     at: 2026-11-12T02:55:43Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "comments"
+      note: "Corrected Consumer span counts and exporter liveness; runtime retention and benchmark checks remain unexecuted."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      mode: "update"
+      note: "Apply review corrections and record unresolved contracts without changing benchmark scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:06Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
 ---
 
 # Establish tracing-enabled performance and retention baselines
@@ -51,7 +73,10 @@ behaviour. Its output is the "before" measurement that later plans compare again
 
 ## Surprises & Discoveries
 
-(None yet.)
+Review correction (2026-11-12): Check A now distinguishes processing spans from lifecycle
+exports and keeps the exporter observably alive across collection. This corrects the existing
+retention check; it adds no benchmark cells or calibration.
+
 
 
 ## Decision Log
@@ -186,8 +211,12 @@ payload before handing the messages to the adapter, and make sure the test itsel
 reference (build the message list inside a function that returns only the weak pointers and the
 adapter; do not capture the list in a closure that outlives processing). After `runApp` finishes
 and `waitApp` returns, call `performMajorGC` twice and require every weak pointer to be dead
-while the exporter still reports the 8 spans. Run it for a single-message processor and for a
-batching processor.
+while the exporter remains reachable and retains the finished spans. Filter by Consumer kind
+when checking counts: eight individually processed messages yield eight Consumer spans; a
+batch yields one Consumer span per processed batch, not per message. Internal ingestion and
+shutdown spans are additional exports (ADR 0012). Run both single and batch cases, explicitly
+finish application cleanup before collection, and read the retained exports after collection
+so the exporter itself is demonstrably still live.
 
 Check B, *heap residency is flat under sustained processing*. With tracing enabled on a
 provider that has no processors (finished spans are not retained by anything), process N small
@@ -316,8 +345,8 @@ commits shows only `shibuya-core-bench/`, `shibuya-core/shibuya-core.cabal`,
 ## Idempotence and Recovery
 
 Everything here is additive. Benchmarks and tests can be run any number of times. The
-temporary retention bug in Milestone 2 must be reverted with `git checkout -- shibuya-core/src`
-before committing; confirm with `git status` that `shibuya-core/src` is clean. If the heap
+temporary retention bug in Milestone 2 must be removed by reversing only the injected edit
+before committing; inspect the diff to preserve any unrelated working-tree changes. If the heap
 residency check proves flaky, do not loosen it silently: record three consecutive readings in
 Surprises & Discoveries, choose a margin from them, and log the decision. `git worktree remove`
 cleans up the baseline tree; if a previous run left it behind, remove it and repeat.

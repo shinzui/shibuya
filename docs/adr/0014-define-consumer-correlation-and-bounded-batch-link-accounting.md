@@ -1,0 +1,70 @@
+# Define consumer correlation and bounded batch link accounting
+
+Status: Proposed
+
+Date: 2026-11-12
+
+## Context
+
+[ADR 0012](0012-keep-telemetry-ownership-and-disabled-context-contracts-explicit.md)
+assigns incoming context to adapters and processing spans to the framework. MasterPlan 8
+adds adapter policy and a public processing helper. Its review exposed ambiguity over absent
+headers, meaningful ambient operations and exact batch overflow accounting.
+
+## Decision
+
+Adapters carry an extensible telemetry value; the core owns correlation and context restoration.
+For single messages with usable creation headers, `ParentAndLink` uses the creation context as
+parent and link; `LinkOnly` creates a new root with that link. Without usable headers, both
+policies retain the existing ambient parent and emit no link. Malformed headers follow the
+absent-header path. Disabled tracing performs no header decoding.
+
+Both public helpers, `withProcessSpan` and `withProcessSpanIO`, use that contract. They serve
+independent message processing: with valid creation headers they neither parent to nor link a
+meaningful ambient operation. Document this limitation explicitly for direct callers. Restore
+prior context on success, failure and cancellation. The effect helper also preserves the
+existing disabled sentinel contract; the IO helper uses its supplied tracer.
+
+Batch spans are roots, independent of adapter policy. Retain the first 128 valid member links
+in member order, including duplicate contexts with distinct message identifiers. Decode all
+remaining headers to count valid omitted contexts exactly in `shibuya.batch.links.dropped`;
+absent and malformed contexts do not contribute. Do not construct link objects or attribute
+maps after the cap. The bound applies to retained links, not total scan time or transient
+decoding allocation. Neither links nor attributes retain message envelopes or payloads.
+
+Kafka and PGMQ retain `ParentAndLink` by default; Kiroku chooses `LinkOnly` for replay semantics.
+The [messaging conventions](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/)
+allow creation-context parenting for single messages and qualify their recommendation against
+that default to processing within another span. The defaults alone are not a conformance gap;
+discarding a meaningful ambient relationship is a deliberate limitation.
+
+Processing names become `process <destination>` with `messaging.operation.name = process`
+in EP-7. Until its acceptance, naming is an implementation gap. Receive/settle spans, baggage,
+propagator replacement and links-aware sampling remain outside this initiative.
+
+## Consequences
+
+A no-header `LinkOnly` call can have an ambient parent. The name describes how a usable
+creation context is correlated, not an unconditional root guarantee. Callers requiring ambient
+operation correlation must not assume these helpers supply it.
+
+Batch accounting is linear in members plus header decoding work while retained link count is
+bounded. Existing performance gates still apply; exact counts do not authorize a regression
+waiver, new benchmark variants, calibration or additional setup. EP-3's root attachment and
+batch attributes and EP-7's operation-name attribute have explicitly measured cost allowances.
+
+EP-2 owns the link helpers and root-context operation. EP-3 starts after EP-2 Complete.
+Publication blocks adapter implementation; PGMQ's representative check precedes Kafka/Kiroku
+completion. These coordination requirements prevent divergent helper definitions and untested
+cross-adapter documentation.
+
+## Evidence
+
+This is a planning decision, not evidence of implemented behavior. The review inspected the
+existing runner and context helpers; no feature builds or benchmarks have run. Implementation
+must add acceptance evidence here and change status only when the planned behavior is accepted.
+
+[MasterPlan 8](../masterplans/8-configurable-trace-correlation-for-consumer-spans.md) coordinates
+[EP-2](../plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md),
+[EP-3](../plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md), and
+[EP-7](../plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md).

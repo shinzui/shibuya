@@ -11,6 +11,28 @@ provenance:
     model: "claude-fable-5-2"
     harness: "claude-code"
     at: 2026-11-12T03:24:05Z
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "comments"
+      note: "Naming plan reviewed against local sources; corrected execution order; dependency source verification remains pending."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
+  revisions:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      mode: "update"
+      note: "Apply review corrections and record unresolved contracts without changing benchmark scope."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
 ---
 
 # Name process spans and operations per the messaging conventions
@@ -38,8 +60,8 @@ Jaeger and reading the span name.
 
 This is a breaking change for anyone whose dashboards, alerts or sampling rules match the old
 span name. It is done now because `shibuya-core` 0.13.0.0 is already a breaking release that
-changes what tracing emits (see the parent MasterPlan), so users adjust once. It must not cost
-anything per message: the name and the new attribute are per-processor constants.
+changes what tracing emits (see the parent MasterPlan), so users adjust once. The name remains a per-processor constant. The extra attribute may increase enabled-path
+map allocation; M2 measures and explains that cost under the existing gate.
 
 
 ## Progress
@@ -95,8 +117,8 @@ test suite `shibuya-core-trace-retention-test`. The MasterPlan schedules this pl
 `docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md`
 and `docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md`, because
 all three edit the same telemetry code and documents and each performance gate should measure
-one change. This plan does not use anything those two define; if they are not yet done, it can
-still be implemented, but then they must be rebased over it.
+one change. This plan has no code-level prerequisite on those two, but follows the MasterPlan
+execution order; do not bypass that order without revising the coordination plan.
 
 Shibuya is a Haskell queue-processing framework; the library package is `shibuya-core`.
 
@@ -138,8 +160,8 @@ framework owns the Consumer span, adapters contribute attributes that override f
 defaults of the same key, and disabled tracing does no per-message work.
 [ADR 0006](../adr/0006-benchmark-gate-runtime-dependency-changes-regardless-of-release-level.md):
 an allocation increase is a regression even when time is within noise.
-Plan 55 creates a correlation ADR (the next number after 0013); this plan adds the naming
-decision to it if it exists, or records it in the changelog and this plan if it does not yet.
+Update [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) with this plan's
+implementation and validation evidence; keep its status honest about remaining work.
 
 Performance. The span name remains a per-processor constant. Adding one key to
 `constantFrameworkAttrs` makes that map four entries instead of three, and `processOne` copies
@@ -281,3 +303,6 @@ attrMessagingOperationName :: Text
 Downstream effect, handled in the adapter plans under `docs/plans/` (57 Kafka, 58 PGMQ, 59
 Kiroku): any adapter test, example or document that matches the old span name must change. One
 is known: the PGMQ adapter's `ChaosSpec.hs` selects spans named `"dlq-identity process"`.
+
+Revision note (2026-11-12): clarified the measured enabled-path attribute cost, retained
+the prescribed execution order, and directed ADR evidence to the existing proposed ADR 0014.

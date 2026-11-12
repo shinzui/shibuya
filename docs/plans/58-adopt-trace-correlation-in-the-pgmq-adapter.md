@@ -27,6 +27,22 @@ provenance:
       at: 2026-11-12T03:38:50Z
       mode: "update"
       note: "Carry the policy in an extensible AdapterTelemetry record"
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      mode: "update"
+      note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+  reviews:
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:42:29Z
+      verdict: "changes-requested"
+      note: "Align release start prerequisite; adapter source verification unavailable."
+    - model: "gpt-6-astra"
+      harness: "codex-cli"
+      at: 2026-11-12T18:51:07Z
+      verdict: "comments"
+      note: "Follow-up: planning findings resolved; document checks pass; dependency, adapter and runtime validation remain implementation prerequisites."
 ---
 
 # Adopt trace correlation in the PGMQ adapter
@@ -78,10 +94,9 @@ on trace headers.
 - Decision: PGMQ defaults to `ParentAndLink`.
   Rationale: PGMQ is a job queue: a message is consumed once, usually soon after it is sent, and
   users expect the job in the request's trace. Delayed sends and long retry cycles are the cases
-  for opting into `LinkOnly`. This is a deliberate departure from the OpenTelemetry messaging
-  conventions, which permit the creation context as parent for single messages but say it is
-  "NOT RECOMMENDED ... (by default)" and require the choice to be documented; the capability
-  document and README must say so.
+  for opting into `LinkOnly`. The conventions allow creation-context parenting for single messages and discourage that
+  default when processing within another span. Document this qualified rule and the deliberate
+  omission of ambient-context links rather than claiming the default alone is a deviation.
   Date: 2026-11-11
 
 - Decision: The dead-letter header merge is not changed.
@@ -104,9 +119,8 @@ This is a child of the Shibuya MasterPlan
 `mori://shinzui/shibuya/masterplans/8-configurable-trace-correlation-for-consumer-spans`
 (file `docs/masterplans/8-configurable-trace-correlation-for-consumer-spans.md` in the Shibuya
 repository). Prerequisite: `shibuya-core` 0.13.0.0 is published on Hackage. Confirm with
-`cabal update && cabal info shibuya-core | head` and against Hackage itself. If it is not
-published, development can use a temporary `source-repository-package` entry for the Shibuya
-repository in `cabal.project`, but this plan is not complete until that entry is removed.
+`cabal update && cabal info shibuya-core | head` and against Hackage itself. Publication is a hard prerequisite to starting this plan. If the release is unavailable,
+leave this plan Not Started; do not substitute a source pin.
 
 Find the adapter repository on disk with:
 
@@ -153,11 +167,12 @@ If the published 0.13 offers a setter function instead of record update, use tha
 
 The framework creates the processing span. It reads `telemetry.traceCorrelation` once per processor; for
 each message with `Envelope.traceContext` it always adds a link to that context and makes it
-the parent only under `ParentAndLink`. Under `LinkOnly` the span is a root in a new trace.
+the parent only under `ParentAndLink`. Under `LinkOnly` usable headers yield a root in a new trace. Without usable headers,
+both policies preserve ambient parentage and emit no link.
 `Shibuya.Telemetry.Propagation.currentTraceHeaders`, called inside a handler or an
 acknowledgement, returns the headers of the *currently active span*, which is the processing
-span; under `LinkOnly` those headers therefore name the new trace. Batch spans always link all
-members and take no parent, whatever the setting. If the published API differs, follow it and
+span; under `LinkOnly` those headers therefore name the new trace. Batch spans link the first 128 members with valid contexts and report the exact valid
+remainder count; they take no parent, whatever the setting. If the published API differs, follow it and
 record the difference.
 
 The same `shibuya-core` release renames the processing span from `<destination> process` to
@@ -193,7 +208,7 @@ keep its frontmatter valid) currently says the handler "runs in the producer's t
 `docs/user/` describe tracing. Decision records under `docs/adr/` are plain Markdown;
 the two existing ones (idempotent dead-letter moves, managed DLQ administration) are not
 changed by this plan. The Shibuya-side decision is in the Shibuya repository's correlation ADR
-(created by Shibuya plan 55); cite it by the canonical URI returned by
+(ADR 0014, implemented by Shibuya plan 55); cite it by the canonical URI returned by
 `mori registry concepts --search 'trace correlation' --json`, or, if not listed, as
 `mori://shinzui/shibuya` plus its path under `docs/adr/`, noting the artifact URI is pending.
 
@@ -256,8 +271,8 @@ runs recorded under `docs/performance/`; treat growth as a blocker.
 
 Rewrite the "On ingest" bullet in `docs/capabilities/otel-trace-propagation.md`: the handler
 runs in the producer's trace by default and in its own linked trace under `LinkOnly`, noting
-that the OpenTelemetry messaging conventions recommend link-only as the default and this adapter
-deliberately keeps the parent for continuity; add a
+the qualified OTel recommendation for processing within another span and the no-header
+ambient-parent exception; add a
 bullet describing the dead-letter headers under each setting and the redelivery shape; keep the
 frontmatter valid, add the new tests as evidence entries, and run the bundle's validation as the
 repository's instructions describe. Update `README.md`, the user documentation under
@@ -338,7 +353,7 @@ its validation passes.
 
 All edits are repeatable. Tests create and drop their own queues; if a run is interrupted,
 re-running recreates them (see the repository's database recipes for a full reset). If Hackage
-lacks 0.13, keep the plan In Progress on the temporary pin rather than loosening bounds. Remove
+lacks the target release, leave the plan Not Started without a source override. Remove
 worktrees after use.
 
 
@@ -366,3 +381,7 @@ data PgmqAdapterConfig = PgmqAdapterConfig
 `mergeDlqHeaders` keeps its signature and behaviour. No other plan depends on this one, but its
 link-only dead-letter test is the representative check the Kafka plan (57) and Kiroku plan (59)
 rely on for their documentation of `LinkOnly`.
+
+Revision note (2026-11-12): publication now blocks implementation, the PGMQ integration
+sequence is explicit, and correlation/conformance documentation includes the no-header
+exception and qualified OTel recommendation. Existing benchmark scope is unchanged.
