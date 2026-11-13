@@ -37,6 +37,11 @@ provenance:
       at: 2026-11-13T00:43:42Z
       mode: "implement"
       note: "Implement batch fan-in links, gate and docs"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T02:40:57Z
+      mode: "implement"
+      note: "Second M2 time-gate attempt blocked by load; allocation reproduced"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -127,6 +132,12 @@ constant. Plan 55 Complete supplies the root-context helper under a single owner
   load benchmark (`en-server-*`, about 950% CPU) and GHC builds. Every group, including the pure
   streamly baselines, failed by 12–210%. The time comparison is to be repeated when the machine
   is quiet (FRIC-2).
+- Second attempt (2026-11-12, 18:19–18:35): same obstacle, load average 24–44 from the same
+  load benchmark (FRIC-3). A fresh full run of `40d112d` and `2c2a580` reproduced the
+  allocation figures above to within 0.4%. The time comparison is queued behind a wait for
+  load below 8, together with plan 60's. The retention suite still passes at `e09be0c`,
+  including both `batch/distinct-contexts` checks. M3's documents are in `2c2a580`; only the
+  parent MasterPlan's Complete mark waits on M2.
 
 
 ## Decision Log

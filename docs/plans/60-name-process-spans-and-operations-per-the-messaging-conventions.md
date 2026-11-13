@@ -38,6 +38,11 @@ provenance:
       at: 2026-11-13T01:00:14Z
       mode: "implement"
       note: "Rename process spans and add messaging.operation.name"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T02:40:57Z
+      mode: "implement"
+      note: "M2 allocation and retention gate; time gate queued for quiet machine"
 ---
 
 # Name process spans and operations per the messaging conventions
@@ -79,6 +84,9 @@ map allocation; M2 measures and explains that cost under the existing gate.
   `shibuya-metrics-test` pass; the old-name grep finds nothing.
 - [ ] M2: Performance gate passed against the baseline commit with no unexplained allocation
   change; retention suite passes.
+  - [x] (2026-11-12) Allocation explained (one map entry: +311 B per message, +225 B per batch;
+    disabled cells flat) and retention suite passes; see Surprises & Discoveries.
+  - [ ] Time comparison on a quiet machine, together with plan 56's.
 - [x] M3 (2026-11-12): User guide, capability document, changelog and the correlation ADR describe the new
   name with migration guidance; parent MasterPlan updated. Evidence: "Span name" subsection
   and attribute tables in `docs/user/opentelemetry.md`; CAP-8 and its log; the Jaeger guide's
@@ -93,6 +101,37 @@ map allocation; M2 measures and explains that cost under the existing gate.
   AttributeKey Text`.
 - `docs/JAEGER_LOCAL_TESTING.md` already disagreed with the code: it expected the
   operation name `shibuya.process.message`. It now states `process <ProcessorId>`.
+- M2 allocation gate (2026-11-12), baseline `2c2a580` (plan 56's final commit) against
+  `e09be0c`. One full run of every group on each side, then `-p '/hot-path/ || /tracing/'`
+  three more times, alternating the two trees. Figures are smallest-to-smallest over the four
+  runs, 10,000 messages per run:
+  - Every pre-existing group with serial processing (`baseline-streamly`, `framework-overhead`,
+    `handler-overhead`, `concurrency-modes` serial cells, `dead-letter-reason`) is unchanged to
+    within a few hundred bytes per run.
+  - Disabled cells: `single-serial/disabled-*` +1.9 bytes per message, `batch100/disabled-*`
+    +0, `hot-path/serial-noop` +1.4, all inside the run-to-run spread (the two trees' ranges
+    overlap). The first run alone showed +8 bytes per message; the reruns did not reproduce it.
+  - `single-serial/enabled-*`: +311 bytes per message on all three shapes, with each tree's
+    four runs within 1 KB of each other. That is one more map entry. hs-opentelemetry's
+    `addAttributes` folds `H.insert` over the incoming map, so the extra key costs its leaf
+    and value, one more slot in every later copy of the span's attribute node, and a
+    one-slot-larger copy of the per-message framework map when `messaging.message.id` is
+    inserted into it.
+  - `batch100/enabled-*`: about +225 bytes per batch, the same one entry on the batch span.
+  - `single-async8/*` and `hot-path/async8-noop`: +32 to +88 bytes per message when disabled
+    and +1.45 to +1.67 KB per message when enabled. These cells are not deterministic under
+    load: between `40d112d` and `2c2a580`, which did not touch this path, the same enabled
+    cells moved −10%, about −1.6 to −1.9 KB per message. Their extra allocation comes from
+    streamly's worker dispatch, whose churn depends on timing (see
+    `docs/plans/30-investigate-and-reduce-the-async-ahead-concurrency-allocation-regression.md`).
+    The per-message code they run is the serial path's, which shows exactly one entry.
+    Recheck them in the quiet-machine run.
+- M2 time gate: not readable. Load average stayed between 24 and 44 through every run, from
+  another session's load benchmark; streamly baselines moved 4–11% between runs of the same
+  code. Recorded as FRIC-3. The comparison is queued for a quiet machine.
+- Retention and regression (2026-11-12, at `e09be0c`): all four `shibuya-core` suites pass
+  (354 examples, both GC suites, and the retention suite including `batch/distinct-contexts`),
+  and `shibuya-metrics-test` passes (104 examples).
 
 
 ## Decision Log

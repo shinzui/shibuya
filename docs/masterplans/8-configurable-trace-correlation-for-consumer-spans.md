@@ -46,6 +46,11 @@ provenance:
       at: 2026-11-12T23:12:57Z
       mode: "implement"
       note: "Coordinate EP-1 onward; registry and progress updates"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T02:40:57Z
+      mode: "implement"
+      note: "Progress for EP-3/EP-7 gates; record recurring benchmark-load friction"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -391,8 +396,10 @@ EP-4 and EP-6 documentation.
 
 EP-1 and EP-2 are Complete (2026-11-12). EP-1 recorded the `tracing` baseline and the
 retention suite. EP-2 links single-message spans and adds the adapter policy and
-`Shibuya.Telemetry.Process`, and lowers per-message allocation. EP-3 is next, with its baseline
-at EP-2's final commit. On
+`Shibuya.Telemetry.Process`, and lowers per-message allocation. EP-3 and EP-7 are implemented,
+documented, and pass behaviour, retention and allocation checks. Each still needs its M2 time
+comparison, queued for a quiet machine. Neither the release gate nor any adapter plan can start
+until both are Complete. On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
 nothing beyond it.
@@ -445,6 +452,13 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   an idle machine and read allocation first. EP-2 also found ten positional `Adapter`
   constructions in this repository that the plans' record-syntax grep missed. The adapter plans
   (EP-4 to EP-6) should expect positional sites in their repositories too.
+- Recurring friction (2026-11-12): machine load has blocked the benchmark time gate under
+  every core plan so far. It cost EP-2 three comparison runs (FRIC-2), left EP-3's time
+  comparison unreadable, and blocked both EP-3's and EP-7's in a second session (FRIC-3).
+  Allocation stayed readable throughout: serial cells repeat within 1 KB per run. Async cells
+  vary by about ±10% even when their code is unchanged. The release skill's gate against
+  0.12.0.0 will face the same constraint. Promotion of a gate that tolerates load, for example
+  interleaved repeated runs, is to be decided at EP-7's friction triage.
 - EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
   208 bytes per message less, and the headers-plus-link path costs less than before, so the
   `ParentOnly` question in the Decision Log is closed.

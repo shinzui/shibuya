@@ -2,6 +2,9 @@
 
 ## 2026-11-13
 
+* **Addition**: FRIC-3 records blocked environment friction with mori://shinzui/shibuya: Benchmark time gate blocked again by concurrent machine load
+
+
 * **Update**: FRIC-2 resolved: Documented the load sensitivity in the bench README
 
 * **Addition**: FRIC-2 records slowdown environment friction with mori://shinzui/shibuya: Benchmark time gate is unreadable under concurrent machine load
