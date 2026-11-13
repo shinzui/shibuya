@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0.1 — 2026-11-13
+
+### Other Changes
+
+- Require `shibuya-core ^>=0.13.0.1`, matching the shared release. No
+  `shibuya-metrics` API changes.
+
 ## 0.13.0.0 — 2026-11-12
 
 ### Breaking Changes
