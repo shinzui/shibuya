@@ -60,9 +60,32 @@ cross-adapter documentation.
 
 ## Evidence
 
-This is a planning decision, not evidence of implemented behavior. The review inspected the
-existing runner and context helpers; no feature builds or benchmarks have run. Implementation
-must add acceptance evidence here and change status only when the planned behavior is accepted.
+Single-message correlation is implemented and accepted (EP-2, 2026-11-12). Batch linking
+(EP-3) and naming (EP-7) are not, so the status stays Proposed.
+
+- Interface: `Shibuya.Telemetry.Correlation` exports `TraceCorrelation`, `AdapterTelemetry`
+  with its field but without its constructor, `defaultAdapterTelemetry`, `creationLink`,
+  `creationLinkWith` and `consumerSpanArgsLinkedTo`. `Shibuya.Telemetry.Process` exports
+  `withProcessSpan` and `withProcessSpanIO`. `Shibuya.Telemetry.Effect` exports
+  `withRootContext`. `Adapter` has `telemetry :: !AdapterTelemetry`. The runner's `processOne`
+  is built on `withProcessSpan`, so the runner and direct callers share one implementation of
+  the rule above.
+- Behaviour: `shibuya-core/test/Shibuya/Telemetry/CorrelationSpec.hs` (28 examples) covers
+  parent and link under `ParentAndLink`, root and link under `LinkOnly` even with an ambient
+  span, ambient parentage and no link for absent or malformed headers, `currentTraceHeaders`
+  under `LinkOnly`, superseded deliveries, disabled tracing, and both helpers called directly.
+- Space: `shibuya-core-trace-retention-test` passes for both policies. Finished spans held by an
+  exporter do not keep payloads alive, and live bytes stay flat from 20,000 to 200,000 messages.
+- Cost, against [plan 54](../plans/54-establish-tracing-enabled-performance-and-retention-baselines.md)'s
+  baseline: single-message processing allocates about 208 bytes per message less on every path.
+  The disabled path no longer decodes headers (`disabled-headers` equals `disabled-noheaders`).
+  With headers the enabled path allocates 1,151 bytes per message more than without them,
+  against 1,360 before; the link costs less than the second unlift it replaced. Time was within
+  the gate on a quiet machine except one 100-message microbenchmark accepted as noise, see
+  [EP-2](../plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md).
+- Measurement constraint: hs-opentelemetry creates non-recording spans when a provider has no
+  span processors. Enabled-path benchmarks and retention checks must use a provider with at
+  least one processor.
 
 [MasterPlan 8](../masterplans/8-configurable-trace-correlation-for-consumer-spans.md) coordinates
 [EP-2](../plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md),

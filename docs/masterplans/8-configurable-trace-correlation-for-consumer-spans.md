@@ -214,7 +214,7 @@ with their measured results. Proposed status does not claim implemented behavior
 | # | Title | Path | Hard Deps | Soft Deps | Status |
 |---|-------|------|-----------|-----------|--------|
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
-| 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | In Progress |
+| 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Complete |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Not Started |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
@@ -270,7 +270,7 @@ field.** Defined by EP-2,
 consumed by EP-4, EP-5, EP-6.
 
 ```haskell
--- module Shibuya.Telemetry.Correlation, re-exported from Shibuya.Adapter and Shibuya.Telemetry
+-- module Shibuya.Telemetry.Correlation, re-exported from Shibuya.Adapter, Shibuya.Telemetry and Shibuya
 data TraceCorrelation
   = ParentAndLink
   | LinkOnly
@@ -283,6 +283,8 @@ data TraceCorrelation
 data AdapterTelemetry = AdapterTelemetry
   { traceCorrelation :: !TraceCorrelation
   }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
 
 -- | @traceCorrelation = ParentAndLink@.
 defaultAdapterTelemetry :: AdapterTelemetry
@@ -387,8 +389,10 @@ EP-4 and EP-6 documentation.
 
 ## Progress
 
-EP-1 is Complete (2026-11-12): the `tracing` benchmark group and the trace retention suite
-exist, and the baseline is recorded in `shibuya-core-bench/README.md`. EP-2 is next. On
+EP-1 and EP-2 are Complete (2026-11-12). EP-1 recorded the `tracing` baseline and the
+retention suite. EP-2 links single-message spans and adds the adapter policy and
+`Shibuya.Telemetry.Process`, and lowers per-message allocation. EP-3 is next, with its baseline
+at EP-2's final commit. On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
 nothing beyond it.
@@ -435,6 +439,15 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   EP-2, EP-3 or EP-7 must use a provider with at least one processor; `Bench.Tracing` and the
   retention suite use one that discards every span. EP-1 also confirmed the disabled-path
   decode cost below: about 346–360 bytes per message.
+- EP-2 (2026-11-12): time gates on this shared 36-core machine are unreadable under concurrent
+  load. Concurrent cells slowed 15–48% in unchanged code while allocation stayed exact (FRIC-2,
+  resolved by a note in `shibuya-core-bench/README.md`). EP-3 and EP-7 should run their gates on
+  an idle machine and read allocation first. EP-2 also found ten positional `Adapter`
+  constructions in this repository that the plans' record-syntax grep missed. The adapter plans
+  (EP-4 to EP-6) should expect positional sites in their repositories too.
+- EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
+  208 bytes per message less, and the headers-plus-link path costs less than before, so the
+  `ParentOnly` question in the Decision Log is closed.
 - The disabled path may already decode headers. `processOne` binds
   `parentCtx = ingested.envelope.traceContext >>= extractTraceContext` and passes it to
   `withExtractedContext`, which pattern-matches on the `Maybe` before it checks whether tracing

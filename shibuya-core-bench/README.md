@@ -329,6 +329,13 @@ cabal bench shibuya-core-bench \
 git worktree remove /tmp/shibuya-tracing-baseline
 ```
 
+Run both sides on an idle machine, and check `uptime` before and after. The benchmark runs
+with `+RTS -N`, one capability per core. GHC's parallel garbage collector stops every
+capability and waits for the slowest, so when other work holds some cores the concurrent,
+GC-heavy cells slow down sharply. In plan 55's gate, a load average around 20 made
+`lifecycle/*` and `single-async8` cells 15–48% slower, including code the change did not touch,
+while allocation stayed exact. Allocation is reliable under load; time is not.
+
 Remove `-p tracing` to compare every group. Cells that have no baseline row are reported
 without a comparison.
 

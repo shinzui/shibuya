@@ -102,11 +102,16 @@ tests that already exist from the preceding plan.
   is active; with tracing disabled no header is decoded; new tests in
   `shibuya-core/test/Shibuya/Telemetry/CorrelationSpec.hs` pass. Evidence: 28 examples, 0
   failures. Disabled-path decode removal is measured in M3.
-- [ ] M3: Performance and retention gate passed against the baseline commit, with the measured
+- [x] M3 (2026-11-12): Performance and retention gate passed against the baseline commit, with the measured
   per-message cost of the link recorded in this plan; retention suite extended to both policies
-  and passing.
-- [ ] M4: User guide, capability document, changelog and ADR 0014 describe the policy; the
-  parent MasterPlan's registry and Integration Points are updated.
+  and passing. Evidence: allocation gate met (Surprises & Discoveries). The time gate was met on
+  a quiet machine except one 100-message microbenchmark accepted as noise (Decision Log).
+  Seven retention checks pass.
+- [x] M4 (2026-11-12): User guide, capability document, changelog and ADR 0014 describe the policy; the
+  parent MasterPlan's registry and Integration Points are updated. Evidence: "Parent or link"
+  section in `docs/user/opentelemetry.md`; CAP-8 and its log updated and `okf validate --strict`
+  passes; `0.13.0.0 — Unreleased` changelog entry; ADR 0014 Evidence section; version bump left
+  to the release skill.
 
 
 ## Surprises & Discoveries
@@ -147,14 +152,21 @@ context with valid headers. Batch decoding remains plan 56 work.
     runs. These cells' allocation depends on worker dispatch (see plan 30); their per-message
     code is the path that got cheaper everywhere else. `lifecycle/batch-size` (+0.2%) runs
     through the batch runner, which this plan does not change.
-- M3 time gate: not verified. Three comparisons — full run, `--stdev 3` re-run, and an
-  order-swapped re-run — reported 15–48% slower times in `lifecycle/*`, `hot-path/async8` and
-  `single-async8`. The unchanged batch path (`lifecycle/batch-size`) was among them, at +16% to
-  +48%. Allocation in those cells fell or stayed flat. Load average rose from 4.7 to 23 during
-  the runs while unrelated test suites from another project and a VM ran on the machine. The
-  swapped run put the candidate under heavier load (≈23) than the baseline (≈16), so it could
-  not separate order from load. The time gate is recorded as not met on this machine; M3 stays
-  open pending a run on an idle machine.
+- M3 time gate, first three comparisons (2026-11-12): 15–48% slower times in `lifecycle/*`,
+  `hot-path/async8` and `single-async8`, across a full run, a `--stdev 3` re-run and an
+  order-swapped re-run. The unchanged batch path (`lifecycle/batch-size`) was among them, while
+  allocation fell or stayed flat. Load average rose from 4.7 to 23 while another project's test
+  suites, a VM and `mori` ran. The suite runs `+RTS -N` (36 capabilities). The parallel GC's
+  stop-the-world barrier waits for the slowest capability, so concurrent, GC-heavy cells
+  degrade most when other work holds some cores; serial cells moved only 2–3%.
+- M3 time gate, rerun at load ≈4–7 (2026-11-12): every `lifecycle`, `hot-path`, `tracing`,
+  `handler` and `concurrency` cell is within `--fail-if-slower 10`. One cell failed,
+  `framework-overhead/comparison/100-msgs/shibuya-framework`: +22%, and +12% on the
+  `--stdev 3` confirming re-run. It is accepted as noise (Decision Log). In the same confirming
+  run its pure-streamly control `comparison/1000-msgs/streamly-baseline`, which contains no
+  Shibuya code, failed at +17%. Its twin `processing/runWithMetrics-100` measures the same
+  `runWithMetrics` call without in-measurement message construction and was unchanged
+  (30.2 µs). Its own allocation fell from 319,008 to 298,269 bytes.
 
 
 ## Decision Log
@@ -212,6 +224,17 @@ context with valid headers. Batch decoding remains plan 56 work.
   which the Milestone 3 gate checks.
   Date: 2026-11-11
 
+- Decision: Accept the remaining time-gate failure,
+  `framework-overhead/comparison/100-msgs/shibuya-framework` (+12% to +22%), as measurement
+  noise and complete M3.
+  Rationale: The cell builds its 100 messages inside the measured region. Its twin
+  `processing/runWithMetrics-100`, which measures the same `runWithMetrics` call, is unchanged.
+  Its allocation fell 7%. A pure-streamly control in the same group failed at +17% in the same
+  run. This plan changes only per-message span construction, which got cheaper in every cell
+  that isolates it. The user directed (2026-11-12) that time failures which disappear on a
+  quiet machine be recorded as artifacts and the work continued.
+  Date: 2026-11-12
+
 - Decision: A message without `traceContext` behaves exactly as today under either policy.
   Rationale: With no creation context there is nothing to link or to parent. Leaving the
   ambient context untouched keeps this plan's behaviour change limited to messages that carry
@@ -221,7 +244,29 @@ context with valid headers. Batch decoding remains plan 56 work.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Completed 2026-11-12. Every per-message processing span links to the producer's span when its
+headers decode. Adapters declare `ParentAndLink` (the default) or `LinkOnly` through
+`Adapter.telemetry`, a strict field holding an `AdapterTelemetry` record whose constructor is
+hidden. `processOne` and external callers share `Shibuya.Telemetry.Process`. The interfaces
+match the parent MasterPlan's Integration Points; `withTraceCorrelation` was not needed.
+
+The change made processing cheaper rather than costlier. About 208 bytes per message
+disappeared from every single-message path. The disabled path stopped decoding headers, about
+350 bytes per message for messages with a `traceparent`. With headers and tracing enabled,
+the link costs less than the second unlift it replaced. `ParentOnly` therefore stays
+unnecessary, and the MasterPlan's two-policy decision stands.
+
+Most of this plan's time went into the time gate. On a 36-core machine shared with other
+workloads, the `+RTS -N` benchmark's concurrent cells were unreadable until load fell. The
+remaining failure was accepted with evidence (Decision Log).
+
+Friction: FRIC-2 (`docs/friction-log/2-benchmark-time-gate-is-unreadable-under-concurrent-machine-load.md`,
+slowdown) is resolved by the load note in `shibuya-core-bench/README.md`.
+
+ADR distillation: ADR 0014 now records the implemented interface, the evidence and the
+non-recording-provider constraint. The load sensitivity of time gates is a benchmarking
+practice, documented in the bench README rather than an ADR. ADR 0006 already says allocation
+is the stricter signal.
 
 
 ## Context and Orientation
