@@ -35,6 +35,9 @@ evidence:
     resource: shibuya-core/test-retention/Main.hs
     proves: Finished processing spans under either policy do not retain message payloads, and live heap stays flat under sustained traced processing.
   - kind: test
+    resource: shibuya-core/test/Shibuya/Telemetry/BatchCorrelationSpec.hs
+    proves: Batch spans are roots linking each member's creation context in order with its message id, bounded at 128 with an exact count of omitted valid contexts.
+  - kind: test
     resource: shibuya-core/test/Shibuya/Telemetry/SemanticSpec.hs
     proves: Span names and messaging.* attributes follow OpenTelemetry semantic conventions.
   - kind: guide
@@ -63,6 +66,11 @@ sources, the consumer starts a new trace and the link relates the two. Users cha
 in the adapter's configuration. Messages without usable headers have no link and keep whatever
 context the processing thread already had, as before.
 
+Batch spans are always roots. They link every member's creation context in member order, each
+link naming its member's `messaging.message.id`, up to 128 links. The remaining valid contexts
+are counted in `shibuya.batch.links.dropped`, and the span carries
+`messaging.batch.message_count`.
+
 The same span is available outside the runner through `Shibuya.Telemetry.Process`
 (`withProcessSpan`, `withProcessSpanIO`). With valid headers these helpers neither parent on
 nor link an ambient span on the calling thread. They are meant for independent message
@@ -85,7 +93,6 @@ defaults. Adapters with nothing to add pay nothing, which is the common case.
 - Spans follow OpenTelemetry messaging semantic conventions; upgrading conventions is a
   user-visible change and has been one before (see the 0.2.0.0 and 0.3.0.0 entries in
   [`../../CHANGELOG.md`](../../CHANGELOG.md)).
-- Batch spans still take the first member's context as parent; batch linking is planned separately.
 - Propagation requires the backend to carry headers. `Envelope.headers` is `Nothing` when the
   adapter does not surface them, and no parent context is recovered.
 - Requires the OpenTelemetry 1.0 library series as of 0.6.0.0.

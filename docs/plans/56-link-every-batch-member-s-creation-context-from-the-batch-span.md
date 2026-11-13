@@ -105,6 +105,28 @@ constant. Plan 55 Complete supplies the root-context helper under a single owner
   Decision Log is built in: equal header lists reuse the previous member's decoded context.
 - The fixed-header `batch100` cells compare one list against an identical list per member, so
   they decode once per batch, as the baseline did, and build 100 links.
+- M2 allocation gate (2026-11-12, against `40d112d`, plan 55's final commit). All per-run, 10,000
+  messages:
+  - `batch100/enabled-headers`: 24,430,713 → 30,680,957, about +625 bytes per member. Each
+    member gets a `NewLink`, a one-entry attribute map with its message id, a list cell, and the
+    SDK's frozen `Link` copy. The baseline decoded one header per batch and built no link.
+  - `batch100/enabled-headers-distinct` (new): 34,068,690, about 339 bytes per member more than
+    the fixed-header cell. That is the decode of 100 distinct headers per batch, consistent with
+    plan 54's ≈346-byte decode.
+  - `batch1000/enabled-headers-distinct` (new): 28,393,426, *below* the batch100 distinct cell. It
+    decodes all 10,000 headers but stores 128 links per batch (1,280 in total, against 10,000).
+    The link bound holds at the cost level.
+  - `batch100/enabled-noheaders`: +34,637, about 346 bytes per batch: the root-context attachment
+    and the `messaging.batch.message_count` entry, as the contract allows.
+  - `batch100/disabled-*`: −53,529 and −142,157. The disabled path no longer decodes the first
+    member's header.
+  - Single-message serial cells and pre-existing serial groups are within 0.3%. Async and
+    `concurrency-modes` cells moved ±2–10% in both directions, as they did in plan 55's runs;
+    their allocation depends on scheduling.
+- M2 time gate: unreadable on this run. Load average reached 29.5 while another session ran a
+  load benchmark (`en-server-*`, about 950% CPU) and GHC builds. Every group, including the pure
+  streamly baselines, failed by 12–210%. The time comparison is to be repeated when the machine
+  is quiet (FRIC-2).
 
 
 ## Decision Log

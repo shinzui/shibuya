@@ -354,6 +354,33 @@ discourage creation-context parenting by default only when processing runs
 inside another span. Shibuya documents this choice instead of adding a
 second link to the ambient span.
 
+#### Batches
+
+A batch span accounts for many messages, and a span can have only one
+parent, so batch spans never take a member's producer as parent. A batch
+span is always the root of its own trace, whatever the adapter's policy, and
+carries one link per member whose `traceparent` decodes:
+
+-   Links follow member order, and each carries that member's
+    `messaging.message.id`. Members that share a producer still get
+    separate links, because their message IDs differ.
+-   Shibuya stores at most 128 links per batch span, the OpenTelemetry
+    SDK's default per-span limit. It still decodes the remaining members'
+    headers and reports how many valid contexts it left out in
+    `shibuya.batch.links.dropped`, which is set only when non-zero. Absent
+    or malformed headers are never counted.
+-   The span carries `messaging.batch.message_count`, the number of
+    members processed, after superseded deliveries are removed. Superseded
+    members get no link.
+-   If you set the SDK's own limit lower (`OTEL_SPAN_LINK_COUNT_LIMIT`), the
+    SDK drops links beyond it on its own. `shibuya.batch.links.dropped`
+    counts only what Shibuya itself omitted.
+
+Before 0.13.0.0 a batch span was a child of its first member's producer,
+and the other members' producers were not recorded. To find the batch that
+processed a message, follow the link from the producer's trace in a backend
+that indexes links.
+
 ### Producing messages from a handler
 
 If your handler produces a follow-on message, attach the current
@@ -543,6 +570,15 @@ The framework always sets these on its per-message span:
 | `shibuya.inflight.max` | Int | Max concurrency |
 | `shibuya.ack.decision` | Text | `"ack_ok"` / `"ack_retry"` / `"ack_dead_letter"` / `"ack_halt"` / `"error"` |
 | `shibuya.dead_letter.reason.code` | Text | Stable code from `deadLetterReasonCode` (only for `AckDeadLetter`) |
+
+Batch spans additionally carry:
+
+| Key | Type | Source |
+|-----|------|--------|
+| `messaging.batch.message_count` | Int | Members processed in the batch |
+| `shibuya.batch.links.dropped` | Int | Members with a valid context beyond the 128-link bound (only when non-zero) |
+
+Each link on a batch span carries `messaging.message.id` (Text) for its member.
 
 The dead-letter detail appears only in the span's canonical `Error` status
 description. Code and detail are not emitted as metric labels.

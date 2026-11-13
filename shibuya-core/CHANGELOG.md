@@ -12,6 +12,11 @@
   `Envelope.traceContext` decodes. Under the default `ParentAndLink` policy the span
   is still the producer span's child, so existing traces keep their shape and gain
   one link.
+- Batch processing spans are always roots and no longer join the first member's
+  trace. They link every member whose trace headers decode, in member order, each
+  link carrying `messaging.message.id`, up to 128 links. Valid contexts beyond
+  that are counted in `shibuya.batch.links.dropped`. Batch spans also carry
+  `messaging.batch.message_count`.
 
 ### New Features
 
@@ -29,6 +34,9 @@
   as the runner for code that drains an adapter outside it. With valid headers they
   neither parent on nor link an ambient span; they are meant for independent
   message processing.
+- `Shibuya.Telemetry.Correlation` also exports `maxBatchLinks`, `BatchLinks`,
+  `collectBatchLinks` and `collectBatchLinksBy`, and `Shibuya.Telemetry.Semantic`
+  exports `attrMessagingBatchMessageCount` and `attrShibuyaBatchLinksDropped`.
 - `Shibuya.Telemetry.Effect.withRootContext` runs an action with an empty
   OpenTelemetry context attached.
 

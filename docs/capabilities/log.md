@@ -1,6 +1,7 @@
 # Bundle Update Log
 
 ## 2026-11-12
+* **Update**: CAP-8 records root batch spans with bounded per-member links, `messaging.batch.message_count` and `shibuya.batch.links.dropped`
 * **Update**: CAP-8 records the producer-span link on processing spans, the adapter-declared `ParentAndLink`/`LinkOnly` policy, the public processing-span helpers, and correlation and retention evidence
 
 ## 2026-10-12
