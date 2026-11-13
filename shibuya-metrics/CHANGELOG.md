@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0.0 — 2026-11-12
+
+### Breaking Changes
+
+- Require `shibuya-core ^>=0.13.0.0` in the library, test suite and load
+  executables, matching the shared release. `shibuya-core` 0.13 adds the strict
+  `Adapter.telemetry` field; code that constructs an `Adapter` must supply
+  `telemetry = defaultAdapterTelemetry`. No `shibuya-metrics` API changes.
+
 ## 0.12.0.0 — 2026-10-26
 
 ### Breaking Changes

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.0.0 — Unreleased
+## 0.13.0.0 — 2026-11-12
 
 ### Breaking Changes
 
@@ -17,7 +17,6 @@
   link carrying `messaging.message.id`, up to 128 links. Valid contexts beyond
   that are counted in `shibuya.batch.links.dropped`. Batch spans also carry
   `messaging.batch.message_count`.
-
 - Processing and batch spans are renamed from `<destination> process` to
   `process <destination>`, following the messaging conventions'
   `{messaging.operation.name} {destination}`. Saved searches, alerts and sampling
@@ -59,6 +58,19 @@
   path. With tracing enabled and trace headers present it allocates about 210 bytes
   less, even with the added link, because the context attachment and the span now
   share one unlift.
+- Accept a measured allocation increase on `Async` runners whose handlers wait:
+  `concurrency-modes` `async-5` cells allocate 20–30% more than 0.12.0.0 (for
+  example 1.17–1.21 MB to 1.47–1.57 MB for 100 messages with a 1 ms handler delay),
+  `async-10` 4–5% and `async-20` 2–3% more, with unchanged time. `async-2`, every
+  `Ahead` cell and `hot-path/async8` are flat or lower. The per-message code these
+  cells run is the path that got cheaper everywhere else; the increase comes from
+  streamly's worker dispatch, which is sensitive to the shape of per-message work
+  (see `docs/plans/30-investigate-and-reduce-the-async-ahead-concurrency-allocation-regression.md`).
+- The release comparison against 0.12.0.0 measured 10,000-message processing
+  (`hot-path/serial-noop-10000`) at 9.247 to 9.098 ms, with allocation falling
+  from 19,918,565 to 17,837,870 bytes. Every timing comparison passed the 10% gate
+  in interleaved confirming runs at `--stdev 3`; measurements used package-default
+  RTS settings on a shared workstation.
 
 ## 0.12.0.0 — 2026-10-26
 

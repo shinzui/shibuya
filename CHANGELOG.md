@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.13.0.0 — 2026-11-12
+
+Processing spans now link to the producer's span, adapters choose how consumer
+traces relate to producer traces, and span names follow the OpenTelemetry
+messaging conventions. See `docs/user/opentelemetry.md` and
+[ADR 0014](docs/adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md).
+
+### Breaking Changes
+
+- `shibuya-core`: `Adapter` gains a strict `telemetry :: AdapterTelemetry` field.
+  Record constructions must add `telemetry = defaultAdapterTelemetry`; positional
+  construction needs the extra argument. Adapters should expose the value in their
+  own configuration.
+- `shibuya-core`: batch processing spans are roots and no longer join the first
+  member's trace. They link up to 128 members' creation contexts, each link carrying
+  `messaging.message.id`; valid contexts beyond the bound are counted in
+  `shibuya.batch.links.dropped`.
+- `shibuya-core`: processing and batch spans are renamed from
+  `<destination> process` to `process <destination>`. Saved searches, alerts and
+  sampling rules that match span or operation names must change.
+- `shibuya-metrics` requires `shibuya-core ^>=0.13.0.0` in every component.
+  Consumers such as `mori://shinzui/shibuya-pgmq-adapter`,
+  `mori://shinzui/shibuya-kafka-adapter` and `mori://shinzui/kiroku` construct
+  `Adapter` records directly; their core 0.12 bounds keep them on that series until
+  they migrate explicitly.
+
+### New Features
+
+- `shibuya-core`: each per-message processing span links to its creation context
+  when `Envelope.traceContext` decodes. The adapter's `TraceCorrelation` policy
+  decides the parent: `ParentAndLink` (the default) keeps the producer as parent;
+  `LinkOnly` starts a new trace related to the producer only by the link. Without
+  usable headers both policies keep the ambient parent.
+- `shibuya-core`: new modules `Shibuya.Telemetry.Correlation` (`TraceCorrelation`,
+  the extensible `AdapterTelemetry`, link helpers and batch link collection) and
+  `Shibuya.Telemetry.Process` (`withProcessSpan`, `withProcessSpanIO`) for code that
+  processes messages outside the runner; `Shibuya.Telemetry.Effect.withRootContext`.
+- `shibuya-core`: processing and batch spans carry `messaging.operation.name`, and
+  batch spans carry `messaging.batch.message_count`.
+
+### Other Changes
+
+- `shibuya-core`: with tracing disabled, processing no longer decodes W3C trace
+  headers. Single-message processing allocates about 208 bytes less per message.
+- Add a tracing-enabled benchmark group and an isolated trace-retention test suite
+  that checks finished spans do not retain payloads and live bytes stay flat.
+- Accept a measured allocation increase on `Async` runners whose handlers wait:
+  `async-5` benchmark cells allocate 20–30% more than 0.12.0.0, `async-10` 4–5% and
+  `async-20` 2–3% more, with unchanged time. The increase comes from streamly's worker
+  dispatch; per-message processing itself is cheaper.
+- The release comparison against 0.12.0.0 measured 10,000-message processing at
+  9.247 to 9.098 ms, with allocation falling from 19,918,565 to 17,837,870 bytes.
+  All timing comparisons passed the 10% gate.
+
 ## 0.12.0.0 — 2026-10-26
 
 ### Breaking Changes
