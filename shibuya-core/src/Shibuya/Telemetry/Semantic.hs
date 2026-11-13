@@ -15,6 +15,7 @@ module Shibuya.Telemetry.Semantic
     attrMessagingMessageId,
     attrMessagingDestinationName,
     attrMessagingOperation,
+    attrMessagingBatchMessageCount,
 
     -- * Attribute Keys (Shibuya-specific)
     attrShibuyaProcessorId,
@@ -26,6 +27,7 @@ module Shibuya.Telemetry.Semantic
     attrShibuyaBatchKey,
     attrShibuyaBatchSize,
     attrShibuyaBatchTrigger,
+    attrShibuyaBatchLinksDropped,
 
     -- * Event Names
     eventHandlerStarted,
@@ -104,6 +106,11 @@ attrMessagingDestinationName = unkey Sem.messaging_destination_name
 attrMessagingOperation :: Text
 attrMessagingOperation = unkey Sem.messaging_operation_type
 
+-- | @messaging.batch.message_count@: the number of messages in a batch, set
+-- on batch processing spans.
+attrMessagingBatchMessageCount :: Text
+attrMessagingBatchMessageCount = unkey Sem.messaging_batch_messageCount
+
 --------------------------------------------------------------------------------
 -- Attribute Keys (Shibuya-specific)
 --
@@ -164,6 +171,11 @@ attrShibuyaBatchSize = "shibuya.batch.size"
 -- | Why the batch was emitted: size, timeout, or flush (@shibuya.batch.trigger@).
 attrShibuyaBatchTrigger :: Text
 attrShibuyaBatchTrigger = "shibuya.batch.trigger"
+
+-- | Members of a batch with a valid creation context that were not linked
+-- because the batch span reached its link bound. Set only when non-zero.
+attrShibuyaBatchLinksDropped :: Text
+attrShibuyaBatchLinksDropped = "shibuya.batch.links.dropped"
 
 --------------------------------------------------------------------------------
 -- Event Names

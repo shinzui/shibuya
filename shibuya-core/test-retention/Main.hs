@@ -20,6 +20,7 @@ import Control.Exception (evaluate)
 import Control.Monad (forM, unless, void)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
+import Data.ByteString.Char8 qualified as BS8
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (isJust)
@@ -28,6 +29,7 @@ import Data.Word (Word8)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.Exception qualified as Exception
 import GHC.Stats (GCDetails (..), RTSStats (..), getRTSStats)
+import Numeric (showHex)
 import OpenTelemetry.Attributes (emptyAttributes)
 import OpenTelemetry.Exporter.InMemory (inMemoryListExporter)
 import OpenTelemetry.Processor.Span (FlushResult (..), ShutdownResult (..), SpanProcessor (..))
@@ -56,12 +58,15 @@ import System.Mem (performMajorGC)
 import System.Mem.Weak (Weak, deRefWeak)
 import System.Timeout (timeout)
 
-data Shape = SingleSerial | SingleAsync8 | Batch
+-- | 'BatchDistinct' is a batch whose members each carry a different producer
+-- context, so the batch span holds one link per member up to the bound.
+data Shape = SingleSerial | SingleAsync8 | Batch | BatchDistinct
   deriving stock (Eq, Show)
 
 -- | Batch cases are labelled by shape alone: batch spans take no policy.
 caseName :: Shape -> TraceCorrelation -> String
 caseName Batch _ = shapeName Batch
+caseName BatchDistinct _ = shapeName BatchDistinct
 caseName shape policy = shapeName shape <> "/" <> show policy
 
 shapeName :: Shape -> String
@@ -69,6 +74,7 @@ shapeName = \case
   SingleSerial -> "single-serial"
   SingleAsync8 -> "single-async8"
   Batch -> "batch"
+  BatchDistinct -> "batch/distinct-contexts"
 
 -- | A message payload. The 'token' is the identity the weak pointer watches:
 -- a weak pointer keyed on an 'IORef' follows its underlying mutable cell,
@@ -87,10 +93,12 @@ main = do
       [ checkPayloadsCollected SingleSerial ParentAndLink,
         checkPayloadsCollected SingleSerial LinkOnly,
         checkPayloadsCollected Batch ParentAndLink,
+        checkPayloadsCollected BatchDistinct ParentAndLink,
         checkLiveBytesFlat SingleSerial ParentAndLink,
         checkLiveBytesFlat SingleSerial LinkOnly,
         checkLiveBytesFlat SingleAsync8 ParentAndLink,
-        checkLiveBytesFlat Batch ParentAndLink
+        checkLiveBytesFlat Batch ParentAndLink,
+        checkLiveBytesFlat BatchDistinct ParentAndLink
       ]
   unless (and results) exitFailure
 
@@ -116,7 +124,7 @@ checkPayloadsCollected shape policy = bounded label $ do
   spans <- readIORef exported
   let consumerSpans = length [() | sp <- spans, OTel.spanKind sp == OTel.Consumer]
   batchCount <- readIORef batches
-  let expectedConsumer = if shape == Batch then batchCount else payloadCount
+  let expectedConsumer = if isBatch shape then batchCount else payloadCount
   void $ OTel.shutdownTracerProvider provider (Just 1_000_000)
   report
     label
@@ -145,7 +153,7 @@ runPayloadCase tracer shape policy batches = do
     token <- newIORef ()
     weak <- mkWeakToken token
     let payload = Payload {blob = BS.replicate (1024 * 1024) (fromIntegral i :: Word8), token}
-    pure (weak, message i payload)
+    pure (weak, message shape i payload)
   let weaks = map fst built
       adapter =
         Adapter
@@ -209,7 +217,7 @@ runSmallMessages tracer shape policy n = do
         Adapter
           { adapterName = "trace-retention:flat",
             -- A generator, not a list, so the source itself retains nothing.
-            source = fmap (\i -> message i (Text.pack (show i))) (Stream.enumerateFromTo 1 n),
+            source = fmap (\i -> message shape i (Text.pack (show i))) (Stream.enumerateFromTo 1 n),
             shutdown = pure (),
             telemetry = defaultAdapterTelemetry
           }
@@ -251,7 +259,9 @@ runToCompletion shape policy batches adapter0 = do
       processor = case shape of
         SingleSerial -> QueueProcessor adapter (\_ -> pure AckOk) Unordered Serial
         SingleAsync8 -> QueueProcessor adapter (\_ -> pure AckOk) Unordered (Async 8)
-        Batch -> BatchingProcessor adapter (countBatch batches) defaultBatchConfig {batchSize = 100} Unordered Serial
+        Batch -> batching
+        BatchDistinct -> batching
+      batching = BatchingProcessor adapter (countBatch batches) defaultBatchConfig {batchSize = 100} Unordered Serial
   runApp defaultAppConfig [(ProcessorId "trace-retention", processor)] >>= \case
     Left err -> liftIO $ fail ("runApp failed: " <> show err)
     Right app -> Exception.finally (waitApp app) (stopApp app)
@@ -261,10 +271,24 @@ countBatch batches _ _ = do
   liftIO $ atomicModifyIORef' batches (\n -> (n + 1, ()))
   pure ackAllOk
 
-message :: (IOE :> es) => Int -> msg -> Ingested es msg
-message i payload =
-  let envelope = (mkEnvelope (MessageId (Text.pack (show i))) payload) {traceContext = Just traceHeaders}
+isBatch :: Shape -> Bool
+isBatch = \case
+  Batch -> True
+  BatchDistinct -> True
+  _ -> False
+
+message :: (IOE :> es) => Shape -> Int -> msg -> Ingested es msg
+message shape i payload =
+  let headers = if shape == BatchDistinct then distinctTraceHeaders i else traceHeaders
+      envelope = (mkEnvelope (MessageId (Text.pack (show i))) payload) {traceContext = Just headers}
    in mkIngested envelope (AckHandle (\_ -> pure ()))
+
+-- | A valid W3C context unique to message @i@.
+distinctTraceHeaders :: Int -> TraceHeaders
+distinctTraceHeaders i =
+  [("traceparent", BS8.pack ("00-" <> hex 32 (i + 0x1000) <> "-" <> hex 16 (i + 0x1000) <> "-01"))]
+  where
+    hex width n = let digits = showHex n "" in replicate (width - length digits) '0' <> digits
 
 traceHeaders :: TraceHeaders
 traceHeaders = [("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")]

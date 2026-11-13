@@ -134,6 +134,7 @@ test-suite shibuya-core-test
     Shibuya.Runner.PauseSpec
     Shibuya.Runner.SupervisedSpec
     Shibuya.RunnerSpec
+    Shibuya.Telemetry.BatchCorrelationSpec
     Shibuya.Telemetry.CorrelationSpec
     Shibuya.Telemetry.EffectSpec
     Shibuya.Telemetry.LifecycleSpec

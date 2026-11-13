@@ -23,12 +23,14 @@ where
 import Control.DeepSeq (NFData, deepseq)
 import Control.Monad (unless)
 import Data.ByteString (ByteString)
+import Data.ByteString.Char8 qualified as BS8
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time (UTCTime (..), fromGregorian)
 import Effectful (Eff, IOE, liftIO, runEff, (:>))
 import Effectful.Exception qualified as Exception
 import GHC.Generics (Generic)
+import Numeric (showHex)
 import OpenTelemetry.Attributes qualified as Attr
 import OpenTelemetry.Processor.Span (FlushResult (..), ShutdownResult (..), SpanProcessor (..))
 import OpenTelemetry.Trace.Core qualified as OTel
@@ -58,16 +60,22 @@ import Test.Tasty.Bench (Benchmark, bench, bgroup, env, nfIO)
 
 data BenchMessage = BenchMessage
   { msgId :: !Int,
-    msgPayload :: !Text
+    msgPayload :: !Text,
+    -- | Per-message trace headers, built in 'env' outside the measurement.
+    -- Only the @*-distinct@ cells read it; the others use 'Nothing' or the
+    -- shared 'fixedTraceHeaders'.
+    msgTrace :: !(Maybe TraceHeaders)
   }
   deriving stock (Generic)
   deriving anyclass (NFData)
 
 data TracingMode = Disabled | Enabled
 
-data HeaderMode = NoHeaders | WithHeaders
+-- | 'DistinctHeaders' gives every message its own valid producer context, so
+-- batch spans carry one link per member up to the bound.
+data HeaderMode = NoHeaders | WithHeaders | DistinctHeaders
 
-data Shape = SingleSerial | SingleAsync8 | Batch100
+data Shape = SingleSerial | SingleAsync8 | Batch100 | Batch1000
   deriving stock (Eq)
 
 messageCount :: Int
@@ -115,7 +123,10 @@ benchmarks tracer =
     "tracing"
     [ shapeGroup "single-serial" SingleSerial,
       shapeGroup "single-async8" SingleAsync8,
-      shapeGroup "batch100" Batch100
+      shapeGroup "batch100" Batch100,
+      -- Added by docs/plans/56-…: 1,000 distinct producers per batch, so the
+      -- 128-link bound and the overflow count are exercised.
+      bgroup "batch1000" [cell "enabled-headers-distinct" Enabled DistinctHeaders ParentAndLink Batch1000]
     ]
   where
     shapeGroup name shape =
@@ -131,9 +142,13 @@ benchmarks tracer =
           <> [ cell "enabled-headers-linkonly" Enabled WithHeaders LinkOnly shape
              | shape /= Batch100
              ]
+          -- Added by docs/plans/56-…: one distinct producer per member, one link each.
+          <> [ cell "enabled-headers-distinct" Enabled DistinctHeaders ParentAndLink shape
+             | shape == Batch100
+             ]
 
     cell name mode headers correlation shape =
-      env (pure $ createBenchMessages messageCount) $ \payloads ->
+      env (pure $ createBenchMessages headers messageCount) $ \payloads ->
         bench name $
           nfIO $
             -- Force the env value outside any STM transaction first; see the
@@ -168,6 +183,13 @@ runShape headers correlation shape payloads = do
             defaultBatchConfig {batchSize = 100}
             Unordered
             Serial
+        Batch1000 ->
+          BatchingProcessor
+            adapter
+            (\_ _ -> pure ackAllOk)
+            defaultBatchConfig {batchSize = 1000}
+            Unordered
+            Serial
   runApp defaultAppConfig [(ProcessorId "tracing", processor)] >>= \case
     Left err -> liftIO $ fail ("Bench.Tracing: runApp failed: " <> show err)
     Right app -> Exception.finally (waitAndCount app) (stopApp app)
@@ -198,17 +220,30 @@ fixedTraceparent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
 benchTime :: UTCTime
 benchTime = UTCTime (fromGregorian 2024 1 1) 0
 
-createBenchMessages :: Int -> [BenchMessage]
-createBenchMessages n = [BenchMessage i (Text.pack $ "payload-" <> show i) | i <- [1 .. n]]
+createBenchMessages :: HeaderMode -> Int -> [BenchMessage]
+createBenchMessages headers n =
+  [BenchMessage i (Text.pack $ "payload-" <> show i) (distinct i) | i <- [1 .. n]]
+  where
+    distinct i = case headers of
+      DistinctHeaders -> Just (distinctTraceHeaders i)
+      _ -> Nothing
+
+-- | A valid W3C context unique to message @i@.
+distinctTraceHeaders :: Int -> TraceHeaders
+distinctTraceHeaders i =
+  [("traceparent", BS8.pack ("00-" <> hex 32 (i + 0x1000) <> "-" <> hex 16 (i + 0x1000) <> "-01"))]
+  where
+    hex width n = let digits = showHex n "" in replicate (width - length digits) '0' <> digits
 
 createIngestedMessages :: (IOE :> es) => HeaderMode -> [BenchMessage] -> [Ingested es BenchMessage]
 createIngestedMessages headers = map createMessage
   where
-    traceContext = case headers of
-      NoHeaders -> Nothing
-      WithHeaders -> Just fixedTraceHeaders
+    traceContextOf = case headers of
+      NoHeaders -> const Nothing
+      WithHeaders -> const (Just fixedTraceHeaders)
+      DistinctHeaders -> (.msgTrace)
     createMessage payload =
       let msgId' = MessageId $ Text.pack $ show payload.msgId
-          envelope = (mkEnvelope msgId' payload) {enqueuedAt = Just benchTime, traceContext}
+          envelope = (mkEnvelope msgId' payload) {enqueuedAt = Just benchTime, traceContext = traceContextOf payload}
           ackHandle = AckHandle $ \_ -> pure ()
        in mkIngested envelope ackHandle

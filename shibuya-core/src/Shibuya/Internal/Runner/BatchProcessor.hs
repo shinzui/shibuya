@@ -87,22 +87,25 @@ import Shibuya.Internal.Runner.Halt
 import Shibuya.Internal.Runner.KeyedScheduler (runKeyedScheduler)
 import Shibuya.Policy (Concurrency (..))
 import Shibuya.Prelude
+import Shibuya.Telemetry.Correlation (BatchLinks (..), collectBatchLinksBy, consumerSpanArgsLinkedTo)
 import Shibuya.Telemetry.Effect
   ( Tracing,
     addAttribute,
     addAttributes,
     addEvent,
+    isTracingEnabled,
     recordException,
     setStatus,
-    withExtractedContext,
+    withRootContext,
     withSpan',
   )
-import Shibuya.Telemetry.Propagation (extractTraceContext)
 import Shibuya.Telemetry.Semantic
-  ( attrMessagingDestinationName,
+  ( attrMessagingBatchMessageCount,
+    attrMessagingDestinationName,
     attrMessagingOperation,
     attrMessagingSystem,
     attrShibuyaBatchKey,
+    attrShibuyaBatchLinksDropped,
     attrShibuyaBatchSize,
     attrShibuyaBatchTrigger,
     attrShibuyaInflightCount,
@@ -184,138 +187,150 @@ processCurrentBatchWithDetail ::
   (BatchInfo, NonEmpty (Ingested es msg)) ->
   Eff es ()
 processCurrentBatchWithDetail detailed metricsHandle procId maxConc stopSignal exitPublisher handler (info, batch) = do
-  -- Use the first message's trace context as the batch span's parent. A batch
-  -- may span several traces; picking the first is a pragmatic single parent
-  -- (full fan-in links are a later refinement).
-  let firstMsg = NE.head batch
-      parentCtx = firstMsg.envelope.traceContext >>= extractTraceContext
-      ProcessorId pidText = procId
+  enabled <- isTracingEnabled
+  let ProcessorId pidText = procId
+      spanName = processSpanName pidText
+      -- A batch has many producers and a span has one parent, so the batch
+      -- span is always a root and links each member's creation context
+      -- instead (ADR 0014). Disabled tracing reads no member headers.
+      openBatchSpan body
+        | not enabled = withSpan' spanName consumerSpanArgs body
+        | otherwise =
+            let !batchLinks = collectBatchLinksBy (.envelope.messageId) (.envelope.traceContext) batch
+                !args = case batchLinks.links of
+                  [] -> consumerSpanArgs
+                  links -> consumerSpanArgsLinkedTo links
+             in withRootContext $
+                  withSpan' spanName args $ \traceSpan -> do
+                    when (batchLinks.dropped > 0) $
+                      addAttribute traceSpan attrShibuyaBatchLinksDropped batchLinks.dropped
+                    body traceSpan
 
-  withExtractedContext parentCtx $
-    withSpan' (processSpanName pidText) consumerSpanArgs $ \traceSpan -> do
-      -- Framework messaging.* attributes plus batch-scoped attributes.
-      let BatchKey keyText = info.batchKey
-          frameworkAttrs =
-            HashMap.fromList
-              [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
-                (attrMessagingDestinationName, toAttribute pidText),
-                (attrMessagingOperation, toAttribute ("process" :: Text)),
-                (attrShibuyaBatchKey, toAttribute keyText),
-                (attrShibuyaBatchSize, toAttribute info.size),
-                (attrShibuyaBatchTrigger, toAttribute (triggerText info.trigger))
-              ]
-      addAttributes traceSpan frameworkAttrs
+  openBatchSpan $ \traceSpan -> do
+    -- Framework messaging.* attributes plus batch-scoped attributes.
+    let BatchKey keyText = info.batchKey
+        frameworkAttrs =
+          HashMap.fromList
+            [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
+              (attrMessagingDestinationName, toAttribute pidText),
+              (attrMessagingOperation, toAttribute ("process" :: Text)),
+              (attrShibuyaBatchKey, toAttribute keyText),
+              (attrShibuyaBatchSize, toAttribute info.size),
+              (attrMessagingBatchMessageCount, toAttribute info.size),
+              (attrShibuyaBatchTrigger, toAttribute (triggerText info.trigger))
+            ]
+    addAttributes traceSpan frameworkAttrs
 
-      let process currentInflight = do
-            addAttribute traceSpan attrShibuyaInflightCount currentInflight
-            addAttribute traceSpan attrShibuyaInflightMax maxConc
+    let process currentInflight = do
+          addAttribute traceSpan attrShibuyaInflightCount currentInflight
+          addAttribute traceSpan attrShibuyaInflightMax maxConc
 
-            addEvent traceSpan (mkEvent eventBatchStarted [])
+          addEvent traceSpan (mkEvent eventBatchStarted [])
 
-            terminal <- liftIO $ readProcessorExit stopSignal
+          terminal <- liftIO $ readProcessorExit stopSignal
 
-            -- Run the handler under exception isolation. On any exception, record it
-            -- on the span and substitute the whole-batch retry default.
-            (handlerResult, skippedAfterHalt) <-
-              case terminal of
-                Just _ -> pure (Left (), True)
-                Nothing -> do
-                  result <-
-                    catchAny
-                      (Right <$> handler info (toMessage <$> batch))
-                      ( \ex -> do
-                          recordException traceSpan ex
-                          pure (Left ())
-                      )
-                  pure (result, False)
-            let (resolvedAck, handlerThrew) = case handlerResult of
-                  Right a -> (a, False)
-                  Left () -> (ackAll (AckRetry (RetryDelay 0)), True)
+          -- Run the handler under exception isolation. On any exception, record it
+          -- on the span and substitute the whole-batch retry default.
+          (handlerResult, skippedAfterHalt) <-
+            case terminal of
+              Just _ -> pure (Left (), True)
+              Nothing -> do
+                result <-
+                  catchAny
+                    (Right <$> handler info (toMessage <$> batch))
+                    ( \ex -> do
+                        recordException traceSpan ex
+                        pure (Left ())
+                    )
+                pure (result, False)
+          let (resolvedAck, handlerThrew) = case handlerResult of
+                Right a -> (a, False)
+                Left () -> (ackAll (AckRetry (RetryDelay 0)), True)
 
-            -- RELIABLE FINALIZATION: iterate OUR OWN retained list, never the
-            -- handler's output. For each retained message, choose its decision once
-            -- via findWithDefault, then call the idempotent adapter finalizer with
-            -- bounded retry. Do not let one adapter failure prevent attempts for the
-            -- rest of the batch.
-            results <-
-              mapM
-                ( \ingested -> do
-                    let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
-                        d = fromMaybe resolvedAck.fallback explicitDecision
-                    finalResult <- finalizeWithRetry traceSpan ingested d
-                    let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
-                    when detailed $ case (finalResult, d) of
-                      (Right (), AckOk) -> recordCursor
-                      (Right (), AckDeadLetter _) -> recordCursor
-                      _ -> pure ()
-                    pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
-                )
-                (NE.toList batch)
-            let decisions = [d | (_, _, d, _) <- results]
-                finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
+          -- RELIABLE FINALIZATION: iterate OUR OWN retained list, never the
+          -- handler's output. For each retained message, choose its decision once
+          -- via findWithDefault, then call the idempotent adapter finalizer with
+          -- bounded retry. Do not let one adapter failure prevent attempts for the
+          -- rest of the batch.
+          results <-
+            mapM
+              ( \ingested -> do
+                  let explicitDecision = Map.lookup ingested.envelope.messageId resolvedAck.decisions
+                      d = fromMaybe resolvedAck.fallback explicitDecision
+                  finalResult <- finalizeWithRetry traceSpan ingested d
+                  let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+                  when detailed $ case (finalResult, d) of
+                    (Right (), AckOk) -> recordCursor
+                    (Right (), AckDeadLetter _) -> recordCursor
+                    _ -> pure ()
+                  pure (ingested.envelope.messageId, isJust explicitDecision, d, finalResult)
+              )
+              (NE.toList batch)
+          let decisions = [d | (_, _, d, _) <- results]
+              finalizeFailures = [(mid, ex) | (mid, _, _, Left ex) <- results]
 
-            -- Compute halt and partial-failure signals from the resolved decisions.
-            let finalizationFailure =
-                  case finalizeFailures of
-                    [] -> Nothing
-                    failed@((firstMessageId, _) : _) ->
-                      Just $
-                        ProcessorFailed
-                          ( "batch finalization failed for message ids: "
-                              <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
-                          )
-                          (Just firstMessageId)
-                firstHalt = listToMaybe [r | AckHalt r <- decisions]
-                requestedExit = finalizationFailure <|> (ProcessorHalted <$> firstHalt)
-                overrideFailures =
-                  [ ()
-                  | (_, explicitlyNamed, d, _) <- results,
-                    explicitlyNamed,
-                    isFailing d
-                  ]
-                partialInc = not handlerThrew && not (null overrideFailures)
+          -- Compute halt and partial-failure signals from the resolved decisions.
+          let finalizationFailure =
+                case finalizeFailures of
+                  [] -> Nothing
+                  failed@((firstMessageId, _) : _) ->
+                    Just $
+                      ProcessorFailed
+                        ( "batch finalization failed for message ids: "
+                            <> Text.intercalate ", " [tshow mid | (mid, _) <- failed]
+                        )
+                        (Just firstMessageId)
+              firstHalt = listToMaybe [r | AckHalt r <- decisions]
+              requestedExit = finalizationFailure <|> (ProcessorHalted <$> firstHalt)
+              overrideFailures =
+                [ ()
+                | (_, explicitlyNamed, d, _) <- results,
+                  explicitlyNamed,
+                  isFailing d
+                ]
+              partialInc = not handlerThrew && not (null overrideFailures)
 
-            -- Span status: error on halt or exception, otherwise Ok.
-            addEvent traceSpan (mkEvent eventBatchCompleted [])
-            case requestedExit of
-              Just processorExit -> setStatus traceSpan (OTel.Error (processorExitText processorExit))
-              Nothing ->
-                if skippedAfterHalt
-                  then setStatus traceSpan (OTel.Error "batch skipped after halt")
-                  else
-                    if handlerThrew
-                      then setStatus traceSpan (OTel.Error "batch handler exception")
-                      else setStatus traceSpan OTel.Ok
+          -- Span status: error on halt or exception, otherwise Ok.
+          addEvent traceSpan (mkEvent eventBatchCompleted [])
+          case requestedExit of
+            Just processorExit -> setStatus traceSpan (OTel.Error (processorExitText processorExit))
+            Nothing ->
+              if skippedAfterHalt
+                then setStatus traceSpan (OTel.Error "batch skipped after halt")
+                else
+                  if handlerThrew
+                    then setStatus traceSpan (OTel.Error "batch handler exception")
+                    else setStatus traceSpan OTel.Ok
 
-            traverse_ (recordException traceSpan . snd) finalizeFailures
+          traverse_ (recordException traceSpan . snd) finalizeFailures
 
-            -- Record metrics: decrement in-flight, add per-message counter deltas,
-            -- advance batch counters, set Failed state on halt or exhausted
-            -- finalization retry.
-            liftIO $
-              recordBatchOutcomeMetrics
-                metricsHandle
-                (triggerMetric info.trigger)
-                info.size
-                handlerThrew
-                partialInc
-                (decisionMetric <$> decisions)
-                (processorExitText <$> requestedExit)
+          -- Record metrics: decrement in-flight, add per-message counter deltas,
+          -- advance batch counters, set Failed state on halt or exhausted
+          -- finalization retry.
+          liftIO $
+            recordBatchOutcomeMetrics
+              metricsHandle
+              (triggerMetric info.trigger)
+              info.size
+              handlerThrew
+              partialInc
+              (decisionMetric <$> decisions)
+              (processorExitText <$> requestedExit)
 
-            -- Halt: set the shared flag; do NOT throw (let the stream drain).
-            for_ requestedExit $ \processorExit ->
-              liftIO $ requestProcessorExit exitPublisher processorExit
-      if not detailed
-        then do
-          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-          process currentInflight
-        else Exception.mask $ \restore -> do
-          currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
-          slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle firstMsg.envelope.messageId
-          restore (process currentInflight)
-            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
-          liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
-            `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+          -- Halt: set the shared flag; do NOT throw (let the stream drain).
+          for_ requestedExit $ \processorExit ->
+            liftIO $ requestProcessorExit exitPublisher processorExit
+    if not detailed
+      then do
+        currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+        process currentInflight
+      else Exception.mask $ \restore -> do
+        currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
+        slot <- liftIO $ Metrics.claimInFlightSlot metricsHandle (NE.head batch).envelope.messageId
+        restore (process currentInflight)
+          `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
+        liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
+          `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
   where
     isFailing :: AckDecision -> Bool
     isFailing (AckDeadLetter _) = True

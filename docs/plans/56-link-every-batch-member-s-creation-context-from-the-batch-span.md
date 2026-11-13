@@ -32,6 +32,11 @@ provenance:
       at: 2026-11-12T18:51:06Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T00:43:42Z
+      mode: "implement"
+      note: "Implement batch fan-in links, gate and docs"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -75,9 +80,10 @@ size, built strictly, and holds no reference to the messages beyond their identi
 
 ## Progress
 
-- [ ] M1: Batch spans are roots with one link per member that has a creation context, each
+- [x] M1 (2026-11-12): Batch spans are roots with one link per member that has a creation context, each
   carrying `messaging.message.id`, bounded at 128, plus `messaging.batch.message_count`; `shibuya-core/test/Shibuya/Telemetry/BatchCorrelationSpec.hs`
-  passes along with the rest of `cabal test shibuya-core`.
+  passes along with the rest of `cabal test shibuya-core`. Evidence: 14 new examples; all four
+  `shibuya-core` suites pass (354 examples), and `shibuya-metrics-test` passes.
 - [ ] M2: Performance and retention gate passed against the baseline commit for the
   `tracing/batch100/*` cells and a new large-batch cell; retention suite covers batch links.
 - [ ] M3: User guide, capability document, changelog and the correlation ADR describe batch
@@ -89,6 +95,16 @@ size, built strictly, and holds no reference to the messages beyond their identi
 Review resolved (2026-11-12): overflow accounting scans and decodes the full batch, counting
 only valid omitted contexts. Retained links are bounded at 128; scan and decode work are not
 constant. Plan 55 Complete supplies the root-context helper under a single owner.
+
+- The pinned `hs-opentelemetry-semantic-conventions` names the key `messaging_batch_messageCount`
+  (`AttributeKey Int64`, wire name `messaging.batch.message_count`), not
+  `messaging_batch_message_count`. `attrMessagingBatchMessageCount` uses it.
+- The collector folds over the batch `NonEmpty` directly, as the plan preferred, through
+  `collectBatchLinksBy :: Foldable t => (a -> MessageId) -> (a -> Maybe TraceHeaders) -> t a -> BatchLinks`.
+  `collectBatchLinks` over pairs remains for unit tests. The raw-header reuse described in the
+  Decision Log is built in: equal header lists reuse the previous member's decoded context.
+- The fixed-header `batch100` cells compare one list against an identical list per member, so
+  they decode once per batch, as the baseline did, and build 100 links.
 
 
 ## Decision Log

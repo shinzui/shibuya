@@ -16,16 +16,23 @@ module Shibuya.Telemetry.Correlation
     creationLink,
     creationLinkWith,
     consumerSpanArgsLinkedTo,
+
+    -- * Batch links
+    maxBatchLinks,
+    BatchLinks (..),
+    collectBatchLinks,
+    collectBatchLinksBy,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.HashMap.Strict qualified as HashMap
 import GHC.Generics (Generic)
-import OpenTelemetry.Attributes (AttributeMap)
-import OpenTelemetry.Trace.Core (NewLink (..), SpanArguments (..), SpanKind (..))
-import Shibuya.Core.Types (TraceHeaders)
+import OpenTelemetry.Attributes (AttributeMap, toAttribute)
+import OpenTelemetry.Trace.Core (NewLink (..), SpanArguments (..), SpanContext, SpanKind (..))
+import Shibuya.Core.Types (MessageId (..), TraceHeaders)
 import Shibuya.Telemetry.Propagation (extractTraceContext)
+import Shibuya.Telemetry.Semantic (attrMessagingMessageId)
 
 -- | How a processing span relates to the span that created the message.
 --
@@ -101,3 +108,64 @@ consumerSpanArgsLinkedTo links =
       startTime = Nothing
     }
 {-# INLINE consumerSpanArgsLinkedTo #-}
+
+-- | Maximum links Shibuya places on one batch span: the OpenTelemetry SDK's
+-- default per-span link limit. A lower configured SDK limit
+-- (@OTEL_SPAN_LINK_COUNT_LIMIT@) can still drop supplied links on its own.
+maxBatchLinks :: Int
+maxBatchLinks = 128
+
+-- | The creation-context links collected for one batch.
+data BatchLinks = BatchLinks
+  { -- | One link per member with a decodable creation context, in member
+    -- order, each carrying that member's @messaging.message.id@. Fully
+    -- evaluated; at most 'maxBatchLinks' long.
+    links :: ![NewLink],
+    -- | Members with a decodable creation context beyond 'maxBatchLinks'.
+    -- Absent and malformed contexts are never counted.
+    dropped :: !Int
+  }
+
+-- | 'collectBatchLinksBy' over @(message id, trace headers)@ pairs.
+collectBatchLinks :: [(MessageId, Maybe TraceHeaders)] -> BatchLinks
+collectBatchLinks = collectBatchLinksBy fst snd
+{-# INLINE collectBatchLinks #-}
+
+-- | Collect one link per member that has a decodable creation context, in
+-- order, each carrying @messaging.message.id@. At most 'maxBatchLinks' links
+-- are stored. Decoding continues past the bound so that 'dropped' counts the
+-- valid omitted contexts exactly, but no link or attribute map is built for
+-- them.
+--
+-- One strict pass with strict accumulators. A member whose raw headers equal
+-- the previous member's reuses that member's decoded context. Members that
+-- share a context still get separate links, because the links carry
+-- different message identifiers. The result references only evaluated span
+-- contexts and identifier text, never the members.
+collectBatchLinksBy :: (Foldable t) => (a -> MessageId) -> (a -> Maybe TraceHeaders) -> t a -> BatchLinks
+collectBatchLinksBy messageIdOf headersOf members =
+  case foldl' step (Acc 0 [] 0 Nothing Nothing) members of
+    Acc _ collected omitted _ _ -> BatchLinks {links = reverse collected, dropped = omitted}
+  where
+    step acc@(Acc count collected omitted previousHeaders previousContext) member =
+      case headersOf member of
+        Nothing -> acc
+        Just headers ->
+          let !context =
+                if Just headers == previousHeaders
+                  then previousContext
+                  else extractTraceContext headers
+           in case context of
+                Nothing -> Acc count collected omitted (Just headers) context
+                Just spanContext
+                  | count < maxBatchLinks ->
+                      let MessageId idText = messageIdOf member
+                          !attrs = HashMap.singleton attrMessagingMessageId $! toAttribute idText
+                          !link = NewLink {linkContext = spanContext, linkAttributes = attrs}
+                       in Acc (count + 1) (link : collected) omitted (Just headers) context
+                  | otherwise -> Acc count collected (omitted + 1) (Just headers) context
+{-# INLINE collectBatchLinksBy #-}
+
+-- Strict fold state: links so far, reversed, with their count; the overflow
+-- count; and the previous member's raw headers and decoded context.
+data Acc = Acc !Int ![NewLink] !Int !(Maybe TraceHeaders) !(Maybe SpanContext)
