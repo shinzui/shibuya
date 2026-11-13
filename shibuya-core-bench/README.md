@@ -444,6 +444,46 @@ The framework benchmarks include full supervisor setup which takes longer. Incre
 cabal bench shibuya-core-bench --benchmark-options="--timeout 120"
 ```
 
+### Concurrent allocation moves while time does not
+
+If `Async` or `Ahead` cells gain or lose hundreds of KB per run and time does not move,
+check thread stack chunks before dispatch. Every streamly worker is a new GHC thread, started
+with a 1 KiB stack (RTS option `-ki`). A thread that outgrows it allocates a 32 KiB chunk
+(`-kc`), and that chunk counts in `Allocated`. In the `concurrency-modes` cells the worker
+stack sits close to the 1 KiB line, so one word saved across the handler call moves whole
+32 KiB chunks per fork. Plan 61 traced 0.13.0.0's +250–350 KB on `async-5` to a single extra
+word (see
+[plan 61](../docs/plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md)).
+
+To test for it, run the cell on both trees with a larger initial stack:
+
+```bash
+./$B -p '$NF == "async-5" && /concurrency-levels/' --stdev 3 +RTS -N -T -A32m -ki16k -RTS
+```
+
+If the difference disappears with `-ki16k`, grows with `-kc64k` and shrinks with `-kc8k`, it
+is stack chunks. Sweep `-ki` in 8-byte steps (`-ki1024`, `-ki1032`, …) to find the smallest
+initial stack that runs without overflowing. That is each tree's peak, and the difference
+between two trees is the number of extra stack words. To see which frame grew, decode the
+worker's stack from inside a handler with `cloneMyStack` (`GHC.Stack.CloneStack`) and
+`decodeStack` (`GHC.Exts.Stack.Decode` in `ghc-heap`), and compare frame sizes.
+
+A one-file probe like that compiles against the tree's in-place `shibuya-core` with
+`cabal exec`. Name only packages outside the build plan with `-package`: the environment
+`cabal exec` loads already exposes the plan's packages, and naming one again makes its modules
+ambiguous. Pass the package's default extensions by hand, since `cabal exec` does not apply
+them:
+
+```bash
+cabal exec -- ghc -O2 -threaded -rtsopts -package ghc-heap \
+  -XGHC2024 -XNoFieldSelectors -XOverloadedRecordDot -outputdir probe-out -o probe Probe.hs
+```
+
+In `shibuya-core`, the frame that matters is the one the runner saves across the handler call.
+The comment on `FinishEnv` in `Shibuya.Internal.Runner.Supervised` explains how it is kept
+small. Values that code after the handler needs stay live in that frame, so new post-handler
+work belongs in `finalizeMessage` or `recordMessageOutcome`, not in `processOne`.
+
 ### High variance in results
 
 Reduce standard deviation target (takes longer but more accurate):

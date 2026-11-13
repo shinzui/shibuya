@@ -2,6 +2,9 @@
 
 ## 2026-11-13
 
+* **Update**: FRIC-4 resolved: Resolved by documenting the working cabal exec recipe next to the stack-chunk diagnostic that needs it.
+
+
 * **Addition**: FRIC-4 records slowdown tooling friction with mori://shinzui/shibuya: cabal exec ghc rejects -package flags for in-tree dependencies
 
 

@@ -52,6 +52,11 @@ provenance:
       at: 2026-11-13T04:16:05Z
       mode: "update"
       note: "Correct async allocation claim from the 0.13.0.0 release gate"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T06:42:24Z
+      mode: "update"
+      note: "Point the async allocation correction at plan 61's stack-chunk finding and fix"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -166,6 +171,12 @@ context with valid headers. Batch decoding remains plan 56 work.
     through plans 56 and 60, so this plan's runner change introduced it. The likely mechanism
     is streamly's worker dispatch (plan 30), but it is unproven. Accepted for the release and
     recorded in the 0.13.0.0 changelog.
+    Resolved after the release by
+    [plan 61](61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md): the
+    mechanism is GHC thread stacks, not dispatch. This plan's change saved one more word in
+    `processOne`'s frame across the handler call, which pushed more short-lived worker threads
+    past the 1 KiB initial stack into a 32 KiB chunk each. Commit `27bc701` shrinks that frame;
+    `async-5` now allocates 0.79–0.80 MB, below 0.12.0.0's 1.17–1.19 MB.
 - M3 time gate, first three comparisons (2026-11-12): 15–48% slower times in `lifecycle/*`,
   `hot-path/async8` and `single-async8`, across a full run, a `--stdev 3` re-run and an
   order-swapped re-run. The unchanged batch path (`lifecycle/batch-size`) was among them, while

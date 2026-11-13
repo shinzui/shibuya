@@ -51,6 +51,11 @@ provenance:
       at: 2026-11-13T02:40:57Z
       mode: "implement"
       note: "Progress for EP-3/EP-7 gates; record recurring benchmark-load friction"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T06:42:31Z
+      mode: "update"
+      note: "Record plan 61's follow-up result in the release-gate discovery"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -477,6 +482,12 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   do not overlap. The shift dates from EP-2, which had called it dispatch noise; EP-2's plan
   now carries the correction. The user accepted the increase for 0.13.0.0, and the changelog
   records it. The cause, probably streamly worker dispatch (plan 30), is not established.
+  Follow-up (2026-11-12): plan 61
+  ([`docs/plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md`](../plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md))
+  found the cause: worker threads overflowing GHC's 1 KiB initial stack into a 32 KiB chunk,
+  after EP-2 added one word to the runner's frame across the handler call. Commit `27bc701`
+  shrinks that frame, and `Async` and `Ahead` cells now allocate about half of 0.13.0.0 and
+  less than 0.12.0.0 ([ADR 0015](../adr/0015-keep-the-runner-frame-across-the-handler-call-small.md)). It ships in the next core release.
 - EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
   208 bytes per message less, and the headers-plus-link path costs less than before, so the
   `ParentOnly` question in the Decision Log is closed.

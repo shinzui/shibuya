@@ -53,11 +53,21 @@ after 0.13.0.0; this plan does not publish it.
   chunk for each worker fork whose stack outgrows the 1 KiB initial stack. `efd1081` saves
   one more word in `processOne`'s frame across the handler call, which pushes more forks over
   the limit (S1–S6). Hypothesis 1 is confirmed. Hypotheses 2 and 3 are rejected.
-- [ ] M2: A change reduces `Async` allocation to within the `v0.12.0.0` range, or as far as
+- [x] M2: A change reduces `Async` allocation to within the `v0.12.0.0` range, or as far as
   the measurements allow. Serial allocation keeps the 0.13.0.0 reduction, the `n`-thread
-  bound and all tests hold, and the time gate passes.
-- [ ] M3: The changelog's Unreleased section, plan 55 and the MasterPlan record the outcome,
+  bound and all tests hold, and the time gate passes. (2026-11-12) Commit `27bc701`. Every
+  `Async` and `Ahead` cell with a waiting handler is below its 0.12.0.0 range, `async-5` at
+  0.79 MB against 1.17–1.19 MB (S7). Serial and tracing-enabled cells are equal or lower. The
+  full benchmark at `--stdev 5` against a `v0.13.0.0` baseline passes `--fail-if-slower 10`
+  on the first sequential run: 78 cells, none slower, `serial-noop-10000` 11% and
+  `counter-1000` 4% faster. All four `shibuya-core` suites (354 examples in
+  `shibuya-core-test`) and `shibuya-metrics` (104 examples) pass; `prod-stress` processed
+  960,000 messages with no nested-atomically crashes.
+- [x] M3: The changelog's Unreleased section, plan 55 and the MasterPlan record the outcome,
   and any durable lesson is captured in `shibuya-core-bench/README.md` or an ADR.
+  (2026-11-12) Unreleased entries in `shibuya-core/CHANGELOG.md` and `CHANGELOG.md`; notes in
+  plan 55's correction bullet and MasterPlan 8's release-gate discovery; README section
+  "Concurrent allocation moves while time does not"; ADR 0015.
 
 
 ## Surprises & Discoveries
@@ -118,6 +128,33 @@ after 0.13.0.0; this plan does not publish it.
   JSON decoding) are likely to exceed the 1 KiB budget anyway; this was not measured. For them
   the gain is a smaller framework share of each worker's stack, not avoided chunks.
 
+- S7 (2026-11-12): Acceptance ranges, four interleaved rounds of `v0.12.0.0`, `v0.13.0.0`
+  and master at `27bc701` (`--stdev 3`, load 4–8), `Allocated` min..max in bytes:
+
+  ```text
+  cell                                       v0.12.0.0              v0.13.0.0              27bc701
+  io-bound/100-msgs-1ms-delay/async-5        1,172,219..1,197,001   1,415,883..1,612,767     787,650..  793,709
+  io-bound/100-msgs-1ms-delay/async-10       1,444,789..1,489,751   1,540,318..1,583,045     764,780..  769,568
+  io-bound/50-msgs-5ms-delay/async-5           904,669..  934,074   1,070,070..1,208,264     655,818..  666,708
+  io-bound/50-msgs-5ms-delay/async-10        1,014,498..1,072,583   1,069,478..1,188,924     541,327..  553,583
+  concurrency-levels/async-5                 1,165,718..1,190,171   1,431,782..1,556,015     791,006..  795,686
+  concurrency-levels/async-10                1,473,064..1,511,099   1,540,078..1,566,624     763,687..  777,439
+  concurrency-levels/async-20                1,770,433..1,790,727   1,807,349..1,830,432     916,223..  935,649
+  concurrency-levels/async-2                 1,144,862..1,152,783   1,121,679..1,130,115   1,120,357..1,134,821
+  concurrency-levels/ahead-5                 1,954,718..2,138,845   2,005,401..2,054,059   1,082,090..1,092,964
+  hot-path/serial-noop-10000                19,916,597..19,919,951 17,839,956..17,843,499 17,779,387..17,784,662
+  hot-path/async8-noop-10000                37,336,283..37,747,584 35,273,104..35,797,737 35,224,275..35,590,594
+  tracing/single-serial/enabled-headers      -                     98,937,922..98,945,294 98,856,087..98,860,045
+  tracing/single-async8/enabled-headers      -                    210,232,797..219,780,341 205,001,277..217,427,620
+  ```
+
+  Every `Async` and `Ahead` cell with a waiting handler is below its 0.12.0.0 range, and
+  their ranges also narrowed. Serial cells are equal or lower (`serial-noop-10000` 6 B/msg
+  lower); the largest serial increase is `io-handler/counter-100` at +150 B per run (0.05%),
+  while `counter-1000` and `counter-10000` are equal or lower. The `async8` cells, with a
+  no-op handler and 10,000 messages, show no change beyond their ±1.5% spread. Tracing-enabled
+  ranges overlap 0.13.0.0's with equal or lower minimums. The CSVs were not committed.
+
 
 ## Decision Log
 
@@ -159,7 +196,35 @@ after 0.13.0.0; this plan does not publish it.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+(2026-11-12) The plan met its goal and went further. 0.13.0.0's `Async` increase is gone,
+and `Async` and `Ahead` runners with waiting handlers now allocate about half of 0.13.0.0
+and less than 0.12.0.0 (S7). Serial cost, tracing cost, time, the `n`-thread bound and the
+public signatures are unchanged. The change is internal to
+`shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs` and ships in the next core release.
+
+The cause was not the one the release gate guessed. It was not streamly dispatch but GHC
+thread stacks: short-lived worker threads that each grow a 32 KiB chunk once they pass the
+1 KiB initial stack. That explains why allocation moved while time did not, and why the
+pattern across `n` looked erratic. The `-ki` and `-kc` RTS options proved it in minutes,
+once the question was framed as per-fork cost. An 8-byte `-ki` sweep and a stack decode
+turned it into an exact word count. These two techniques are the durable lesson, now in
+`shibuya-core-bench/README.md`. The design constraint, keeping the runner's frame across
+the handler call small, is
+[ADR 0015](../adr/0015-keep-the-runner-frame-across-the-handler-call-small.md), with a
+pointer comment on `FinishEnv`.
+
+The margin is small: 6 words under 1 KiB on `async-5`. A GHC upgrade or a later
+`processOne` change can erase it. The README diagnostic is the way to check. Real handlers
+that do I/O probably exceed 1 KiB on their own (S6). For them the gain is the runner's
+smaller share of the stack, which this plan did not measure.
+
+What remains: the `OPAQUE` handler step (V3d in the Decision Log) would add 6 more words of
+headroom, at 10–40 B/msg on every path. It was rejected under this plan's serial constraint
+and would need its own decision.
+
+Friction: FRIC-4 (`cabal exec ghc` rejects `-package` for packages in the build plan;
+tooling, slowdown) was resolved by documenting the working recipe in
+`shibuya-core-bench/README.md`.
 
 
 ## Context and Orientation

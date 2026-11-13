@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Other Changes
+
+- `Async` and `Ahead` runners whose handlers wait allocate about half what
+  0.13.0.0 did, and less than 0.12.0.0. Streamly forks short-lived worker
+  threads, and GHC starts each with a 1 KiB stack; a worker that outgrows it
+  allocates a 32 KiB stack chunk. 0.13.0.0 saved one more word on the worker's
+  stack across the handler call, which pushed more workers over the limit. The
+  runner now keeps the state it needs after the handler in a boxed per-processor
+  record and in functions that run after the handler returns, so the benchmark
+  workers stay within 1 KiB. For 100 messages with a 1 ms handler delay
+  (`concurrency-modes`, four runs each, 0.12.0.0 / 0.13.0.0 / now): `async-5`
+  1.17–1.19 MB / 1.43–1.56 MB / 0.79–0.80 MB, `async-10` 1.47–1.51 MB /
+  1.54–1.57 MB / 0.76–0.78 MB, `async-20` 1.77–1.79 MB / 1.81–1.83 MB /
+  0.92–0.94 MB, `ahead-5` 1.95–2.14 MB / 2.01–2.05 MB / 1.08–1.09 MB. `async-2`
+  is unchanged. Serial and tracing-enabled allocation stay at 0.13.0.0's level,
+  and every benchmark cell passes the 10% time gate against 0.13.0.0.
+  A worker whose handler pushes the stack past 1 KiB still grows a chunk; there
+  the change only shrinks the runner's share of the stack.
+
 ## 0.13.0.0 — 2026-11-12
 
 ### Breaking Changes

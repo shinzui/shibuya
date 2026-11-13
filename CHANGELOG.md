@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Other Changes
+
+- `shibuya-core`: `Async` and `Ahead` runners whose handlers wait allocate about
+  half what 0.13.0.0 did, and less than 0.12.0.0 (`async-5`, 100 messages with a
+  1 ms delay: 1.43–1.56 MB to 0.79–0.80 MB). Fewer short-lived worker threads
+  outgrow GHC's 1 KiB initial stack, because the runner keeps less state on the
+  stack across the handler call. Serial and tracing allocation are unchanged. See
+  [ADR 0015](docs/adr/0015-keep-the-runner-frame-across-the-handler-call-small.md).
+
 ## 0.13.0.0 — 2026-11-12
 
 Processing spans now link to the producer's span, adapters choose how consumer

@@ -6,13 +6,18 @@ generated:
   by: "claude-code/claude-opus-5-5"
   at: "2026-11-13T05:02:32Z"
 frictionId: FRIC-4
-status: logged
+status: "resolved"
 impact: slowdown
 kind: tooling
 origin: "mori://shinzui/shibuya"
 affects: "mori://shinzui/shibuya"
 plan: "docs/plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md"
 workaround: "Pass only packages outside the build plan (here -package ghc-heap) and rely on the environment file cabal exec loads for everything else; pass -XGHC2024 -XNoFieldSelectors by hand since cabal's default-extensions do not apply."
+resolution: "shibuya-core-bench/README.md now shows how to compile a probe with cabal exec: name only packages outside the build plan and pass default extensions by hand."
+amended:
+  - by: "claude-code/claude-opus-5-5"
+    at: "2026-11-13T06:38:22Z"
+    change: "Resolved by documenting the working cabal exec recipe next to the stack-chunk diagnostic that needs it."
 ---
 # cabal exec ghc rejects -package flags for in-tree dependencies
 
