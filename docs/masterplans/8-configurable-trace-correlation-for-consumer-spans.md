@@ -209,9 +209,10 @@ Relevant local ADRs, read for this plan:
 No cross-repository ADR on trace correlation was found (`mori registry concepts --search` for
 "trace context" and "span link" returned capability records only).
 
-Proposed [ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) records the correlation
-contract and batch accounting. EP-2 adds implementation evidence; EP-3 and EP-7 extend it
-with their measured results. Proposed status does not claim implemented behavior.
+[ADR 0014](../adr/0014-define-consumer-correlation-and-bounded-batch-link-accounting.md) records the correlation
+contract and batch accounting. EP-2 added implementation evidence; EP-3 and EP-7 extended it
+with their measured results. It was accepted on 2026-11-12, when all three core plans were
+Complete; adapter adoption follows the release.
 
 
 ## Exec-Plan Registry
@@ -220,11 +221,11 @@ with their measured results. Proposed status does not claim implemented behavior
 |---|-------|------|-----------|-----------|--------|
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Complete |
-| 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | In Progress |
+| 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Complete |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
-| 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | In Progress |
+| 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | Complete |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).
@@ -394,12 +395,11 @@ EP-4 and EP-6 documentation.
 
 ## Progress
 
-EP-1 and EP-2 are Complete (2026-11-12). EP-1 recorded the `tracing` baseline and the
-retention suite. EP-2 links single-message spans and adds the adapter policy and
-`Shibuya.Telemetry.Process`, and lowers per-message allocation. EP-3 and EP-7 are implemented,
-documented, and pass behaviour, retention and allocation checks. Each still needs its M2 time
-comparison, queued for a quiet machine. Neither the release gate nor any adapter plan can start
-until both are Complete. On
+All four core plans are Complete (2026-11-12): EP-1 (baselines and retention suite), EP-2
+(single-message policy, links, `Shibuya.Telemetry.Process`), EP-3 (bounded batch fan-in
+links) and EP-7 (`process <destination>` and `messaging.operation.name`). ADR 0014 is
+Accepted. The release gate is now the next step: publish `shibuya-core` 0.13.0.0 with the
+release skill. EP-4, EP-5 and EP-6 stay Not Started until it is published. On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
 nothing beyond it.
@@ -457,8 +457,10 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   comparison unreadable, and blocked both EP-3's and EP-7's in a second session (FRIC-3).
   Allocation stayed readable throughout: serial cells repeat within 1 KB per run. Async cells
   vary by about ±10% even when their code is unchanged. The release skill's gate against
-  0.12.0.0 will face the same constraint. Promotion of a gate that tolerates load, for example
-  interleaved repeated runs, is to be decided at EP-7's friction triage.
+  0.12.0.0 will face the same constraint. Triage at EP-7's completion resolved FRIC-3
+  instead of promoting it. Interleaved, load-gated confirming pairs at `--stdev 3` passed both
+  gates after a sequential quiet-window run had failed, and `shibuya-core-bench/README.md`
+  now prescribes that method. The release gate should use it too.
 - EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
   208 bytes per message less, and the headers-plus-link path costs less than before, so the
   `ParentOnly` question in the Decision Log is closed.

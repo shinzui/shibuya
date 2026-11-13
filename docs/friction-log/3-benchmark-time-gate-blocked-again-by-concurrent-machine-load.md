@@ -6,7 +6,7 @@ generated:
   by: "claude-code/claude-opus-5-5"
   at: "2026-11-13T02:40:10Z"
 frictionId: FRIC-3
-status: logged
+status: "resolved"
 impact: blocked
 kind: environment
 origin: "mori://shinzui/shibuya"
@@ -16,6 +16,11 @@ workaround: "Read allocation under load (serial cells are deterministic) and que
 tags:
   - "benchmark"
   - "load"
+resolution: "shibuya-core-bench/README.md now prescribes interleaved, load-gated confirming pairs at --stdev 3 and explains async-cell allocation variance; both gates passed that way"
+amended:
+  - by: "claude-code/claude-opus-5-5"
+    at: "2026-11-13T03:34:32Z"
+    change: "Resolved by documenting the interleaved confirming method that passed plans 56 and 60"
 ---
 # Benchmark time gate blocked again by concurrent machine load
 

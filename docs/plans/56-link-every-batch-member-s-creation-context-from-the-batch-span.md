@@ -89,10 +89,14 @@ size, built strictly, and holds no reference to the messages beyond their identi
   carrying `messaging.message.id`, bounded at 128, plus `messaging.batch.message_count`; `shibuya-core/test/Shibuya/Telemetry/BatchCorrelationSpec.hs`
   passes along with the rest of `cabal test shibuya-core`. Evidence: 14 new examples; all four
   `shibuya-core` suites pass (354 examples), and `shibuya-metrics-test` passes.
-- [ ] M2: Performance and retention gate passed against the baseline commit for the
+- [x] M2 (2026-11-12): Performance and retention gate passed against the baseline commit for the
   `tracing/batch100/*` cells and a new large-batch cell; retention suite covers batch links.
-- [ ] M3: User guide, capability document, changelog and the correlation ADR describe batch
-  behaviour; parent MasterPlan updated.
+  Evidence: allocation explained in Surprises & Discoveries. Two interleaved confirming runs
+  at `--stdev 3`, load 4.8–6.7, exit 0 with `--fail-if-slower 10`. The first quiet-window run
+  failed only cells this plan does not touch. `batch/distinct-contexts` retention checks pass.
+- [x] M3 (2026-11-12): User guide, capability document, changelog and the correlation ADR describe batch
+  behaviour; parent MasterPlan updated. Evidence: `2c2a580`; MasterPlan registry marks EP-3
+  Complete.
 
 
 ## Surprises & Discoveries
@@ -138,6 +142,15 @@ constant. Plan 55 Complete supplies the root-context helper under a single owner
   load below 8, together with plan 60's. The retention suite still passes at `e09be0c`,
   including both `batch/distinct-contexts` checks. M3's documents are in `2c2a580`; only the
   parent MasterPlan's Complete mark waits on M2.
+- M2 time gate passed (2026-11-12, `40d112d` against `2c2a580`). The first run after load fell
+  (19:05–19:10, load 2.6 rising to 6.4) failed five cells. All were in code this plan does not
+  touch: `tracing/single-serial/disabled-*` +17–21%, `hot-path/async8-noop`,
+  `lifecycle/async-hot-key` and a 10,000-message framework cell. The plan's own batch cells
+  were within 5%, and `batch100/enabled-headers` was 7% faster. Two confirming runs of the
+  failing groups at `--stdev 3`, each baseline-then-change pair started below load 8 (load
+  4.8–6.7), both exited 0. Batch cells moved −7.1% to +7.6% across the two pairs, in both
+  directions. Single-message and hot-path cells moved −6.5% to +7.9%. Linking members costs
+  no measurable time.
 
 
 ## Decision Log
@@ -173,7 +186,22 @@ constant. Plan 55 Complete supplies the root-context helper under a single owner
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Complete (2026-11-12). Batch spans are roots that link every surviving member with a creation
+context, in member order, each link labelled with `messaging.message.id`. They keep at most 128
+links and count the valid remainder exactly in `shibuya.batch.links.dropped`, and they carry
+`messaging.batch.message_count`. Disabled tracing reads no member header, and now allocates
+slightly less than before, because the first member's header is no longer decoded.
+
+Cost matched the contract. Each linked member costs about 625 bytes, and the link bound holds:
+a 1,000-member distinct-context batch allocates less than ten 100-member ones. A batch without
+headers pays one root attachment and the count attribute, about 346 bytes. Time was within the
+gate once measured on a quiet machine. The raw-header reuse kept fixed-header batches at one
+decode per batch, as before.
+
+What took effort was measuring, not building. The time comparison needed three sessions'
+worth of attempts because of machine load (FRIC-2 under plan 55, FRIC-3 under plan 60). The
+reliable method was interleaved baseline-then-change pairs started below a load threshold; a
+single sequential run, even in a quiet window, drifted with load.
 
 
 ## Context and Orientation

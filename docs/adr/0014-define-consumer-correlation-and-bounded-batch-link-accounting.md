@@ -1,6 +1,6 @@
 # Define consumer correlation and bounded batch link accounting
 
-Status: Proposed
+Status: Accepted
 
 Date: 2026-11-12
 
@@ -63,9 +63,11 @@ cross-adapter documentation.
 
 ## Evidence
 
-Single-message correlation is implemented and accepted (EP-2, 2026-11-12). Batch linking
-(EP-3) and naming (EP-7) are implemented and pass behaviour, retention and allocation checks.
-Their time comparisons are still pending a quiet machine, so the status stays Proposed.
+The core contract is implemented and accepted (2026-11-12): single-message correlation (EP-2),
+batch linking (EP-3) and naming (EP-7). Each passed its behaviour, retention, allocation and
+time gates. The adapter defaults above are adopted by the adapter plans after the
+`shibuya-core` 0.13.0.0 release; until then, Kafka, PGMQ and Kiroku run on 0.12 and show
+the previous behaviour.
 
 - Interface: `Shibuya.Telemetry.Correlation` exports `TraceCorrelation`, `AdapterTelemetry`
   with its field but without its constructor, `defaultAdapterTelemetry`, `creationLink`,
@@ -97,7 +99,11 @@ Their time comparisons are still pending a quiet machine, so the status stays Pr
   headers pays about 346 bytes for root attachment and the count attribute.
 - Naming (EP-7, [plan 60](../plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md)):
   the semantic, correlation and batch specs assert `process <destination>` and
-  `messaging.operation.name = process` for single and batch spans.
+  `messaging.operation.name = process` for single and batch spans. The attribute costs one map
+  entry: 311 bytes per traced message and about 225 bytes per batch, with no measurable time.
+- Time: EP-3 and EP-7 passed `--fail-if-slower 10` in two interleaved confirming runs at
+  `--stdev 3`, each started below load 8. Machine load from other work made sequential runs
+  unreadable; `shibuya-core-bench/README.md` records the method.
 - Measurement constraint: hs-opentelemetry creates non-recording spans when a provider has no
   span processors. Enabled-path benchmarks and retention checks must use a provider with at
   least one processor.

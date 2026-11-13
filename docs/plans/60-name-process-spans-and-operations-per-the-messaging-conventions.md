@@ -82,11 +82,11 @@ map allocation; M2 measures and explains that cost under the existing gate.
   failed (`SemanticSpec` twice, and the `CorrelationSpec` span-shape cases, whose direct-call
   name was hard-coded). After them, all `shibuya-core` suites (354 examples) and
   `shibuya-metrics-test` pass; the old-name grep finds nothing.
-- [ ] M2: Performance gate passed against the baseline commit with no unexplained allocation
-  change; retention suite passes.
-  - [x] (2026-11-12) Allocation explained (one map entry: +311 B per message, +225 B per batch;
-    disabled cells flat) and retention suite passes; see Surprises & Discoveries.
-  - [ ] Time comparison on a quiet machine, together with plan 56's.
+- [x] M2 (2026-11-12): Performance gate passed against the baseline commit with no unexplained allocation
+  change; retention suite passes. Evidence: allocation explained by one map entry (+311 B per
+  message, +225 B per batch; disabled cells flat). Two interleaved confirming runs at
+  `--stdev 3`, load 4.7–7.8, exit 0 with `--fail-if-slower 10`. Retention suite passes. See
+  Surprises & Discoveries.
 - [x] M3 (2026-11-12): User guide, capability document, changelog and the correlation ADR describe the new
   name with migration guidance; parent MasterPlan updated. Evidence: "Span name" subsection
   and attribute tables in `docs/user/opentelemetry.md`; CAP-8 and its log; the Jaeger guide's
@@ -126,9 +126,20 @@ map allocation; M2 measures and explains that cost under the existing gate.
     `docs/plans/30-investigate-and-reduce-the-async-ahead-concurrency-allocation-regression.md`).
     The per-message code they run is the serial path's, which shows exactly one entry.
     Recheck them in the quiet-machine run.
-- M2 time gate: not readable. Load average stayed between 24 and 44 through every run, from
+- M2 time gate, first attempt: not readable. Load average stayed between 24 and 44 through every run, from
   another session's load benchmark; streamly baselines moved 4–11% between runs of the same
   code. Recorded as FRIC-3. The comparison is queued for a quiet machine.
+- M2 time gate passed (2026-11-12, `2c2a580` against `e09be0c`). The first quiet-window run
+  (19:10–19:12) failed 15 cells while load rose from 6.4 to 9.4. They included cells whose
+  per-message code did not change, such as `hot-path/serial-noop` (+30%) and
+  `batch100/disabled-*` (+13–16%), so the failures tracked load drift. Two confirming runs of
+  the failing groups (`hot-path`, `tracing`, `lifecycle`, `framework-overhead`,
+  `cpu-bound-serial`) at `--stdev 3` used baseline-then-change pairs, each started below load
+  8 (load 4.7–7.8). Both exited 0. Traced single-message cells moved −0.3% to +5.4%, which is
+  consistent with one more attribute insert. Disabled and batch cells moved −7.3% to +1.8%.
+- With the machine quieter, `single-async8` allocation differences shrank to −2.6% to +2.5%.
+  This confirms that the earlier +1.45–1.67 KB per message under load was scheduling noise,
+  not cost.
 - Retention and regression (2026-11-12, at `e09be0c`): all four `shibuya-core` suites pass
   (354 examples, both GC suites, and the retention suite including `batch/distinct-contexts`),
   and `shibuya-metrics-test` passes (104 examples).
@@ -158,7 +169,20 @@ map allocation; M2 measures and explains that cost under the existing gate.
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Complete (2026-11-12). Processing and batch spans are named `process <destination>` and carry
+the Required `messaging.operation.name = "process"`. This meets the messaging conventions'
+naming rule, except that the destination is the processor id when an adapter overrides
+`messaging.destination.name` (documented in ADR 0014). The changelog gives the old and new
+names for users who search by span name.
+
+The attribute costs 311 bytes per traced message and about 225 bytes per batch, one map entry
+in each, with no measurable time cost. Disabled tracing is unaffected. The shared-constant
+alternative in M2 was not needed.
+
+Friction: FRIC-3. The time gate was blocked by another session's load benchmark and passed
+only with interleaved, load-gated confirming runs. That method is now in
+`shibuya-core-bench/README.md` (FRIC-3 resolved). Plan 55 hit the same surface as FRIC-2, so
+the release gate should expect the same constraint.
 
 
 ## Context and Orientation

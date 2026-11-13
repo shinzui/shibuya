@@ -336,6 +336,18 @@ GC-heavy cells slow down sharply. In plan 55's gate, a load average around 20 ma
 `lifecycle/*` and `single-async8` cells 15–48% slower, including code the change did not touch,
 while allocation stayed exact. Allocation is reliable under load; time is not.
 
+Serial cells repeat their allocation to within about 1 KB per run. `async8`, `Ahead` and `Async`
+cells can vary by about ±10% between runs under load, because streamly's worker dispatch
+depends on timing. Under load, read allocation from the serial cells, and recheck async cells
+when the machine is quiet.
+
+A single sequential run drifts when load changes between its two sides, even in a quiet window.
+If cells fail that the change does not touch, confirm with interleaved pairs: wait until the
+one-minute load average is below about 8, run the baseline, then immediately run the change
+against it at `--stdev 3`, restricted with `-p` to the failing groups. Repeat for a second pair.
+Accept the gate when both pairs exit 0. Plans 56 and 60 used this to pass a time gate that the
+sequential run had failed.
+
 Remove `-p tracing` to compare every group. Cells that have no baseline row are reported
 without a comparison.
 
