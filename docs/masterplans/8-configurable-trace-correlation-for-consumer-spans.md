@@ -398,8 +398,9 @@ EP-4 and EP-6 documentation.
 All four core plans are Complete (2026-11-12): EP-1 (baselines and retention suite), EP-2
 (single-message policy, links, `Shibuya.Telemetry.Process`), EP-3 (bounded batch fan-in
 links) and EP-7 (`process <destination>` and `messaging.operation.name`). ADR 0014 is
-Accepted. The release gate is now the next step: publish `shibuya-core` 0.13.0.0 with the
-release skill. EP-4, EP-5 and EP-6 stay Not Started until it is published. On
+Accepted. The release gate is in progress: 0.13.0.0 is committed and tagged locally, and
+pushing and publishing wait for the user. EP-4, EP-5 and EP-6 stay Not Started until it is
+published. On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
 nothing beyond it.
@@ -410,6 +411,10 @@ Cross-plan gates not owned by a child plan:
   Complete, with the release skill's benchmark regression gate passing against 0.12.0.0 and no
   unexplained increase in the `allocated` column for the existing `hot-path`, `handler`,
   `concurrency` and `framework` groups.
+  - [x] (2026-11-12) Benchmark gate run and the `Async` allocation increase accepted (see
+    Surprises & Discoveries). Builds, tests and flake check pass. Release commit and tag
+    `v0.13.0.0` made locally.
+  - [ ] Push, Hackage publication of `shibuya-core` and `shibuya-metrics`, GitHub release.
 - [ ] Initiative acceptance: with all three adapters released, one end-to-end trace per adapter
   viewed in a trace backend (the local Jaeger setup in `docs/JAEGER_LOCAL_TESTING.md`) shows
   spans named `process <destination>` and the documented default shape: Kafka and PGMQ processing spans as children of the producer with a
@@ -461,6 +466,12 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   instead of promoting it. Interleaved, load-gated confirming pairs at `--stdev 3` passed both
   gates after a sequential quiet-window run had failed, and `shibuya-core-bench/README.md`
   now prescribes that method. The release gate should use it too.
+- Release gate (2026-11-12): against 0.12.0.0, time passes and every serial path allocates
+  about 208 bytes per message less. `Async` runners with waiting handlers allocate more:
+  `async-5` +20–30%, `async-10` +4–5%, `async-20` +2–3%. The ranges over four runs per side
+  do not overlap. The shift dates from EP-2, which had called it dispatch noise; EP-2's plan
+  now carries the correction. The user accepted the increase for 0.13.0.0, and the changelog
+  records it. The cause, probably streamly worker dispatch (plan 30), is not established.
 - EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
   208 bytes per message less, and the headers-plus-link path costs less than before, so the
   `ParentOnly` question in the Decision Log is closed.
@@ -559,6 +570,17 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   Rationale: The requirement is no performance regression and no space leak. Neither can be
   shown without a tracing-enabled baseline, and none exists.
   Date: 2026-11-11
+
+- Decision: Release 0.13.0.0 with the `Async` allocation increase accepted, then investigate
+  reducing it after the release.
+  Rationale: Time is unchanged and serial paths are cheaper, so the increase does not justify
+  delaying the release the adapters are waiting for. The user still wants to know whether the
+  extra dispatch allocation on `async-5`/`async-10` can be removed. Do that in a separate
+  ExecPlan, outside this initiative's adapter sequence. Plan 30's method is its starting point:
+  compare `efd1081` and its parent on the `concurrency-modes` cells and test dispatch
+  candidates with the `n`-thread bound intact. A fix can ship in a later patch or minor
+  release.
+  Date: 2026-11-12
 
 - Decision: One breaking core release (0.13.0.0) after EP-2, EP-3 and EP-7, before any adapter plan
   completes.

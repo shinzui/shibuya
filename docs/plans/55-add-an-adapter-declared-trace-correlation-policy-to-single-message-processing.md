@@ -47,6 +47,11 @@ provenance:
       at: 2026-11-12T23:23:05Z
       mode: "implement"
       note: "Implement correlation policy, process span helpers, gate and docs"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T04:16:05Z
+      mode: "update"
+      note: "Correct async allocation claim from the 0.13.0.0 release gate"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -152,6 +157,15 @@ context with valid headers. Batch decoding remains plan 56 work.
     runs. These cells' allocation depends on worker dispatch (see plan 30); their per-message
     code is the path that got cheaper everywhere else. `lifecycle/batch-size` (+0.2%) runs
     through the batch runner, which this plan does not change.
+  - Correction (2026-11-12, release gate for 0.13.0.0): the `Async` part of that exception is a
+    stable shift, not noise in both directions. With four runs per side against 0.12.0.0, the
+    `async-5` cells allocate 20–30% more with no overlap between ranges, for example
+    `io-bound/100-msgs-1ms-delay/async-5` 1.17–1.21 MB → 1.47–1.57 MB. `async-10` is 4–5%
+    higher and `async-20` 2–3% higher. `async-2`, `Ahead` and `hot-path/async8` are flat or
+    lower, and time is unchanged. The shift is already present at `40d112d` and unchanged
+    through plans 56 and 60, so this plan's runner change introduced it. The likely mechanism
+    is streamly's worker dispatch (plan 30), but it is unproven. Accepted for the release and
+    recorded in the 0.13.0.0 changelog.
 - M3 time gate, first three comparisons (2026-11-12): 15–48% slower times in `lifecycle/*`,
   `hot-path/async8` and `single-async8`, across a full run, a `--stdev 3` re-run and an
   order-swapped re-run. The unchanged batch path (`lifecycle/batch-size`) was among them, while
