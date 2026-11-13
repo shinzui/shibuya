@@ -581,7 +581,8 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   Rationale: Time is unchanged and serial paths are cheaper, so the increase does not justify
   delaying the release the adapters are waiting for. The user still wants to know whether the
   extra dispatch allocation on `async-5`/`async-10` can be removed. Do that in a separate
-  ExecPlan, outside this initiative's adapter sequence. Plan 30's method is its starting point:
+  ExecPlan, outside this initiative's adapter sequence:
+  `docs/plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md`. Plan 30's method is its starting point:
   compare `efd1081` and its parent on the `concurrency-modes` cells and test dispatch
   candidates with the `n`-thread bound intact. A fix can ship in a later patch or minor
   release.
