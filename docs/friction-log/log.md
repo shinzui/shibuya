@@ -2,6 +2,18 @@
 
 ## 2026-11-13
 
+* **Update**: FRIC-7 accepted: Accepted: the documented interleaved method resolved the gate for EP-5
+
+
+* **Addition**: FRIC-7 records slowdown environment friction with mori://shinzui/shibuya-pgmq-adapter: Adapter benchmark time gate unreadable under concurrent machine load
+
+
+* **Addition**: FRIC-6 records blocked environment friction with mori://shinzui/shibuya-kafka-adapter: Kafka adapter private Redpanda broker cannot be started
+
+
+* **Addition**: FRIC-5 records detour environment friction with mori://shinzui/shibuya-pgmq-adapter: PGMQ adapter dev PostgreSQL cluster no longer starts under the devShell
+
+
 * **Update**: FRIC-4 resolved: Resolved by documenting the working cabal exec recipe next to the stack-chunk diagnostic that needs it.
 
 

@@ -56,6 +56,11 @@ provenance:
       at: 2026-11-13T06:42:31Z
       mode: "update"
       note: "Record plan 61's follow-up result in the release-gate discovery"
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T15:12:56Z
+      mode: "implement"
+      note: "Coordinate adapter plans after release; EP-5 first"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -227,9 +232,9 @@ Complete; adapter adoption follows the release.
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Complete |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Complete |
-| 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
-| 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
-| 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
+| 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | In Progress |
+| 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Complete |
+| 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | In Progress |
 | 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | Complete |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -404,8 +409,13 @@ All four core plans are Complete (2026-11-12): EP-1 (baselines and retention sui
 (single-message policy, links, `Shibuya.Telemetry.Process`), EP-3 (bounded batch fan-in
 links) and EP-7 (`process <destination>` and `messaging.operation.name`). ADR 0014 is
 Accepted. The release gate is complete: `shibuya-core` and `shibuya-metrics` 0.13.0.0 are on
-Hackage. The adapter plans are unblocked; the next step is EP-5 (PGMQ) through M2, then EP-5,
-EP-4 and EP-6 per the Dependency Graph. The post-release `Async` allocation investigation is a
+Hackage. EP-5 (PGMQ) is Complete (2026-11-13) and its representative link-only dead-letter
+check passed, so EP-4 and EP-6 may finish their documentation. EP-4 (Kafka) has code, docs and
+broker-free span tests passing but is blocked on its broker-backed integration tests and
+trace-backend check by the container runtime (FRIC-6; fix delegated to the redpanda-container
+session). EP-6 (Kiroku) has code, tests and the trace-backend check passing; its catch-up heap
+check, ADR and performance gate remain. Adapter publication (PGMQ 0.19.0.0, Kafka 0.13.0.0,
+Kiroku 0.8.0.0) needs the user's approval under each repository's release skill. The post-release `Async` allocation investigation is a
 separate follow-up (Decision Log). On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
@@ -488,6 +498,31 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   after EP-2 added one word to the runner's frame across the handler call. Commit `27bc701`
   shrinks that frame, and `Async` and `Ahead` cells now allocate about half of 0.13.0.0 and
   less than 0.12.0.0 ([ADR 0015](../adr/0015-keep-the-runner-frame-across-the-handler-call-small.md)). It ships in the next core release.
+- EP-5 (2026-11-13): the representative check passed. Under `LinkOnly` the PGMQ dead-letter
+  message's `traceparent` names the consumer's processing span in its own trace and
+  `x-shibuya-upstream-traceparent` keeps the producer header byte for byte, so core's context
+  handling at the adapter's dead-letter merge is correct. All three adapters were also checked
+  in the machine-wide trace UI (`:16686`, a Jaeger UI over VictoriaTraces with OTLP ingest at
+  `http://localhost:10428/insert/opentelemetry`; PGMQ and Kiroku done, Kafka pending). That UI's
+  Jaeger view collapses a parent that is also a link into one FOLLOWS_FROM reference, so a
+  `ParentAndLink` span looks parentless there; confirm parentage from the stored record
+  (`/select/logsql/query`, `parent_span_id`) or by trace ID.
+- Adapter adoption (2026-11-13): besides `shibuya-core`, examples pin `shibuya-metrics`, which
+  must move to `^>=0.13.0.0` with it. Core 0.13 handlers receive `Message`, not `Ingested`.
+  Each adapter had full config or `Adapter` literals the plans' searches missed (PGMQ: six config
+  literals and one positional `Adapter`; Kafka: eight config literals and one `Adapter`; Kiroku:
+  three `Adapter` literals and the consumer-group member config). In Kiroku, which keeps field
+  selectors, `telemetry` joins the fields already shared by `KirokuAdapterConfig`,
+  `KirokuConsumerGroupConfig` and `Adapter`, so a record update needs a type annotation or
+  generic-lens, as for `batchSize` today.
+- Recurring friction (2026-11-13): machine load blocked a single-run benchmark time gate under a
+  fourth child plan (FRIC-7, EP-5, after FRIC-2/FRIC-3 under EP-2, EP-3 and EP-7). The
+  interleaved-pairs method resolved it again; it is now the expected method for every gate on
+  this machine. FRIC-6: the Kafka repository's private Redpanda (generated from the
+  nix-haskell-flake seihou module over mori://shinzui/redpanda-container's `defaults.nix`) runs a
+  nixpkgs `container` 1.1.0 CLI against the machine's 1.5.0 apiserver and hangs on start; a
+  1.5.0-client start of that container also hung. The user asked the redpanda-container session
+  to fix the module and release an updated nix-haskell-flake.
 - EP-2 (2026-11-12): the link is cheaper than nothing. Single-message processing allocates about
   208 bytes per message less, and the headers-plus-link path costs less than before, so the
   `ParentOnly` question in the Decision Log is closed.

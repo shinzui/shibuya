@@ -32,6 +32,11 @@ provenance:
       at: 2026-11-12T18:51:07Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T15:12:56Z
+      mode: "implement"
+      note: "Implement PGMQ adoption: 0.13 bound, telemetry field, correlation tests"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -76,17 +81,47 @@ on trace headers.
 
 ## Progress
 
-- [ ] M1: The adapter builds against `shibuya-core` 0.13 from Hackage with
-  `PgmqAdapterConfig.telemetry` defaulting to `traceCorrelation = ParentAndLink` and copied into the
-  `Adapter`; configuration tests cover the default and the override; the full suite passes.
-- [ ] M2: Tests show the span shape for both settings, the shape across redeliveries, and the
-  dead-letter headers under `LinkOnly`; adapter benchmarks show no regression.
-- [ ] M3: Documentation, changelog, example and version are updated; parent MasterPlan updated.
+- [x] M1 (2026-11-13): builds against `shibuya-core`/`shibuya-metrics` 0.13.0.1 from Hackage
+  (bounds `^>=0.13.0.0`, no source override); `PgmqAdapterConfig.telemetry` defaults to
+  `defaultAdapterTelemetry` and is copied into the `Adapter`; `ConfigSpec` covers the default and
+  a validated `LinkOnly` override. Adapter commit `495c69a`.
+- [x] M2 (2026-11-13): `CorrelationSpec` (real PostgreSQL) passes all five behaviours, including
+  the representative link-only dead-letter check; full suite 210 examples, 0 failures.
+  `dlq-payload-bench` allocation is identical (within 4 B per cell) and time passes on
+  interleaved pairs (median ratio 1.009, max 1.037); the DB-backed bench is unchanged in
+  allocation (median 0.0%, ±2.4%) and unreadable in time under load (FRIC-7). Both policies
+  were also checked end to end in the trace backend with the example simulator and consumer.
+- [x] M3 (2026-11-13): README, user guide, architecture notes, CAP-5 capability (bundle validates),
+  both changelogs, example (`OTEL_TRACE_LINK_ONLY`) and version 0.19.0.0 updated; adapter
+  commit `2526689`. Publication (tag, Hackage, GitHub release) is left to the user through the
+  repository's release skill, which requires their approval.
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+- The plan's bound list missed `shibuya-metrics`: `shibuya-pgmq-example` also pins
+  `shibuya-metrics ^>=0.12.0.0`, which requires core 0.12, so the solver failed until it was
+  raised to `^>=0.13.0.0` (published alongside core 0.13). Kafka and Kiroku should check for it.
+- Core 0.13 handlers receive `Message es msg` (envelope and lease, no ack handle), not
+  `Ingested`; tests that inspect `envelope.attempt` must import `Message (..)`.
+- The test suite has six full `PgmqAdapterConfig` literals and one positional `Adapter`
+  construction (`ChaosSpec`), none caught by the plan's record-syntax search; the compiler found
+  them.
+- The main benchmark `shibuya-pgmq-adapter-bench` imports no Shibuya module: it measures raw
+  pgmq-hasql/pgmq-effectful operations against PostgreSQL, so it cannot observe this change.
+  Only `dlq-payload-bench` (pure, `mkDlqPayload` over core's `DeadLetterReason`) links Shibuya
+  code. Neither exercises the runner; the processing-span cost was gated in `shibuya-core`.
+- The adapter's dev cluster `db/db` no longer starts under the devShell's PostgreSQL 18
+  ("control file appears to be corrupt"); benchmark and Jaeger runs used a throwaway cluster on
+  127.0.0.1:55432 (FRIC-5). The repository also carries 13 uncommitted bench/script/perf-doc
+  edits dated 2026-10-27 that predate this plan; they were left untouched and excluded from
+  every commit, and both benchmark sides ran in clean worktrees.
+- The globally running trace UI on :16686 is a Jaeger UI over VictoriaTraces (OTLP ingest at
+  `http://localhost:10428/insert/opentelemetry`). Its Jaeger view collapses a parent that is
+  also a link into a single FOLLOWS_FROM reference, so under `ParentAndLink` the process span
+  looks parentless in the Jaeger JSON although it shares the producer's trace; the stored
+  record (`/select/logsql/query`) shows `parent_span_id` and `link:link_span_id:0` both equal
+  to the producer span. Verify parentage there, or by trace ID, not by Jaeger references.
 
 
 ## Decision Log
@@ -107,10 +142,42 @@ on trace headers.
   documented explanation, not new behaviour.
   Date: 2026-11-11
 
+- Decision: Run both benchmark sides from clean worktrees (`v0.18.0.0` and the candidate commit)
+  rather than comparing the working tree, and judge time by interleaved confirming pairs.
+  Rationale: the adapter checkout carries 13 unrelated uncommitted bench edits from 2026-10-27
+  that rename benchmark groups, and single runs under machine load disagreed (FRIC-7).
+  Date: 2026-11-13
+
+- Decision: Accept the DB-backed bench on allocation alone.
+  Rationale: `shibuya-pgmq-adapter-bench` imports only pgmq-hasql/pgmq-effectful modules, so
+  this change cannot affect it; both sides timed out on 8-10 cells under load and allocation
+  matched. A quiet-machine rerun would add no information about this change.
+  Date: 2026-11-13
+
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+The PGMQ adapter adopts `shibuya-core` 0.13 with one strict `telemetry` field, default
+`ParentAndLink`, and no change to conversion or dead-letter code. The representative check
+holds: under `LinkOnly` the dead-letter queue message's `traceparent` names the consumer's
+processing span in its own trace, `x-shibuya-upstream-traceparent` keeps the producer header
+byte for byte, and the processing span links to the producer, so `shibuya-core`'s context
+handling at `mergeDlqHeaders` is correct and EP-4 and EP-6 may document `LinkOnly` on that
+basis. In the trace backend, `ParentAndLink` spans share the producer's trace with
+`parent_span_id` and the link both naming the `pgmq.produce` span; `LinkOnly` spans are roots of
+their own traces with the same link.
+
+Performance: no regression. The only adapter benchmark that links Shibuya code
+(`dlq-payload-bench`) allocates identically and passes the time gate on interleaved pairs; the
+DB-backed bench measures raw pgmq client calls and cannot observe this change.
+
+Friction: FRIC-5 (dev PostgreSQL cluster no longer starts under the devShell's PostgreSQL 18)
+stays logged for the repository owner to decide whether to recreate `db/db`; FRIC-7 (benchmark
+time gate under concurrent load) accepted, the fourth child plan to meet it, handled by the
+interleaved-pairs method.
+
+Remaining outside this plan: publishing 0.19.0.0, which needs the user's approval under the
+adapter's release skill.
 
 
 ## Context and Orientation
