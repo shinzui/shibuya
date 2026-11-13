@@ -219,7 +219,7 @@ with their measured results. Proposed status does not claim implemented behavior
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
 | 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Not Started |
-| 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | Not Started |
+| 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | In Progress |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
 Hard Deps and Soft Deps reference other rows by their # prefix (e.g., EP-1, EP-3).

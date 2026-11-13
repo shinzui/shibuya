@@ -38,9 +38,12 @@ allow creation-context parenting for single messages and qualify their recommend
 that default to processing within another span. The defaults alone are not a conformance gap;
 discarding a meaningful ambient relationship is a deliberate limitation.
 
-Processing names become `process <destination>` with `messaging.operation.name = process`
-in EP-7. Until its acceptance, naming is an implementation gap. Receive/settle spans, baggage,
-propagator replacement and links-aware sampling remain outside this initiative.
+Processing and batch spans are named `process <destination>`, the conventions'
+`{messaging.operation.name} {destination}`, and carry `messaging.operation.name = process`
+(EP-7). The destination in the name is the processor id even when an adapter overrides
+`messaging.destination.name` per message, which keeps the name a per-processor constant.
+Receive/settle spans, baggage, propagator replacement and links-aware sampling remain outside
+this initiative.
 
 ## Consequences
 
@@ -61,7 +64,8 @@ cross-adapter documentation.
 ## Evidence
 
 Single-message correlation is implemented and accepted (EP-2, 2026-11-12). Batch linking
-(EP-3) and naming (EP-7) are not, so the status stays Proposed.
+(EP-3) and naming (EP-7) are implemented and pass behaviour, retention and allocation checks.
+Their time comparisons are still pending a quiet machine, so the status stays Proposed.
 
 - Interface: `Shibuya.Telemetry.Correlation` exports `TraceCorrelation`, `AdapterTelemetry`
   with its field but without its constructor, `defaultAdapterTelemetry`, `creationLink`,
@@ -83,6 +87,17 @@ Single-message correlation is implemented and accepted (EP-2, 2026-11-12). Batch
   against 1,360 before; the link costs less than the second unlift it replaced. Time was within
   the gate on a quiet machine except one 100-message microbenchmark accepted as noise, see
   [EP-2](../plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md).
+- Batches (EP-3, [plan 56](../plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md)):
+  `collectBatchLinksBy` folds once over the surviving members.
+  `shibuya-core/test/Shibuya/Telemetry/BatchCorrelationSpec.hs` covers member order, message-id
+  link attributes, shared contexts, the 128 bound with an exact count of valid omitted
+  contexts, superseded members, policy independence, ambient restoration and disabled tracing.
+  Each linked member costs about 625 bytes. A 1,000-member batch with distinct contexts
+  allocates less than ten 100-member batches, because it stores only 128 links. A batch without
+  headers pays about 346 bytes for root attachment and the count attribute.
+- Naming (EP-7, [plan 60](../plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md)):
+  the semantic, correlation and batch specs assert `process <destination>` and
+  `messaging.operation.name = process` for single and batch spans.
 - Measurement constraint: hs-opentelemetry creates non-recording spans when a provider has no
   span processors. Enabled-path benchmarks and retention checks must use a provider with at
   least one processor.

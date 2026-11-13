@@ -33,6 +33,11 @@ provenance:
       at: 2026-11-12T18:51:07Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T01:00:14Z
+      mode: "implement"
+      note: "Rename process spans and add messaging.operation.name"
 ---
 
 # Name process spans and operations per the messaging conventions
@@ -66,18 +71,28 @@ map allocation; M2 measures and explains that cost under the existing gate.
 
 ## Progress
 
-- [ ] M1: Processing and batch spans are named `process <destination>` and carry
+- [x] M1 (2026-11-12): Processing and batch spans are named `process <destination>` and carry
   `messaging.operation.name = "process"`; telemetry tests are updated and pass with
-  `cabal test shibuya-core`.
+  `cabal test shibuya-core`. Evidence: before the test updates, the four old-name assertions
+  failed (`SemanticSpec` twice, and the `CorrelationSpec` span-shape cases, whose direct-call
+  name was hard-coded). After them, all `shibuya-core` suites (354 examples) and
+  `shibuya-metrics-test` pass; the old-name grep finds nothing.
 - [ ] M2: Performance gate passed against the baseline commit with no unexplained allocation
   change; retention suite passes.
-- [ ] M3: User guide, capability document, changelog and the correlation ADR describe the new
-  name with migration guidance; parent MasterPlan updated.
+- [x] M3 (2026-11-12): User guide, capability document, changelog and the correlation ADR describe the new
+  name with migration guidance; parent MasterPlan updated. Evidence: "Span name" subsection
+  and attribute tables in `docs/user/opentelemetry.md`; CAP-8 and its log; the Jaeger guide's
+  expected `operationName`, which was stale (`shibuya.process.message`); a breaking-change
+  changelog item with old and new names; and the ADR 0014 conformance text. `README.md` stated
+  no span name.
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+- The key exists in the pinned semantic conventions as `messaging_operation_name ::
+  AttributeKey Text`.
+- `docs/JAEGER_LOCAL_TESTING.md` already disagreed with the code: it expected the
+  operation name `shibuya.process.message`. It now states `process <ProcessorId>`.
 
 
 ## Decision Log

@@ -80,6 +80,9 @@ spec = describe "Shibuya.Telemetry.Correlation (batches)" $ do
       map snd sp.links `shouldBe` map (Just . toAttribute) ["m1", "m2", "m3" :: Text]
       sp.traceHex `notElem` map traceHex [1, 2, 3] `shouldBe` True
       HashMap.lookup "messaging.batch.message_count" sp.attributes `shouldBe` Just (toAttribute (3 :: Int))
+      sp.name `shouldBe` "process batch-correlation"
+      HashMap.lookup "messaging.operation.name" sp.attributes `shouldBe` Just (toAttribute ("process" :: Text))
+      HashMap.lookup "messaging.operation.type" sp.attributes `shouldBe` Just (toAttribute ("process" :: Text))
       HashMap.member "shibuya.batch.links.dropped" sp.attributes `shouldBe` False
 
     it "links members that share a context separately" $ do
@@ -188,7 +191,8 @@ withExporter action = do
   readIORef spansRef
 
 data BatchSpan = BatchSpan
-  { traceHex :: Text,
+  { name :: Text,
+    traceHex :: Text,
     parent :: Maybe OTel.SpanContext,
     links :: [(Text, Maybe Attribute)],
     attributes :: HashMap.HashMap Text Attribute
@@ -202,7 +206,8 @@ batchSpans spans = traverse describeSpan [sp | sp <- spans, OTel.spanKind sp == 
       parent <- traverse OTel.getSpanContext (OTel.spanParent sp)
       pure
         BatchSpan
-          { traceHex = OTel.Id.traceIdBaseEncodedText Base16 (OTel.spanContext sp).traceId,
+          { name = OTel.hotName hot,
+            traceHex = OTel.Id.traceIdBaseEncodedText Base16 (OTel.spanContext sp).traceId,
             parent,
             links =
               [ (hexSpan (OTel.frozenLinkContext link), HashMap.lookup "messaging.message.id" (getAttributeMap (OTel.frozenLinkAttributes link)))

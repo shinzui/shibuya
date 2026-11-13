@@ -123,6 +123,7 @@ import Shibuya.Telemetry.Semantic
   ( attrMessagingDestinationName,
     attrMessagingMessageId,
     attrMessagingOperation,
+    attrMessagingOperationName,
     attrMessagingSystem,
     attrShibuyaAckDecision,
     attrShibuyaDeadLetterReasonCode,
@@ -635,7 +636,8 @@ processUntilDrained detailed metricsHandle procId correlation ordering concurren
         HashMap.fromList
           [ (attrMessagingSystem, toAttribute ("shibuya" :: Text)),
             (attrMessagingDestinationName, toAttribute pidText),
-            (attrMessagingOperation, toAttribute ("process" :: Text))
+            (attrMessagingOperation, toAttribute ("process" :: Text)),
+            (attrMessagingOperationName, toAttribute ("process" :: Text))
           ]
 
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do

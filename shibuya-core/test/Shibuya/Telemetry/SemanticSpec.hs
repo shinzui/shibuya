@@ -80,7 +80,7 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
     case spans of
       [processingSpan] -> do
         hot <- readIORef (spanHot processingSpan)
-        hotName hot `shouldBe` "skip-proc process"
+        hotName hot `shouldBe` "process skip-proc"
         let events = toList (appendOnlyBoundedCollectionValues (hotEvents hot))
         map eventName events `shouldBe` ["shibuya.ack.decision"]
         hotStatus hot `shouldBe` Ok
@@ -109,8 +109,9 @@ spec = describe "Shibuya.Telemetry.Semantic (wire-format)" $ do
     case spans of
       [s] -> do
         hot <- readIORef (spanHot s)
-        hotName hot `shouldBe` "test-proc process"
+        hotName hot `shouldBe` "process test-proc"
         let attrs = getAttributeMap (hotAttributes hot)
+        attrs `shouldHaveTextAttribute` ("messaging.operation.name", "process")
         attrs `shouldHaveTextAttribute` ("messaging.system", "shibuya")
         attrs `shouldHaveTextAttribute` ("messaging.message.id", "m-1")
         attrs `shouldHaveTextAttribute` ("messaging.destination.name", "test-proc")

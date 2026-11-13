@@ -15,6 +15,7 @@ module Shibuya.Telemetry.Semantic
     attrMessagingMessageId,
     attrMessagingDestinationName,
     attrMessagingOperation,
+    attrMessagingOperationName,
     attrMessagingBatchMessageCount,
 
     -- * Attribute Keys (Shibuya-specific)
@@ -59,19 +60,21 @@ import OpenTelemetry.Trace.Core
 -- Span Names
 --------------------------------------------------------------------------------
 
--- | Span name for processing a single message.
+-- | Span name for processing a message or a batch: @\"process <destination>\"@,
+-- for example @\"process orders\"@.
 --
--- Follows the OpenTelemetry messaging-spans recommendation that consumer
--- spans be named @\"<destination> <operation>\"@ — for Shibuya the
--- destination is the processor id and the operation is @\"process\"@,
--- yielding e.g. @\"shibuya-consumer process\"@.
+-- The OpenTelemetry messaging conventions say the span name "SHOULD be
+-- @{messaging.operation.name} {destination}@". Shibuya's operation name is
+-- @process@ and the destination is the processor id. The destination stays
+-- the processor id even when an adapter overrides
+-- @messaging.destination.name@ per message, so the name remains a
+-- per-processor constant.
 --
--- This intentionally departs from
--- @hs-opentelemetry-instrumentation-hw-kafka-client@'s
--- @\"process <topic>\"@ order in favor of the spec's order; see
--- @docs/plans/2-align-opentelemetry-semantic-conventions.md@.
+-- Before 0.13.0.0 the name was @\"<destination> process\"@, following an
+-- earlier reading of the conventions
+-- (@docs/plans/2-align-opentelemetry-semantic-conventions.md@).
 processSpanName :: Text -> Text
-processSpanName destination = destination <> " process"
+processSpanName destination = "process " <> destination
 
 -- | Span name for the ingester lifecycle.
 ingestSpanName :: Text
@@ -105,6 +108,12 @@ attrMessagingDestinationName = unkey Sem.messaging_destination_name
 -- @process@, @settle@. Shibuya's per-message span uses @"process"@.
 attrMessagingOperation :: Text
 attrMessagingOperation = unkey Sem.messaging_operation_type
+
+-- | @messaging.operation.name@: the system-specific operation name, Required
+-- by the messaging conventions. Shibuya's processing spans set @\"process\"@.
+-- ('attrMessagingOperation' is the operation /type/ key.)
+attrMessagingOperationName :: Text
+attrMessagingOperationName = unkey Sem.messaging_operation_name
 
 -- | @messaging.batch.message_count@: the number of messages in a batch, set
 -- on batch processing spans.

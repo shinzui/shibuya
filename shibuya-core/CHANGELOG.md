@@ -18,8 +18,18 @@
   that are counted in `shibuya.batch.links.dropped`. Batch spans also carry
   `messaging.batch.message_count`.
 
+- Processing and batch spans are renamed from `<destination> process` to
+  `process <destination>`, following the messaging conventions'
+  `{messaging.operation.name} {destination}`. Saved searches, alerts and sampling
+  rules that match the span or operation name must change: a Jaeger or Tempo
+  search for operation `orders process` becomes `process orders`. Lifecycle span
+  names are unchanged.
+
 ### New Features
 
+- Processing and batch spans carry `messaging.operation.name = "process"`, which
+  the conventions mark Required, alongside `messaging.operation.type`.
+  `Shibuya.Telemetry.Semantic` exports `attrMessagingOperationName`.
 - New module `Shibuya.Telemetry.Correlation`, re-exported from `Shibuya.Adapter`,
   `Shibuya.Telemetry` and `Shibuya`. It provides `TraceCorrelation`
   (`ParentAndLink`, `LinkOnly`), `AdapterTelemetry` (constructor hidden, built from

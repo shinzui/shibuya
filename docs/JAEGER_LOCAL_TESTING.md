@@ -107,8 +107,9 @@ curl -s 'http://localhost:16686/api/traces?service=shibuya-pgmq-example&limit=1'
 ```
 
 Expected span attributes:
-- `operationName`: "shibuya.process.message"
+- `operationName`: "process <ProcessorId>", for example "process orders"
 - `messaging.system`: "shibuya"
+- `messaging.operation.name` and `messaging.operation.type`: "process"
 - `messaging.message.id`: message ID
 - `shibuya.ack.decision`: "ack_ok", "ack_retry", or "ack_dead_letter"
 - `shibuya.inflight.count`: current in-flight messages

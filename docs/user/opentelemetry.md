@@ -108,8 +108,9 @@ export OTEL_TRACES_SAMPLER="always_on"
 ## What Shibuya emits per message
 
 Inside `runApp`, the framework's `processOne` opens **exactly one
-Consumer-kind span per message**, named `"<ProcessorId> process"`
-per the OpenTelemetry messaging-spans spec. The span:
+Consumer-kind span per message**, named `"process <ProcessorId>"`
+per the OpenTelemetry messaging-spans spec (before 0.13.0.0:
+`"<ProcessorId> process"`). The span:
 
 -   **Links** to the span that produced the message when the message's
     W3C `traceparent` decodes. The adapter's trace correlation policy
@@ -121,6 +122,7 @@ per the OpenTelemetry messaging-spans spec. The span:
     runner on a thread that already has one.
 -   Carries the spec-aligned messaging attributes
     `messaging.system`, `messaging.destination.name`,
+    `messaging.operation.name = "process"`,
     `messaging.operation.type = "process"`, `messaging.message.id`, plus
     Shibuya-specific `shibuya.inflight.count`,
     `shibuya.inflight.max`, `shibuya.ack.decision`.
@@ -563,6 +565,7 @@ The framework always sets these on its per-message span:
 |-----|------|--------|
 | `messaging.system` | Text | `"shibuya"` (overridable by adapter) |
 | `messaging.destination.name` | Text | `ProcessorId` |
+| `messaging.operation.name` | Text | Always `"process"` (since 0.13.0.0) |
 | `messaging.operation.type` | Text | Always `"process"` |
 | `messaging.message.id` | Text | `Envelope.messageId` |
 | `shibuya.partition` | Text | `Envelope.partition` (when present) |
@@ -602,9 +605,20 @@ The Kafka adapter additionally sets, via `Envelope.attributes`:
 
 ### Span name
 
-The span name is `"<destination> process"`, where `<destination>` is
-the `ProcessorId` text. This follows the OpenTelemetry messaging-spans
-spec recommendation of `<destination> <operation>`.
+The span name is `"process <destination>"`, where `<destination>` is
+the `ProcessorId` text, for example `process orders`. Batch spans use
+the same name. The OpenTelemetry messaging conventions say the span name
+"SHOULD be `{messaging.operation.name} {destination}`", and Shibuya's
+operation name is `process`.
+
+The destination in the name is always the processor id, even when an
+adapter overrides `messaging.destination.name` per message. The name is
+built once per processor, so it costs nothing per message.
+
+Before 0.13.0.0 the name was `"<destination> process"`. Update saved
+searches, alerts and sampling rules that match on the span or operation
+name: a Jaeger or Tempo search for operation `orders process` becomes
+`process orders`.
 
 ### Useful module imports
 

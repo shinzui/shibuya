@@ -49,8 +49,9 @@ evidence:
 
 **Builds on:** [CAP-1 — backend-agnostic queue processing](backend-agnostic-queue-processing.md).
 
-Every message opens a `Consumer`-kind span named `"<destination> process"`, carrying
-`messaging.*` attributes, in-flight gauges, and the handler's ack decision. When the message's
+Every message opens a `Consumer`-kind span named `"process <destination>"` (the conventions'
+`{messaging.operation.name} {destination}`; `"<destination> process"` before 0.13.0.0), carrying
+`messaging.*` attributes, including the Required `messaging.operation.name`, in-flight gauges, and the handler's ack decision. When the message's
 trace headers decode, the span links to the producer's span.
 
 ```haskell

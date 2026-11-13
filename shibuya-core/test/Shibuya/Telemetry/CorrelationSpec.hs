@@ -36,6 +36,7 @@ import Shibuya.Telemetry.Correlation (consumerSpanArgsLinkedTo, creationLink, cr
 import Shibuya.Telemetry.Effect (Tracing, runTracing, runTracingNoop, withSpan')
 import Shibuya.Telemetry.Process (withProcessSpan, withProcessSpanIO)
 import Shibuya.Telemetry.Propagation (currentTraceHeaders, extractTraceContext)
+import Shibuya.Telemetry.Semantic (processSpanName)
 import Test.Hspec
 
 spec :: Spec
@@ -194,7 +195,7 @@ malformedHeaders :: [(ByteString, ByteString)]
 malformedHeaders = [("traceparent", "00-not-a-valid-traceparent-01")]
 
 processName :: Text
-processName = "correlation process"
+processName = processSpanName "correlation"
 
 producedMessage :: (IOE :> es) => Maybe TraceHeaders -> Ingested es ()
 producedMessage headers =
