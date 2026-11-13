@@ -234,7 +234,7 @@ Complete; adapter adoption follows the release.
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Complete |
 | 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | In Progress |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Complete |
-| 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | In Progress |
+| 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Complete |
 | 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | Complete |
 
 Status values: Not Started, In Progress, Complete, Cancelled.
@@ -413,8 +413,9 @@ Hackage. EP-5 (PGMQ) is Complete (2026-11-13) and its representative link-only d
 check passed, so EP-4 and EP-6 may finish their documentation. EP-4 (Kafka) has code, docs and
 broker-free span tests passing but is blocked on its broker-backed integration tests and
 trace-backend check by the container runtime (FRIC-6; fix delegated to the redpanda-container
-session). EP-6 (Kiroku) has code, tests and the trace-backend check passing; its catch-up heap
-check, ADR and performance gate remain. Adapter publication (PGMQ 0.19.0.0, Kafka 0.13.0.0,
+session); its broker-free tests and benchmark comparison pass. EP-6 (Kiroku) is Complete
+(2026-11-13): `LinkOnly` default, ADR-24, trace-backend check, a heap check showing no added
+retention, and no overhead regression. Adapter publication (PGMQ 0.19.0.0, Kafka 0.13.0.0,
 Kiroku 0.8.0.0) needs the user's approval under each repository's release skill. The post-release `Async` allocation investigation is a
 separate follow-up (Decision Log). On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it

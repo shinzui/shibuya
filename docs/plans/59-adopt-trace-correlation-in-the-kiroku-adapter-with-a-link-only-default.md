@@ -37,6 +37,11 @@ provenance:
       at: 2026-11-12T18:51:07Z
       mode: "update"
       note: "Resolve review contracts and sequencing; retain benchmark scope and external verification limits."
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T17:49:52Z
+      mode: "implement"
+      note: "Implement adapter adoption: 0.13 bound, telemetry field, correlation tests, docs"
   reviews:
     - model: "gpt-6-astra"
       harness: "codex-cli"
@@ -85,18 +90,44 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
 
 ## Progress
 
-- [ ] M1: The finding that `kiroku-otel`'s subscription spans are independent roots (see the
-  Decision Log) is re-confirmed against the current code, so the `LinkOnly` default stands.
-- [ ] M2: The adapter builds against `shibuya-core` 0.13 with `telemetry` on
-  `KirokuAdapterConfig` (default `LinkOnly`), honoured by single adapters and by every
-  consumer-group member; tests cover the default, the override, and the span shape.
-- [ ] M3: Performance checks show no regression; documentation, changelog, decision record and
-  version are updated; the parent MasterPlan is updated.
+- [x] M1 (2026-11-13): re-confirmed in `kiroku-otel/src/Kiroku/Otel/Subscription.hs`: every
+  native span is opened by `openSpan` with `createSpan tracer Context.empty`, from the
+  subscription event handler. They are independent roots, not children of the appending span and
+  not ambient parents of the processing span, so the `LinkOnly` default stands.
+- [x] M2 (2026-11-13): builds against `shibuya-core` 0.13.0.1 (`>=0.13 && <0.14` in the adapter
+  and `kiroku-store`). `telemetry` is on `KirokuAdapterConfig` and `KirokuConsumerGroupConfig`
+  (the group path builds member configs itself), default `kirokuDefaultTelemetry` (`LinkOnly`).
+  `CorrelationSpec` covers all six behaviours (eight examples) against PostgreSQL; full adapter
+  suite 53 examples, 0 failures. Both policies were checked in the trace backend: `LinkOnly`
+  processing spans are roots linked to `append …` writer spans in other traces; `ParentAndLink`
+  spans share the writer's trace with the writer as parent and link. Kiroku commit `39f6565`.
+- [x] M3 (2026-11-13): changelog (behaviour change, restoration, corrected 0.5.0.0 note),
+  version 0.8.0.0, module header, three capability documents (bundle validates), ADR-24 (strict
+  validation passes). Performance: the catch-up heap check adds no retained memory (see
+  Surprises); `kiroku-shibuya-overhead`, interleaved twice per side, shows overlapping Shibuya
+  adapter throughput before and after (100 events: 23.1–23.4k vs 23.7–24.7k events/s; 1,000:
+  45.4–49.2k vs 46.5–48.8k; 5,000: 49.3–52.7k vs 48.4–50.0k). Publication is left to the user
+  under Kiroku's release process.
 
 
 ## Surprises & Discoveries
 
-(None yet.)
+- Catch-up heap check (2026-11-13), 200,000 events with `traceparent`, default `LinkOnly`,
+  recording tracer with a discarding processor (EP-1 found a processor-less provider makes
+  spans non-recording, so the plan's "no span processors" would not exercise the link), live
+  bytes after a major GC every 20,000 events: 1.21 MB at 20k, 1.68 MB at 200k, rising a steady
+  ~44.5 KB per 20k (about 2.2 bytes per event). That growth is not from this change: tracing
+  off gives the same curve (1.20 → 1.63 MB), and the pre-change tree (adapter 0.7.0.1, core
+  0.12, tracing off) gives 1.21 → 1.64 MB. With 100 events per stream instead of 1,000 it is
+  smaller and flattens (1.19 → 1.42 MB). The link and the policy add no retained memory; the
+  pre-existing slope in the catch-up path is recorded here for Kiroku to investigate separately.
+- `telemetry` joins field names already shared by `KirokuAdapterConfig`,
+  `KirokuConsumerGroupConfig` and Shibuya's `Adapter`. Kiroku keeps field selectors, so
+  `cfg {telemetry = …}` is an ambiguous record update without a type annotation, exactly as for
+  `batchSize` today; the tests use generic-lens (`& #telemetry .~`), the house style.
+- `kiroku-store`'s library does not depend on `shibuya-core`; only its
+  `kiroku-shibuya-overhead` benchmark does. Its structural and workload performance gates
+  (ADR-5) cannot observe this change.
 
 
 ## Decision Log
@@ -134,6 +165,20 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
   stays one value per adapter.
   Date: 2026-11-11
 
+- Decision: Add `telemetry` to `KirokuConsumerGroupConfig` as well, with the same default,
+  and export `kirokuDefaultTelemetry` for both.
+  Rationale: `kirokuConsumerGroupProcessors` builds each member's `KirokuAdapterConfig` as a full
+  literal from the group fields rather than from `defaultKirokuAdapterConfig`, so the group
+  needs its own field; one shared default value keeps the two paths from diverging.
+  Date: 2026-11-13
+
+- Decision: Limit performance evidence to the catch-up heap check and the
+  `kiroku-shibuya-overhead` before/after comparison; do not run `just perf-check`.
+  Rationale: Kiroku's AGENTS.md asks for the minimum evidence for the changed path. The store's
+  structural and workload gates cover only `kiroku-store`, whose library is unchanged; the
+  per-event link cost was gated in `shibuya-core`.
+  Date: 2026-11-13
+
 - Decision: The setting applies uniformly to a consumer group; members do not differ.
   Rationale: A consumer group is one logical subscription presented as several processors. A
   per-member policy has no use and would complicate `KirokuConsumerGroupConfig`.
@@ -142,7 +187,19 @@ This plan lives in the Shibuya repository but is implemented in the Kiroku repos
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+`shibuya-kiroku-adapter` 0.8.0.0 defaults to `LinkOnly`: each processed event is a root linked
+to the span that appended it, which the trace backend shows as one short trace per event whose
+link opens the `append …` span in the writer's trace. `ParentAndLink` restores the single trace
+per adapter or per consumer group, and events without `traceparent` get no link under either
+policy. `kiroku-otel` needed no change because its spans were already independent roots; the
+old changelog claim of "a single trace" is corrected and ADR-24 records the decision.
+
+Performance and space: no regression and no added retention. The catch-up heap curve is
+identical before and after the change and with tracing off; a small pre-existing linear growth
+(about 2.2 bytes per event at 1,000 events per stream) is recorded in Surprises for Kiroku to
+investigate separately.
+
+Friction: none recorded under this plan. Remaining outside it: publishing 0.8.0.0.
 
 
 ## Context and Orientation
