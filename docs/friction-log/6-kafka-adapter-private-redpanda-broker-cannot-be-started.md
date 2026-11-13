@@ -6,13 +6,18 @@ generated:
   by: "claude-code/claude-opus-5-5"
   at: "2026-11-13T16:45:40Z"
 frictionId: FRIC-6
-status: logged
+status: "resolved"
 impact: blocked
 kind: environment
 origin: "mori://shinzui/shibuya"
 affects: "mori://shinzui/shibuya-kafka-adapter"
 plan: "docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md"
 workaround: "Ran the broker-free tests (scripted log, 63 passing) and deferred broker-backed integration tests and the Kafka Jaeger check; did not restart the container runtime because other projects' containers are running in it"
+resolution: "redpanda-container 2107c28 / nix-haskell-flake 0.40.0 use the host container CLI and refuse version skew (Kafka commit 05accc5), and the wedged Apple Container network service was recovered by booting out and restarting every container job"
+amended:
+  - by: "claude-code/claude-opus-5-5"
+    at: "2026-11-13T18:46:44Z"
+    change: "Resolved: broker starts, Kafka integration tests and trace check passed"
 ---
 # Kafka adapter private Redpanda broker cannot be started
 

@@ -2,6 +2,9 @@
 
 ## 2026-11-13
 
+* **Update**: FRIC-6 resolved: Resolved: broker starts, Kafka integration tests and trace check passed
+
+
 * **Update**: FRIC-7 accepted: Accepted: the documented interleaved method resolved the gate for EP-5
 
 

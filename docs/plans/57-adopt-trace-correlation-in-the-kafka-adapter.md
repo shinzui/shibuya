@@ -79,21 +79,22 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
 
 ## Progress
 
-- [ ] M1 (2026-11-13, partial): builds against `shibuya-core` 0.13.0.1 from Hackage (all five
-  stanzas `^>=0.13.0.0`); `KafkaAdapterConfig.telemetry` defaults to `defaultAdapterTelemetry`
-  and reaches the `Adapter`; unit tests cover the default and the override; the 63 broker-free
-  tests pass. Remaining: the broker-backed `IntegrationTest` run, blocked by FRIC-6 (the
-  project's private Redpanda will not start). Kafka commit `fee5690`.
-- [ ] M2 (2026-11-13, partial): broker-free `CorrelationTest` over the scripted log proves both
-  span shapes through `kafkaAdapter` and the runner with an in-memory exporter. The benchmark
-  (`v0.12.0.0` vs `fee5690` in clean worktrees, three interleaved pairs at `--stdev 3`) shows
-  identical allocation in all 16 cells and median time ratio 0.991 (0.946–1.026). Remaining:
-  the trace-backend check with `otel-producer-demo` and
-  `otel-demo` (both now take `KAFKA_BROKER`; `otel-demo` takes `OTEL_DEMO_LINK_ONLY`), blocked
-  by FRIC-6.
-- [ ] M3 (2026-11-13, partial): READMEs (trace-correlation section), envelope-conversion
-  capability (bundle validates), changelog and version 0.13.0.0 done. Remaining: completion
-  after M1/M2.
+- [x] M1 (2026-11-13): builds against `shibuya-core` 0.13.0.1 from Hackage (all five stanzas
+  `^>=0.13.0.0`, no source override); `KafkaAdapterConfig.telemetry` defaults to
+  `defaultAdapterTelemetry` and reaches the `Adapter`; unit tests cover the default and the
+  override. Full suite against the private broker (127.0.0.1:29092): 78 tests pass, including
+  the 15 broker-backed integration tests. Kafka commits `fee5690`, `05accc5`.
+- [x] M2 (2026-11-13): broker-free `CorrelationTest` over the scripted log proves both span shapes
+  through `kafkaAdapter` and the runner with an in-memory exporter. The benchmark (`v0.12.0.0` vs
+  `fee5690` in clean worktrees, three interleaved pairs at `--stdev 3`) shows identical
+  allocation in all 16 cells and median time ratio 0.991 (0.946–1.026). In the trace backend,
+  `otel-producer-demo` then `otel-demo` (two records: the upstream-instrumented `send orders` and
+  the DIY `shibuya.send.message`) gave, under `ParentAndLink`, `process orders` spans in the
+  producer's traces with `parent_span_id` and link both naming the send span, and under
+  `LinkOnly` roots of new traces linked to the same send spans.
+- [x] M3 (2026-11-13): READMEs (trace-correlation section), envelope-conversion capability
+  (bundle validates), changelog, demos (`OTEL_DEMO_LINK_ONLY`, `KAFKA_BROKER`) and version
+  0.13.0.0 done. Publication is left to the user under the repository's release skill.
 
 
 ## Surprises & Discoveries
@@ -130,7 +131,19 @@ This plan lives in the Shibuya repository but is implemented in the Kafka adapte
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+The Kafka adapter adopts `shibuya-core` 0.13 with one strict `telemetry` field, default
+`ParentAndLink`, and no change to conversion. Both shapes were proven in-process over the
+scripted log and end to end against a real broker in the trace backend. The adapter's own
+benchmark is unchanged.
+
+Friction: FRIC-6 resolved. The private Redpanda would not start because the generated
+`nix/redpanda.nix` drove the 1.5.0 apiserver with nixpkgs' `container` 1.1.0 CLI, and the Apple
+Container network service had separately wedged. The redpanda-container session fixed the module
+(redpanda-container 2107c28, nix-haskell-flake 0.40.0, applied here as `05accc5`) and, with the
+user's approval, recovered the runtime by booting out every container job; a plain
+`container system stop/start` had not restarted anything.
+
+Remaining outside this plan: publishing 0.13.0.0, which needs the user's approval.
 
 
 ## Context and Orientation

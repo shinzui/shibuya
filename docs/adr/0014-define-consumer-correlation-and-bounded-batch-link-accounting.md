@@ -65,9 +65,17 @@ cross-adapter documentation.
 
 The core contract is implemented and accepted (2026-11-12): single-message correlation (EP-2),
 batch linking (EP-3) and naming (EP-7). Each passed its behaviour, retention, allocation and
-time gates. The adapter defaults above are adopted by the adapter plans after the
-`shibuya-core` 0.13.0.0 release; until then, Kafka, PGMQ and Kiroku run on 0.12 and show
-the previous behaviour.
+time gates. The adapter defaults above were adopted on 2026-11-13 by the adapter plans
+(EP-4 to EP-6), each carrying the whole `AdapterTelemetry` in its own configuration's
+`telemetry` field; publication of those adapter releases is pending.
+
+- Adapters: `mori://shinzui/shibuya-pgmq-adapter` 0.19.0.0 and
+  `mori://shinzui/shibuya-kafka-adapter` 0.13.0.0 default to `ParentAndLink`;
+  `shibuya-kiroku-adapter` 0.8.0.0 in `mori://shinzui/kiroku` defaults to `LinkOnly` (its
+  ADR-24, `mori://shinzui/kiroku/okf/adrs/concepts/ADR-24`). Each adapter's tests prove both
+  shapes; PGMQ's also prove that under `LinkOnly` a dead-lettered message's `traceparent` names
+  the consumer span while the producer header is kept under `x-shibuya-upstream-traceparent`.
+  All three were checked end to end in a trace backend under both policies.
 
 - Interface: `Shibuya.Telemetry.Correlation` exports `TraceCorrelation`, `AdapterTelemetry`
   with its field but without its constructor, `defaultAdapterTelemetry`, `creationLink`,

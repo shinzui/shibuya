@@ -232,7 +232,7 @@ Complete; adapter adoption follows the release.
 | 1 | Establish tracing-enabled performance and retention baselines | docs/plans/54-establish-tracing-enabled-performance-and-retention-baselines.md | None | None | Complete |
 | 2 | Add an adapter-declared trace correlation policy to single-message processing | docs/plans/55-add-an-adapter-declared-trace-correlation-policy-to-single-message-processing.md | EP-1 | None | Complete |
 | 3 | Link every batch member's creation context from the batch span | docs/plans/56-link-every-batch-member-s-creation-context-from-the-batch-span.md | EP-1, EP-2 | None | Complete |
-| 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | In Progress |
+| 4 | Adopt trace correlation in the Kafka adapter | docs/plans/57-adopt-trace-correlation-in-the-kafka-adapter.md | EP-2, Release gate | EP-3, EP-7 | Complete |
 | 5 | Adopt trace correlation in the PGMQ adapter | docs/plans/58-adopt-trace-correlation-in-the-pgmq-adapter.md | EP-2, Release gate | EP-3, EP-7 | Complete |
 | 6 | Adopt trace correlation in the Kiroku adapter with a link-only default | docs/plans/59-adopt-trace-correlation-in-the-kiroku-adapter-with-a-link-only-default.md | EP-2, Release gate | EP-3, EP-7 | Complete |
 | 7 | Name process spans and operations per the messaging conventions | docs/plans/60-name-process-spans-and-operations-per-the-messaging-conventions.md | EP-1 | EP-2, EP-3 | Complete |
@@ -409,15 +409,12 @@ All four core plans are Complete (2026-11-12): EP-1 (baselines and retention sui
 (single-message policy, links, `Shibuya.Telemetry.Process`), EP-3 (bounded batch fan-in
 links) and EP-7 (`process <destination>` and `messaging.operation.name`). ADR 0014 is
 Accepted. The release gate is complete: `shibuya-core` and `shibuya-metrics` 0.13.0.0 are on
-Hackage. EP-5 (PGMQ) is Complete (2026-11-13) and its representative link-only dead-letter
-check passed, so EP-4 and EP-6 may finish their documentation. EP-4 (Kafka) has code, docs and
-broker-free span tests passing but is blocked on its broker-backed integration tests and
-trace-backend check by the container runtime (FRIC-6; fix delegated to the redpanda-container
-session); its broker-free tests and benchmark comparison pass. EP-6 (Kiroku) is Complete
-(2026-11-13): `LinkOnly` default, ADR-24, trace-backend check, a heap check showing no added
-retention, and no overhead regression. Adapter publication (PGMQ 0.19.0.0, Kafka 0.13.0.0,
-Kiroku 0.8.0.0) needs the user's approval under each repository's release skill. The post-release `Async` allocation investigation is a
-separate follow-up (Decision Log). On
+Hackage. All seven child plans are Complete (2026-11-13): EP-5 (PGMQ) passed the
+representative link-only dead-letter check, EP-4 (Kafka) and EP-6 (Kiroku, default `LinkOnly`)
+followed, and every adapter's span shape under both policies was checked in the trace backend.
+Adapter publication (PGMQ 0.19.0.0, Kafka 0.13.0.0,
+Kiroku 0.8.0.0) needs the user's approval under each repository's release skill. The
+post-release `Async` allocation follow-up (plan 61) shipped in `shibuya-core` 0.13.0.1. On
 2026-11-12 the user authorized the benchmark scope exactly as the child plans specify it
 (EP-1's group and baseline; EP-2, EP-3 and EP-7's added cells and worktree comparisons), and
 nothing beyond it.
@@ -436,7 +433,9 @@ Cross-plan gates not owned by a child plan:
     (https://hackage.haskell.org/package/shibuya-core-0.13.0.0,
     https://hackage.haskell.org/package/shibuya-metrics-0.13.0.0); GitHub release
     https://github.com/shinzui/shibuya/releases/tag/v0.13.0.0.
-- [ ] Initiative acceptance: with all three adapters released, one end-to-end trace per adapter
+- [ ] Initiative acceptance: trace-backend checks done for all three adapters (2026-11-13, see
+  the child plans); the gate closes when the three adapter releases are published.
+  Original wording: with all three adapters released, one end-to-end trace per adapter
   viewed in a trace backend (the local Jaeger setup in `docs/JAEGER_LOCAL_TESTING.md`) shows
   spans named `process <destination>` and the documented default shape: Kafka and PGMQ processing spans as children of the producer with a
   link, Kiroku processing spans as separate roots with a link.
@@ -516,6 +515,11 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
   selectors, `telemetry` joins the fields already shared by `KirokuAdapterConfig`,
   `KirokuConsumerGroupConfig` and `Adapter`, so a record update needs a type annotation or
   generic-lens, as for `batchSize` today.
+- FRIC-6 resolved (2026-11-13): redpanda-container 2107c28 and nix-haskell-flake 0.40.0 use the
+  host `container` CLI and refuse a client/server version mismatch; the Apple Container network
+  service, wedged since 07:21 that day, needed every `com.apple.container.*` launchd job booted
+  out, because `container system stop/start` restarted nothing. Any later plan needing a local
+  broker should check `redpanda-local-status` before assuming a code problem.
 - Recurring friction (2026-11-13): machine load blocked a single-run benchmark time gate under a
   fourth child plan (FRIC-7, EP-5, after FRIC-2/FRIC-3 under EP-2, EP-3 and EP-7). The
   interleaved-pairs method resolved it again; it is now the expected method for every gate on
@@ -644,7 +648,21 @@ versions/tags remain unverified. No builds, benchmarks or services were run for 
 
 ## Outcomes & Retrospective
 
-(To be filled during and after implementation.)
+Interim (2026-11-13), all seven child plans Complete; the initiative acceptance gate waits only
+on publishing the three adapter releases. Consumer spans now link every usable creation
+context, batch spans link bounded member contexts as roots, processing spans are named
+`process <destination>` with `messaging.operation.name`, and each adapter exposes the policy
+through its own `telemetry` field with the planned defaults. Every adapter's span shape was
+checked end to end in the trace backend under both policies; no adapter showed a performance
+regression, and the Kiroku catch-up check showed no added retention.
+
+Lessons. Measure first worked: EP-1's baselines made every later gate one comparison, and the
+link turned out cheaper than the code it replaced. The shared machine's load made single-run
+time gates unreadable under four child plans (FRIC-2, FRIC-3, FRIC-7); interleaved confirming
+pairs, reading allocation first, is the method that worked each time. The adapter plans'
+record-syntax searches missed positional and full-literal constructions in every repository;
+the compiler found them. Local infrastructure, not code, blocked the last adapter for most of a
+day (FRIC-6); it was fixed upstream in redpanda-container and nix-haskell-flake.
 
 Revision note (2026-11-12): resolved the review findings across the MasterPlan and children,
 recorded the proposed correlation contract in ADR 0014, and retained explicit external
