@@ -625,6 +625,8 @@ processUntilDrained ::
 processUntilDrained detailed metricsHandle procId correlation ordering concurrency handler inbox streamDoneVar = do
   stopSignal <- liftIO newProcessorSignal
   let exitPublisher = newProcessorExitPublisherWithWake stopSignal streamDoneVar
+      -- Built once per processor; see 'FinishEnv'.
+      finishEnv = FinishEnv detailed metricsHandle exitPublisher
 
   let maxConc = case concurrency of
         Serial -> 1
@@ -643,7 +645,7 @@ processUntilDrained detailed metricsHandle procId correlation ordering concurren
   withEffToIO (ConcUnlift Persistent Unlimited) $ \runInIO -> do
     let inboxStream = inboxToStream inbox streamDoneVar stopSignal
         runProcessAction ingested =
-          runInIO $ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc exitPublisher handler ingested
+          runInIO $ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc finishEnv handler ingested
 
         -- Restore normal interruptibility for handlers and finalizers while the
         -- concurrent Streamly scheduler retains its inherited mask.
@@ -694,6 +696,12 @@ handlerStartedEvent = mkEvent eventHandlerStarted []
 
 -- | Process a single message with metrics tracking and tracing.
 -- Thread-safe for concurrent execution.
+--
+-- The work is split so that a concurrent worker's stack stays small while
+-- the handler and the ack run: 'processOne' opens the span and records the
+-- start, 'runMessageHandler' (inlined here) calls the handler and tail-calls
+-- 'finalizeMessage', which finalizes and tail-calls 'recordMessageOutcome'.
+-- See 'FinishEnv' for why the frame size matters.
 processOne ::
   (IOE :> es, Tracing :> es) =>
   Bool ->
@@ -702,11 +710,11 @@ processOne ::
   Text ->
   HashMap.HashMap Text Attribute ->
   Int ->
-  ProcessorExitPublisher ->
+  FinishEnv ->
   Handler es msg ->
   Ingested es msg ->
   Eff es ()
-processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc exitPublisher handler ingested =
+processOne detailed metricsHandle correlation spanName constantFrameworkAttrs maxConc finishEnv handler ingested =
   -- Link to (and, by policy, parent on) the producer's span from the
   -- message's trace headers. With tracing disabled the headers are not read.
   withProcessSpan correlation spanName ingested.envelope.traceContext $ \traceSpan -> do
@@ -742,97 +750,7 @@ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs ma
               -- Record handler start event
               addEvent traceSpan handlerStartedEvent
 
-              -- Call handler and finalizer separately. A handler exception is
-              -- substituted with immediate retry so an admitted delivery always receives a
-              -- finalization decision. Superseded deliveries are excluded.
-              --
-              -- This is a *separate* per-message 'catchAny' from the one inside
-              -- 'finalizeWithRetry' below. 0.7.1.0 used a single combined catch around
-              -- handler+finalize, which skipped finalization when the handler threw;
-              -- splitting them is what makes "always finalize admitted deliveries" hold. The extra
-              -- per-message exception frame costs ~126 bytes/message (measured, EP-31
-              -- S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md) and is
-              -- accepted as the price of the always-finalize guarantee — do not merge the
-              -- two catches back together to reclaim it.
-              handlerResult <-
-                catchAny
-                  (Right <$> handler (toMessage ingested))
-                  ( \ex -> do
-                      recordException traceSpan ex
-                      pure (Left ex)
-                  )
-              let (decision, result) = case handlerResult of
-                    Right d -> (d, Right d)
-                    Left ex ->
-                      ( AckRetry (RetryDelay 0),
-                        Left $ HandlerException $ Text.pack $ show ex
-                      )
-
-              when (isLeft handlerResult) $
-                addEvent traceSpan $
-                  mkEvent
-                    eventAckDecision
-                    [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
-
-              finalizeResult <- finalizeWithRetry traceSpan ingested decision
-
-              -- Record completion event and set status
-              case finalizeResult of
-                Left _ -> do
-                  addEvent traceSpan $
-                    mkEvent
-                      eventAckDecision
-                      [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
-                  setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
-                Right () -> case result of
-                  Right decision' -> do
-                    let decisionText = showAckDecision decision'
-                    addEvent traceSpan $
-                      mkEvent
-                        eventHandlerCompleted
-                        [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
-                    addAttribute traceSpan attrShibuyaAckDecision decisionText
-
-                    -- Set span status based on decision
-                    case decision' of
-                      AckOk -> setStatus traceSpan OTel.Ok
-                      AckRetry _ -> setStatus traceSpan OTel.Ok
-                      AckDeadLetter reason -> do
-                        addAttribute
-                          traceSpan
-                          attrShibuyaDeadLetterReasonCode
-                          (deadLetterCodeText (deadLetterReasonCode reason))
-                        setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
-                      AckHalt reason ->
-                        setStatus traceSpan $ OTel.Error $ showHaltReason reason
-                  Left err -> do
-                    addEvent traceSpan $
-                      mkEvent
-                        eventAckDecision
-                        [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
-                    setStatus traceSpan $ OTel.Error $ handlerErrorToText err
-
-              let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
-              when detailed $ case (finalizeResult, result) of
-                (Right (), Right AckOk) -> recordCursor
-                (Right (), Right (AckDeadLetter _)) -> recordCursor
-                _ -> pure ()
-
-              -- Decrement in-flight and update stats.
-              liftIO $
-                case finalizeResult of
-                  Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
-                  Right () -> finishProcessing metricsHandle (metricForResult result)
-
-              -- Handle halt (set flag, don't throw - let stream drain)
-              case finalizeResult of
-                Left _ ->
-                  liftIO $
-                    requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
-                Right () -> case result of
-                  Right (AckHalt reason) ->
-                    liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
-                  _ -> pure ()
+              runMessageHandler finishEnv traceSpan handler ingested
         if not detailed
           then do
             currentInflight <- liftIO $ beginProcessing metricsHandle maxConc
@@ -844,11 +762,162 @@ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs ma
               `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
             liftIO (Metrics.releaseInFlightSlot metricsHandle slot)
               `Exception.onException` liftIO (Metrics.abandonInFlightSlot metricsHandle slot)
-  where
-    isLeft :: Either a b -> Bool
-    isLeft (Left _) = True
-    isLeft (Right _) = False
+{-# INLINE processOne #-}
 
+-- | The per-processor values needed after the handler returns, built once per
+-- processor.
+--
+-- Why this exists: every value the code after a call still needs is saved in
+-- a stack frame for the duration of the call. When the code after the handler
+-- lived in 'processOne', GHC saved about 25 words across the handler call:
+-- unpacked 'Text' and 'MetricsHandle' fields, the effect environment and so on.
+-- Concurrent modes run each message on a streamly worker thread, and GHC
+-- starts every thread with a 1 KiB stack (RTS option @-ki@). A worker that
+-- outgrows it allocates a 32 KiB stack chunk (@-kc@), which counts as
+-- allocation. In the @Async@ benchmarks the stack sat within a word of that
+-- limit, so one extra saved value in 0.13.0.0 cost 250–350 KB per run.
+--
+-- The steps after the handler ('finalizeMessage', 'recordMessageOutcome') are
+-- therefore @OPAQUE@ functions that take this record boxed, and each
+-- tail-calls the next. @OPAQUE@ stops GHC from unpacking the record into its
+-- fields at the call site, so the frame saved across the handler holds about
+-- 12 words instead of 25, and the frame saved across the ack call is small
+-- too. Measured on the @Async 5@ benchmark, a worker's stack peaks 6 words
+-- under the 1 KiB limit, where 0.12.0.0 was 6 words and 0.13.0.0 7 words over
+-- it. 'runMessageHandler' itself stays inlined: making it @OPAQUE@ as well
+-- saves 6 more words but costs 10–40 bytes per message on every path,
+-- including 'Serial'. Before adding work after the handler, keep it in these
+-- functions and keep their arguments boxed.
+-- See docs/plans/61-reduce-the-async-dispatch-allocation-increase-introduced-in-0-13-0-0.md.
+data FinishEnv = FinishEnv !Bool !MetricsHandle !ProcessorExitPublisher
+
+-- | Call the handler for one admitted delivery, then finalize it.
+runMessageHandler ::
+  (IOE :> es, Tracing :> es) =>
+  FinishEnv ->
+  OTel.Span ->
+  Handler es msg ->
+  Ingested es msg ->
+  Eff es ()
+runMessageHandler finishEnv traceSpan handler ingested = do
+  -- Call handler and finalizer separately. A handler exception is
+  -- substituted with immediate retry so an admitted delivery always receives a
+  -- finalization decision. Superseded deliveries are excluded.
+  --
+  -- This is a *separate* per-message 'catchAny' from the one inside
+  -- 'finalizeWithRetry' (in 'finalizeMessage'). 0.7.1.0 used a single combined
+  -- catch around handler+finalize, which skipped finalization when the handler
+  -- threw; splitting them is what makes "always finalize admitted deliveries"
+  -- hold. The extra per-message exception frame costs ~126 bytes/message
+  -- (measured, EP-31 S3: docs/plans/31-…-shared-per-message-…-allocation-regression.md)
+  -- and is accepted as the price of the always-finalize guarantee — do not
+  -- merge the two catches back together to reclaim it.
+  handlerResult <-
+    catchAny
+      (Right <$> handler (toMessage ingested))
+      ( \ex -> do
+          recordException traceSpan ex
+          pure (Left ex)
+      )
+  finalizeMessage finishEnv traceSpan ingested handlerResult
+{-# INLINE runMessageHandler #-}
+
+-- | Finalize one delivery with the handler's decision, or with an immediate
+-- retry when the handler threw.
+finalizeMessage ::
+  (IOE :> es, Tracing :> es) =>
+  FinishEnv ->
+  OTel.Span ->
+  Ingested es msg ->
+  Either SomeException AckDecision ->
+  Eff es ()
+finalizeMessage finishEnv traceSpan ingested handlerResult = do
+  decision <- case handlerResult of
+    Right d -> pure d
+    Left _ -> do
+      addEvent traceSpan $
+        mkEvent
+          eventAckDecision
+          [(attrShibuyaAckDecision, OTel.toAttribute ("ack_retry" :: Text))]
+      pure (AckRetry (RetryDelay 0))
+  finalizeResult <- finalizeWithRetry traceSpan ingested decision
+  recordMessageOutcome finishEnv traceSpan ingested handlerResult finalizeResult
+{-# OPAQUE finalizeMessage #-}
+
+-- | Record one delivery's outcome: span events and status, the acknowledged
+-- cursor, in-flight and outcome metrics, and any processor exit request.
+recordMessageOutcome ::
+  (IOE :> es, Tracing :> es) =>
+  FinishEnv ->
+  OTel.Span ->
+  Ingested es msg ->
+  Either SomeException AckDecision ->
+  Either SomeException () ->
+  Eff es ()
+recordMessageOutcome (FinishEnv detailed metricsHandle exitPublisher) traceSpan ingested handlerResult finalizeResult = do
+  let messageId@(MessageId msgIdText) = ingested.envelope.messageId
+      result = case handlerResult of
+        Right d -> Right d
+        Left ex -> Left $ HandlerException $ Text.pack $ show ex
+
+  -- Record completion event and set status
+  case finalizeResult of
+    Left _ -> do
+      addEvent traceSpan $
+        mkEvent
+          eventAckDecision
+          [(attrShibuyaAckDecision, OTel.toAttribute ("finalization_failed" :: Text))]
+      setStatus traceSpan $ OTel.Error $ finalizationFailureText msgIdText
+    Right () -> case result of
+      Right decision' -> do
+        let decisionText = showAckDecision decision'
+        addEvent traceSpan $
+          mkEvent
+            eventHandlerCompleted
+            [(attrShibuyaAckDecision, OTel.toAttribute decisionText)]
+        addAttribute traceSpan attrShibuyaAckDecision decisionText
+
+        -- Set span status based on decision
+        case decision' of
+          AckOk -> setStatus traceSpan OTel.Ok
+          AckRetry _ -> setStatus traceSpan OTel.Ok
+          AckDeadLetter reason -> do
+            addAttribute
+              traceSpan
+              attrShibuyaDeadLetterReasonCode
+              (deadLetterCodeText (deadLetterReasonCode reason))
+            setStatus traceSpan $ OTel.Error $ renderDeadLetterReason reason
+          AckHalt reason ->
+            setStatus traceSpan $ OTel.Error $ showHaltReason reason
+      Left err -> do
+        addEvent traceSpan $
+          mkEvent
+            eventAckDecision
+            [(attrShibuyaAckDecision, OTel.toAttribute ("error" :: Text))]
+        setStatus traceSpan $ OTel.Error $ handlerErrorToText err
+
+  let recordCursor = liftIO $ Metrics.recordAcknowledgedCursor metricsHandle ingested.envelope.partition ingested.envelope.cursor
+  when detailed $ case (finalizeResult, result) of
+    (Right (), Right AckOk) -> recordCursor
+    (Right (), Right (AckDeadLetter _)) -> recordCursor
+    _ -> pure ()
+
+  -- Decrement in-flight and update stats.
+  liftIO $
+    case finalizeResult of
+      Left _ -> finishFinalizationFailure metricsHandle (finalizationFailureText msgIdText)
+      Right () -> finishProcessing metricsHandle (metricForResult result)
+
+  -- Handle halt (set flag, don't throw - let stream drain)
+  case finalizeResult of
+    Left _ ->
+      liftIO $
+        requestProcessorExit exitPublisher (ProcessorFailed (finalizationFailureText msgIdText) (Just messageId))
+    Right () -> case result of
+      Right (AckHalt reason) ->
+        liftIO $ requestProcessorExit exitPublisher (ProcessorHalted reason)
+      _ -> pure ()
+  where
     finalizationFailureText :: Text -> Text
     finalizationFailureText msgIdText =
       "finalization failed for message id: " <> msgIdText
@@ -862,7 +931,7 @@ processOne detailed metricsHandle correlation spanName constantFrameworkAttrs ma
     showHaltReason :: HaltReason -> Text
     showHaltReason (HaltOrderedStream t) = "halt_ordered_stream: " <> t
     showHaltReason (HaltFatal t) = "halt_fatal: " <> t
-{-# INLINE processOne #-}
+{-# OPAQUE recordMessageOutcome #-}
 
 metricForResult :: Either HandlerError AckDecision -> Either Text AckDecisionMetric
 metricForResult (Left err) = Left (handlerErrorToText err)

@@ -2,6 +2,9 @@
 
 ## 2026-11-13
 
+* **Addition**: FRIC-4 records slowdown tooling friction with mori://shinzui/shibuya: cabal exec ghc rejects -package flags for in-tree dependencies
+
+
 * **Update**: FRIC-3 resolved: Resolved by documenting the interleaved confirming method that passed plans 56 and 60
 
 

@@ -10,6 +10,12 @@ provenance:
     model: "claude-opus-5-5"
     harness: "claude-code"
     at: 2026-11-13T04:31:03Z
+  revisions:
+    - model: "claude-opus-5-5"
+      harness: "claude-code"
+      at: 2026-11-13T05:01:55Z
+      mode: "implement"
+      note: "M1 characterized (worker stack-chunk overflow); M2 candidate split of processOne"
 ---
 
 # Reduce the Async dispatch allocation increase introduced in 0.13.0.0
@@ -41,9 +47,12 @@ after 0.13.0.0; this plan does not publish it.
 
 ## Progress
 
-- [ ] M1: The increase is characterized. Two things are measured: whether it is a cost per
+- [x] M1: The increase is characterized. Two things are measured: whether it is a cost per
   run, per message, or per worker thread, and which part of commit `efd1081` causes it. The
-  hypotheses below are confirmed or rejected with evidence.
+  hypotheses below are confirmed or rejected with evidence. (2026-11-12) It is a 32 KiB stack
+  chunk for each worker fork whose stack outgrows the 1 KiB initial stack. `efd1081` saves
+  one more word in `processOne`'s frame across the handler call, which pushes more forks over
+  the limit (S1–S6). Hypothesis 1 is confirmed. Hypotheses 2 and 3 are rejected.
 - [ ] M2: A change reduces `Async` allocation to within the `v0.12.0.0` range, or as far as
   the measurements allow. Serial allocation keeps the 0.13.0.0 reduction, the `n`-thread
   bound and all tests hold, and the time gate passes.
@@ -53,7 +62,61 @@ after 0.13.0.0; this plan does not publish it.
 
 ## Surprises & Discoveries
 
-(None yet.)
+- S1 (2026-11-12): The shift is between `526ddb1` and `efd1081`. One run of
+  `concurrency-levels.async-100msgs-1ms.async-5` on each worktree: 1.1 MB at `526ddb1`, 1.4 MB
+  at `efd1081`. Time was the same (24.5 ms against 24.6 ms).
+
+- S2 (2026-11-12): Hypothesis 1 is confirmed, with a twist. The extra bytes are thread-stack
+  chunks. GHC starts each forked thread with a 1 KiB stack (`-ki1k`). The first time the
+  thread needs more, the runtime allocates a new 32 KiB chunk (`-kc32k`), and that chunk
+  counts as allocation. Single runs of the same cell under different RTS options:
+
+  ```text
+  RTS option     526ddb1   efd1081
+  (default)      1.1 MB    1.4 MB
+  -ki16k         1.1 MB    1.1 MB
+  -kc64k         1.6 MB    2.1 MB    (gap doubles with the chunk size)
+  -kc8k          856 KB    919 KB    (gap shrinks with the chunk size)
+  -ki1088        810 KB    788 KB    (64 bytes more initial stack: no overflow in either)
+  ```
+
+  The twist is that 0.12.0.0 already overflowed. A sweep of `-ki` in 8-byte steps shows two
+  thresholds per tree. `526ddb1` overflows at 1024 bytes on one path and needs 1072 bytes to
+  stop overflowing on the other. `efd1081` needs 1032 and 1080. So 0.13.0.0 is exactly one
+  word (8 bytes) deeper on both paths. That one word pushed a path that fitted in 1024 bytes
+  just over it, so more worker forks pay a 32 KiB chunk. With no overflow at all, both trees
+  allocate about 790 KB, 30% less than 0.12.0.0's default figure.
+
+- S3 (2026-11-12): The extra word is in one stack frame. A throwaway probe (an executable that
+  runs the `Async 5` bench workload and, inside the handler and the ack callback, decodes the
+  worker's own stack with `GHC.Stack.CloneStack.cloneMyStack` and
+  `GHC.Exts.Stack.Decode.decodeStack` from `ghc-heap`) prints every frame. The worker stack at
+  the handler is 54 words at `526ddb1` and 55 at `efd1081`. All of the difference is in one
+  frame: the continuation `processOne` saves across the handler call, which holds 24 values at
+  `526ddb1` and 25 at `efd1081`. Those values are what the code after the handler needs:
+  unpacked `Text` fields, `MetricsHandle` fields, the effect environment, the `:>`
+  dictionaries and so on. The overflow happens above that frame (S6).
+
+- S4 (2026-11-12): Hypothesis 3 is rejected as stated. A prototype that restores the 0.12.0.0
+  call (`withSpan' spanName consumerSpanArgs` directly, no `withProcessSpan`) still measures
+  55 words. The extra word comes from how GHC lays out the large inlined `processOne` after
+  the change, not from `withProcessSpan`'s shape. Hypothesis 2 is rejected as well: at
+  `-ki1088` both trees allocate the same (about 790–810 KB), so the number of worker forks did
+  not change. Only whether each fork overflows did.
+
+- S5 (2026-11-12): Scaling. The cost is per worker fork that overflows, 32 KiB each, so it
+  depends on how many workers streamly forks in a run, not on message count. The +250–350 KB
+  for `async-5` is about 8–11 chunks per run, with 50 messages as with 100. That one frame
+  sits on the 1 KiB boundary explains the odd pattern in the table, rising with some `n` and
+  falling at `n = 2`. One word moves different numbers of forks across the line depending on
+  which path each fork takes.
+
+- S6 (2026-11-12): The stack peak is inside the handler. Shrinking `processOne`'s frame across
+  the handler call moves the higher threshold down by exactly that many words (see the
+  Decision Log entry for the fix). In this benchmark, the handler's frames go on top of
+  `processOne`'s frame: `threadDelay` and the timer manager. Real handlers (database calls,
+  JSON decoding) are likely to exceed the 1 KiB budget anyway; this was not measured. For them
+  the gain is a smaller framework share of each worker's stack, not avoided chunks.
 
 
 ## Decision Log
@@ -62,6 +125,35 @@ after 0.13.0.0; this plan does not publish it.
   Rationale: The increase costs no time and affects only `Async` runners whose handlers
   wait. The adapters needed the release to start migrating. The user accepted the increase
   for 0.13.0.0 and asked for this investigation afterwards, without blocking the release.
+  Date: 2026-11-12
+
+- Decision: Shrink the frame `processOne` saves across the handler call. The code after the
+  handler moves into two `OPAQUE` functions in
+  `shibuya-core/src/Shibuya/Internal/Runner/Supervised.hs`. `finalizeMessage` finalizes, then
+  tail-calls `recordMessageOutcome`, which records the span outcome, the cursor, the metrics
+  and any exit request. Both take a per-processor `FinishEnv` record (detailed flag,
+  `MetricsHandle`, exit publisher), built once in `processUntilDrained` and passed boxed. The
+  handler call stays in the inlined `runMessageHandler`.
+  Rationale: Matching 0.12.0.0 needs only one word removed, but that would leave the stack at
+  0.12.0.0's level, still over the limit on one path. The prototypes, measured with the stack
+  probe (words at the handler and at the ack) and serial allocation:
+
+  ```text
+  candidate                                     handler  ack  serial alloc vs 0.13.0.0
+  0.13.0.0                                       55      55   -
+  V2 withSpan' directly (0.12.0.0 call shape)    55      55   (not measured)
+  V3 post-handler code in one OPAQUE function    42      44   (not measured)
+  V3c handler call OPAQUE too, then V3          36      44   (not measured)
+  V3d V3c with finalize/outcome split            36      37   +10..40 B/msg (worse)
+  B   V3d with the handler step inlined (chosen) 42      37   equal or up to 6 B/msg lower
+  ```
+
+  An `OPAQUE` handler step (V3d) would leave 6 more words of headroom. But it costs 10–40
+  bytes per message on every path, including `Serial`, which the acceptance criteria rule
+  out. B keeps per-message cost at 0.13.0.0's level. On `async-5`, B's workers need
+  `-ki976` to stay in one chunk: 6 words under the default 1024, where `526ddb1` needs 1072
+  and `efd1081` 1080. Splitting finalize from outcome recording also keeps the frame across
+  the ack small (37 words), which matters for adapters whose ack does I/O.
   Date: 2026-11-12
 
 
